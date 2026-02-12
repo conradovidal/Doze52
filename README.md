@@ -103,3 +103,11 @@ Security audit quick check:
 ```bash
 rg -n "service_role|SUPABASE_SERVICE_ROLE|sb_secret|sbp_"
 ```
+
+## Supabase DEV bootstrap (categories/events)
+
+1. Link local CLI to DEV project: `supabase link --project-ref <DEV_REF>`.
+2. Apply migrations: `supabase db push`.
+3. Confirm in Supabase Table Editor that `public.categories` and `public.events` exist.
+4. Confirm RLS policies `*_own` exist for SELECT/INSERT/UPDATE/DELETE on both tables.
+5. If app shows `Banco DEV sem tabelas/migrations...`, run `supabase db push` again in DEV.

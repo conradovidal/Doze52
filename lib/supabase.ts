@@ -19,7 +19,16 @@ export const getSupabaseBrowserClient = () => {
   }
   if (!browserClient) {
     if (process.env.NODE_ENV !== "production" && !didLogSupabaseEnv) {
-      console.log("[supabase]", process.env.NEXT_PUBLIC_SUPABASE_URL);
+      let host = "invalid-url";
+      try {
+        host = new URL(supabaseEnv.url).host;
+      } catch {
+        host = "invalid-url";
+      }
+      console.log("[supabase]", {
+        url: process.env.NEXT_PUBLIC_SUPABASE_URL,
+        host,
+      });
       didLogSupabaseEnv = true;
     }
     browserClient = createBrowserClient(supabaseEnv.url, supabaseEnv.anonKey);

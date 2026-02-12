@@ -52,6 +52,9 @@ export function AuthDialog({
           ? (event.data as { type?: string; error?: string })
           : null;
       if (!data?.type) return;
+      if (process.env.NODE_ENV !== "production") {
+        console.info("[auth] message", { type: data.type, origin: event.origin });
+      }
 
       if (data.type === "SUPABASE_AUTH_SUCCESS") {
         void (async () => {

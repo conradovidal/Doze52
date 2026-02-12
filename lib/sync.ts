@@ -35,6 +35,27 @@ export type CalendarSnapshot = {
   events: CalendarEvent[];
 };
 
+export type SyncErrorKind =
+  | "missing_relation"
+  | "permission"
+  | "transient_network"
+  | "environment"
+  | "unknown";
+
+export class SyncError extends Error {
+  kind: SyncErrorKind;
+  userMessage: string;
+  retryable: boolean;
+
+  constructor(kind: SyncErrorKind, userMessage: string, retryable = false) {
+    super(userMessage);
+    this.kind = kind;
+    this.userMessage = userMessage;
+    this.retryable = retryable;
+    this.name = "SyncError";
+  }
+}
+
 let saveInFlight: Promise<void> | null = null;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -52,19 +73,89 @@ const isTransientError = (message: string) => {
   );
 };
 
-async function withRetry<T>(fn: () => Promise<T>, retries = 2): Promise<T> {
+const isMissingRelationError = (message: string, code?: string, status?: number) => {
+  const normalized = message.toLowerCase();
+  return (
+    code === "42P01" ||
+    code === "PGRST205" ||
+    status === 404 ||
+    normalized.includes("does not exist") ||
+    normalized.includes("relation") ||
+    normalized.includes("schema cache")
+  );
+};
+
+const isPermissionError = (message: string, code?: string, status?: number) => {
+  const normalized = message.toLowerCase();
+  return (
+    status === 401 ||
+    status === 403 ||
+    code === "42501" ||
+    normalized.includes("permission denied") ||
+    normalized.includes("row-level security") ||
+    normalized.includes("not authorized")
+  );
+};
+
+const classifySyncError = (error: unknown): SyncError => {
+  if (error instanceof SyncError) return error;
+  if (error instanceof ValidationError) {
+    return new SyncError("unknown", error.message, false);
+  }
+  const message = error instanceof Error ? error.message : String(error);
+  const status =
+    typeof error === "object" && error && "status" in error
+      ? Number((error as { status?: number }).status)
+      : undefined;
+  const code =
+    typeof error === "object" && error && "code" in error
+      ? String((error as { code?: string }).code)
+      : undefined;
+
+  if (message.toLowerCase().includes("supabase nao configurado")) {
+    return new SyncError(
+      "environment",
+      "Ambiente Supabase incorreto ou nao configurado.",
+      false
+    );
+  }
+  if (isMissingRelationError(message, code, status)) {
+    return new SyncError(
+      "missing_relation",
+      "Banco DEV sem tabelas/migrations. Rode migrations no Supabase DEV.",
+      false
+    );
+  }
+  if (isPermissionError(message, code, status)) {
+    return new SyncError(
+      "permission",
+      "Sem permissao. Verifique RLS/policies para user_id.",
+      false
+    );
+  }
+  if (isTransientError(message)) {
+    return new SyncError(
+      "transient_network",
+      "Falha de sincronizacao. Tente novamente.",
+      true
+    );
+  }
+  return new SyncError("unknown", "Falha de sincronizacao. Tente novamente.", false);
+};
+
+async function withRetry<T>(fn: () => Promise<T>, retries = 1): Promise<T> {
   let lastError: unknown;
   for (let attempt = 0; attempt <= retries; attempt += 1) {
     try {
       return await fn();
     } catch (error) {
       lastError = error;
-      const message = error instanceof Error ? error.message : String(error);
-      if (attempt === retries || !isTransientError(message)) break;
+      const classified = classifySyncError(error);
+      if (attempt === retries || !classified.retryable) break;
       await sleep(attempt === 0 ? 300 : 800);
     }
   }
-  throw lastError instanceof Error ? lastError : new Error("Falha de sincronizacao.");
+  throw classifySyncError(lastError);
 }
 
 const toLocalCategory = (row: DbCategory): CategoryItem => ({
@@ -161,11 +252,14 @@ export const loadRemoteData = async (): Promise<CalendarSnapshot> => {
     const events = await fetchEvents(categories);
     return { categories, events };
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Falha ao carregar dados remotos.";
-    logDevError("sync.loadRemoteData", { message });
+    const syncError = classifySyncError(error);
+    logDevError("sync.loadRemoteData", {
+      kind: syncError.kind,
+      message: syncError.message,
+      retryable: syncError.retryable,
+    });
     logProdError("Falha ao carregar dados remotos.");
-    throw error;
+    throw syncError;
   }
 };
 
@@ -256,14 +350,15 @@ const saveSnapshotInternal = async (snapshot: CalendarSnapshot): Promise<void> =
       }
     }, 1);
   } catch (error) {
-    if (error instanceof ValidationError) {
-      throw error;
-    }
-    const message =
-      error instanceof Error ? error.message : "Falhou ao salvar. Tente novamente.";
-    logDevError("sync.saveSnapshot", { message, userId });
+    const syncError = classifySyncError(error);
+    logDevError("sync.saveSnapshot", {
+      kind: syncError.kind,
+      message: syncError.message,
+      retryable: syncError.retryable,
+      userId,
+    });
     logProdError("Falha ao salvar dados do usuario.");
-    throw new Error("Falhou ao salvar. Tente novamente.");
+    throw syncError;
   }
 };
 

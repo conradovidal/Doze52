@@ -6,9 +6,10 @@ import { YearGrid } from "@/components/calendar/year-grid";
 import { EventDialog } from "@/components/event-dialog";
 import { AppHeader } from "@/components/app-header";
 import { AuthDialog } from "@/components/auth/auth-dialog";
+import { Button } from "@/components/ui/button";
 import { useStore, type EventInput } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
-import { loadRemoteData, saveSnapshot } from "@/lib/sync";
+import { loadRemoteData, saveSnapshot, SyncError } from "@/lib/sync";
 import { logDevError, logProdError } from "@/lib/safe-log";
 import { hasSupabaseEnv } from "@/lib/supabase";
 
@@ -52,6 +53,7 @@ export default function HomePage() {
   const [syncError, setSyncError] = React.useState<string | null>(null);
   const [isSyncing, setIsSyncing] = React.useState(false);
   const [remoteReady, setRemoteReady] = React.useState(false);
+  const [syncBlocked, setSyncBlocked] = React.useState(false);
   const lastSyncedHashRef = React.useRef<string>("");
   const saveTimerRef = React.useRef<number | null>(null);
 
@@ -72,13 +74,17 @@ export default function HomePage() {
   React.useEffect(() => {
     if (!session?.user.id) {
       setRemoteReady(false);
+      setSyncBlocked(false);
       setSyncError(null);
       lastSyncedHashRef.current = "";
       return;
     }
+  }, [session?.user.id]);
 
+  const bootstrapRemote = React.useCallback(() => {
+    if (!session?.user.id) return () => {};
     let cancelled = false;
-    const bootstrapRemote = async () => {
+    const run = async () => {
       setIsSyncing(true);
       setSyncError(null);
       try {
@@ -87,27 +93,33 @@ export default function HomePage() {
         replaceAllData(snapshot);
         lastSyncedHashRef.current = JSON.stringify(snapshot);
         setRemoteReady(true);
+        setSyncBlocked(false);
       } catch (error) {
         if (cancelled) return;
-        const message =
-          error instanceof Error ? error.message : "Falhou ao carregar dados.";
+        const message = error instanceof SyncError ? error.userMessage : "Falhou ao carregar dados.";
         logDevError("app.page.bootstrap-remote", { message });
         logProdError("Falha ao carregar dados remotos.");
         setSyncError(message);
-        setRemoteReady(true);
+        setRemoteReady(false);
+        setSyncBlocked(true);
       } finally {
         if (!cancelled) setIsSyncing(false);
       }
     };
 
-    bootstrapRemote();
+    void run();
     return () => {
       cancelled = true;
     };
   }, [replaceAllData, session?.user.id]);
 
   React.useEffect(() => {
-    if (!session?.user.id || !remoteReady) return;
+    const cleanup = bootstrapRemote();
+    return cleanup;
+  }, [bootstrapRemote]);
+
+  React.useEffect(() => {
+    if (!session?.user.id || !remoteReady || syncBlocked || syncError) return;
     const nextSnapshot = { categories, events };
     const nextHash = JSON.stringify(nextSnapshot);
     if (nextHash === lastSyncedHashRef.current) return;
@@ -123,12 +135,14 @@ export default function HomePage() {
         lastSyncedHashRef.current = nextHash;
       } catch (error) {
         const message =
-          error instanceof Error
-            ? error.message
+          error instanceof SyncError
+            ? error.userMessage
             : "Falhou ao salvar. Tente novamente.";
         logDevError("app.page.save-snapshot", { message });
         logProdError("Falha ao salvar dados.");
         setSyncError(message);
+        setSyncBlocked(true);
+        setRemoteReady(false);
       } finally {
         setIsSyncing(false);
       }
@@ -139,7 +153,7 @@ export default function HomePage() {
         window.clearTimeout(saveTimerRef.current);
       }
     };
-  }, [categories, events, remoteReady, session?.user.id]);
+  }, [categories, events, remoteReady, session?.user.id, syncBlocked, syncError]);
 
   const handleEditEvent = (id: string) => {
     setEditingId(id);
@@ -270,9 +284,20 @@ export default function HomePage() {
         dragDurationDays={dragDurationDays}
       />
       {syncError ? (
-        <p className="mt-2 text-center text-xs text-red-600">
-          Falhou ao salvar no Supabase. Tente novamente.
-        </p>
+        <div className="mt-2 flex flex-col items-center gap-2">
+          <p className="text-center text-xs text-red-600">{syncError}</p>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              setSyncBlocked(false);
+              void bootstrapRemote();
+            }}
+          >
+            Recarregar
+          </Button>
+        </div>
       ) : null}
       {isSyncing && session ? (
         <p className="mt-1 text-center text-xs text-neutral-500">salvando...</p>
