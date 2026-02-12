@@ -1,9 +1,12 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
+import { getServerOriginFromHeaders } from "@/lib/site-origin";
 
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
+  const requestHeaders = await headers();
+  const origin = getServerOriginFromHeaders(requestHeaders, request.url);
   const code = requestUrl.searchParams.get("code");
   const flow = requestUrl.searchParams.get("flow");
   const isPopupFlow = flow === "popup";
@@ -11,7 +14,7 @@ export async function GET(request: Request) {
   const buildResponse = (status: "success" | "error") => {
     const redirectUrl = new URL(
       isPopupFlow ? "/auth/popup-callback" : "/",
-      requestUrl.origin
+      origin
     );
     if (isPopupFlow) {
       redirectUrl.searchParams.set("status", status);
@@ -26,7 +29,11 @@ export async function GET(request: Request) {
 
   if (!supabaseUrl || !supabaseAnonKey) {
     if (process.env.NODE_ENV !== "production") {
-      console.info("[auth] callback ok:", requestUrl.origin);
+      console.info("[auth] callback redirect (env missing)", {
+        requestUrl: request.url,
+        origin,
+        destination: response.headers.get("location"),
+      });
     }
     return response;
   }
@@ -55,7 +62,11 @@ export async function GET(request: Request) {
   }
 
   if (process.env.NODE_ENV !== "production") {
-    console.info("[auth] callback ok:", requestUrl.origin);
+    console.info("[auth] callback redirect", {
+      requestUrl: request.url,
+      origin,
+      destination: response.headers.get("location"),
+    });
   }
 
   return response;

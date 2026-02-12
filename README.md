@@ -52,6 +52,20 @@ Behavior:
 4. In production, the badge only appears when `NEXT_PUBLIC_SHOW_ENV_BADGE=true`.
 5. Valid values for `NEXT_PUBLIC_APP_ENV`: `local | dev | prod`.
 
+## OAuth local/preview/prod checklist
+
+1. Set `NEXT_PUBLIC_SITE_URL` per environment (`http://localhost:3000` local, preview URL in Vercel Preview, prod URL in Vercel Production).
+2. Supabase Auth URL Configuration:
+- Site URL = current environment URL.
+- Redirect URLs include `http://localhost:3000/auth/callback`, `http://127.0.0.1:3000/auth/callback`, preview callback URL(s), and prod callback URL.
+3. Google Cloud OAuth client:
+- Authorized redirect URIs: `https://<SUPABASE_PROJECT_REF>.supabase.co/auth/v1/callback`.
+- Authorized JavaScript origins: `https://<SUPABASE_PROJECT_REF>.supabase.co`.
+4. Preview wildcard (optional, Supabase permitting): `https://*-<team-or-project>.vercel.app/auth/callback`.
+5. Validate in browser Network:
+- Supabase `/auth/v1/authorize` must send `redirect_to=<current-origin>/auth/callback?flow=popup`.
+- Never allow preview/prod to send `redirect_to=http://localhost:3000/...`.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import type { Session } from "@supabase/supabase-js";
+import { getClientOrigin } from "@/lib/site-origin";
 import { getSupabaseBrowserClient, hasSupabaseEnv } from "@/lib/supabase";
 
 export type AuthSession = {
@@ -132,10 +133,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    const redirectTo = `${window.location.origin}/auth/callback?flow=popup`;
-    if (process.env.NODE_ENV !== "production") {
-      console.info("[auth] google redirectTo:", redirectTo);
-    }
+    const origin = getClientOrigin();
+    const redirectTo = `${origin}/auth/callback?flow=popup`;
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
@@ -147,6 +146,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (error) throw error;
     if (!data?.url) {
       throw new Error("Nao foi possivel iniciar login com popup.");
+    }
+
+    if (process.env.NODE_ENV !== "production") {
+      const authorizeUrl = new URL(data.url);
+      console.info("[auth] oauth popup", {
+        origin,
+        redirectTo,
+        authorizeUrl: authorizeUrl.origin + authorizeUrl.pathname,
+        redirectToInAuthorize: authorizeUrl.searchParams.get("redirect_to"),
+        expectedRedirectUri: process.env.NEXT_PUBLIC_SUPABASE_URL
+          ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/callback`
+          : null,
+      });
     }
 
     const width = 520;
@@ -167,7 +179,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const popup = window.open(data.url, "oauthPopup", features);
 
     if (!popup) {
-      throw new Error("Popup bloqueada. Libere popups para continuar o login.");
+      const { error: redirectError } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo,
+          queryParams: { prompt: "select_account" },
+        },
+      });
+      if (redirectError) throw redirectError;
+      return;
     }
 
     oauthPopupRef.current = popup;
