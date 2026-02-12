@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import type { Session } from "@supabase/supabase-js";
-import { getClientOrigin } from "@/lib/site-origin";
 import { getSupabaseBrowserClient, hasSupabaseEnv } from "@/lib/supabase";
 
 export type AuthSession = {
@@ -133,12 +132,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    const origin = getClientOrigin();
-    const redirectTo = `${origin}/auth/callback?flow=popup`;
+    const origin = window.location.origin;
+    const popupRedirectTo = `${origin}/auth/callback?flow=popup`;
+    const fallbackRedirectTo = `${origin}/auth/callback`;
+    if (process.env.NODE_ENV !== "production") {
+      console.info("[auth] oauth start", {
+        origin,
+        popupRedirectTo,
+        fallbackRedirectTo,
+      });
+    }
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo,
+        redirectTo: popupRedirectTo,
         queryParams: { prompt: "select_account" },
         skipBrowserRedirect: true,
       },
@@ -152,7 +159,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const authorizeUrl = new URL(data.url);
       console.info("[auth] oauth popup", {
         origin,
-        redirectTo,
+        popupRedirectTo,
         authorizeUrl: authorizeUrl.origin + authorizeUrl.pathname,
         redirectToInAuthorize: authorizeUrl.searchParams.get("redirect_to"),
         expectedRedirectUri: process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -182,7 +189,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { error: redirectError } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo,
+          redirectTo: fallbackRedirectTo,
           queryParams: { prompt: "select_account" },
         },
       });

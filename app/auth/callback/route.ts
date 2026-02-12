@@ -1,12 +1,15 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse } from "next/server";
 import { cookies, headers } from "next/headers";
-import { getServerOriginFromHeaders } from "@/lib/site-origin";
 
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
   const requestHeaders = await headers();
-  const origin = getServerOriginFromHeaders(requestHeaders, request.url);
+  const forwardedProto = requestHeaders.get("x-forwarded-proto")?.split(",")[0]?.trim();
+  const forwardedHost = requestHeaders.get("x-forwarded-host")?.split(",")[0]?.trim();
+  const origin = forwardedHost
+    ? `${forwardedProto ?? "https"}://${forwardedHost}`
+    : requestUrl.origin;
   const code = requestUrl.searchParams.get("code");
   const flow = requestUrl.searchParams.get("flow");
   const isPopupFlow = flow === "popup";
@@ -31,6 +34,7 @@ export async function GET(request: Request) {
     if (process.env.NODE_ENV !== "production") {
       console.info("[auth] callback redirect (env missing)", {
         requestUrl: request.url,
+        requestUrlOrigin: requestUrl.origin,
         origin,
         destination: response.headers.get("location"),
       });
@@ -64,6 +68,7 @@ export async function GET(request: Request) {
   if (process.env.NODE_ENV !== "production") {
     console.info("[auth] callback redirect", {
       requestUrl: request.url,
+      requestUrlOrigin: requestUrl.origin,
       origin,
       destination: response.headers.get("location"),
     });

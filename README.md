@@ -54,17 +54,17 @@ Behavior:
 
 ## OAuth local/preview/prod checklist
 
-1. Set `NEXT_PUBLIC_SITE_URL` per environment (`http://localhost:3000` local, preview URL in Vercel Preview, prod URL in Vercel Production).
-2. Supabase Auth URL Configuration:
+1. Supabase Auth URL Configuration:
 - Site URL = current environment URL.
 - Redirect URLs include `http://localhost:3000/auth/callback`, `http://127.0.0.1:3000/auth/callback`, preview callback URL(s), and prod callback URL.
-3. Google Cloud OAuth client:
+2. Google Cloud OAuth client:
 - Authorized redirect URIs: `https://<SUPABASE_PROJECT_REF>.supabase.co/auth/v1/callback`.
 - Authorized JavaScript origins: `https://<SUPABASE_PROJECT_REF>.supabase.co`.
-4. Preview wildcard (optional, Supabase permitting): `https://*-<team-or-project>.vercel.app/auth/callback`.
-5. Validate in browser Network:
+3. Preview wildcard (optional, Supabase permitting): `https://*-<team-or-project>.vercel.app/auth/callback`.
+4. Validate in browser Network:
 - Supabase `/auth/v1/authorize` must send `redirect_to=<current-origin>/auth/callback?flow=popup`.
 - Never allow preview/prod to send `redirect_to=http://localhost:3000/...`.
+5. OAuth origin in app runtime is derived from `window.location.origin` (client) and request headers/origin (server), not from env URL.
 
 ## Learn More
 
