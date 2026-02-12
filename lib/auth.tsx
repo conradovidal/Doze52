@@ -3,7 +3,6 @@
 import * as React from "react";
 import type { Session } from "@supabase/supabase-js";
 import { getSupabaseBrowserClient, hasSupabaseEnv } from "@/lib/supabase";
-import { getAppBaseUrl } from "@/lib/runtime-url";
 
 export type AuthSession = {
   accessToken: string;
@@ -117,21 +116,116 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signInWithGoogle = async () => {
+    if (typeof window === "undefined") {
+      throw new Error("Google OAuth deve ser iniciado no client.");
+    }
     if (!hasSupabaseEnv) {
       throw new Error(
         "Supabase nao configurado. Defina NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY."
       );
     }
     const supabase = getSupabaseBrowserClient();
-    const redirectTo = `${getAppBaseUrl()}/auth/callback`;
-    const { error } = await supabase.auth.signInWithOAuth({
+    const redirectTo = `${window.location.origin}/auth/callback`;
+    if (process.env.NODE_ENV !== "production") {
+      console.info("[auth] google redirectTo:", redirectTo);
+    }
+    const runRedirectFallback = async () => {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo,
+          queryParams: { prompt: "select_account" },
+        },
+      });
+      if (error) throw error;
+    };
+
+    const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
         redirectTo,
         queryParams: { prompt: "select_account" },
+        skipBrowserRedirect: true,
       },
     });
     if (error) throw error;
+    if (!data?.url) {
+      await runRedirectFallback();
+      return;
+    }
+
+    const width = 520;
+    const height = 700;
+    const left = Math.max(window.screenX + (window.outerWidth - width) / 2, 0);
+    const top = Math.max(window.screenY + (window.outerHeight - height) / 2, 0);
+    const features = [
+      `width=${Math.round(width)}`,
+      `height=${Math.round(height)}`,
+      `left=${Math.round(left)}`,
+      `top=${Math.round(top)}`,
+      "popup=yes",
+      "resizable=yes",
+      "scrollbars=yes",
+      "noopener",
+      "noreferrer",
+    ].join(",");
+    const popup = window.open(data.url, "google_oauth", features);
+
+    if (!popup) {
+      await runRedirectFallback();
+      return;
+    }
+
+    await new Promise<void>((resolve, reject) => {
+      let settled = false;
+      let checking = false;
+
+      const cleanup = () => {
+        window.clearInterval(intervalId);
+        window.clearTimeout(timeoutId);
+      };
+
+      const finish = (cb: () => void) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        try {
+          if (!popup.closed) popup.close();
+        } catch {
+          // no-op
+        }
+        cb();
+      };
+
+      const intervalId = window.setInterval(async () => {
+        if (settled || checking) return;
+        checking = true;
+        try {
+          if (popup.closed) {
+            finish(() => reject(new Error("Login com Google cancelado.")));
+            return;
+          }
+
+          const { data: sessionData, error: sessionError } =
+            await supabase.auth.getSession();
+          if (sessionError) {
+            finish(() => reject(sessionError));
+            return;
+          }
+          if (sessionData.session) {
+            finish(() => resolve());
+          }
+        } finally {
+          checking = false;
+        }
+      }, 600);
+
+      const timeoutId = window.setTimeout(() => {
+        finish(() =>
+          reject(new Error("Tempo esgotado para concluir login com Google."))
+        );
+      }, 120_000);
+    });
   };
 
   const signOut = async () => {

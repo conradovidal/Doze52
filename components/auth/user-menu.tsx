@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -9,26 +9,33 @@ import { useAuth } from "@/lib/auth";
 export function UserMenu() {
   const { session, signOut } = useAuth();
   const [brokenAvatar, setBrokenAvatar] = useState(false);
+  const loggedMissingAvatarRef = useRef<string | null>(null);
 
-  if (!session) return null;
-
-  const metadata = session.user.metadata ?? {};
+  const metadata = session?.user.metadata ?? {};
   const fullName =
     typeof metadata.full_name === "string" ? metadata.full_name : undefined;
   const shortName = typeof metadata.name === "string" ? metadata.name : undefined;
-  const displayName = fullName || shortName || session.user.email;
-  const compactName = displayName.includes("@")
-    ? displayName.split("@")[0]
-    : displayName;
+  const displayName = fullName || shortName || session?.user.email || "";
   const metadataAvatar =
     (typeof metadata.avatar_url === "string" && metadata.avatar_url) ||
     (typeof metadata.picture === "string" && metadata.picture) ||
     null;
-  const avatarUrl = metadataAvatar || session.user.avatarUrl || null;
+  const avatarUrl = metadataAvatar || session?.user.avatarUrl || null;
   const fallbackInitial =
-    (compactName || session.user.email).trim().charAt(0).toUpperCase() || "?";
-  const metadataKeys = Object.keys(session.user.metadata ?? {});
+    (displayName || session?.user.email || "").trim().charAt(0).toUpperCase() || "?";
+  const metadataKeys = Object.keys(session?.user.metadata ?? {});
   const isDebug = process.env.NODE_ENV !== "production";
+
+  useEffect(() => {
+    if (process.env.NODE_ENV === "production") return;
+    if (!session) return;
+    if (metadataAvatar) return;
+    if (loggedMissingAvatarRef.current === session.user.id) return;
+    loggedMissingAvatarRef.current = session.user.id;
+    console.info("[auth] avatar metadata missing:", session.user.metadata ?? null);
+  }, [metadataAvatar, session]);
+
+  if (!session) return null;
 
   return (
     <Popover>
@@ -39,11 +46,11 @@ export function UserMenu() {
             <img
               src={avatarUrl}
               alt="Perfil"
-              className="h-8 w-8 rounded-full object-cover"
+              className="h-8 w-8 rounded-full border border-neutral-200 object-cover"
               onError={() => setBrokenAvatar(true)}
             />
           ) : (
-            <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-neutral-200 text-xs text-neutral-700">
+            <span className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-neutral-200 bg-neutral-200 text-xs text-neutral-700">
               {fallbackInitial}
             </span>
           )}
@@ -53,16 +60,13 @@ export function UserMenu() {
         <div className="space-y-3">
           <div>
             <p className="text-xs text-neutral-500">Conectado como</p>
-            <p className="truncate text-sm">{compactName}</p>
+            <p className="truncate text-sm">{displayName}</p>
             <p className="truncate text-xs text-neutral-500">{session.user.email}</p>
           </div>
           {isDebug ? (
             <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-2">
               <p className="mb-1 text-[11px] uppercase tracking-wide text-neutral-500">
                 Debug
-              </p>
-              <p className="text-[11px] text-neutral-600">
-                user.id: {session.user.id}
               </p>
               <p className="mt-1 text-[11px] text-neutral-600">
                 metadata keys: {metadataKeys.length ? metadataKeys.join(", ") : "(none)"}
