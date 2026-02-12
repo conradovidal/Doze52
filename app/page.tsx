@@ -159,33 +159,26 @@ export default function HomePage() {
         <div className="grid grid-cols-[1fr_auto_1fr] items-end">
           <div />
           <div className="flex flex-col items-center gap-1.5">
-            <div className="inline-flex items-baseline gap-1.5 leading-none">
-              <span className="font-sans text-2xl font-semibold tracking-tight text-neutral-900">
-                Doze
-              </span>
-              <span className="font-sans text-2xl font-normal text-neutral-700">
-                Meses
-              </span>
-              <span className="font-sans text-2xl font-semibold tracking-tight text-neutral-900">
-                52
-              </span>
-              <span className="font-sans text-2xl font-normal text-neutral-700">
-                Semanas de
-              </span>
-              <Select value={String(year)} onValueChange={(v) => setYear(Number(v))}>
-                <SelectTrigger className="relative top-[1px] h-9 min-w-[92px] align-middle border-0 bg-neutral-200 px-3 font-sans text-2xl leading-none font-normal text-neutral-700 shadow-none hover:bg-neutral-200 focus-visible:ring-neutral-300 [&_svg]:opacity-80 [&_svg]:text-neutral-600">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="2025">2025</SelectItem>
-                  <SelectItem value="2026">2026</SelectItem>
-                  <SelectItem value="2027">2027</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="inline-flex w-fit flex-col items-center">
+              <div className="inline-flex w-full items-baseline justify-between leading-none">
+                <span className="font-sans text-2xl font-semibold tracking-tight text-neutral-900">
+                  Doze 52
+                </span>
+                <Select value={String(year)} onValueChange={(v) => setYear(Number(v))}>
+                  <SelectTrigger className="relative top-[1px] h-8 min-w-[84px] align-middle border-0 bg-neutral-200 px-2.5 font-sans text-xl leading-none font-normal text-neutral-700 shadow-none hover:bg-neutral-200 focus-visible:ring-neutral-300 [&_svg]:opacity-80 [&_svg]:text-neutral-600">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="2025">2025</SelectItem>
+                    <SelectItem value="2026">2026</SelectItem>
+                    <SelectItem value="2027">2027</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <p className="w-full text-center text-xs font-light tracking-wide text-neutral-500">
+                Sistema anual de estruturação de foco.
+              </p>
             </div>
-            <p className="text-center text-xs font-light tracking-wide text-neutral-500">
-              Sistema anual de estruturação de foco.
-            </p>
             <CategoryBar compact />
           </div>
           <div className="self-end justify-self-end">

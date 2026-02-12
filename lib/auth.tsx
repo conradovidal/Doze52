@@ -1,18 +1,20 @@
 "use client";
 
 import * as React from "react";
-
-type StoredUser = {
-  id: string;
-  email: string;
-  password: string;
-};
+import type { Session } from "@supabase/supabase-js";
+import { getSupabaseBrowserClient, hasSupabaseEnv } from "@/lib/supabase";
+import { getAppBaseUrl } from "@/lib/runtime-url";
 
 export type AuthSession = {
+  accessToken: string;
+  refreshToken?: string;
+  expiresAt?: number;
   user: {
     id: string;
     email: string;
     provider: "password" | "google";
+    avatarUrl?: string;
+    metadata?: Record<string, unknown>;
   };
 };
 
@@ -25,97 +27,121 @@ type AuthContextValue = {
   signOut: () => Promise<void>;
 };
 
-const USERS_KEY = "doze52-auth-users";
-const SESSION_KEY = "doze52-auth-session";
-
 const AuthContext = React.createContext<AuthContextValue | null>(null);
 
-const uid = () => crypto.randomUUID();
+const toAuthSession = (session: Session): AuthSession => {
+  const provider =
+    session.user.app_metadata?.provider === "google" ? "google" : "password";
 
-function readUsers(): StoredUser[] {
-  if (typeof window === "undefined") return [];
-  const raw = window.localStorage.getItem(USERS_KEY);
-  if (!raw) return [];
-  try {
-    return JSON.parse(raw) as StoredUser[];
-  } catch {
-    return [];
-  }
-}
-
-function writeUsers(users: StoredUser[]) {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(USERS_KEY, JSON.stringify(users));
-}
-
-function readSession(): AuthSession | null {
-  if (typeof window === "undefined") return null;
-  const raw = window.localStorage.getItem(SESSION_KEY);
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw) as AuthSession;
-  } catch {
-    return null;
-  }
-}
-
-function writeSession(session: AuthSession | null) {
-  if (typeof window === "undefined") return;
-  if (!session) {
-    window.localStorage.removeItem(SESSION_KEY);
-    return;
-  }
-  window.localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-}
+  return {
+    accessToken: session.access_token,
+    refreshToken: session.refresh_token,
+    expiresAt: session.expires_at,
+    user: {
+      id: session.user.id,
+      email: session.user.email ?? "",
+      provider,
+      avatarUrl: session.user.user_metadata?.avatar_url as string | undefined,
+      metadata: session.user.user_metadata as Record<string, unknown> | undefined,
+    },
+  };
+};
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = React.useState<AuthSession | null>(null);
   const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
-    setSession(readSession());
-    setLoading(false);
+    if (!hasSupabaseEnv) {
+      setSession(null);
+      setLoading(false);
+      return;
+    }
+
+    const supabase = getSupabaseBrowserClient();
+
+    const bootstrap = async () => {
+      const { data, error } = await supabase.auth.getSession();
+      if (error) {
+        setSession(null);
+      } else {
+        setSession(data.session ? toAuthSession(data.session) : null);
+      }
+      setLoading(false);
+    };
+
+    bootstrap();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession ? toAuthSession(nextSession) : null);
+      setLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const signInWithPassword = async (email: string, password: string) => {
-    const normalizedEmail = email.trim().toLowerCase();
-    const user = readUsers().find(
-      (u) => u.email.toLowerCase() === normalizedEmail && u.password === password
-    );
-    if (!user) throw new Error("Email ou senha invalidos.");
-    const nextSession: AuthSession = {
-      user: { id: user.id, email: user.email, provider: "password" },
-    };
-    writeSession(nextSession);
-    setSession(nextSession);
+    if (!hasSupabaseEnv) {
+      throw new Error(
+        "Supabase nao configurado. Defina NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY."
+      );
+    }
+    const supabase = getSupabaseBrowserClient();
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    });
+    if (error) throw error;
+    if (data.session) setSession(toAuthSession(data.session));
   };
 
   const signUpWithPassword = async (email: string, password: string) => {
-    const normalizedEmail = email.trim().toLowerCase();
-    const users = readUsers();
-    if (users.some((u) => u.email.toLowerCase() === normalizedEmail)) {
-      throw new Error("Este email ja esta cadastrado.");
+    if (!hasSupabaseEnv) {
+      throw new Error(
+        "Supabase nao configurado. Defina NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY."
+      );
     }
-    const nextUser: StoredUser = { id: uid(), email: normalizedEmail, password };
-    writeUsers([...users, nextUser]);
-    const nextSession: AuthSession = {
-      user: { id: nextUser.id, email: nextUser.email, provider: "password" },
-    };
-    writeSession(nextSession);
-    setSession(nextSession);
+    const supabase = getSupabaseBrowserClient();
+    const { data, error } = await supabase.auth.signUp({
+      email: email.trim(),
+      password,
+    });
+    if (error) throw error;
+    if (data.session) {
+      setSession(toAuthSession(data.session));
+      return;
+    }
+    throw new Error("Conta criada. Confirme seu email para continuar.");
   };
 
   const signInWithGoogle = async () => {
-    const guestEmail = `google_${uid().slice(0, 8)}@gmail.com`;
-    const nextSession: AuthSession = {
-      user: { id: uid(), email: guestEmail, provider: "google" },
-    };
-    writeSession(nextSession);
-    setSession(nextSession);
+    if (!hasSupabaseEnv) {
+      throw new Error(
+        "Supabase nao configurado. Defina NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY."
+      );
+    }
+    const supabase = getSupabaseBrowserClient();
+    const redirectTo = `${getAppBaseUrl()}/auth/callback`;
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo,
+        queryParams: { prompt: "select_account" },
+      },
+    });
+    if (error) throw error;
   };
 
   const signOut = async () => {
-    writeSession(null);
+    if (!hasSupabaseEnv) {
+      setSession(null);
+      return;
+    }
+    const supabase = getSupabaseBrowserClient();
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
     setSession(null);
   };
 

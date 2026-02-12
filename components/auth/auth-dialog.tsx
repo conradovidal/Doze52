@@ -35,6 +35,15 @@ export function AuthDialog({
   }, [open, mode]);
 
   const canSubmit = email.trim().length > 0 && password.length >= 6;
+  const mapAuthError = (raw: string) => {
+    const msg = raw.toLowerCase();
+    if (msg.includes("invalid login credentials")) return "Email ou senha invalidos.";
+    if (msg.includes("user already registered")) return "Este email ja esta cadastrado.";
+    if (msg.includes("supabase nao configurado")) {
+      return "Configure NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.";
+    }
+    return raw;
+  };
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
@@ -45,7 +54,11 @@ export function AuthDialog({
       else await signUpWithPassword(email, password);
       onOpenChange(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Nao foi possivel autenticar.");
+      setError(
+        err instanceof Error
+          ? mapAuthError(err.message)
+          : "Nao foi possivel autenticar."
+      );
     } finally {
       setLoading(false);
     }
@@ -58,7 +71,9 @@ export function AuthDialog({
       await signInWithGoogle();
       onOpenChange(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro no login com Google.");
+      setError(
+        err instanceof Error ? mapAuthError(err.message) : "Erro no login com Google."
+      );
     } finally {
       setLoading(false);
     }
