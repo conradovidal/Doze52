@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -21,7 +22,13 @@ export function AuthDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const { signInWithPassword, signUpWithPassword, signInWithGoogle } = useAuth();
+  const router = useRouter();
+  const {
+    signInWithPassword,
+    signUpWithPassword,
+    signInWithGoogle,
+    closeGooglePopupIfOpen,
+  } = useAuth();
   const [mode, setMode] = React.useState<"login" | "signup">("login");
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
@@ -52,6 +59,7 @@ export function AuthDialog({
             const supabase = getSupabaseBrowserClient();
             await supabase.auth.getSession();
           }
+          router.refresh();
           setError(null);
           onOpenChange(false);
         })();
@@ -64,8 +72,11 @@ export function AuthDialog({
     };
 
     window.addEventListener("message", onAuthMessage);
-    return () => window.removeEventListener("message", onAuthMessage);
-  }, [open, onOpenChange]);
+    return () => {
+      window.removeEventListener("message", onAuthMessage);
+      closeGooglePopupIfOpen();
+    };
+  }, [closeGooglePopupIfOpen, onOpenChange, open, router]);
 
   const canSubmit = email.trim().length > 0 && password.length >= 6;
   const mapAuthError = (raw: string) => {

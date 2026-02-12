@@ -23,6 +23,7 @@ type AuthContextValue = {
   signInWithPassword: (email: string, password: string) => Promise<void>;
   signUpWithPassword: (email: string, password: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
+  closeGooglePopupIfOpen: () => void;
   signOut: () => Promise<void>;
 };
 
@@ -49,6 +50,7 @@ const toAuthSession = (session: Session): AuthSession => {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = React.useState<AuthSession | null>(null);
   const [loading, setLoading] = React.useState(true);
+  const oauthPopupRef = React.useRef<Window | null>(null);
 
   React.useEffect(() => {
     if (!hasSupabaseEnv) {
@@ -125,6 +127,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       );
     }
     const supabase = getSupabaseBrowserClient();
+    if (oauthPopupRef.current && !oauthPopupRef.current.closed) {
+      oauthPopupRef.current.focus();
+      return;
+    }
+
     const redirectTo = `${window.location.origin}/auth/callback?flow=popup`;
     if (process.env.NODE_ENV !== "production") {
       console.info("[auth] google redirectTo:", redirectTo);
@@ -162,6 +169,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!popup) {
       throw new Error("Popup bloqueada. Libere popups para continuar o login.");
     }
+
+    oauthPopupRef.current = popup;
+  };
+
+  const closeGooglePopupIfOpen = () => {
+    if (!oauthPopupRef.current) return;
+    if (!oauthPopupRef.current.closed) {
+      oauthPopupRef.current.close();
+    }
+    oauthPopupRef.current = null;
   };
 
   const signOut = async () => {
@@ -183,6 +200,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signInWithPassword,
         signUpWithPassword,
         signInWithGoogle,
+        closeGooglePopupIfOpen,
         signOut,
       }}
     >
