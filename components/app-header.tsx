@@ -32,9 +32,10 @@ export function AppHeader({
         <div />
         <div className="flex flex-col items-center gap-1.5">
           <div className="inline-flex w-fit flex-col items-center">
-            <div className="inline-flex w-full items-baseline justify-between leading-none">
-              <span className="font-sans text-2xl font-semibold tracking-tight text-neutral-900">
-                Doze 52
+            <div className="inline-flex w-full items-baseline gap-2 leading-none">
+              <span className="inline-flex items-baseline gap-3 font-sans text-2xl font-medium tracking-[0.08em] text-neutral-900">
+                <span>DOZE</span>
+                <span>52</span>
               </span>
               <Select value={String(year)} onValueChange={(v) => onYearChange(Number(v))}>
                 <SelectTrigger className="relative top-[1px] h-7 min-w-[72px] align-middle border-transparent bg-transparent px-1.5 font-sans text-xl leading-none font-normal text-neutral-700 shadow-none hover:bg-transparent focus-visible:border-transparent focus-visible:ring-0 [&_svg]:ml-1 [&_svg]:opacity-80 [&_svg]:text-neutral-600">
