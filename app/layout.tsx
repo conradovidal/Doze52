@@ -3,7 +3,7 @@ import "./globals.css";
 import { AuthProvider } from "@/lib/auth";
 
 export const metadata: Metadata = {
-  title: "Year-in-View",
+  title: "Doze 52 - Sistema anual de estruturação de foco.",
   description: "Planejamento visual anual com revisao mensal e habitos.",
 };
 
