@@ -1,33 +1,26 @@
-create table if not exists public.profiles (
-  id uuid primary key references auth.users(id) on delete cascade,
-  display_name text,
-  created_at timestamptz not null default now()
-);
+begin;
 
-create table if not exists public.categories (
-  id uuid primary key,
-  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
-  name text not null,
-  color text not null,
-  visible boolean not null default true,
-  position int not null default 0,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
+-- Ownership and audit columns
+alter table public.categories
+  alter column user_id set not null,
+  alter column user_id set default auth.uid(),
+  add column if not exists created_at timestamptz not null default now(),
+  add column if not exists updated_at timestamptz not null default now();
 
-create table if not exists public.events (
-  id uuid primary key,
-  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
-  title text not null,
-  category_id uuid not null,
-  start_date date not null,
-  end_date date not null,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  day_order jsonb not null default '{}'::jsonb,
-  constraint events_end_after_start check (end_date >= start_date)
-);
+alter table public.events
+  alter column user_id set not null,
+  alter column user_id set default auth.uid(),
+  add column if not exists created_at timestamptz not null default now(),
+  add column if not exists updated_at timestamptz not null default now();
 
+-- Base integrity
+alter table public.events
+  drop constraint if exists events_end_after_start;
+
+alter table public.events
+  add constraint events_end_after_start check (end_date >= start_date);
+
+-- Multi-tenant integrity: category/event ownership must match
 alter table public.categories
   drop constraint if exists categories_user_id_id_unique;
 
@@ -46,6 +39,7 @@ alter table public.events
   references public.categories(user_id, id)
   on delete restrict;
 
+-- Keep updated_at consistent
 create or replace function public.set_updated_at()
 returns trigger
 language plpgsql
@@ -66,6 +60,7 @@ create trigger events_set_updated_at
 before update on public.events
 for each row execute function public.set_updated_at();
 
+-- Tenant-aware indexes
 create index if not exists idx_categories_user_position
   on public.categories(user_id, position);
 
@@ -78,6 +73,7 @@ create index if not exists idx_events_user_end_date
 create index if not exists idx_events_user_created_at
   on public.events(user_id, created_at);
 
+-- RLS hardening
 alter table public.categories enable row level security;
 alter table public.events enable row level security;
 alter table public.categories force row level security;
@@ -115,9 +111,11 @@ drop policy if exists events_delete_own on public.events;
 create policy events_delete_own on public.events
 for delete using (auth.uid() = user_id);
 
+-- Authenticated-only table access for private data
 revoke all on table public.categories from anon;
 revoke all on table public.events from anon;
-
 grant usage on schema public to authenticated;
 grant select, insert, update, delete on table public.categories to authenticated;
 grant select, insert, update, delete on table public.events to authenticated;
+
+commit;

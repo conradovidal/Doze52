@@ -19,6 +19,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useStore } from "@/lib/store";
+import { logDevError, logProdError } from "@/lib/safe-log";
+import { ValidationError, validateEventInput } from "@/lib/validation";
 
 export function EventDialog({
   open,
@@ -39,14 +41,16 @@ export function EventDialog({
     categoryId: string;
     startDate: string;
     endDate: string;
-  }) => void;
-  onDelete?: () => void;
+  }) => Promise<void> | void;
+  onDelete?: () => Promise<void> | void;
 }) {
   const categories = useStore((s) => s.categories);
   const [title, setTitle] = React.useState("");
   const [categoryId, setCategoryId] = React.useState("");
   const [startDate, setStartDate] = React.useState("");
   const [endDate, setEndDate] = React.useState("");
+  const [isSaving, setIsSaving] = React.useState(false);
+  const [submitError, setSubmitError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     if (!open) return;
@@ -58,6 +62,8 @@ export function EventDialog({
     setEndDate(
       initialEvent?.endDate ?? seedRange?.endDate ?? seedDate ?? ""
     );
+    setIsSaving(false);
+    setSubmitError(null);
   }, [open, initialEvent, seedDate, seedRange, categories]);
 
   const canSave = title.trim() && startDate && endDate && categoryId;
@@ -103,22 +109,86 @@ export function EventDialog({
         </div>
         <DialogFooter className="gap-2 sm:justify-between">
           {onDelete ? (
-            <Button variant="destructive" onClick={onDelete}>
+            <Button
+              variant="destructive"
+              disabled={isSaving}
+              onClick={async () => {
+                if (!onDelete) return;
+                try {
+                  setIsSaving(true);
+                  setSubmitError(null);
+                  await onDelete();
+                } catch (error) {
+                  const message =
+                    error instanceof Error
+                      ? error.message
+                      : "Falhou ao excluir. Tente novamente.";
+                  logDevError("event-dialog.delete", {
+                    message,
+                    hasInitialEvent: Boolean(initialEvent),
+                  });
+                  logProdError("Falha ao excluir evento.");
+                  setSubmitError(
+                    message
+                  );
+                } finally {
+                  setIsSaving(false);
+                }
+              }}
+            >
               Excluir
             </Button>
           ) : (
             <div />
           )}
           <Button
-            disabled={!canSave}
-            onClick={() => {
-              onSubmit({ title, categoryId, startDate, endDate });
-              onOpenChange(false);
+            disabled={!canSave || isSaving}
+            onClick={async () => {
+              try {
+                setIsSaving(true);
+                setSubmitError(null);
+                const categoryIds = new Set(categories.map((category) => category.id));
+                validateEventInput(
+                  {
+                    id: initialEvent?.id ?? crypto.randomUUID(),
+                    title,
+                    categoryId,
+                    startDate,
+                    endDate,
+                    color:
+                      categories.find((category) => category.id === categoryId)?.color ??
+                      "#2563eb",
+                    createdAt: initialEvent?.createdAt ?? new Date().toISOString(),
+                    dayOrder: initialEvent?.dayOrder ?? {},
+                  },
+                  categoryIds
+                );
+                await onSubmit({ title, categoryId, startDate, endDate });
+                onOpenChange(false);
+              } catch (error) {
+                const message =
+                  error instanceof ValidationError
+                    ? error.message
+                    : error instanceof Error
+                      ? error.message
+                      : "Falhou ao salvar. Tente novamente.";
+                logDevError("event-dialog.submit", {
+                  message,
+                  hasInitialEvent: Boolean(initialEvent),
+                });
+                logProdError("Falha ao salvar evento.");
+                setSubmitError(
+                  message
+                );
+              } finally {
+                setIsSaving(false);
+              }
             }}
           >
-            Salvar
+            {isSaving ? "Salvando..." : "Salvar"}
           </Button>
         </DialogFooter>
+        {submitError ? <p className="text-sm text-red-600">{submitError}</p> : null}
       </DialogContent>
     </Dialog>
   );

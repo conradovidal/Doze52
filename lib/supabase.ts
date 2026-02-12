@@ -9,6 +9,7 @@ export const supabaseEnv = {
 export const hasSupabaseEnv = Boolean(supabaseEnv.url && supabaseEnv.anonKey);
 
 let browserClient: SupabaseClient | null = null;
+let didLogSupabaseEnv = false;
 
 export const getSupabaseBrowserClient = () => {
   if (!hasSupabaseEnv) {
@@ -17,6 +18,10 @@ export const getSupabaseBrowserClient = () => {
     );
   }
   if (!browserClient) {
+    if (process.env.NODE_ENV !== "production" && !didLogSupabaseEnv) {
+      console.log("[supabase]", process.env.NEXT_PUBLIC_SUPABASE_URL);
+      didLogSupabaseEnv = true;
+    }
     browserClient = createBrowserClient(supabaseEnv.url, supabaseEnv.anonKey);
   }
   return browserClient;

@@ -72,12 +72,13 @@ export const useStore = create<StoreState>()(
         set((state) => {
           let changed = false;
           const nextEvents = state.events.map((evt, idx) => {
+            const id = evt.id ?? uid();
             const createdAt =
               evt.createdAt ?? new Date(Date.UTC(2024, 0, 1, 0, 0, idx)).toISOString();
             const dayOrder = evt.dayOrder ?? {};
-            if (evt.createdAt === createdAt && evt.dayOrder === dayOrder) return evt;
+            if (evt.id === id && evt.createdAt === createdAt && evt.dayOrder === dayOrder) return evt;
             changed = true;
-            return { ...evt, createdAt, dayOrder };
+            return { ...evt, id, createdAt, dayOrder };
           });
           return changed ? { events: nextEvents } : state;
         }),
@@ -291,6 +292,7 @@ export const useStore = create<StoreState>()(
             if (evt.categoryId) {
               return {
                 ...evt,
+                id: evt.id ?? uid(),
                 createdAt,
                 dayOrder,
               };
@@ -308,6 +310,7 @@ export const useStore = create<StoreState>()(
                       : defaultCategoryId;
             return {
               ...evt,
+              id: evt.id ?? uid(),
               categoryId: mappedId,
               createdAt,
               dayOrder,

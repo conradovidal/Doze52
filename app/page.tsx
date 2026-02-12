@@ -4,19 +4,13 @@ import * as React from "react";
 import { addDays, differenceInCalendarDays, format, parseISO } from "date-fns";
 import { YearGrid } from "@/components/calendar/year-grid";
 import { EventDialog } from "@/components/event-dialog";
-import { CategoryBar } from "@/components/category-bar";
+import { AppHeader } from "@/components/app-header";
 import { AuthDialog } from "@/components/auth/auth-dialog";
-import { UserMenu } from "@/components/auth/user-menu";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
 import { useStore, type EventInput } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
+import { loadRemoteData, saveSnapshot } from "@/lib/sync";
+import { logDevError, logProdError } from "@/lib/safe-log";
+import { hasSupabaseEnv } from "@/lib/supabase";
 
 export default function HomePage() {
   const initialYear = React.useMemo(() => {
@@ -25,13 +19,18 @@ export default function HomePage() {
   }, []);
   const [year, setYear] = React.useState<number>(initialYear);
   const events = useStore((s) => s.events);
+  const categories = useStore((s) => s.categories);
   const ensureEventMetadata = useStore((s) => s.ensureEventMetadata);
+  const replaceAllData = useStore((s) => s.replaceAllData);
   const addEvent = useStore((s) => s.addEvent);
   const updateEvent = useStore((s) => s.updateEvent);
   const deleteEvent = useStore((s) => s.deleteEvent);
   const moveEventByDelta = useStore((s) => s.moveEventByDelta);
   const getEventById = useStore((s) => s.getEventById);
   const { session, loading: authLoading } = useAuth();
+  const isDevBuildInfoVisible = process.env.NODE_ENV !== "production";
+  const commitSha = process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA ?? "local";
+  const buildLabel = commitSha === "local" ? "local" : commitSha.slice(0, 7);
 
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [authDialogOpen, setAuthDialogOpen] = React.useState(false);
@@ -50,12 +49,97 @@ export default function HomePage() {
   const [dragDurationDays, setDragDurationDays] = React.useState<number | null>(null);
   const [dragGrabOffsetDays, setDragGrabOffsetDays] = React.useState<number | null>(null);
   const [dragHoverPointerDate, setDragHoverPointerDate] = React.useState<string | null>(null);
+  const [syncError, setSyncError] = React.useState<string | null>(null);
+  const [isSyncing, setIsSyncing] = React.useState(false);
+  const [remoteReady, setRemoteReady] = React.useState(false);
+  const lastSyncedHashRef = React.useRef<string>("");
+  const saveTimerRef = React.useRef<number | null>(null);
 
   const editingEvent = editingId ? getEventById(editingId) : null;
 
   React.useEffect(() => {
     ensureEventMetadata();
   }, [ensureEventMetadata]);
+
+  React.useEffect(() => {
+    if (hasSupabaseEnv) return;
+    const message =
+      "Supabase nao configurado. Defina NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY neste ambiente.";
+    logDevError("app.page.supabase-env", { message });
+    logProdError("Supabase nao configurado neste ambiente.");
+  }, []);
+
+  React.useEffect(() => {
+    if (!session?.user.id) {
+      setRemoteReady(false);
+      setSyncError(null);
+      lastSyncedHashRef.current = "";
+      return;
+    }
+
+    let cancelled = false;
+    const bootstrapRemote = async () => {
+      setIsSyncing(true);
+      setSyncError(null);
+      try {
+        const snapshot = await loadRemoteData();
+        if (cancelled) return;
+        replaceAllData(snapshot);
+        lastSyncedHashRef.current = JSON.stringify(snapshot);
+        setRemoteReady(true);
+      } catch (error) {
+        if (cancelled) return;
+        const message =
+          error instanceof Error ? error.message : "Falhou ao carregar dados.";
+        logDevError("app.page.bootstrap-remote", { message });
+        logProdError("Falha ao carregar dados remotos.");
+        setSyncError(message);
+        setRemoteReady(true);
+      } finally {
+        if (!cancelled) setIsSyncing(false);
+      }
+    };
+
+    bootstrapRemote();
+    return () => {
+      cancelled = true;
+    };
+  }, [replaceAllData, session?.user.id]);
+
+  React.useEffect(() => {
+    if (!session?.user.id || !remoteReady) return;
+    const nextSnapshot = { categories, events };
+    const nextHash = JSON.stringify(nextSnapshot);
+    if (nextHash === lastSyncedHashRef.current) return;
+
+    if (saveTimerRef.current !== null) {
+      window.clearTimeout(saveTimerRef.current);
+    }
+    saveTimerRef.current = window.setTimeout(async () => {
+      setIsSyncing(true);
+      setSyncError(null);
+      try {
+        await saveSnapshot(nextSnapshot);
+        lastSyncedHashRef.current = nextHash;
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Falhou ao salvar. Tente novamente.";
+        logDevError("app.page.save-snapshot", { message });
+        logProdError("Falha ao salvar dados.");
+        setSyncError(message);
+      } finally {
+        setIsSyncing(false);
+      }
+    }, 800);
+
+    return () => {
+      if (saveTimerRef.current !== null) {
+        window.clearTimeout(saveTimerRef.current);
+      }
+    };
+  }, [categories, events, remoteReady, session?.user.id]);
 
   const handleEditEvent = (id: string) => {
     setEditingId(id);
@@ -64,7 +148,7 @@ export default function HomePage() {
     setDialogOpen(true);
   };
 
-  const handleSubmit = (payload: EventInput) => {
+  const handleSubmit = async (payload: EventInput) => {
     if (editingId) updateEvent(editingId, payload);
     else addEvent(payload);
   };
@@ -155,43 +239,18 @@ export default function HomePage() {
 
   return (
     <main className="mx-auto w-full max-w-none px-4 py-8">
-      <header className="mb-6">
-        <div className="grid grid-cols-[1fr_auto_1fr] items-end">
-          <div />
-          <div className="flex flex-col items-center gap-1.5">
-            <div className="inline-flex w-fit flex-col items-center">
-              <div className="inline-flex w-full items-baseline justify-between leading-none">
-                <span className="font-sans text-2xl font-semibold tracking-tight text-neutral-900">
-                  Doze 52
-                </span>
-                <Select value={String(year)} onValueChange={(v) => setYear(Number(v))}>
-                  <SelectTrigger className="relative top-[1px] h-8 min-w-[84px] align-middle border-0 bg-neutral-200 px-2.5 font-sans text-xl leading-none font-normal text-neutral-700 shadow-none hover:bg-neutral-200 focus-visible:ring-neutral-300 [&_svg]:opacity-80 [&_svg]:text-neutral-600">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="2025">2025</SelectItem>
-                    <SelectItem value="2026">2026</SelectItem>
-                    <SelectItem value="2027">2027</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <p className="w-full text-center text-xs font-light tracking-wide text-neutral-500">
-                Sistema anual de estruturação de foco.
-              </p>
-            </div>
-            <CategoryBar compact />
-          </div>
-          <div className="self-end justify-self-end">
-            {authLoading ? null : session ? (
-              <UserMenu />
-            ) : (
-              <Button size="sm" className="h-8" onClick={() => setAuthDialogOpen(true)}>
-                Entrar
-              </Button>
-            )}
-          </div>
-        </div>
-      </header>
+      <AppHeader
+        year={year}
+        onYearChange={setYear}
+        authLoading={authLoading}
+        isAuthenticated={Boolean(session)}
+        onOpenAuthDialog={() => setAuthDialogOpen(true)}
+      />
+      {!hasSupabaseEnv ? (
+        <p className="mb-3 text-center text-sm text-amber-700">
+          Supabase nao configurado neste ambiente.
+        </p>
+      ) : null}
 
       <YearGrid
         year={year}
@@ -210,6 +269,14 @@ export default function HomePage() {
         dragGrabOffsetDays={dragGrabOffsetDays}
         dragDurationDays={dragDurationDays}
       />
+      {syncError ? (
+        <p className="mt-2 text-center text-xs text-red-600">
+          Falhou ao salvar no Supabase. Tente novamente.
+        </p>
+      ) : null}
+      {isSyncing && session ? (
+        <p className="mt-1 text-center text-xs text-neutral-500">salvando...</p>
+      ) : null}
 
       <EventDialog
         open={dialogOpen}
@@ -233,6 +300,11 @@ export default function HomePage() {
         }
       />
       <AuthDialog open={authDialogOpen} onOpenChange={setAuthDialogOpen} />
+      {isDevBuildInfoVisible ? (
+        <footer className="mt-4 text-center text-[11px] text-neutral-400">
+          build: {buildLabel}
+        </footer>
+      ) : null}
     </main>
   );
 }

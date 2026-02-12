@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth";
+import { getSupabaseBrowserClient, hasSupabaseEnv } from "@/lib/supabase";
 import { GoogleButton } from "./google-button";
 
 export function AuthDialog({
@@ -33,6 +34,38 @@ export function AuthDialog({
     setEmail("");
     setPassword("");
   }, [open, mode]);
+
+  React.useEffect(() => {
+    if (!open) return;
+
+    const onAuthMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      const data =
+        event.data && typeof event.data === "object"
+          ? (event.data as { type?: string; error?: string })
+          : null;
+      if (!data?.type) return;
+
+      if (data.type === "SUPABASE_AUTH_SUCCESS") {
+        void (async () => {
+          if (hasSupabaseEnv) {
+            const supabase = getSupabaseBrowserClient();
+            await supabase.auth.getSession();
+          }
+          setError(null);
+          onOpenChange(false);
+        })();
+        return;
+      }
+
+      if (data.type === "SUPABASE_AUTH_ERROR") {
+        setError("Falha no login com Google. Tente novamente.");
+      }
+    };
+
+    window.addEventListener("message", onAuthMessage);
+    return () => window.removeEventListener("message", onAuthMessage);
+  }, [open, onOpenChange]);
 
   const canSubmit = email.trim().length > 0 && password.length >= 6;
   const mapAuthError = (raw: string) => {
@@ -69,7 +102,6 @@ export function AuthDialog({
     setError(null);
     try {
       await signInWithGoogle();
-      onOpenChange(false);
     } catch (err) {
       setError(
         err instanceof Error ? mapAuthError(err.message) : "Erro no login com Google."

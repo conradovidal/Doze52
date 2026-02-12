@@ -125,21 +125,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       );
     }
     const supabase = getSupabaseBrowserClient();
-    const redirectTo = `${window.location.origin}/auth/callback`;
+    const redirectTo = `${window.location.origin}/auth/callback?flow=popup`;
     if (process.env.NODE_ENV !== "production") {
       console.info("[auth] google redirectTo:", redirectTo);
     }
-    const runRedirectFallback = async () => {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo,
-          queryParams: { prompt: "select_account" },
-        },
-      });
-      if (error) throw error;
-    };
-
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
@@ -150,12 +139,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
     if (error) throw error;
     if (!data?.url) {
-      await runRedirectFallback();
-      return;
+      throw new Error("Nao foi possivel iniciar login com popup.");
     }
 
     const width = 520;
-    const height = 700;
+    const height = 640;
     const left = Math.max(window.screenX + (window.outerWidth - width) / 2, 0);
     const top = Math.max(window.screenY + (window.outerHeight - height) / 2, 0);
     const features = [
@@ -166,66 +154,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       "popup=yes",
       "resizable=yes",
       "scrollbars=yes",
-      "noopener",
-      "noreferrer",
+      "toolbar=no",
+      "menubar=no",
     ].join(",");
-    const popup = window.open(data.url, "google_oauth", features);
+    const popup = window.open(data.url, "oauthPopup", features);
 
     if (!popup) {
-      await runRedirectFallback();
-      return;
+      throw new Error("Popup bloqueada. Libere popups para continuar o login.");
     }
-
-    await new Promise<void>((resolve, reject) => {
-      let settled = false;
-      let checking = false;
-
-      const cleanup = () => {
-        window.clearInterval(intervalId);
-        window.clearTimeout(timeoutId);
-      };
-
-      const finish = (cb: () => void) => {
-        if (settled) return;
-        settled = true;
-        cleanup();
-        try {
-          if (!popup.closed) popup.close();
-        } catch {
-          // no-op
-        }
-        cb();
-      };
-
-      const intervalId = window.setInterval(async () => {
-        if (settled || checking) return;
-        checking = true;
-        try {
-          if (popup.closed) {
-            finish(() => reject(new Error("Login com Google cancelado.")));
-            return;
-          }
-
-          const { data: sessionData, error: sessionError } =
-            await supabase.auth.getSession();
-          if (sessionError) {
-            finish(() => reject(sessionError));
-            return;
-          }
-          if (sessionData.session) {
-            finish(() => resolve());
-          }
-        } finally {
-          checking = false;
-        }
-      }, 600);
-
-      const timeoutId = window.setTimeout(() => {
-        finish(() =>
-          reject(new Error("Tempo esgotado para concluir login com Google."))
-        );
-      }, 120_000);
-    });
   };
 
   const signOut = async () => {

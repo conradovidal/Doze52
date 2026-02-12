@@ -5,10 +5,14 @@ import { LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useAuth } from "@/lib/auth";
+import { exportUserData } from "@/lib/sync";
+import { logDevError, logProdError } from "@/lib/safe-log";
 
 export function UserMenu() {
   const { session, signOut } = useAuth();
   const [brokenAvatar, setBrokenAvatar] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
   const loggedMissingAvatarRef = useRef<string | null>(null);
 
   const metadata = session?.user.metadata ?? {};
@@ -20,7 +24,7 @@ export function UserMenu() {
     (typeof metadata.avatar_url === "string" && metadata.avatar_url) ||
     (typeof metadata.picture === "string" && metadata.picture) ||
     null;
-  const avatarUrl = metadataAvatar || session?.user.avatarUrl || null;
+  const avatarUrl = metadataAvatar;
   const fallbackInitial =
     (displayName || session?.user.email || "").trim().charAt(0).toUpperCase() || "?";
   const metadataKeys = Object.keys(session?.user.metadata ?? {});
@@ -32,7 +36,10 @@ export function UserMenu() {
     if (metadataAvatar) return;
     if (loggedMissingAvatarRef.current === session.user.id) return;
     loggedMissingAvatarRef.current = session.user.id;
-    console.info("[auth] avatar metadata missing:", session.user.metadata ?? null);
+    console.log(
+      Object.keys(session.user.metadata ?? {}),
+      session.user.metadata ?? null
+    );
   }, [metadataAvatar, session]);
 
   if (!session) return null;
@@ -80,6 +87,32 @@ export function UserMenu() {
             <LogOut size={14} className="mr-2" />
             Sair
           </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-start"
+            disabled={isExporting}
+            onClick={async () => {
+              try {
+                setIsExporting(true);
+                setExportError(null);
+                await exportUserData();
+              } catch (error) {
+                const message =
+                  error instanceof Error
+                    ? error.message
+                    : "Falhou ao exportar. Tente novamente.";
+                logDevError("user-menu.export", { message });
+                logProdError("Falha ao exportar dados do usuario.");
+                setExportError("Falhou ao exportar. Tente novamente.");
+              } finally {
+                setIsExporting(false);
+              }
+            }}
+          >
+            {isExporting ? "Exportando..." : "Exportar dados"}
+          </Button>
+          {exportError ? <p className="text-xs text-red-600">{exportError}</p> : null}
         </div>
       </PopoverContent>
     </Popover>

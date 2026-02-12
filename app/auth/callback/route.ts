@@ -5,21 +5,29 @@ import { cookies } from "next/headers";
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
-  const next = requestUrl.searchParams.get("next");
-  const error = requestUrl.searchParams.get("error");
+  const flow = requestUrl.searchParams.get("flow");
+  const isPopupFlow = flow === "popup";
 
-  const redirectPath =
-    next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
-  const redirectUrl = new URL(redirectPath, requestUrl.origin);
-  if (error) {
-    redirectUrl.searchParams.set("auth_error", "1");
-  }
-  const response = NextResponse.redirect(redirectUrl);
+  const buildResponse = (status: "success" | "error") => {
+    const redirectUrl = new URL(
+      isPopupFlow ? "/auth/popup-callback" : "/",
+      requestUrl.origin
+    );
+    if (isPopupFlow) {
+      redirectUrl.searchParams.set("status", status);
+    }
+    return NextResponse.redirect(redirectUrl);
+  };
+
+  let response = buildResponse("success");
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  if (!supabaseUrl || !supabaseAnonKey || error) {
+  if (!supabaseUrl || !supabaseAnonKey) {
+    if (process.env.NODE_ENV !== "production") {
+      console.info("[auth] callback ok:", requestUrl.origin);
+    }
     return response;
   }
 
@@ -37,8 +45,17 @@ export async function GET(request: Request) {
     },
   });
 
-  if (code) {
-    await supabase.auth.exchangeCodeForSession(code);
+  try {
+    if (code) {
+      const { error } = await supabase.auth.exchangeCodeForSession(code);
+      if (error) throw error;
+    }
+  } catch {
+    response = buildResponse("error");
+  }
+
+  if (process.env.NODE_ENV !== "production") {
+    console.info("[auth] callback ok:", requestUrl.origin);
   }
 
   return response;

@@ -79,6 +79,8 @@ export function CategoryManager({
   const [customHexDraft, setCustomHexDraft] = React.useState(DEFAULT_CATEGORY_COLOR);
   const [customHexError, setCustomHexError] = React.useState(false);
   const [customPopoverOpen, setCustomPopoverOpen] = React.useState(false);
+  const [isSaving, setIsSaving] = React.useState(false);
+  const [saveError, setSaveError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     if (!open) return;
@@ -89,6 +91,8 @@ export function CategoryManager({
       setCustomHexDraft(initial);
       setCustomHexError(false);
       setCustomPopoverOpen(false);
+      setIsSaving(false);
+      setSaveError(null);
       return;
     }
     setName("");
@@ -96,6 +100,8 @@ export function CategoryManager({
     setCustomHexDraft(DEFAULT_CATEGORY_COLOR);
     setCustomHexError(false);
     setCustomPopoverOpen(false);
+    setIsSaving(false);
+    setSaveError(null);
   }, [open, mode, category]);
 
   const canSave = name.trim().length > 0;
@@ -104,23 +110,47 @@ export function CategoryManager({
   const normalizedColor = color.toLowerCase();
   const isPresetColor = PASTEL_COLORS.some((c) => c.toLowerCase() === normalizedColor);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!canSave) return;
-    if (isEdit) {
-      if (!categoryId) return;
-      updateCategory(categoryId, { name: name.trim(), color });
+    try {
+      setIsSaving(true);
+      setSaveError(null);
+      if (isEdit) {
+        if (!categoryId) return;
+        updateCategory(categoryId, { name: name.trim(), color });
+        onOpenChange(false);
+        return;
+      }
+      const id = createCategory({ name: name.trim(), color });
+      if (id) onCreated?.(id);
       onOpenChange(false);
-      return;
+    } catch (error) {
+      setSaveError(
+        error instanceof Error
+          ? error.message
+          : "Falhou ao salvar categoria. Tente novamente."
+      );
+    } finally {
+      setIsSaving(false);
     }
-    const id = createCategory({ name: name.trim(), color });
-    if (id) onCreated?.(id);
-    onOpenChange(false);
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!isEdit || !categoryId || !canDelete) return;
-    deleteCategory(categoryId);
-    onOpenChange(false);
+    try {
+      setIsSaving(true);
+      setSaveError(null);
+      deleteCategory(categoryId);
+      onOpenChange(false);
+    } catch (error) {
+      setSaveError(
+        error instanceof Error
+          ? error.message
+          : "Falhou ao excluir categoria. Tente novamente."
+      );
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const applyHexDraft = (raw: string) => {
@@ -258,21 +288,22 @@ export function CategoryManager({
         </div>
         <DialogFooter className="sm:justify-between">
           {isEdit ? (
-            <Button variant="destructive" onClick={handleDelete} disabled={!canDelete}>
+            <Button variant="destructive" onClick={handleDelete} disabled={!canDelete || isSaving}>
               Deletar
             </Button>
           ) : (
             <div />
           )}
           <div className="flex gap-2">
-            <Button variant="ghost" onClick={() => onOpenChange(false)}>
+            <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={isSaving}>
               Cancelar
             </Button>
-            <Button onClick={handleSave} disabled={!canSave}>
-              {isEdit ? "Salvar" : "Criar"}
+            <Button onClick={handleSave} disabled={!canSave || isSaving}>
+              {isSaving ? "Salvando..." : isEdit ? "Salvar" : "Criar"}
             </Button>
           </div>
         </DialogFooter>
+        {saveError ? <p className="text-sm text-red-600">{saveError}</p> : null}
       </DialogContent>
     </Dialog>
   );
