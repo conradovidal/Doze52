@@ -96,10 +96,16 @@ export default function HomePage() {
         setSyncBlocked(false);
       } catch (error) {
         if (cancelled) return;
-        const message = error instanceof SyncError ? error.userMessage : "Falhou ao carregar dados.";
-        logDevError("app.page.bootstrap-remote", { message });
+        const syncError =
+          error instanceof SyncError
+            ? error
+            : new SyncError("unknown", "Falhou ao carregar dados.", false);
+        logDevError("app.page.bootstrap-remote", {
+          kind: syncError.kind,
+          message: syncError.userMessage,
+        });
         logProdError("Falha ao carregar dados remotos.");
-        setSyncError(message);
+        setSyncError(syncError.userMessage);
         setRemoteReady(false);
         setSyncBlocked(true);
       } finally {
@@ -134,13 +140,16 @@ export default function HomePage() {
         await saveSnapshot(nextSnapshot);
         lastSyncedHashRef.current = nextHash;
       } catch (error) {
-        const message =
+        const syncError =
           error instanceof SyncError
-            ? error.userMessage
-            : "Falhou ao salvar. Tente novamente.";
-        logDevError("app.page.save-snapshot", { message });
+            ? error
+            : new SyncError("unknown", "Falhou ao salvar. Tente novamente.", false);
+        logDevError("app.page.save-snapshot", {
+          kind: syncError.kind,
+          message: syncError.userMessage,
+        });
         logProdError("Falha ao salvar dados.");
-        setSyncError(message);
+        setSyncError(syncError.userMessage);
         setSyncBlocked(true);
         setRemoteReady(false);
       } finally {
