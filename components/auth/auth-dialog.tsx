@@ -12,7 +12,6 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth";
-import { getSupabaseBrowserClient, hasSupabaseEnv } from "@/lib/supabase";
 import { GoogleButton } from "./google-button";
 
 export function AuthDialog({
@@ -27,6 +26,7 @@ export function AuthDialog({
     signInWithPassword,
     signUpWithPassword,
     signInWithGoogle,
+    refreshSessionFromClient,
     closeGooglePopupIfOpen,
     isGooglePopupOpen,
   } = useAuth();
@@ -36,98 +36,172 @@ export function AuthDialog({
   const [error, setError] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [pendingGooglePopup, setPendingGooglePopup] = React.useState(false);
+  const popupIntervalRef = React.useRef<number | null>(null);
+  const popupTimeoutRef = React.useRef<number | null>(null);
+  const popupMessageReceivedRef = React.useRef(false);
+  const popupSettledRef = React.useRef(false);
+  const pollingInFlightRef = React.useRef(false);
+
+  const clearPopupTimers = React.useCallback(() => {
+    if (popupIntervalRef.current !== null) {
+      window.clearInterval(popupIntervalRef.current);
+      popupIntervalRef.current = null;
+    }
+    if (popupTimeoutRef.current !== null) {
+      window.clearTimeout(popupTimeoutRef.current);
+      popupTimeoutRef.current = null;
+    }
+  }, []);
+
+  const finalizeAuthSuccess = React.useCallback(
+    async (alreadyRefreshed = false) => {
+      if (popupSettledRef.current) return;
+      popupSettledRef.current = true;
+      if (!alreadyRefreshed) {
+        await refreshSessionFromClient();
+      }
+      clearPopupTimers();
+      setPendingGooglePopup(false);
+      setError(null);
+      router.refresh();
+      onOpenChange(false);
+    },
+    [clearPopupTimers, onOpenChange, refreshSessionFromClient, router]
+  );
+
+  const finalizeAuthError = React.useCallback(
+    (message: string) => {
+      if (popupSettledRef.current) return;
+      popupSettledRef.current = true;
+      clearPopupTimers();
+      setPendingGooglePopup(false);
+      setError(message);
+    },
+    [clearPopupTimers]
+  );
 
   React.useEffect(() => {
     if (!open) {
       setPendingGooglePopup(false);
+      popupMessageReceivedRef.current = false;
+      popupSettledRef.current = false;
+      pollingInFlightRef.current = false;
+      clearPopupTimers();
       return;
     }
     setError(null);
     setEmail("");
     setPassword("");
-  }, [open, mode]);
+  }, [clearPopupTimers, open, mode]);
 
   React.useEffect(() => {
     if (!open) return;
 
     const onAuthMessage = (event: MessageEvent) => {
-      if (event.origin !== window.location.origin) return;
       const data =
         event.data && typeof event.data === "object"
           ? (event.data as { type?: string; error?: string })
           : null;
-      if (!data?.type) return;
+
+      const originMatches = event.origin === window.location.origin;
       if (process.env.NODE_ENV !== "production") {
         console.info("[auth] message received", {
-          type: data.type,
-          origin: event.origin,
+          type: data?.type ?? null,
+          eventOrigin: event.origin,
+          currentOrigin: window.location.origin,
+          accepted: originMatches,
         });
       }
+      if (!originMatches || !data?.type) return;
 
       if (data.type === "SUPABASE_AUTH_SUCCESS") {
-        void (async () => {
-          if (hasSupabaseEnv) {
-            const supabase = getSupabaseBrowserClient();
-            await supabase.auth.getSession();
-          }
-          setPendingGooglePopup(false);
-          router.refresh();
-          setError(null);
-          onOpenChange(false);
-        })();
+        popupMessageReceivedRef.current = true;
+        void finalizeAuthSuccess(false);
         return;
       }
 
       if (data.type === "SUPABASE_AUTH_ERROR") {
-        setPendingGooglePopup(false);
-        setError("Falha no login com Google. Tente novamente.");
+        popupMessageReceivedRef.current = true;
+        finalizeAuthError("Falha no login com Google. Tente novamente.");
       }
     };
 
     window.addEventListener("message", onAuthMessage);
     return () => {
       window.removeEventListener("message", onAuthMessage);
+      clearPopupTimers();
       closeGooglePopupIfOpen();
     };
-  }, [closeGooglePopupIfOpen, onOpenChange, open, router]);
+  }, [
+    clearPopupTimers,
+    closeGooglePopupIfOpen,
+    finalizeAuthError,
+    finalizeAuthSuccess,
+    open,
+  ]);
 
   React.useEffect(() => {
-    if (!open || !pendingGooglePopup || !hasSupabaseEnv) return;
-    const supabase = getSupabaseBrowserClient();
-    const start = Date.now();
+    if (!open || !pendingGooglePopup) return;
+    popupSettledRef.current = false;
+    popupMessageReceivedRef.current = false;
+    pollingInFlightRef.current = false;
+    clearPopupTimers();
+
     const timeoutMs = 15000;
     const intervalMs = 500;
-    let stopped = false;
+    const startedAt = Date.now();
 
-    const poll = async () => {
-      if (stopped) return;
+    const runSessionCheck = async (
+      reason: "poll" | "popup_closed" | "timeout"
+    ) => {
+      if (popupSettledRef.current || pollingInFlightRef.current) return;
+      pollingInFlightRef.current = true;
+      try {
+        const nextSession = await refreshSessionFromClient();
+        if (nextSession) {
+          await finalizeAuthSuccess(true);
+          return;
+        }
+        if (reason === "popup_closed") {
+          finalizeAuthError("Falha no login com Google. Tente novamente.");
+          return;
+        }
+        if (reason === "timeout" || Date.now() - startedAt >= timeoutMs) {
+          finalizeAuthError("Falha no login com Google. Tente novamente.");
+        }
+      } finally {
+        pollingInFlightRef.current = false;
+      }
+    };
+
+    popupIntervalRef.current = window.setInterval(() => {
+      if (popupSettledRef.current || popupMessageReceivedRef.current) return;
       const popupOpen = isGooglePopupOpen();
-      if (popupOpen && Date.now() - start < timeoutMs) return;
-
-      const { data } = await supabase.auth.getSession();
-      if (data.session) {
-        setPendingGooglePopup(false);
-        setError(null);
-        router.refresh();
-        onOpenChange(false);
+      if (!popupOpen) {
+        void runSessionCheck("popup_closed");
         return;
       }
-
-      if (!popupOpen || Date.now() - start >= timeoutMs) {
-        setPendingGooglePopup(false);
-        setError("Falha no login com Google. Tente novamente.");
-      }
-    };
-
-    const timer = window.setInterval(() => {
-      void poll();
+      void runSessionCheck("poll");
     }, intervalMs);
 
+    popupTimeoutRef.current = window.setTimeout(() => {
+      if (popupSettledRef.current || popupMessageReceivedRef.current) return;
+      void runSessionCheck("timeout");
+    }, timeoutMs);
+
     return () => {
-      stopped = true;
-      window.clearInterval(timer);
+      clearPopupTimers();
+      pollingInFlightRef.current = false;
     };
-  }, [isGooglePopupOpen, onOpenChange, open, pendingGooglePopup, router]);
+  }, [
+    clearPopupTimers,
+    finalizeAuthError,
+    finalizeAuthSuccess,
+    isGooglePopupOpen,
+    open,
+    pendingGooglePopup,
+    refreshSessionFromClient,
+  ]);
 
   const canSubmit = email.trim().length > 0 && password.length >= 6;
   const mapAuthError = (raw: string) => {
@@ -164,6 +238,8 @@ export function AuthDialog({
     setError(null);
     try {
       await signInWithGoogle();
+      popupMessageReceivedRef.current = false;
+      popupSettledRef.current = false;
       setPendingGooglePopup(true);
     } catch (err) {
       setError(

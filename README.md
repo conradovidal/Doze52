@@ -110,10 +110,20 @@ Security audit quick check:
 rg -n "service_role|SUPABASE_SERVICE_ROLE|sb_secret|sbp_"
 ```
 
-## Supabase DEV bootstrap (categories/events)
+## Supabase DEV migrations (categories/events)
 
-1. Link local CLI to DEV project: `supabase link --project-ref <DEV_REF>`.
-2. Apply migrations: `supabase db push`.
-3. Confirm in Supabase Table Editor that `public.categories` and `public.events` exist.
-4. Confirm RLS policies `*_own` exist for SELECT/INSERT/UPDATE/DELETE on both tables.
-5. If app shows `Banco DEV sem tabelas/migrations...`, run `supabase db push` again in DEV.
+1. Apply migrations to DEV:
+- `supabase link --project-ref <DEV_REF>`
+- `supabase db push`
+2. Confirm tables used by sync (`loadRemoteData`, `saveSnapshot`, `exportUserData`):
+- `public.categories`
+- `public.events`
+3. Confirm minimum RLS/policies per table:
+- RLS `enabled` and `force`.
+- Policies `SELECT/INSERT/UPDATE/DELETE` with `auth.uid() = user_id`.
+4. Confirm environment points to the same DEV project:
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+5. Validate after login:
+- home loads without `Banco DEV sem tabelas/migrations...`
+- create/update/delete category/event persists after reload.

@@ -20,6 +20,7 @@ export type AuthSession = {
 type AuthContextValue = {
   session: AuthSession | null;
   loading: boolean;
+  refreshSessionFromClient: () => Promise<AuthSession | null>;
   signInWithPassword: (email: string, password: string) => Promise<void>;
   signUpWithPassword: (email: string, password: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
@@ -82,6 +83,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     return () => subscription.unsubscribe();
+  }, []);
+
+  const refreshSessionFromClient = React.useCallback(async () => {
+    if (!hasSupabaseEnv) {
+      setSession(null);
+      return null;
+    }
+    const supabase = getSupabaseBrowserClient();
+    const { data, error } = await supabase.auth.getSession();
+    if (error || !data.session) {
+      setSession(null);
+      return null;
+    }
+    const nextSession = toAuthSession(data.session);
+    setSession(nextSession);
+    return nextSession;
   }, []);
 
   const signInWithPassword = async (email: string, password: string) => {
@@ -232,6 +249,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       value={{
         session,
         loading,
+        refreshSessionFromClient,
         signInWithPassword,
         signUpWithPassword,
         signInWithGoogle,
