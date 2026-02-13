@@ -56,15 +56,21 @@ Behavior:
 
 1. Supabase Auth URL Configuration:
 - Site URL = current environment URL.
-- Redirect URLs include `http://localhost:3000/auth/callback`, `http://127.0.0.1:3000/auth/callback`, preview callback URL(s), and prod callback URL.
+- Redirect URLs include:
+  - `http://localhost:3000/auth/callback`
+  - `http://localhost:3000/auth/callback/popup`
+  - `http://localhost:3000/auth/popup-callback`
+  - `http://127.0.0.1:3000/auth/callback`
+  - `http://127.0.0.1:3000/auth/callback/popup`
+  - preview/prod equivalents for `/auth/callback`, `/auth/callback/popup`, and `/auth/popup-callback`.
 2. Google Cloud OAuth client:
 - Authorized redirect URIs: `https://<SUPABASE_PROJECT_REF>.supabase.co/auth/v1/callback`.
 - Authorized JavaScript origins: `https://<SUPABASE_PROJECT_REF>.supabase.co`.
-3. Preview wildcard (optional, Supabase permitting): `https://*-<team-or-project>.vercel.app/auth/callback`.
+3. Preview wildcard (optional, Supabase permitting): `https://*-<team-or-project>.vercel.app/auth/callback*`.
 4. Validate in browser Network:
-- Supabase `/auth/v1/authorize` must send `redirect_to=<current-origin>/auth/callback?flow=popup`.
+- Supabase `/auth/v1/authorize` must send `redirect_to=<current-origin>/auth/callback/popup`.
 - Never allow preview/prod to send `redirect_to=http://localhost:3000/...`.
-5. OAuth origin in app runtime is derived from `window.location.origin` (client) and request headers/origin (server), not from env URL.
+5. Stage/Preview `NEXT_PUBLIC_SUPABASE_URL` must point to the same Supabase project where these redirect URLs were configured.
 
 ## Learn More
 

@@ -11,7 +11,7 @@ import { useStore, type EventInput } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { loadRemoteData, saveSnapshot, SyncError } from "@/lib/sync";
 import { logDevError, logProdError } from "@/lib/safe-log";
-import { hasSupabaseEnv } from "@/lib/supabase";
+import { getSupabaseBrowserClient, hasSupabaseEnv } from "@/lib/supabase";
 
 export default function HomePage() {
   const initialYear = React.useMemo(() => {
@@ -54,24 +54,109 @@ export default function HomePage() {
   const [isSyncing, setIsSyncing] = React.useState(false);
   const [remoteReady, setRemoteReady] = React.useState(false);
   const [syncBlocked, setSyncBlocked] = React.useState(false);
+  const [windowContext] = React.useState<"main" | "popup">(() => {
+    if (typeof window === "undefined") return "main";
+    return Boolean(window.opener) || window.name === "doze52_oauth"
+      ? "popup"
+      : "main";
+  });
+  const [popupStatusMessage, setPopupStatusMessage] = React.useState(
+    "Finalizando login..."
+  );
   const lastSyncedHashRef = React.useRef<string>("");
   const saveTimerRef = React.useRef<number | null>(null);
 
   const editingEvent = editingId ? getEventById(editingId) : null;
 
   React.useEffect(() => {
-    ensureEventMetadata();
-  }, [ensureEventMetadata]);
+    if (windowContext !== "popup") return;
+    let finished = false;
+    let attempts = 0;
+    const maxAttempts = 30;
+    let timer: number | null = null;
+
+    const notifyOpener = (
+      type: "SUPABASE_AUTH_SUCCESS" | "SUPABASE_AUTH_ERROR"
+    ) => {
+      if (!window.opener) return;
+      if (type === "SUPABASE_AUTH_SUCCESS") {
+        window.opener.postMessage({ type }, window.location.origin);
+        return;
+      }
+      window.opener.postMessage(
+        { type, error: "oauth_callback_failed" },
+        window.location.origin
+      );
+    };
+
+    const finishSuccess = () => {
+      notifyOpener("SUPABASE_AUTH_SUCCESS");
+      setPopupStatusMessage("Login concluido. Voce pode fechar esta janela.");
+      window.close();
+    };
+
+    const finishError = () => {
+      notifyOpener("SUPABASE_AUTH_ERROR");
+      setPopupStatusMessage("Falha no login. Feche esta janela e tente novamente.");
+    };
+
+    if (!hasSupabaseEnv) {
+      finishError();
+      return;
+    }
+
+    const supabase = getSupabaseBrowserClient();
+    const tryFinalize = async () => {
+      if (finished) return;
+      attempts += 1;
+      const { data } = await supabase.auth.getSession();
+      if (finished) return;
+      if (data.session) {
+        finished = true;
+        if (timer !== null) {
+          window.clearInterval(timer);
+        }
+        finishSuccess();
+        return;
+      }
+      if (attempts >= maxAttempts) {
+        finished = true;
+        if (timer !== null) {
+          window.clearInterval(timer);
+        }
+        finishError();
+      }
+    };
+
+    void tryFinalize();
+    timer = window.setInterval(() => {
+      void tryFinalize();
+    }, 500);
+
+    return () => {
+      finished = true;
+      if (timer !== null) {
+        window.clearInterval(timer);
+      }
+    };
+  }, [windowContext]);
 
   React.useEffect(() => {
+    if (windowContext !== "main") return;
+    ensureEventMetadata();
+  }, [ensureEventMetadata, windowContext]);
+
+  React.useEffect(() => {
+    if (windowContext !== "main") return;
     if (hasSupabaseEnv) return;
     const message =
       "Supabase nao configurado. Defina NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY neste ambiente.";
     logDevError("app.page.supabase-env", { message });
     logProdError("Supabase nao configurado neste ambiente.");
-  }, []);
+  }, [windowContext]);
 
   React.useEffect(() => {
+    if (windowContext !== "main") return;
     if (!session?.user.id) {
       setRemoteReady(false);
       setSyncBlocked(false);
@@ -79,9 +164,10 @@ export default function HomePage() {
       lastSyncedHashRef.current = "";
       return;
     }
-  }, [session?.user.id]);
+  }, [session?.user.id, windowContext]);
 
   const bootstrapRemote = React.useCallback(() => {
+    if (windowContext !== "main") return () => {};
     if (!session?.user.id) return () => {};
     let cancelled = false;
     const run = async () => {
@@ -117,7 +203,7 @@ export default function HomePage() {
     return () => {
       cancelled = true;
     };
-  }, [replaceAllData, session?.user.id]);
+  }, [replaceAllData, session?.user.id, windowContext]);
 
   React.useEffect(() => {
     const cleanup = bootstrapRemote();
@@ -125,6 +211,7 @@ export default function HomePage() {
   }, [bootstrapRemote]);
 
   React.useEffect(() => {
+    if (windowContext !== "main") return;
     if (!session?.user.id || !remoteReady || syncBlocked || syncError) return;
     const nextSnapshot = { categories, events };
     const nextHash = JSON.stringify(nextSnapshot);
@@ -162,7 +249,15 @@ export default function HomePage() {
         window.clearTimeout(saveTimerRef.current);
       }
     };
-  }, [categories, events, remoteReady, session?.user.id, syncBlocked, syncError]);
+  }, [
+    categories,
+    events,
+    remoteReady,
+    session?.user.id,
+    syncBlocked,
+    syncError,
+    windowContext,
+  ]);
 
   const handleEditEvent = (id: string) => {
     setEditingId(id);
@@ -228,13 +323,14 @@ export default function HomePage() {
   }, []);
 
   React.useEffect(() => {
+    if (windowContext !== "main") return;
     const onWindowMouseUp = () => {
       if (!creatingRange || draggingEventId) return;
       handleFinishCreateRange();
     };
     window.addEventListener("mouseup", onWindowMouseUp);
     return () => window.removeEventListener("mouseup", onWindowMouseUp);
-  }, [creatingRange, draggingEventId, handleFinishCreateRange]);
+  }, [creatingRange, draggingEventId, handleFinishCreateRange, windowContext]);
 
   const clearDragState = () => {
     setDraggingEventId(null);
@@ -259,6 +355,14 @@ export default function HomePage() {
     moveEventByDelta(draggingEventId, deltaDays);
     clearDragState();
   };
+
+  if (windowContext === "popup") {
+    return (
+      <main className="flex min-h-screen items-center justify-center px-4">
+        <p className="text-sm text-neutral-600">{popupStatusMessage}</p>
+      </main>
+    );
+  }
 
   return (
     <main className="mx-auto w-full max-w-none px-4 py-8">

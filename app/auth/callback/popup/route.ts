@@ -11,19 +11,21 @@ export async function GET(request: Request) {
     ? `${forwardedProto ?? "https"}://${forwardedHost}`
     : requestUrl.origin;
   const code = requestUrl.searchParams.get("code");
-  const buildResponse = () => {
-    const redirectUrl = new URL("/", origin);
+
+  const buildResponse = (status: "success" | "error") => {
+    const redirectUrl = new URL("/auth/popup-callback", origin);
+    redirectUrl.searchParams.set("status", status);
     return NextResponse.redirect(redirectUrl);
   };
 
-  let response = buildResponse();
+  let response = buildResponse("success");
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!supabaseUrl || !supabaseAnonKey) {
     if (process.env.NODE_ENV !== "production") {
-      console.info("[callback.normal] env missing", {
+      console.info("[callback.popup] env missing", {
         requestUrl: request.url,
         origin,
         hasCode: Boolean(code),
@@ -53,11 +55,11 @@ export async function GET(request: Request) {
       if (error) throw error;
     }
   } catch {
-    response = buildResponse();
+    response = buildResponse("error");
   }
 
   if (process.env.NODE_ENV !== "production") {
-    console.info("[callback.normal]", {
+    console.info("[callback.popup]", {
       requestUrl: request.url,
       origin,
       hasCode: Boolean(code),

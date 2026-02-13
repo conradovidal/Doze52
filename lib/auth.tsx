@@ -134,10 +134,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     const origin = window.location.origin;
-    const popupRedirectTo = `${origin}/auth/callback?flow=popup`;
+    const popupRedirectTo = `${origin}/auth/callback/popup`;
     const fallbackRedirectTo = `${origin}/auth/callback`;
     if (process.env.NODE_ENV !== "production") {
-      console.info("[auth] oauth start", {
+      console.info("[oauth] start", {
         origin,
         popupRedirectTo,
         fallbackRedirectTo,
@@ -158,7 +158,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (process.env.NODE_ENV !== "production") {
       const authorizeUrl = new URL(data.url);
-      console.info("[auth] oauth popup", {
+      console.info("[oauth] authorize", {
+        url: data.url,
         origin,
         popupRedirectTo,
         authorizeUrl: authorizeUrl.origin + authorizeUrl.pathname,
@@ -188,7 +189,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (!popup) {
       if (process.env.NODE_ENV !== "production") {
-        console.info("[auth] oauth fallback", { mode: "redirect", origin });
+        console.info("[oauth] fallback", { mode: "redirect", origin });
       }
       const { error: redirectError } = await supabase.auth.signInWithOAuth({
         provider: "google",

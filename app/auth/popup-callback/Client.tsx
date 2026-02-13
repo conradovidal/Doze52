@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo } from "react";
 
@@ -34,13 +33,10 @@ export default function PopupCallbackClient() {
 
   return (
     <main className="flex min-h-screen items-center justify-center px-4">
-      <div className="space-y-2 text-center">
+      <div className="text-center">
         <p className="text-sm text-neutral-600">
           Falha no login. Feche esta janela e tente novamente.
         </p>
-        <Link href="/" className="text-sm text-neutral-700 underline">
-          Voltar para o inicio
-        </Link>
       </div>
     </main>
   );
