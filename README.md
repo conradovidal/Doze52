@@ -112,18 +112,23 @@ rg -n "service_role|SUPABASE_SERVICE_ROLE|sb_secret|sbp_"
 
 ## Supabase DEV migrations (categories/events)
 
-1. Apply migrations to DEV:
+1. Via Supabase CLI:
 - `supabase link --project-ref <DEV_REF>`
 - `supabase db push`
-2. Confirm tables used by sync (`loadRemoteData`, `saveSnapshot`, `exportUserData`):
-- `public.categories`
-- `public.events`
-3. Confirm minimum RLS/policies per table:
-- RLS `enabled` and `force`.
-- Policies `SELECT/INSERT/UPDATE/DELETE` with `auth.uid() = user_id`.
-4. Confirm environment points to the same DEV project:
+2. Via SQL Editor (Dashboard), execute in order:
+- `supabase/migrations/0001_init.sql`
+- `supabase/migrations/0002_rls.sql`
+- if needed, run incremental files `supabase/migrations/20260212_*.sql`.
+3. Checklist de env vars:
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-5. Validate after login:
+- local/preview should target DEV project; production should target PROD project.
+4. Confirm tables used by sync (`loadRemoteData`, `saveSnapshot`, `exportUserData`):
+- `public.categories`
+- `public.events`
+5. Confirm minimum RLS/policies per table:
+- RLS `enabled` and `force`.
+- Policies `SELECT/INSERT/UPDATE/DELETE` with `auth.uid() = user_id`.
+6. Validate after login:
 - home loads without `Banco DEV sem tabelas/migrations...`
 - create/update/delete category/event persists after reload.

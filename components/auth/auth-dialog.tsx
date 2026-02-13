@@ -38,7 +38,9 @@ export function AuthDialog({
   const [pendingGooglePopup, setPendingGooglePopup] = React.useState(false);
   const popupIntervalRef = React.useRef<number | null>(null);
   const popupTimeoutRef = React.useRef<number | null>(null);
-  const popupMessageReceivedRef = React.useRef(false);
+  const popupMessageReceivedRef = React.useRef<"none" | "success" | "error">(
+    "none"
+  );
   const popupSettledRef = React.useRef(false);
   const pollingInFlightRef = React.useRef(false);
 
@@ -56,9 +58,17 @@ export function AuthDialog({
   const finalizeAuthSuccess = React.useCallback(
     async (alreadyRefreshed = false) => {
       if (popupSettledRef.current) return;
+      const nextSession = alreadyRefreshed
+        ? null
+        : await refreshSessionFromClient();
+      if (!alreadyRefreshed && !nextSession) {
+        return;
+      }
       popupSettledRef.current = true;
-      if (!alreadyRefreshed) {
-        await refreshSessionFromClient();
+      if (process.env.NODE_ENV !== "production") {
+        console.info("[auth] session refreshed", {
+          userId: nextSession?.user.id ?? null,
+        });
       }
       clearPopupTimers();
       setPendingGooglePopup(false);
@@ -83,7 +93,7 @@ export function AuthDialog({
   React.useEffect(() => {
     if (!open) {
       setPendingGooglePopup(false);
-      popupMessageReceivedRef.current = false;
+      popupMessageReceivedRef.current = "none";
       popupSettledRef.current = false;
       pollingInFlightRef.current = false;
       clearPopupTimers();
@@ -115,13 +125,13 @@ export function AuthDialog({
       if (!originMatches || !data?.type) return;
 
       if (data.type === "SUPABASE_AUTH_SUCCESS") {
-        popupMessageReceivedRef.current = true;
+        popupMessageReceivedRef.current = "success";
         void finalizeAuthSuccess(false);
         return;
       }
 
       if (data.type === "SUPABASE_AUTH_ERROR") {
-        popupMessageReceivedRef.current = true;
+        popupMessageReceivedRef.current = "error";
         finalizeAuthError("Falha no login com Google. Tente novamente.");
       }
     };
@@ -143,7 +153,7 @@ export function AuthDialog({
   React.useEffect(() => {
     if (!open || !pendingGooglePopup) return;
     popupSettledRef.current = false;
-    popupMessageReceivedRef.current = false;
+    popupMessageReceivedRef.current = "none";
     pollingInFlightRef.current = false;
     clearPopupTimers();
 
@@ -159,10 +169,18 @@ export function AuthDialog({
       try {
         const nextSession = await refreshSessionFromClient();
         if (nextSession) {
+          if (process.env.NODE_ENV !== "production") {
+            console.info("[auth] session refreshed", {
+              userId: nextSession.user.id,
+            });
+          }
           await finalizeAuthSuccess(true);
           return;
         }
         if (reason === "popup_closed") {
+          if (popupMessageReceivedRef.current === "success") {
+            return;
+          }
           finalizeAuthError("Falha no login com Google. Tente novamente.");
           return;
         }
@@ -175,7 +193,7 @@ export function AuthDialog({
     };
 
     popupIntervalRef.current = window.setInterval(() => {
-      if (popupSettledRef.current || popupMessageReceivedRef.current) return;
+      if (popupSettledRef.current) return;
       const popupOpen = isGooglePopupOpen();
       if (!popupOpen) {
         void runSessionCheck("popup_closed");
@@ -185,7 +203,7 @@ export function AuthDialog({
     }, intervalMs);
 
     popupTimeoutRef.current = window.setTimeout(() => {
-      if (popupSettledRef.current || popupMessageReceivedRef.current) return;
+      if (popupSettledRef.current) return;
       void runSessionCheck("timeout");
     }, timeoutMs);
 
@@ -238,7 +256,7 @@ export function AuthDialog({
     setError(null);
     try {
       await signInWithGoogle();
-      popupMessageReceivedRef.current = false;
+      popupMessageReceivedRef.current = "none";
       popupSettledRef.current = false;
       setPendingGooglePopup(true);
     } catch (err) {
