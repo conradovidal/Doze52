@@ -1,11 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo } from "react";
 
 export default function PopupCallbackClient() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const status = searchParams.get("status");
   const isSuccess = useMemo(() => status !== "error", [status]);
@@ -21,16 +20,14 @@ export default function PopupCallbackClient() {
       window.close();
       return;
     }
-
-    if (isSuccess) {
-      router.replace("/");
-    }
-  }, [isSuccess, router]);
+  }, [isSuccess]);
 
   if (isSuccess) {
     return (
       <main className="flex min-h-screen items-center justify-center px-4">
-        <p className="text-sm text-neutral-600">You can close this window.</p>
+        <p className="text-sm text-neutral-600">
+          Login concluido. Voce pode fechar esta janela.
+        </p>
       </main>
     );
   }

@@ -24,6 +24,7 @@ type AuthContextValue = {
   signUpWithPassword: (email: string, password: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   closeGooglePopupIfOpen: () => void;
+  isGooglePopupOpen: () => boolean;
   signOut: () => Promise<void>;
 };
 
@@ -169,7 +170,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     const width = 520;
-    const height = 640;
+    const height = 720;
     const left = Math.max(window.screenX + (window.outerWidth - width) / 2, 0);
     const top = Math.max(window.screenY + (window.outerHeight - height) / 2, 0);
     const features = [
@@ -183,9 +184,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       "toolbar=no",
       "menubar=no",
     ].join(",");
-    const popup = window.open(data.url, "oauthPopup", features);
+    const popup = window.open(data.url, "doze52_oauth", features);
 
     if (!popup) {
+      if (process.env.NODE_ENV !== "production") {
+        console.info("[auth] oauth fallback", { mode: "redirect", origin });
+      }
       const { error: redirectError } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
@@ -208,6 +212,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     oauthPopupRef.current = null;
   };
 
+  const isGooglePopupOpen = () =>
+    Boolean(oauthPopupRef.current && !oauthPopupRef.current.closed);
+
   const signOut = async () => {
     if (!hasSupabaseEnv) {
       setSession(null);
@@ -228,6 +235,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signUpWithPassword,
         signInWithGoogle,
         closeGooglePopupIfOpen,
+        isGooglePopupOpen,
         signOut,
       }}
     >

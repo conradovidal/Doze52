@@ -28,15 +28,20 @@ export function AuthDialog({
     signUpWithPassword,
     signInWithGoogle,
     closeGooglePopupIfOpen,
+    isGooglePopupOpen,
   } = useAuth();
   const [mode, setMode] = React.useState<"login" | "signup">("login");
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
+  const [pendingGooglePopup, setPendingGooglePopup] = React.useState(false);
 
   React.useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setPendingGooglePopup(false);
+      return;
+    }
     setError(null);
     setEmail("");
     setPassword("");
@@ -62,6 +67,7 @@ export function AuthDialog({
             const supabase = getSupabaseBrowserClient();
             await supabase.auth.getSession();
           }
+          setPendingGooglePopup(false);
           router.refresh();
           setError(null);
           onOpenChange(false);
@@ -70,6 +76,7 @@ export function AuthDialog({
       }
 
       if (data.type === "SUPABASE_AUTH_ERROR") {
+        setPendingGooglePopup(false);
         setError("Falha no login com Google. Tente novamente.");
       }
     };
@@ -80,6 +87,44 @@ export function AuthDialog({
       closeGooglePopupIfOpen();
     };
   }, [closeGooglePopupIfOpen, onOpenChange, open, router]);
+
+  React.useEffect(() => {
+    if (!open || !pendingGooglePopup || !hasSupabaseEnv) return;
+    const supabase = getSupabaseBrowserClient();
+    const start = Date.now();
+    const timeoutMs = 15000;
+    const intervalMs = 500;
+    let stopped = false;
+
+    const poll = async () => {
+      if (stopped) return;
+      const popupOpen = isGooglePopupOpen();
+      if (popupOpen && Date.now() - start < timeoutMs) return;
+
+      const { data } = await supabase.auth.getSession();
+      if (data.session) {
+        setPendingGooglePopup(false);
+        setError(null);
+        router.refresh();
+        onOpenChange(false);
+        return;
+      }
+
+      if (!popupOpen || Date.now() - start >= timeoutMs) {
+        setPendingGooglePopup(false);
+        setError("Falha no login com Google. Tente novamente.");
+      }
+    };
+
+    const timer = window.setInterval(() => {
+      void poll();
+    }, intervalMs);
+
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+    };
+  }, [isGooglePopupOpen, onOpenChange, open, pendingGooglePopup, router]);
 
   const canSubmit = email.trim().length > 0 && password.length >= 6;
   const mapAuthError = (raw: string) => {
@@ -116,10 +161,12 @@ export function AuthDialog({
     setError(null);
     try {
       await signInWithGoogle();
+      setPendingGooglePopup(true);
     } catch (err) {
       setError(
         err instanceof Error ? mapAuthError(err.message) : "Erro no login com Google."
       );
+      setPendingGooglePopup(false);
     } finally {
       setLoading(false);
     }
