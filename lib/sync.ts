@@ -1,5 +1,9 @@
 import type { CalendarEvent, CategoryItem } from "@/lib/types";
-import { getSupabaseBrowserClient, hasSupabaseEnv } from "@/lib/supabase";
+import {
+  getSupabaseBrowserClient,
+  hasSupabaseEnv,
+  supabaseEnv,
+} from "@/lib/supabase";
 import { logDevError, logProdError } from "@/lib/safe-log";
 import {
   ValidationError,
@@ -38,7 +42,8 @@ export type CalendarSnapshot = {
 export type SyncErrorKind =
   | "missing_relation"
   | "permission"
-  | "transient_network"
+  | "not_authenticated"
+  | "network"
   | "environment"
   | "unknown";
 
@@ -59,6 +64,97 @@ export class SyncError extends Error {
 let saveInFlight: Promise<void> | null = null;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const genericSyncMessage = "Falha de sincronizacao. Tente novamente.";
+
+type QueryAction = "select" | "insert/update" | "delete" | "getUser";
+type QueryMeta = {
+  table: "categories" | "events" | "auth";
+  action: QueryAction;
+};
+
+const isDetailedSyncErrorEnabled = () =>
+  process.env.NODE_ENV !== "production" ||
+  process.env.NEXT_PUBLIC_APP_ENV === "local" ||
+  process.env.NEXT_PUBLIC_APP_ENV === "dev";
+
+const getSupabaseOrigin = () => {
+  try {
+    return new URL(supabaseEnv.url).origin;
+  } catch {
+    return "invalid-supabase-url";
+  }
+};
+
+const getErrorStatus = (error: unknown) => {
+  if (typeof error === "object" && error && "status" in error) {
+    const status = Number((error as { status?: number }).status);
+    return Number.isFinite(status) ? status : undefined;
+  }
+  return undefined;
+};
+
+const getErrorCode = (error: unknown) => {
+  if (typeof error === "object" && error && "code" in error) {
+    return String((error as { code?: string }).code);
+  }
+  return undefined;
+};
+
+const getErrorMessage = (error: unknown) =>
+  error instanceof Error ? error.message : String(error ?? "");
+
+const getErrorBody = (error: unknown) => {
+  if (typeof error !== "object" || !error) {
+    return { message: String(error ?? "unknown") };
+  }
+  const record = error as Record<string, unknown>;
+  return {
+    code: record.code ?? null,
+    message: record.message ?? null,
+    details: record.details ?? null,
+    hint: record.hint ?? null,
+  };
+};
+
+const logQueryFailure = (meta: QueryMeta, error: unknown) => {
+  if (!isDetailedSyncErrorEnabled()) return;
+  console.error("[sync.supabase.error]", {
+    supabaseUrl: getSupabaseOrigin(),
+    table: meta.table,
+    action: meta.action,
+    status: getErrorStatus(error) ?? null,
+    responseBody: getErrorBody(error),
+  });
+};
+
+const assertQuerySuccess = (error: unknown, meta: QueryMeta) => {
+  if (!error) return;
+  logQueryFailure(meta, error);
+  throw error;
+};
+
+const safeSupabaseMessage = (message: string) => {
+  const trimmed = message.trim();
+  if (!trimmed) return null;
+  if (
+    /token|apikey|api_key|authorization|bearer|service_role|anon_key/i.test(
+      trimmed
+    )
+  ) {
+    return null;
+  }
+  return trimmed.length > 220 ? `${trimmed.slice(0, 217)}...` : trimmed;
+};
+
+const userMessageForKind = (kind: SyncErrorKind, fallbackMessage?: string) => {
+  if (!isDetailedSyncErrorEnabled()) return genericSyncMessage;
+  if (kind === "not_authenticated") return "Nao autenticado.";
+  if (kind === "permission") return "Sem permissao (RLS).";
+  if (kind === "missing_relation") return "Tabela nao existe neste ambiente.";
+  if (kind === "network") return "Falha de rede.";
+  if (kind === "environment") return "Ambiente Supabase incorreto ou nao configurado.";
+  return safeSupabaseMessage(fallbackMessage ?? "") ?? genericSyncMessage;
+};
 
 const isTransientError = (message: string) => {
   const normalized = message.toLowerCase();
@@ -88,7 +184,6 @@ const isMissingRelationError = (message: string, code?: string, status?: number)
 const isPermissionError = (message: string, code?: string, status?: number) => {
   const normalized = message.toLowerCase();
   return (
-    status === 401 ||
     status === 403 ||
     code === "42501" ||
     normalized.includes("permission denied") ||
@@ -97,50 +192,71 @@ const isPermissionError = (message: string, code?: string, status?: number) => {
   );
 };
 
+const isNotAuthenticatedError = (
+  message: string,
+  code?: string,
+  status?: number
+) => {
+  const normalized = message.toLowerCase();
+  return (
+    status === 401 ||
+    code === "PGRST301" ||
+    normalized.includes("nao autenticado") ||
+    normalized.includes("sessao expirada") ||
+    normalized.includes("jwt") ||
+    normalized.includes("auth session missing")
+  );
+};
+
 const classifySyncError = (error: unknown): SyncError => {
   if (error instanceof SyncError) return error;
   if (error instanceof ValidationError) {
-    return new SyncError("unknown", error.message, false);
+    return new SyncError(
+      "unknown",
+      userMessageForKind("unknown", error.message),
+      false
+    );
   }
-  const message = error instanceof Error ? error.message : String(error);
-  const status =
-    typeof error === "object" && error && "status" in error
-      ? Number((error as { status?: number }).status)
-      : undefined;
-  const code =
-    typeof error === "object" && error && "code" in error
-      ? String((error as { code?: string }).code)
-      : undefined;
+  const message = getErrorMessage(error);
+  const status = getErrorStatus(error);
+  const code = getErrorCode(error);
 
   if (message.toLowerCase().includes("supabase nao configurado")) {
     return new SyncError(
       "environment",
-      "Ambiente Supabase incorreto ou nao configurado.",
+      userMessageForKind("environment"),
+      false
+    );
+  }
+  if (isNotAuthenticatedError(message, code, status)) {
+    return new SyncError(
+      "not_authenticated",
+      userMessageForKind("not_authenticated"),
       false
     );
   }
   if (isMissingRelationError(message, code, status)) {
     return new SyncError(
       "missing_relation",
-      "Banco DEV sem tabelas/migrations. Rode migrations no Supabase DEV.",
+      userMessageForKind("missing_relation"),
       false
     );
   }
   if (isPermissionError(message, code, status)) {
     return new SyncError(
       "permission",
-      "Sem permissao. Verifique RLS/policies para user_id.",
+      userMessageForKind("permission"),
       false
     );
   }
   if (isTransientError(message)) {
     return new SyncError(
-      "transient_network",
-      "Falha de sincronizacao. Tente novamente.",
+      "network",
+      userMessageForKind("network"),
       true
     );
   }
-  return new SyncError("unknown", "Falha de sincronizacao. Tente novamente.", false);
+  return new SyncError("unknown", userMessageForKind("unknown", message), false);
 };
 
 async function withRetry<T>(fn: () => Promise<T>, retries = 1): Promise<T> {
@@ -208,10 +324,21 @@ const ensureSupabase = () => {
 const getCurrentUserIdOrThrow = async () => {
   const supabase = ensureSupabase();
   const { data, error } = await supabase.auth.getUser();
-  if (error) throw error;
+  assertQuerySuccess(error, {
+    table: "auth",
+    action: "getUser",
+  });
   const userId = data.user?.id;
   if (!userId) {
-    throw new Error("Sessao expirada. Faca login novamente.");
+    const authError = new Error("Nao autenticado.");
+    logQueryFailure(
+      {
+        table: "auth",
+        action: "getUser",
+      },
+      authError
+    );
+    throw authError;
   }
   return userId;
 };
@@ -225,7 +352,7 @@ export const fetchCategories = async (): Promise<CategoryItem[]> => {
       .select("*")
       .eq("user_id", userId)
       .order("position", { ascending: true });
-    if (error) throw error;
+    assertQuerySuccess(error, { table: "categories", action: "select" });
     return ((data ?? []) as DbCategory[]).map(toLocalCategory);
   });
 };
@@ -241,7 +368,7 @@ export const fetchEvents = async (
       .select("*")
       .eq("user_id", userId)
       .order("start_date", { ascending: true });
-    if (error) throw error;
+    assertQuerySuccess(error, { table: "events", action: "select" });
     return ((data ?? []) as DbEvent[]).map((row) => toLocalEvent(row, categories));
   });
 };
@@ -304,21 +431,33 @@ const saveSnapshotInternal = async (snapshot: CalendarSnapshot): Promise<void> =
         supabase.from("events").select("id").eq("user_id", userId),
       ]);
 
-      if (currentCategories.error) throw currentCategories.error;
-      if (currentEvents.error) throw currentEvents.error;
+      assertQuerySuccess(currentCategories.error, {
+        table: "categories",
+        action: "select",
+      });
+      assertQuerySuccess(currentEvents.error, {
+        table: "events",
+        action: "select",
+      });
 
       if (categoryRows.length > 0) {
         const { error } = await supabase
           .from("categories")
           .upsert(categoryRows, { onConflict: "id" });
-        if (error) throw error;
+        assertQuerySuccess(error, {
+          table: "categories",
+          action: "insert/update",
+        });
       }
 
       if (eventRows.length > 0) {
         const { error } = await supabase
           .from("events")
           .upsert(eventRows, { onConflict: "id" });
-        if (error) throw error;
+        assertQuerySuccess(error, {
+          table: "events",
+          action: "insert/update",
+        });
       }
 
       const localCategoryIds = new Set(categoryRows.map((row) => row.id));
@@ -332,7 +471,10 @@ const saveSnapshotInternal = async (snapshot: CalendarSnapshot): Promise<void> =
           .delete()
           .eq("user_id", userId)
           .in("id", categoriesToDelete);
-        if (error) throw error;
+        assertQuerySuccess(error, {
+          table: "categories",
+          action: "delete",
+        });
       }
 
       const localEventIds = new Set(eventRows.map((row) => row.id));
@@ -346,7 +488,10 @@ const saveSnapshotInternal = async (snapshot: CalendarSnapshot): Promise<void> =
           .delete()
           .eq("user_id", userId)
           .in("id", eventsToDelete);
-        if (error) throw error;
+        assertQuerySuccess(error, {
+          table: "events",
+          action: "delete",
+        });
       }
     }, 1);
   } catch (error) {

@@ -17,8 +17,17 @@ export function UserMenu() {
   const metadata = session?.user.metadata ?? {};
   const fullName =
     typeof metadata.full_name === "string" ? metadata.full_name : undefined;
-  const shortName = typeof metadata.name === "string" ? metadata.name : undefined;
-  const displayName = fullName || shortName || session?.user.email || "";
+  const shortNameRaw =
+    typeof metadata.name === "string" ? metadata.name : undefined;
+  const isSyntheticGoogleName = (value: string | undefined) =>
+    Boolean(value && /^google_[a-z0-9]+$/i.test(value.trim()));
+  const shortName = isSyntheticGoogleName(shortNameRaw)
+    ? undefined
+    : shortNameRaw;
+  const email = session?.user.email ?? "";
+  const truncatedEmail =
+    email.length > 32 ? `${email.slice(0, 29).trimEnd()}...` : email;
+  const displayName = fullName || shortName || truncatedEmail || "";
   const metadataAvatar =
     (typeof metadata.avatar_url === "string" && metadata.avatar_url) ||
     (typeof metadata.picture === "string" && metadata.picture) ||
@@ -53,7 +62,7 @@ export function UserMenu() {
           <div>
             <p className="text-xs text-neutral-500">Conectado como</p>
             <p className="truncate text-sm">{displayName}</p>
-            <p className="truncate text-xs text-neutral-500">{session.user.email}</p>
+            <p className="truncate text-xs text-neutral-500">{email}</p>
           </div>
           <Button variant="ghost" size="sm" className="w-full justify-start" onClick={() => signOut()}>
             <LogOut size={14} className="mr-2" />

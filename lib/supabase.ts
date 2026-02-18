@@ -10,9 +10,17 @@ export const hasSupabaseEnv = Boolean(supabaseEnv.url && supabaseEnv.anonKey);
 
 let browserClient: SupabaseClient | null = null;
 let didLogSupabaseEnv = false;
+let didLogMissingSupabaseEnv = false;
 
 export const getSupabaseBrowserClient = () => {
   if (!hasSupabaseEnv) {
+    if (process.env.NODE_ENV !== "production" && !didLogMissingSupabaseEnv) {
+      console.error("[supabase] missing env", {
+        hasUrl: Boolean(supabaseEnv.url),
+        hasAnonKey: Boolean(supabaseEnv.anonKey),
+      });
+      didLogMissingSupabaseEnv = true;
+    }
     throw new Error(
       "Supabase nao configurado. Defina NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY."
     );

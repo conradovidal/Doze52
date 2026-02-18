@@ -19,6 +19,7 @@ export type AuthSession = {
 
 type AuthContextValue = {
   session: AuthSession | null;
+  user: AuthSession["user"] | null;
   loading: boolean;
   refreshSessionFromClient: () => Promise<AuthSession | null>;
   signInWithPassword: (email: string, password: string) => Promise<void>;
@@ -66,6 +67,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const bootstrap = async () => {
       const { data, error } = await supabase.auth.getSession();
       if (error) {
+        if (process.env.NODE_ENV !== "production") {
+          console.error("[auth] getSession bootstrap error", {
+            message: error.message,
+          });
+        }
         setSession(null);
       } else {
         setSession(data.session ? toAuthSession(data.session) : null);
@@ -77,7 +83,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      if (process.env.NODE_ENV !== "production") {
+        console.info("[auth] state change", {
+          event,
+          userId: nextSession?.user?.id ?? null,
+        });
+      }
       setSession(nextSession ? toAuthSession(nextSession) : null);
       setLoading(false);
     });
@@ -248,6 +260,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     <AuthContext.Provider
       value={{
         session,
+        user: session?.user ?? null,
         loading,
         refreshSessionFromClient,
         signInWithPassword,

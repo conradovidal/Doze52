@@ -52,7 +52,13 @@ export async function GET(request: Request) {
       const { error } = await supabase.auth.exchangeCodeForSession(code);
       if (error) throw error;
     }
-  } catch {
+  } catch (error) {
+    if (process.env.NODE_ENV !== "production") {
+      console.error("[callback.normal] exchange error", {
+        message: error instanceof Error ? error.message : String(error),
+        requestUrl: request.url,
+      });
+    }
     response = buildResponse();
   }
 
