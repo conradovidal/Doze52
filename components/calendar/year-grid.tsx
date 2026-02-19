@@ -100,36 +100,24 @@ export function YearGrid({
     });
   }, [visibleEvents, year]);
 
-  const applyDragState = React.useCallback(
-    (
-      updater:
-        | GlobalDragState
-        | ((prev: GlobalDragState) => GlobalDragState)
-    ) => {
-      setDragState((prev) => {
-        const next =
-          typeof updater === "function"
-            ? (updater as (prev: GlobalDragState) => GlobalDragState)(prev)
-            : updater;
-        dragSnapshotRef.current = next;
-        return next;
-      });
-    },
-    []
-  );
-
   const clearDragState = React.useCallback(() => {
-    applyDragState({
+    const nextState: GlobalDragState = {
       draggingEventId: null,
       hoverDateIso: null,
       reorderTarget: null,
       source: null,
-    });
-  }, [applyDragState]);
+    };
+    dragSnapshotRef.current = nextState;
+    setDragState(nextState);
+  }, []);
 
   const clearReorderTarget = React.useCallback(() => {
-    applyDragState((prev) => ({ ...prev, reorderTarget: null }));
-  }, [applyDragState]);
+    setDragState((prev) => {
+      const nextState = { ...prev, reorderTarget: null };
+      dragSnapshotRef.current = nextState;
+      return nextState;
+    });
+  }, []);
 
   const onEventDragStart = React.useCallback(
     (payload: {
@@ -142,7 +130,7 @@ export function YearGrid({
       const durationDaysInclusive =
         differenceInCalendarDays(parseISO(payload.endDate), parseISO(payload.startDate)) + 1;
       didDropRef.current = false;
-      applyDragState({
+      const nextState: GlobalDragState = {
         draggingEventId: payload.eventId,
         hoverDateIso: format(
           addDays(parseISO(payload.startDate), payload.grabOffsetDays),
@@ -153,29 +141,49 @@ export function YearGrid({
           ...payload,
           durationDaysInclusive: Math.max(1, durationDaysInclusive),
         },
-      });
+      };
+      dragSnapshotRef.current = nextState;
+      setDragState(nextState);
     },
-    [applyDragState]
+    []
   );
 
   const onDayHover = React.useCallback((dateIso: string) => {
-    applyDragState((prev) => ({ ...prev, hoverDateIso: dateIso, reorderTarget: null }));
-  }, [applyDragState]);
+    setDragState((prev) => {
+      const nextState = { ...prev, hoverDateIso: dateIso, reorderTarget: null };
+      dragSnapshotRef.current = nextState;
+      return nextState;
+    });
+  }, []);
 
   const onSingleDayListHover = React.useCallback((dayIso: string, insertIndex: number) => {
-    applyDragState((prev) => ({
-      ...prev,
-      hoverDateIso: dayIso,
-      reorderTarget: { dayIso, insertIndex },
-    }));
-  }, [applyDragState]);
+    setDragState((prev) => {
+      const nextState = {
+        ...prev,
+        hoverDateIso: dayIso,
+        reorderTarget: { dayIso, insertIndex },
+      };
+      dragSnapshotRef.current = nextState;
+      return nextState;
+    });
+  }, []);
 
   const onDayDrop = React.useCallback(
     (dropDateIso: string) => {
-      const currentState =
-        dragState.source && dragState.draggingEventId
-          ? dragState
-          : dragSnapshotRef.current;
+      const hasLiveState = Boolean(dragState.source && dragState.draggingEventId);
+      const currentState = hasLiveState ? dragState : dragSnapshotRef.current;
+      const hasSnapshot = Boolean(
+        dragSnapshotRef.current.source && dragSnapshotRef.current.draggingEventId
+      );
+      if (process.env.NODE_ENV !== "production") {
+        console.info("[dnd.drop.source]", {
+          hasLiveState,
+          hasSnapshot,
+          dropDateIso,
+          draggingEventId:
+            currentState.draggingEventId ?? dragSnapshotRef.current.draggingEventId,
+        });
+      }
       if (!currentState.source || !currentState.draggingEventId) {
         clearDragState();
         return;

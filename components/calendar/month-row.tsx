@@ -492,7 +492,6 @@ export function MonthRow({
                       clearReorderTarget();
                     }}
                     onDrop={(e) => {
-                      if (!isDraggingAny) return;
                       e.preventDefault();
                       e.stopPropagation();
                       onDayDrop(day.iso);
