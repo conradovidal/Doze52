@@ -8,6 +8,13 @@ export type CalendarEventDndPayload = {
   grabOffsetDays: number;
 };
 
+const transferTypesToArray = (
+  transfer: DataTransfer | null | undefined
+): string[] => {
+  if (!transfer?.types) return [];
+  return Array.from(transfer.types);
+};
+
 const isValidPayload = (value: unknown): value is CalendarEventDndPayload => {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const candidate = value as Partial<CalendarEventDndPayload>;
@@ -50,3 +57,7 @@ export const readCalendarEventDndPayload = (
     return null;
   }
 };
+
+export const hasCalendarEventDndPayloadType = (
+  transfer: DataTransfer | null | undefined
+) => transferTypesToArray(transfer).includes(CALENDAR_EVENT_DND_MIME);

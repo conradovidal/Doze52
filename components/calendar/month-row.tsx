@@ -16,6 +16,7 @@ import type { CalendarEvent } from "@/lib/types";
 import type { GlobalDragState } from "./year-grid";
 import { fmtMonthLabel } from "@/lib/date";
 import {
+  hasCalendarEventDndPayloadType,
   readCalendarEventDndPayload,
   writeCalendarEventDndPayload,
 } from "@/lib/calendar-dnd";
@@ -487,14 +488,18 @@ export function MonthRow({
                     style={{ top: `${singleDayStartOffset}px` }}
                     onDragOver={(e) => {
                       const dragPayload = readCalendarEventDndPayload(e.dataTransfer);
-                      const hasAppDrag = Boolean(dragPayload || hasDragContext);
+                      const hasTransferType = hasCalendarEventDndPayloadType(e.dataTransfer);
+                      const hasAppDrag = Boolean(dragPayload || hasTransferType || hasDragContext);
                       if (!hasAppDrag) return;
                       e.preventDefault();
                       e.stopPropagation();
                       onDayHover(day.iso);
+                      const draggedEventId = dragPayload?.eventId ?? dragState.draggingEventId;
                       const isSingleDayDrag = dragPayload
                         ? !dragPayload.isMultiDay
-                        : draggingSingleDay;
+                        : dragState.source
+                          ? !dragState.source.isMultiDay
+                          : true;
                       if (!isSingleDayDrag) {
                         clearReorderTarget();
                         return;
@@ -503,7 +508,7 @@ export function MonthRow({
                       const relativeY = Math.max(0, e.clientY - rect.top);
                       const baseIds = dayEvents
                         .map((event) => event.id)
-                        .filter((id) => id !== dragState.draggingEventId);
+                        .filter((id) => id !== draggedEventId);
                       const step = EVENT_ROW_STEP;
                       const insertIndex = Math.max(
                         0,

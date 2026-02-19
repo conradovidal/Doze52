@@ -74,6 +74,7 @@ export function YearGrid({
     reorderTarget: null,
     source: null,
   });
+  const [isQueryDebugEnabled, setIsQueryDebugEnabled] = React.useState(false);
   const dragSnapshotRef = React.useRef<GlobalDragState>({
     draggingEventId: null,
     hoverDateIso: null,
@@ -81,8 +82,26 @@ export function YearGrid({
     source: null,
   });
   const didDropRef = React.useRef(false);
-  const shouldLogDnd =
-    process.env.NODE_ENV !== "production" || process.env.NEXT_PUBLIC_DND_DEBUG === "1";
+  const shouldLogDnd = React.useMemo(
+    () =>
+      process.env.NODE_ENV !== "production" ||
+      process.env.NEXT_PUBLIC_DND_DEBUG === "1" ||
+      isQueryDebugEnabled,
+    [isQueryDebugEnabled]
+  );
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    const syncFromQuery = () => {
+      const params = new URLSearchParams(window.location.search);
+      setIsQueryDebugEnabled(params.get("dndDebug") === "1");
+    };
+    syncFromQuery();
+    window.addEventListener("popstate", syncFromQuery);
+    return () => {
+      window.removeEventListener("popstate", syncFromQuery);
+    };
+  }, []);
 
   const visibleEvents = React.useMemo(
     () => events.filter((event) => visibleCategoryIds.includes(event.categoryId)),
@@ -145,10 +164,20 @@ export function YearGrid({
           durationDaysInclusive: Math.max(1, durationDaysInclusive),
         },
       };
+      if (shouldLogDnd) {
+        console.info("[dnd.dragstart]", {
+          eventId: payload.eventId,
+          startDate: payload.startDate,
+          endDate: payload.endDate,
+          isMultiDay: payload.isMultiDay,
+          grabOffsetDays: payload.grabOffsetDays,
+          durationDaysInclusive: nextState.source?.durationDaysInclusive ?? 1,
+        });
+      }
       dragSnapshotRef.current = nextState;
       setDragState(nextState);
     },
-    []
+    [shouldLogDnd]
   );
 
   const onDayHover = React.useCallback((dateIso: string) => {
@@ -234,15 +263,6 @@ export function YearGrid({
         currentReorderTarget.dayIso === dropDateIso &&
         Number.isInteger(currentReorderTarget.insertIndex)
       ) {
-        if (shouldLogDnd) {
-          console.info("[dnd.drop]", {
-            branch: "reorder",
-            dropDateIso,
-            sourceStartDate: currentSource.startDate,
-            hoverDateIso: dragState.hoverDateIso,
-            reorderTarget: currentReorderTarget,
-          });
-        }
         const inDayIds = visibleEvents
           .filter((event) => event.startDate === dropDateIso && event.endDate === dropDateIso)
           .sort((a, b) => {
@@ -259,6 +279,17 @@ export function YearGrid({
           Math.min(currentReorderTarget.insertIndex, withoutMoved.length)
         );
         withoutMoved.splice(insertAt, 0, currentEventId);
+        if (shouldLogDnd) {
+          console.info("[dnd.drop]", {
+            branch: "reorder",
+            dropDateIso,
+            sourceStartDate: currentSource.startDate,
+            hoverDateIso: dragState.hoverDateIso,
+            reorderTarget: currentReorderTarget,
+            insertAt,
+            orderedIds: withoutMoved,
+          });
+        }
 
         onApplyDayReorder({
           dayIso: dropDateIso,
@@ -280,8 +311,11 @@ export function YearGrid({
       if (shouldLogDnd) {
         console.info("[dnd.drop]", {
           branch: "move-date",
+          eventId: currentEventId,
           dropDateIso,
           sourceStartDate: currentSource.startDate,
+          newStartDate: format(newStartDate, "yyyy-MM-dd"),
+          deltaDays,
           hoverDateIso: dragState.hoverDateIso,
           reorderTarget: currentReorderTarget,
         });
