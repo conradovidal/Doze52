@@ -82,12 +82,11 @@ export function YearGrid({
     source: null,
   });
   const didDropRef = React.useRef(false);
+  const isDevNodeEnv = process.env.NODE_ENV !== "production";
+  const isEnvDebugEnabled = process.env.NEXT_PUBLIC_DND_DEBUG === "1";
   const shouldLogDnd = React.useMemo(
-    () =>
-      process.env.NODE_ENV !== "production" ||
-      process.env.NEXT_PUBLIC_DND_DEBUG === "1" ||
-      isQueryDebugEnabled,
-    [isQueryDebugEnabled]
+    () => isDevNodeEnv || isEnvDebugEnabled || isQueryDebugEnabled,
+    [isDevNodeEnv, isEnvDebugEnabled, isQueryDebugEnabled]
   );
 
   React.useEffect(() => {
@@ -102,6 +101,15 @@ export function YearGrid({
       window.removeEventListener("popstate", syncFromQuery);
     };
   }, []);
+
+  React.useEffect(() => {
+    if (!shouldLogDnd) return;
+    console.log("[dnd.debug.enabled]", {
+      fromQuery: isQueryDebugEnabled,
+      fromEnv: isEnvDebugEnabled,
+      nodeEnv: process.env.NODE_ENV,
+    });
+  }, [isEnvDebugEnabled, isQueryDebugEnabled, shouldLogDnd]);
 
   const visibleEvents = React.useMemo(
     () => events.filter((event) => visibleCategoryIds.includes(event.categoryId)),
@@ -165,7 +173,7 @@ export function YearGrid({
         },
       };
       if (shouldLogDnd) {
-        console.info("[dnd.dragstart]", {
+        console.log("[dnd.dragstart]", {
           eventId: payload.eventId,
           startDate: payload.startDate,
           endDate: payload.endDate,
@@ -236,7 +244,7 @@ export function YearGrid({
       }
 
       if (shouldLogDnd) {
-        console.info("[dnd.drop.source]", {
+        console.log("[dnd.drop.source]", {
           sourceKind,
           hasLiveState,
           hasSnapshot,
@@ -246,12 +254,26 @@ export function YearGrid({
         });
       }
       if (!currentSource || !currentEventId) {
+        if (shouldLogDnd) {
+          console.log("[dnd.drop.abort.no-source]", {
+            dropDateIso,
+            hasLiveState,
+            hasSnapshot,
+            hasTransferPayload: Boolean(transferPayload),
+          });
+        }
         clearDragState();
         return;
       }
 
       const sourceEvent = eventById.get(currentEventId);
       if (!sourceEvent) {
+        if (shouldLogDnd) {
+          console.log("[dnd.drop.abort.missing-event]", {
+            dropDateIso,
+            eventId: currentEventId,
+          });
+        }
         clearDragState();
         return;
       }
@@ -280,7 +302,7 @@ export function YearGrid({
         );
         withoutMoved.splice(insertAt, 0, currentEventId);
         if (shouldLogDnd) {
-          console.info("[dnd.drop]", {
+          console.log("[dnd.drop]", {
             branch: "reorder",
             dropDateIso,
             sourceStartDate: currentSource.startDate,
@@ -309,7 +331,7 @@ export function YearGrid({
       const sourceStart = parseISO(currentSource.startDate);
       const deltaDays = differenceInCalendarDays(newStartDate, sourceStart);
       if (shouldLogDnd) {
-        console.info("[dnd.drop]", {
+        console.log("[dnd.drop]", {
           branch: "move-date",
           eventId: currentEventId,
           dropDateIso,
@@ -328,6 +350,14 @@ export function YearGrid({
       const checkDays =
         differenceInCalendarDays(expectedNewEnd, newStartDate) + 1;
       if (checkDays !== currentSource.durationDaysInclusive) {
+        if (shouldLogDnd) {
+          console.log("[dnd.drop.abort.duration-mismatch]", {
+            dropDateIso,
+            eventId: currentEventId,
+            expectedDurationDays: currentSource.durationDaysInclusive,
+            actualDurationDays: checkDays,
+          });
+        }
         clearDragState();
         return;
       }

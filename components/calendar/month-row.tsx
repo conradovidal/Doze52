@@ -487,19 +487,25 @@ export function MonthRow({
                     }`}
                     style={{ top: `${singleDayStartOffset}px` }}
                     onDragOver={(e) => {
+                      // Keep the target droppable even if drag context detection is flaky.
+                      e.preventDefault();
+                      e.stopPropagation();
+
                       const dragPayload = readCalendarEventDndPayload(e.dataTransfer);
                       const hasTransferType = hasCalendarEventDndPayloadType(e.dataTransfer);
                       const hasAppDrag = Boolean(dragPayload || hasTransferType || hasDragContext);
-                      if (!hasAppDrag) return;
-                      e.preventDefault();
-                      e.stopPropagation();
+                      if (!hasAppDrag) {
+                        clearReorderTarget();
+                        return;
+                      }
+
                       onDayHover(day.iso);
                       const draggedEventId = dragPayload?.eventId ?? dragState.draggingEventId;
                       const isSingleDayDrag = dragPayload
                         ? !dragPayload.isMultiDay
                         : dragState.source
                           ? !dragState.source.isMultiDay
-                          : true;
+                          : null;
                       if (!isSingleDayDrag) {
                         clearReorderTarget();
                         return;
