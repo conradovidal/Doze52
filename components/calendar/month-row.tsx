@@ -299,6 +299,31 @@ export function MonthRow({
 
       <div
         className="relative flex-1 w-full"
+        onDragOver={(e) => {
+          const dragPayload = readCalendarEventDndPayload(e.dataTransfer);
+          const hasTransferType = hasCalendarEventDndPayloadType(e.dataTransfer);
+          const hasAppDrag = Boolean(dragPayload || hasTransferType || hasDragContext);
+          if (!hasAppDrag) return;
+          e.preventDefault();
+          e.stopPropagation();
+
+          const targetDate = resolveTargetDateFromPointer(e.clientX);
+          if (!targetDate) return;
+          onDayHover(format(targetDate, "yyyy-MM-dd"));
+          clearReorderTarget();
+        }}
+        onDrop={(e) => {
+          const dragPayload = readCalendarEventDndPayload(e.dataTransfer);
+          const hasTransferType = hasCalendarEventDndPayloadType(e.dataTransfer);
+          const hasAppDrag = Boolean(dragPayload || hasTransferType || hasDragContext);
+          if (!hasAppDrag) return;
+          e.preventDefault();
+          e.stopPropagation();
+
+          const targetDate = resolveTargetDateFromPointer(e.clientX);
+          if (!targetDate) return;
+          onDayDrop(format(targetDate, "yyyy-MM-dd"), e.dataTransfer);
+        }}
         onMouseEnter={(e) => {
           if (!creatingRange || isDraggingAny) return;
           const targetDate = resolveTargetDateFromPointer(e.clientX);
