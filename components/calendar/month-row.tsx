@@ -18,18 +18,20 @@ import { fmtMonthLabel } from "@/lib/date";
 import {
   EVENT_ITEM_GAP_PX,
   EVENT_ITEM_HEIGHT_PX,
+  EVENT_ITEM_LINE_HEIGHT_CLASS,
   EVENT_ITEM_PADDING_X_CLASS,
   EVENT_ITEM_RADIUS_CLASS,
   EVENT_ITEM_TEXT_CLASS,
+  MONTH_MULTI_DAY_TOP_OFFSET_PX,
+  MONTH_ROW_BASE_MIN_HEIGHT_PX,
+  MONTH_ROW_BOTTOM_PADDING_PX,
+  MONTH_SINGLE_DAY_GAP_FROM_BARS_PX,
+  MONTH_SINGLE_DAY_TOP_OFFSET_NO_MULTI_PX,
 } from "@/lib/calendar-layout";
 import { DayCell } from "./day-cell";
 import { EventBar } from "./event-bar";
 
 const COLUMNS = 37;
-const BASE_MIN_HEIGHT_COMPACT = 48;
-const HEADER_OFFSET = 18;
-const SINGLE_DAY_GAP_FROM_BARS = 6;
-const BOTTOM_PADDING = 4;
 const EVENT_ROW_STEP = EVENT_ITEM_HEIGHT_PX + EVENT_ITEM_GAP_PX;
 
 type ParsedEvent = CalendarEvent & {
@@ -189,17 +191,18 @@ export function MonthRow({
     ...Array.from(singleDayByIso.values()).map((bucket) => bucket.length)
   );
   const singleDayStartOffset =
-    HEADER_OFFSET +
+    MONTH_MULTI_DAY_TOP_OFFSET_PX +
     (maxMultiRows > 0
       ? maxMultiRows * EVENT_ITEM_HEIGHT_PX +
         Math.max(0, maxMultiRows - 1) * EVENT_ITEM_GAP_PX +
-        SINGLE_DAY_GAP_FROM_BARS
-      : 2);
+        MONTH_SINGLE_DAY_GAP_FROM_BARS_PX
+      : MONTH_SINGLE_DAY_TOP_OFFSET_NO_MULTI_PX);
   const singleDayContentHeight =
     maxSingleRows * EVENT_ITEM_HEIGHT_PX +
     Math.max(0, maxSingleRows - 1) * EVENT_ITEM_GAP_PX;
-  const contentHeight = singleDayStartOffset + singleDayContentHeight + BOTTOM_PADDING;
-  const minHeightPx = Math.max(BASE_MIN_HEIGHT_COMPACT, contentHeight);
+  const contentHeight =
+    singleDayStartOffset + singleDayContentHeight + MONTH_ROW_BOTTOM_PADDING_PX;
+  const minHeightPx = Math.max(MONTH_ROW_BASE_MIN_HEIGHT_PX, contentHeight);
 
   const rangeBounds = React.useMemo(() => {
     if (!creatingRange) return null;
@@ -354,11 +357,12 @@ export function MonthRow({
 
         <div className="pointer-events-none absolute inset-x-0 top-0 z-10">
           <div
-            className="grid pt-[18px]"
+            className="grid"
             style={{
               gridTemplateColumns: "repeat(37, minmax(0, 1fr))",
               gap: `${EVENT_ITEM_GAP_PX}px 0px`,
               gridAutoRows: `${EVENT_ITEM_HEIGHT_PX}px`,
+              paddingTop: `${MONTH_MULTI_DAY_TOP_OFFSET_PX}px`,
             }}
           >
             {segments.map((seg, idx) => (
@@ -478,7 +482,10 @@ export function MonthRow({
                       onDayDrop(day.iso);
                     }}
                   >
-                    <div className="space-y-[2px]">
+                    <div
+                      className="flex flex-col"
+                      style={{ gap: `${EVENT_ITEM_GAP_PX}px` }}
+                    >
                       {visibleEvents.map((event, index) => (
                         <React.Fragment key={`single-${day.iso}-${event.id}`}>
                           {previewIndex === index ? (
@@ -518,11 +525,10 @@ export function MonthRow({
                       ) : null}
                       {showMoveGhost ? (
                         <div
-                          className={`pointer-events-none ${EVENT_ITEM_RADIUS_CLASS} ${EVENT_ITEM_PADDING_X_CLASS} ${EVENT_ITEM_TEXT_CLASS} truncate text-white opacity-75`}
+                          className={`pointer-events-none ${EVENT_ITEM_RADIUS_CLASS} ${EVENT_ITEM_PADDING_X_CLASS} ${EVENT_ITEM_TEXT_CLASS} ${EVENT_ITEM_LINE_HEIGHT_CLASS} truncate text-white opacity-75`}
                           style={{
                             backgroundColor: draggingEvent?.color ?? "#6b7280",
                             minHeight: `${EVENT_ITEM_HEIGHT_PX}px`,
-                            lineHeight: `${EVENT_ITEM_HEIGHT_PX}px`,
                           }}
                         >
                           {draggingEvent?.title ?? "Movendo..."}

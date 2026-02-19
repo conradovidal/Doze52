@@ -38,6 +38,7 @@ export function AuthDialog({
   const [pendingGooglePopup, setPendingGooglePopup] = React.useState(false);
   const popupIntervalRef = React.useRef<number | null>(null);
   const popupTimeoutRef = React.useRef<number | null>(null);
+  const popupClosedAtRef = React.useRef<number | null>(null);
   const popupMessageReceivedRef = React.useRef<"none" | "success" | "error">(
     "none"
   );
@@ -96,6 +97,7 @@ export function AuthDialog({
       popupMessageReceivedRef.current = "none";
       popupSettledRef.current = false;
       pollingInFlightRef.current = false;
+      popupClosedAtRef.current = null;
       clearPopupTimers();
       return;
     }
@@ -155,10 +157,12 @@ export function AuthDialog({
     popupSettledRef.current = false;
     popupMessageReceivedRef.current = "none";
     pollingInFlightRef.current = false;
+    popupClosedAtRef.current = null;
     clearPopupTimers();
 
     const timeoutMs = 15000;
     const intervalMs = 500;
+    const popupClosedGraceMs = 3000;
     const startedAt = Date.now();
 
     const runSessionCheck = async (
@@ -181,8 +185,12 @@ export function AuthDialog({
           if (popupMessageReceivedRef.current === "success") {
             return;
           }
-          finalizeAuthError("Falha no login com Google. Tente novamente.");
-          return;
+          const closedAt = popupClosedAtRef.current ?? Date.now();
+          const elapsedSinceClose = Date.now() - closedAt;
+          if (elapsedSinceClose >= popupClosedGraceMs) {
+            finalizeAuthError("Falha no login com Google. Tente novamente.");
+            return;
+          }
         }
         if (reason === "timeout" || Date.now() - startedAt >= timeoutMs) {
           finalizeAuthError("Falha no login com Google. Tente novamente.");
@@ -196,9 +204,13 @@ export function AuthDialog({
       if (popupSettledRef.current) return;
       const popupOpen = isGooglePopupOpen();
       if (!popupOpen) {
+        if (popupClosedAtRef.current === null) {
+          popupClosedAtRef.current = Date.now();
+        }
         void runSessionCheck("popup_closed");
         return;
       }
+      popupClosedAtRef.current = null;
       void runSessionCheck("poll");
     }, intervalMs);
 
@@ -210,6 +222,7 @@ export function AuthDialog({
     return () => {
       clearPopupTimers();
       pollingInFlightRef.current = false;
+      popupClosedAtRef.current = null;
     };
   }, [
     clearPopupTimers,

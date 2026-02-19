@@ -33,7 +33,8 @@ export function EventBar({
 }) {
   const today = startOfDay(new Date());
   const isPast = isBefore(parseISO(event.endDate), today);
-  const suppressClickRef = React.useRef(false);
+  const isDragCycleRef = React.useRef(false);
+  const lastDragEndAtRef = React.useRef(0);
   const radius =
     isStart && isEnd
       ? "rounded-sm"
@@ -48,9 +49,11 @@ export function EventBar({
       type="button"
       draggable={draggable}
       onClick={(e) => {
-        if (suppressClickRef.current) {
+        const justDragged = performance.now() - lastDragEndAtRef.current < 180;
+        if (isDragCycleRef.current || justDragged) {
           e.preventDefault();
           e.stopPropagation();
+          isDragCycleRef.current = false;
           return;
         }
         e.stopPropagation();
@@ -60,13 +63,12 @@ export function EventBar({
         e.stopPropagation();
         e.dataTransfer.effectAllowed = "move";
         e.dataTransfer.setData("text/plain", event.id);
-        suppressClickRef.current = true;
+        isDragCycleRef.current = true;
         onDragStart?.(e);
       }}
       onDragEnd={() => {
-        window.setTimeout(() => {
-          suppressClickRef.current = false;
-        }, 0);
+        isDragCycleRef.current = false;
+        lastDragEndAtRef.current = performance.now();
         onDragEnd?.();
       }}
       className={`group relative block w-full cursor-pointer truncate text-left text-neutral-100 ${EVENT_ITEM_PADDING_X_CLASS} ${EVENT_ITEM_TEXT_CLASS} ${radius} ${isPast ? "opacity-50" : ""} ${isDragging ? "opacity-40" : ""} ${className ?? ""} overflow-visible`}

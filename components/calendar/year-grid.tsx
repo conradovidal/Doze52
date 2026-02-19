@@ -162,6 +162,7 @@ export function YearGrid({
 
       if (
         !currentState.source.isMultiDay &&
+        currentState.source.startDate === dropDateIso &&
         currentState.reorderTarget &&
         currentState.reorderTarget.dayIso === dropDateIso &&
         Number.isInteger(currentState.reorderTarget.insertIndex)
