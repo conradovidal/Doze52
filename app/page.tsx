@@ -27,7 +27,6 @@ export default function HomePage() {
   const updateEvent = useStore((s) => s.updateEvent);
   const deleteEvent = useStore((s) => s.deleteEvent);
   const moveEventByDelta = useStore((s) => s.moveEventByDelta);
-  const reorderEventInDay = useStore((s) => s.reorderEventInDay);
   const normalizeDayOrder = useStore((s) => s.normalizeDayOrder);
   const getEventById = useStore((s) => s.getEventById);
   const { session, loading: authLoading } = useAuth();
@@ -341,7 +340,8 @@ export default function HomePage() {
         onFinishCreateRange={handleFinishCreateRange}
         onMoveEventByDelta={moveEventByDelta}
         onApplyDayReorder={({ dayIso, eventId, toIndex, orderedIds }) => {
-          reorderEventInDay({ eventId, dayIso, toIndex });
+          void eventId;
+          void toIndex;
           normalizeDayOrder(dayIso, orderedIds);
         }}
       />

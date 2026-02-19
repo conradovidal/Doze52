@@ -227,6 +227,32 @@ export function YearGrid({
     didDropRef.current = false;
   }, [clearDragState]);
 
+  React.useEffect(() => {
+    if (!dragState.draggingEventId) return;
+
+    const handleWindowDrop = () => {
+      window.setTimeout(() => {
+        if (!didDropRef.current) {
+          clearDragState();
+        }
+      }, 0);
+    };
+
+    const handleWindowDragEnd = () => {
+      if (!didDropRef.current) {
+        clearDragState();
+      }
+      didDropRef.current = false;
+    };
+
+    window.addEventListener("drop", handleWindowDrop, true);
+    window.addEventListener("dragend", handleWindowDragEnd, true);
+    return () => {
+      window.removeEventListener("drop", handleWindowDrop, true);
+      window.removeEventListener("dragend", handleWindowDragEnd, true);
+    };
+  }, [clearDragState, dragState.draggingEventId]);
+
   return (
     <div className="w-full overflow-hidden rounded-xl border border-neutral-200">
       {Array.from({ length: 12 }).map((_, idx) => (

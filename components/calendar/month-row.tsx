@@ -429,8 +429,7 @@ export function MonthRow({
             {dayInfos.map((day) => {
               if (!day.inMonth) return null;
               const dayEvents = singleDayByIso.get(day.iso) ?? [];
-              const hiddenDraggedId = dragState.draggingEventId;
-              const visibleEvents = dayEvents.filter((event) => event.id !== hiddenDraggedId);
+              const draggedEventId = dragState.draggingEventId;
 
               const previewIndex =
                 dragState.reorderTarget?.dayIso === day.iso
@@ -440,6 +439,9 @@ export function MonthRow({
                 draggingSingleDay &&
                 dragState.hoverDateIso === day.iso &&
                 (previewIndex === null || previewIndex < 0);
+              const baseCountInDay = dayEvents.filter(
+                (event) => event.id !== draggedEventId
+              ).length;
 
               return (
                 <div
@@ -451,7 +453,11 @@ export function MonthRow({
                   }}
                 >
                   <div
-                    className="pointer-events-auto absolute inset-x-0"
+                    className={`absolute inset-x-0 ${
+                      isDraggingAny && !draggingSingleDay
+                        ? "pointer-events-none"
+                        : "pointer-events-auto"
+                    }`}
                     style={{ top: `${singleDayStartOffset}px` }}
                     onDragOver={(e) => {
                       if (!draggingSingleDay) return;
@@ -486,38 +492,57 @@ export function MonthRow({
                       className="flex flex-col"
                       style={{ gap: `${EVENT_ITEM_GAP_PX}px` }}
                     >
-                      {visibleEvents.map((event, index) => (
-                        <React.Fragment key={`single-${day.iso}-${event.id}`}>
-                          {previewIndex === index ? (
-                            <div
-                              className={`${EVENT_ITEM_RADIUS_CLASS} bg-neutral-500/15 ring-1 ring-neutral-400/70`}
-                              style={{ minHeight: `${EVENT_ITEM_HEIGHT_PX}px` }}
-                            />
-                          ) : null}
-                          <EventBar
-                            event={event}
-                            onClick={() => onEditEvent(event.id)}
-                            draggable
-                            isDragging={dragState.draggingEventId === event.id}
-                            className={
-                              isDraggingAny && dragState.draggingEventId !== event.id
-                                ? "pointer-events-none"
-                                : ""
-                            }
-                            onDragStart={() => {
-                              onEventDragStart({
-                                eventId: event.id,
-                                startDate: event.startDate,
-                                endDate: event.endDate,
-                                grabOffsetDays: 0,
-                                isMultiDay: false,
-                              });
-                            }}
-                            onDragEnd={onEventDragEnd}
-                          />
-                        </React.Fragment>
-                      ))}
-                      {previewIndex !== null && previewIndex >= visibleEvents.length ? (
+                      {(() => {
+                        let nonDraggedSeen = 0;
+                        let placeholderRendered = false;
+                        return dayEvents.map((event) => {
+                          const isDragged = event.id === draggedEventId;
+                          const shouldRenderPlaceholderBefore =
+                            !placeholderRendered &&
+                            previewIndex !== null &&
+                            previewIndex === nonDraggedSeen;
+                          if (shouldRenderPlaceholderBefore) {
+                            placeholderRendered = true;
+                          }
+                          if (!isDragged) {
+                            nonDraggedSeen += 1;
+                          }
+                          return (
+                            <React.Fragment key={`single-${day.iso}-${event.id}`}>
+                              {shouldRenderPlaceholderBefore ? (
+                                <div
+                                  className={`${EVENT_ITEM_RADIUS_CLASS} bg-neutral-500/15 ring-1 ring-neutral-400/70`}
+                                  style={{ minHeight: `${EVENT_ITEM_HEIGHT_PX}px` }}
+                                />
+                              ) : null}
+                              <EventBar
+                                event={event}
+                                onClick={() => onEditEvent(event.id)}
+                                draggable
+                                isDragging={isDragged}
+                                className={
+                                  isDragged
+                                    ? "pointer-events-none opacity-40"
+                                    : isDraggingAny
+                                      ? "pointer-events-none"
+                                      : ""
+                                }
+                                onDragStart={() => {
+                                  onEventDragStart({
+                                    eventId: event.id,
+                                    startDate: event.startDate,
+                                    endDate: event.endDate,
+                                    grabOffsetDays: 0,
+                                    isMultiDay: false,
+                                  });
+                                }}
+                                onDragEnd={onEventDragEnd}
+                              />
+                            </React.Fragment>
+                          );
+                        });
+                      })()}
+                      {previewIndex !== null && previewIndex >= baseCountInDay ? (
                         <div
                           className={`${EVENT_ITEM_RADIUS_CLASS} bg-neutral-500/15 ring-1 ring-neutral-400/70`}
                           style={{ minHeight: `${EVENT_ITEM_HEIGHT_PX}px` }}

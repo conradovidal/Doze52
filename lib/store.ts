@@ -217,22 +217,8 @@ export const useStore = create<StoreState>()(
         set((state) => {
           void _dayIso;
           const eventSet = new Set(eventIdsInDay);
-          const byId = new Map(state.events.map((evt) => [evt.id, evt]));
-          const ordered = [...eventIdsInDay]
-            .map((id) => byId.get(id))
-            .filter(Boolean)
-            .sort((a, b) => {
-              const byOrder =
-                normalizeEventDayOrder(a!.dayOrder) -
-                normalizeEventDayOrder(b!.dayOrder);
-              if (byOrder !== 0) return byOrder;
-              const byCreated = a!.createdAt.localeCompare(b!.createdAt);
-              if (byCreated !== 0) return byCreated;
-              return a!.id.localeCompare(b!.id);
-            });
-
           const normalized = new Map<string, number>();
-          ordered.forEach((evt, idx) => normalized.set(evt!.id, idx));
+          eventIdsInDay.forEach((id, idx) => normalized.set(id, idx));
 
           return {
             events: state.events.map((evt) => {
