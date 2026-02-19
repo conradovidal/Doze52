@@ -5,22 +5,45 @@ import { fmtDayLabel } from "@/lib/date";
 
 export function DayCell({
   date,
+  dateIso,
   minHeightPx,
   isRangeSelected,
   isRangeStart,
   isRangeEnd,
   isInMonth,
+  isDropActive = false,
+  onDayHover,
+  onDayDrop,
 }: {
   date: Date;
+  dateIso: string;
   minHeightPx: number;
   isRangeSelected: boolean;
   isRangeStart: boolean;
   isRangeEnd: boolean;
   isInMonth: boolean;
+  isDropActive?: boolean;
+  onDayHover?: (dateIso: string) => void;
+  onDayDrop?: (dateIso: string) => void;
 }) {
   if (!isInMonth) {
     return (
-      <div className="w-full bg-neutral-200" style={{ minHeight: `${minHeightPx}px` }} />
+      <div
+        className={`w-full bg-neutral-200 ${isDropActive ? "ring-1 ring-inset ring-blue-500 bg-blue-100/30" : ""}`}
+        style={{ minHeight: `${minHeightPx}px` }}
+        onDragOver={(e) => {
+          if (!onDayHover) return;
+          e.preventDefault();
+          e.stopPropagation();
+          onDayHover(dateIso);
+        }}
+        onDrop={(e) => {
+          if (!onDayDrop) return;
+          e.preventDefault();
+          e.stopPropagation();
+          onDayDrop(dateIso);
+        }}
+      />
     );
   }
 
@@ -42,8 +65,20 @@ export function DayCell({
         today ? "ring-black" : "ring-transparent hover:ring-neutral-400/70"
       } ${isRangeSelected ? "bg-neutral-300/35 ring-neutral-500/80" : ""} ${
         isRangeStart || isRangeEnd ? "ring-neutral-700" : ""
-      } select-none`}
+      } ${isDropActive ? "ring-blue-500 bg-blue-100/40" : ""} select-none`}
       style={{ minHeight: `${minHeightPx}px` }}
+      onDragOver={(e) => {
+        if (!onDayHover) return;
+        e.preventDefault();
+        e.stopPropagation();
+        onDayHover(dateIso);
+      }}
+      onDrop={(e) => {
+        if (!onDayDrop) return;
+        e.preventDefault();
+        e.stopPropagation();
+        onDayDrop(dateIso);
+      }}
     >
       <div className={`flex h-3.5 flex-none items-center gap-1 px-0.5 leading-none text-[10px] ${isPast ? "text-neutral-400" : "text-neutral-600"}`}>
         <span

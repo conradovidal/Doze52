@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { addDays, differenceInCalendarDays, format, parseISO } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { YearGrid } from "@/components/calendar/year-grid";
 import { EventDialog } from "@/components/event-dialog";
 import { AppHeader } from "@/components/app-header";
@@ -27,6 +27,8 @@ export default function HomePage() {
   const updateEvent = useStore((s) => s.updateEvent);
   const deleteEvent = useStore((s) => s.deleteEvent);
   const moveEventByDelta = useStore((s) => s.moveEventByDelta);
+  const reorderEventInDay = useStore((s) => s.reorderEventInDay);
+  const normalizeDayOrder = useStore((s) => s.normalizeDayOrder);
   const getEventById = useStore((s) => s.getEventById);
   const { session, loading: authLoading } = useAuth();
   const isDevBuildInfoVisible = process.env.NODE_ENV !== "production";
@@ -45,11 +47,6 @@ export default function HomePage() {
     hoverIso: string;
     isDragging: boolean;
   } | null>(null);
-  const [draggingEventId, setDraggingEventId] = React.useState<string | null>(null);
-  const [dragOriginStart, setDragOriginStart] = React.useState<string | null>(null);
-  const [dragDurationDays, setDragDurationDays] = React.useState<number | null>(null);
-  const [dragGrabOffsetDays, setDragGrabOffsetDays] = React.useState<number | null>(null);
-  const [dragHoverPointerDate, setDragHoverPointerDate] = React.useState<string | null>(null);
   const [syncError, setSyncError] = React.useState<string | null>(null);
   const [isSyncing, setIsSyncing] = React.useState(false);
   const [remoteReady, setRemoteReady] = React.useState(false);
@@ -271,28 +268,7 @@ export default function HomePage() {
     else addEvent(payload);
   };
 
-  const handleDragStartEvent = (
-    eventId: string,
-    startDateIso: string,
-    endDateIso: string,
-    grabOffsetDays: number
-  ) => {
-    setDraggingEventId(eventId);
-    setDragOriginStart(startDateIso);
-    setDragDurationDays(
-      differenceInCalendarDays(parseISO(endDateIso), parseISO(startDateIso))
-    );
-    setDragGrabOffsetDays(grabOffsetDays);
-    setDragHoverPointerDate(format(addDays(parseISO(startDateIso), grabOffsetDays), "yyyy-MM-dd"));
-  };
-
-  const handleDragEnterDate = (dateIso: string) => {
-    if (!draggingEventId) return;
-    setDragHoverPointerDate(dateIso);
-  };
-
   const handleStartCreateRange = (startIso: string) => {
-    if (draggingEventId) return;
     setCreatingRange({ startIso, hoverIso: startIso, isDragging: false });
   };
 
@@ -325,36 +301,12 @@ export default function HomePage() {
   React.useEffect(() => {
     if (windowContext !== "main") return;
     const onWindowMouseUp = () => {
-      if (!creatingRange || draggingEventId) return;
+      if (!creatingRange) return;
       handleFinishCreateRange();
     };
     window.addEventListener("mouseup", onWindowMouseUp);
     return () => window.removeEventListener("mouseup", onWindowMouseUp);
-  }, [creatingRange, draggingEventId, handleFinishCreateRange, windowContext]);
-
-  const clearDragState = () => {
-    setDraggingEventId(null);
-    setDragOriginStart(null);
-    setDragDurationDays(null);
-    setDragGrabOffsetDays(null);
-    setDragHoverPointerDate(null);
-    setCreatingRange(null);
-  };
-
-  const handleDropOnDate = (targetDateIso: string) => {
-    if (!draggingEventId || !dragOriginStart) {
-      clearDragState();
-      return;
-    }
-    const offsetDays = dragGrabOffsetDays ?? 0;
-    const projectedStart = addDays(parseISO(targetDateIso), -offsetDays);
-    const deltaDays = differenceInCalendarDays(
-      projectedStart,
-      parseISO(dragOriginStart)
-    );
-    moveEventByDelta(draggingEventId, deltaDays);
-    clearDragState();
-  };
+  }, [creatingRange, handleFinishCreateRange, windowContext]);
 
   if (windowContext === "popup") {
     return (
@@ -387,14 +339,11 @@ export default function HomePage() {
         onStartCreateRange={handleStartCreateRange}
         onHoverCreateRange={handleHoverCreateRange}
         onFinishCreateRange={handleFinishCreateRange}
-        onDragStartEvent={handleDragStartEvent}
-        onDragEnterDate={handleDragEnterDate}
-        onDropOnDate={handleDropOnDate}
-        onDragEndEvent={clearDragState}
-        draggingEventId={draggingEventId}
-        dragHoverPointerDate={dragHoverPointerDate}
-        dragGrabOffsetDays={dragGrabOffsetDays}
-        dragDurationDays={dragDurationDays}
+        onMoveEventByDelta={moveEventByDelta}
+        onApplyDayReorder={({ dayIso, eventId, toIndex, orderedIds }) => {
+          reorderEventInDay({ eventId, dayIso, toIndex });
+          normalizeDayOrder(dayIso, orderedIds);
+        }}
       />
       {syncError ? (
         <div className="mt-2 flex flex-col items-center gap-2">
