@@ -434,8 +434,11 @@ export function MonthRow({
           </div>
         </div>
 
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-[11]">
-          <div className="grid" style={{ gridTemplateColumns: "repeat(37, minmax(0, 1fr))" }}>
+        <div className="absolute inset-x-0 top-0 z-[11]">
+          <div
+            className="grid pointer-events-none"
+            style={{ gridTemplateColumns: "repeat(37, minmax(0, 1fr))" }}
+          >
             {dayInfos.map((day) => {
               if (!day.inMonth) return null;
               const dayEvents = singleDayByIso.get(day.iso) ?? [];
@@ -456,7 +459,7 @@ export function MonthRow({
               return (
                 <div
                   key={`single-${monthIndex}-${day.iso}`}
-                  className="relative"
+                  className="relative pointer-events-none"
                   style={{
                     gridColumn: `${day.col} / ${day.col + 1}`,
                     minHeight: `${minHeightPx}px`,
