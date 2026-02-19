@@ -167,6 +167,15 @@ export function YearGrid({
         currentState.reorderTarget.dayIso === dropDateIso &&
         Number.isInteger(currentState.reorderTarget.insertIndex)
       ) {
+        if (process.env.NODE_ENV !== "production") {
+          console.info("[dnd.drop]", {
+            branch: "reorder",
+            dropDateIso,
+            sourceStartDate: currentState.source.startDate,
+            hoverDateIso: currentState.hoverDateIso,
+            reorderTarget: currentState.reorderTarget,
+          });
+        }
         const inDayIds = visibleEvents
           .filter((event) => event.startDate === dropDateIso && event.endDate === dropDateIso)
           .sort((a, b) => {
@@ -201,6 +210,15 @@ export function YearGrid({
       );
       const sourceStart = parseISO(currentState.source.startDate);
       const deltaDays = differenceInCalendarDays(newStartDate, sourceStart);
+      if (process.env.NODE_ENV !== "production") {
+        console.info("[dnd.drop]", {
+          branch: "move-date",
+          dropDateIso,
+          sourceStartDate: currentState.source.startDate,
+          hoverDateIso: currentState.hoverDateIso,
+          reorderTarget: currentState.reorderTarget,
+        });
+      }
 
       const expectedNewEnd = addDays(
         newStartDate,
@@ -238,18 +256,9 @@ export function YearGrid({
       }, 0);
     };
 
-    const handleWindowDragEnd = () => {
-      if (!didDropRef.current) {
-        clearDragState();
-      }
-      didDropRef.current = false;
-    };
-
     window.addEventListener("drop", handleWindowDrop, true);
-    window.addEventListener("dragend", handleWindowDragEnd, true);
     return () => {
       window.removeEventListener("drop", handleWindowDrop, true);
-      window.removeEventListener("dragend", handleWindowDragEnd, true);
     };
   }, [clearDragState, dragState.draggingEventId]);
 

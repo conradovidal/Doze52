@@ -129,8 +129,16 @@ export function MonthRow({
   const inMonthDays = dayInfos.filter((d) => d.inMonth);
   const monthLabel = fmtMonthLabel(monthStart);
 
-  const parsedEvents: ParsedEvent[] = events
-    .filter((evt) => visibleCategoryIds.includes(evt.categoryId))
+  const globallyVisibleEvents = React.useMemo(
+    () => events.filter((evt) => visibleCategoryIds.includes(evt.categoryId)),
+    [events, visibleCategoryIds]
+  );
+  const globalEventById = React.useMemo(
+    () => new Map(globallyVisibleEvents.map((evt) => [evt.id, evt])),
+    [globallyVisibleEvents]
+  );
+
+  const parsedEvents: ParsedEvent[] = globallyVisibleEvents
     .map((evt) => {
       const start = parseISO(evt.startDate);
       const end = parseISO(evt.endDate);
@@ -143,12 +151,12 @@ export function MonthRow({
     })
     .filter((evt) => !(evt.end < monthStart || evt.start > monthEnd));
 
-  const eventById = new Map(parsedEvents.map((evt) => [evt.id, evt]));
   const draggingEvent = dragState.draggingEventId
-    ? eventById.get(dragState.draggingEventId)
+    ? globalEventById.get(dragState.draggingEventId)
     : undefined;
-  const isDraggingAny = Boolean(dragState.draggingEventId);
-  const draggingSingleDay = Boolean(draggingEvent && !draggingEvent.isMultiDay);
+  const isDraggingAny = Boolean(dragState.draggingEventId && dragState.source);
+  const draggingSingleDay = Boolean(dragState.source && !dragState.source.isMultiDay);
+  const draggingMultiDay = Boolean(dragState.source?.isMultiDay);
 
   const multiDayEvents = parsedEvents.filter((evt) => evt.isMultiDay).sort(sortMultiDayEvents);
   const singleDayEvents = parsedEvents
@@ -234,7 +242,7 @@ export function MonthRow({
     | { row: number; startCol: number; endCol: number }
     | null = null;
 
-  if (dragState.source && dragState.hoverDateIso && draggingEvent?.isMultiDay) {
+  if (dragState.source?.isMultiDay && dragState.hoverDateIso && dragState.draggingEventId) {
     const projectedStart = addDays(
       parseISO(dragState.hoverDateIso),
       -(dragState.source.grabOffsetDays ?? 0)
@@ -257,7 +265,9 @@ export function MonthRow({
       const startCol = Math.max(1, Math.min(startIndex, COLUMNS));
       const endCol = Math.max(1, Math.min(endIndex, COLUMNS));
       if (startCol <= endCol) {
-        const occupied = segments.filter((seg) => seg.event.id !== draggingEvent.id);
+        const occupied = segments.filter(
+          (seg) => seg.event.id !== dragState.draggingEventId
+        );
         let row = 1;
         while (
           occupied.some(
@@ -454,7 +464,7 @@ export function MonthRow({
                 >
                   <div
                     className={`absolute inset-x-0 ${
-                      isDraggingAny && !draggingSingleDay
+                      draggingMultiDay
                         ? "pointer-events-none"
                         : "pointer-events-auto"
                     }`}
@@ -523,7 +533,7 @@ export function MonthRow({
                                 className={
                                   isDragged
                                     ? "pointer-events-none opacity-40"
-                                    : isDraggingAny
+                                    : draggingSingleDay
                                       ? "pointer-events-none"
                                       : ""
                                 }
