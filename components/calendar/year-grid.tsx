@@ -287,6 +287,8 @@ export function YearGrid({
     didDropRef.current = false;
   }, [clearDragState]);
 
+  const hasDragContext = Boolean(dragState.draggingEventId || dragState.source);
+
   React.useEffect(() => {
     if (!dragState.draggingEventId) return;
 
@@ -315,6 +317,7 @@ export function YearGrid({
           visibleCategoryIds={visibleCategoryIds}
           multiDaySlotById={multiDaySlotById}
           dragState={dragState}
+          hasDragContext={hasDragContext}
           onEditEvent={onEditEvent}
           creatingRange={creatingRange}
           onStartCreateRange={onStartCreateRange}

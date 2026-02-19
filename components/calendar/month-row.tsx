@@ -68,6 +68,7 @@ export function MonthRow({
   visibleCategoryIds,
   multiDaySlotById,
   dragState,
+  hasDragContext,
   onEditEvent,
   creatingRange,
   onStartCreateRange,
@@ -86,6 +87,7 @@ export function MonthRow({
   visibleCategoryIds: string[];
   multiDaySlotById: Map<string, number>;
   dragState: GlobalDragState;
+  hasDragContext: boolean;
   onEditEvent: (id: string) => void;
   creatingRange: { startIso: string; hoverIso: string; isDragging: boolean } | null;
   onStartCreateRange: (startIso: string) => void;
@@ -154,7 +156,7 @@ export function MonthRow({
   const draggingEvent = dragState.draggingEventId
     ? globalEventById.get(dragState.draggingEventId)
     : undefined;
-  const isDraggingAny = Boolean(dragState.draggingEventId && dragState.source);
+  const isDraggingAny = hasDragContext;
   const draggingSingleDay = Boolean(dragState.source && !dragState.source.isMultiDay);
   const draggingMultiDay = Boolean(dragState.source?.isMultiDay);
 
@@ -434,9 +436,9 @@ export function MonthRow({
           </div>
         </div>
 
-        <div className="absolute inset-x-0 top-0 z-[11]">
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-[11]">
           <div
-            className="grid pointer-events-none"
+            className="grid"
             style={{ gridTemplateColumns: "repeat(37, minmax(0, 1fr))" }}
           >
             {dayInfos.map((day) => {
@@ -459,7 +461,7 @@ export function MonthRow({
               return (
                 <div
                   key={`single-${monthIndex}-${day.iso}`}
-                  className="relative pointer-events-none"
+                  className="relative"
                   style={{
                     gridColumn: `${day.col} / ${day.col + 1}`,
                     minHeight: `${minHeightPx}px`,
@@ -473,9 +475,10 @@ export function MonthRow({
                     }`}
                     style={{ top: `${singleDayStartOffset}px` }}
                     onDragOver={(e) => {
-                      if (!draggingSingleDay) return;
+                      if (!hasDragContext) return;
                       e.preventDefault();
                       e.stopPropagation();
+                      if (!draggingSingleDay) return;
                       const rect = e.currentTarget.getBoundingClientRect();
                       const relativeY = Math.max(0, e.clientY - rect.top);
                       const baseIds = dayEvents
@@ -489,7 +492,6 @@ export function MonthRow({
                       onSingleDayListHover(day.iso, insertIndex);
                     }}
                     onDragLeave={(e) => {
-                      if (!draggingSingleDay) return;
                       const related = e.relatedTarget as Node | null;
                       if (related && e.currentTarget.contains(related)) return;
                       clearReorderTarget();
