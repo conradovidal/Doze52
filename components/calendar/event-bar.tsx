@@ -69,7 +69,9 @@ export function EventBar({
       onDragEnd={() => {
         isDragCycleRef.current = false;
         lastDragEndAtRef.current = performance.now();
-        onDragEnd?.();
+        window.setTimeout(() => {
+          onDragEnd?.();
+        }, 0);
       }}
       className={`group relative block w-full cursor-pointer truncate text-left text-neutral-100 ${EVENT_ITEM_PADDING_X_CLASS} ${EVENT_ITEM_TEXT_CLASS} ${radius} ${isPast ? "opacity-50" : ""} ${isDragging ? "opacity-40" : ""} ${className ?? ""} overflow-visible`}
       style={{ backgroundColor: event.color }}

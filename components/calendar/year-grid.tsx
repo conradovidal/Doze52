@@ -73,6 +73,12 @@ export function YearGrid({
     reorderTarget: null,
     source: null,
   });
+  const dragSnapshotRef = React.useRef<GlobalDragState>({
+    draggingEventId: null,
+    hoverDateIso: null,
+    reorderTarget: null,
+    source: null,
+  });
   const didDropRef = React.useRef(false);
 
   const visibleEvents = React.useMemo(
@@ -94,18 +100,36 @@ export function YearGrid({
     });
   }, [visibleEvents, year]);
 
+  const applyDragState = React.useCallback(
+    (
+      updater:
+        | GlobalDragState
+        | ((prev: GlobalDragState) => GlobalDragState)
+    ) => {
+      setDragState((prev) => {
+        const next =
+          typeof updater === "function"
+            ? (updater as (prev: GlobalDragState) => GlobalDragState)(prev)
+            : updater;
+        dragSnapshotRef.current = next;
+        return next;
+      });
+    },
+    []
+  );
+
   const clearDragState = React.useCallback(() => {
-    setDragState({
+    applyDragState({
       draggingEventId: null,
       hoverDateIso: null,
       reorderTarget: null,
       source: null,
     });
-  }, []);
+  }, [applyDragState]);
 
   const clearReorderTarget = React.useCallback(() => {
-    setDragState((prev) => ({ ...prev, reorderTarget: null }));
-  }, []);
+    applyDragState((prev) => ({ ...prev, reorderTarget: null }));
+  }, [applyDragState]);
 
   const onEventDragStart = React.useCallback(
     (payload: {
@@ -118,7 +142,7 @@ export function YearGrid({
       const durationDaysInclusive =
         differenceInCalendarDays(parseISO(payload.endDate), parseISO(payload.startDate)) + 1;
       didDropRef.current = false;
-      setDragState({
+      applyDragState({
         draggingEventId: payload.eventId,
         hoverDateIso: format(
           addDays(parseISO(payload.startDate), payload.grabOffsetDays),
@@ -131,24 +155,27 @@ export function YearGrid({
         },
       });
     },
-    []
+    [applyDragState]
   );
 
   const onDayHover = React.useCallback((dateIso: string) => {
-    setDragState((prev) => ({ ...prev, hoverDateIso: dateIso, reorderTarget: null }));
-  }, []);
+    applyDragState((prev) => ({ ...prev, hoverDateIso: dateIso, reorderTarget: null }));
+  }, [applyDragState]);
 
   const onSingleDayListHover = React.useCallback((dayIso: string, insertIndex: number) => {
-    setDragState((prev) => ({
+    applyDragState((prev) => ({
       ...prev,
       hoverDateIso: dayIso,
       reorderTarget: { dayIso, insertIndex },
     }));
-  }, []);
+  }, [applyDragState]);
 
   const onDayDrop = React.useCallback(
     (dropDateIso: string) => {
-      const currentState = dragState;
+      const currentState =
+        dragState.source && dragState.draggingEventId
+          ? dragState
+          : dragSnapshotRef.current;
       if (!currentState.source || !currentState.draggingEventId) {
         clearDragState();
         return;
@@ -235,7 +262,14 @@ export function YearGrid({
       didDropRef.current = true;
       clearDragState();
     },
-    [clearDragState, dragState, eventById, onApplyDayReorder, onMoveEventByDelta, visibleEvents]
+    [
+      clearDragState,
+      dragState,
+      eventById,
+      onApplyDayReorder,
+      onMoveEventByDelta,
+      visibleEvents,
+    ]
   );
 
   const onEventDragEnd = React.useCallback(() => {
