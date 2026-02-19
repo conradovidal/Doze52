@@ -31,7 +31,7 @@ type DbEvent = {
   end_date: string;
   created_at: string;
   updated_at: string;
-  day_order: Record<string, number>;
+  day_order: unknown;
 };
 
 export type CalendarSnapshot = {
@@ -144,6 +144,66 @@ const safeSupabaseMessage = (message: string) => {
     return null;
   }
   return trimmed.length > 220 ? `${trimmed.slice(0, 217)}...` : trimmed;
+};
+
+const logSanitizedField = (params: {
+  table: "categories" | "events";
+  action: "insert/update";
+  field: string;
+  original: unknown;
+  sanitized: number | null;
+}) => {
+  if (!isDetailedSyncErrorEnabled()) return;
+  console.warn("[sync.sanitize]", {
+    supabaseUrl: getSupabaseOrigin(),
+    table: params.table,
+    action: params.action,
+    field: params.field,
+    original: params.original,
+    sanitized: params.sanitized,
+  });
+};
+
+const sanitizeIntegerField = (params: {
+  table: "categories" | "events";
+  action: "insert/update";
+  field: string;
+  value: unknown;
+  fallback?: number | null;
+}): number | null => {
+  const fallback = params.fallback ?? 0;
+  let next: number | null;
+
+  if (typeof params.value === "number" && Number.isFinite(params.value)) {
+    next = Math.trunc(params.value);
+  } else if (
+    typeof params.value === "string" &&
+    params.value.trim().length > 0 &&
+    Number.isFinite(Number(params.value))
+  ) {
+    next = Math.trunc(Number(params.value));
+  } else {
+    next = fallback;
+    logSanitizedField({
+      table: params.table,
+      action: params.action,
+      field: params.field,
+      original: params.value,
+      sanitized: next,
+    });
+  }
+
+  return next;
+};
+
+const normalizeDayOrderFromDb = (value: unknown): Record<string, number> => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const normalized: Record<string, number> = {};
+  for (const [key, entry] of Object.entries(value)) {
+    if (typeof entry !== "number" || !Number.isFinite(entry)) continue;
+    normalized[key] = Math.trunc(entry);
+  }
+  return normalized;
 };
 
 const userMessageForKind = (kind: SyncErrorKind, fallbackMessage?: string) => {
@@ -293,7 +353,7 @@ const toLocalEvent = (row: DbEvent, categories: CategoryItem[]): CalendarEvent =
   startDate: row.start_date,
   endDate: row.end_date,
   createdAt: row.created_at,
-  dayOrder: row.day_order ?? {},
+  dayOrder: normalizeDayOrderFromDb(row.day_order),
 });
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
@@ -412,7 +472,13 @@ const saveSnapshotInternal = async (snapshot: CalendarSnapshot): Promise<void> =
         name: category.name.trim(),
         color: category.color,
         visible: category.visible,
-        position: index,
+        position: sanitizeIntegerField({
+          table: "categories",
+          action: "insert/update",
+          field: "position",
+          value: index,
+          fallback: 0,
+        }),
       }));
 
       const eventRows = snapshot.events.map((event) => ({
@@ -422,7 +488,13 @@ const saveSnapshotInternal = async (snapshot: CalendarSnapshot): Promise<void> =
         category_id: event.categoryId,
         start_date: event.startDate || todayIso(),
         end_date: event.endDate || event.startDate || todayIso(),
-        day_order: event.dayOrder ?? {},
+        day_order: sanitizeIntegerField({
+          table: "events",
+          action: "insert/update",
+          field: "day_order",
+          value: event.dayOrder,
+          fallback: 0,
+        }),
         created_at: event.createdAt || nowIso(),
       }));
 
