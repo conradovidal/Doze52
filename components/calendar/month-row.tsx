@@ -473,7 +473,7 @@ export function MonthRow({
               return (
                 <div
                   key={`single-${monthIndex}-${day.iso}`}
-                  className="relative"
+                  className="relative pointer-events-none"
                   style={{
                     gridColumn: `${day.col} / ${day.col + 1}`,
                     minHeight: `${minHeightPx}px`,

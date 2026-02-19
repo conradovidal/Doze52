@@ -379,10 +379,19 @@ export function YearGrid({
 
   const onEventDragEnd = React.useCallback(() => {
     if (!didDropRef.current) {
+      if (shouldLogDnd) {
+        console.log("[dnd.dragend.no-drop]", {
+          draggingEventId: dragState.draggingEventId,
+          hoverDateIso: dragState.hoverDateIso,
+          reorderTarget: dragState.reorderTarget,
+          sourceStartDate: dragState.source?.startDate ?? null,
+          isMultiDay: dragState.source?.isMultiDay ?? null,
+        });
+      }
       clearDragState();
     }
     didDropRef.current = false;
-  }, [clearDragState]);
+  }, [clearDragState, dragState, shouldLogDnd]);
 
   const hasDragContext = Boolean(dragState.draggingEventId || dragState.source);
 
@@ -390,6 +399,15 @@ export function YearGrid({
     if (!dragState.draggingEventId) return;
 
     const handleWindowDrop = () => {
+      if (shouldLogDnd) {
+        console.log("[dnd.window.drop.capture]", {
+          draggingEventId: dragSnapshotRef.current.draggingEventId,
+          hoverDateIso: dragSnapshotRef.current.hoverDateIso,
+          reorderTarget: dragSnapshotRef.current.reorderTarget,
+          sourceStartDate: dragSnapshotRef.current.source?.startDate ?? null,
+          isMultiDay: dragSnapshotRef.current.source?.isMultiDay ?? null,
+        });
+      }
       window.setTimeout(() => {
         if (!didDropRef.current) {
           clearDragState();
@@ -401,7 +419,7 @@ export function YearGrid({
     return () => {
       window.removeEventListener("drop", handleWindowDrop, true);
     };
-  }, [clearDragState, dragState.draggingEventId]);
+  }, [clearDragState, dragState.draggingEventId, shouldLogDnd]);
 
   return (
     <div className="w-full overflow-hidden rounded-xl border border-neutral-200">
