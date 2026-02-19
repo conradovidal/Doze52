@@ -12,6 +12,7 @@ import {
 import type { CalendarEvent, CategoryItem } from "@/lib/types";
 import { useStore } from "@/lib/store";
 import { buildMultiDaySlotMap } from "@/lib/calendar-slotting";
+import { readCalendarEventDndPayload } from "@/lib/calendar-dnd";
 import { MonthRow } from "./month-row";
 
 type ReorderTarget = {
@@ -80,6 +81,8 @@ export function YearGrid({
     source: null,
   });
   const didDropRef = React.useRef(false);
+  const shouldLogDnd =
+    process.env.NODE_ENV !== "production" || process.env.NEXT_PUBLIC_DND_DEBUG === "1";
 
   const visibleEvents = React.useMemo(
     () => events.filter((event) => visibleCategoryIds.includes(event.categoryId)),
@@ -169,46 +172,75 @@ export function YearGrid({
   }, []);
 
   const onDayDrop = React.useCallback(
-    (dropDateIso: string) => {
+    (dropDateIso: string, transfer?: DataTransfer | null) => {
+      const transferPayload = readCalendarEventDndPayload(transfer);
       const hasLiveState = Boolean(dragState.source && dragState.draggingEventId);
-      const currentState = hasLiveState ? dragState : dragSnapshotRef.current;
       const hasSnapshot = Boolean(
         dragSnapshotRef.current.source && dragSnapshotRef.current.draggingEventId
       );
-      if (process.env.NODE_ENV !== "production") {
+
+      let currentSource: DragSource | null = null;
+      let currentEventId: string | null = null;
+      let sourceKind: "transfer" | "live" | "snapshot" | "none" = "none";
+      const currentReorderTarget = dragState.reorderTarget ?? dragSnapshotRef.current.reorderTarget;
+
+      if (transferPayload) {
+        const durationDaysInclusive =
+          differenceInCalendarDays(
+            parseISO(transferPayload.endDate),
+            parseISO(transferPayload.startDate)
+          ) + 1;
+        currentSource = {
+          ...transferPayload,
+          durationDaysInclusive: Math.max(1, durationDaysInclusive),
+        };
+        currentEventId = transferPayload.eventId;
+        sourceKind = "transfer";
+      } else if (hasLiveState) {
+        currentSource = dragState.source;
+        currentEventId = dragState.draggingEventId;
+        sourceKind = "live";
+      } else if (hasSnapshot) {
+        currentSource = dragSnapshotRef.current.source;
+        currentEventId = dragSnapshotRef.current.draggingEventId;
+        sourceKind = "snapshot";
+      }
+
+      if (shouldLogDnd) {
         console.info("[dnd.drop.source]", {
+          sourceKind,
           hasLiveState,
           hasSnapshot,
+          hasTransferPayload: Boolean(transferPayload),
           dropDateIso,
-          draggingEventId:
-            currentState.draggingEventId ?? dragSnapshotRef.current.draggingEventId,
+          draggingEventId: currentEventId ?? dragSnapshotRef.current.draggingEventId,
         });
       }
-      if (!currentState.source || !currentState.draggingEventId) {
+      if (!currentSource || !currentEventId) {
         clearDragState();
         return;
       }
 
-      const sourceEvent = eventById.get(currentState.draggingEventId);
+      const sourceEvent = eventById.get(currentEventId);
       if (!sourceEvent) {
         clearDragState();
         return;
       }
 
       if (
-        !currentState.source.isMultiDay &&
-        currentState.source.startDate === dropDateIso &&
-        currentState.reorderTarget &&
-        currentState.reorderTarget.dayIso === dropDateIso &&
-        Number.isInteger(currentState.reorderTarget.insertIndex)
+        !currentSource.isMultiDay &&
+        currentSource.startDate === dropDateIso &&
+        currentReorderTarget &&
+        currentReorderTarget.dayIso === dropDateIso &&
+        Number.isInteger(currentReorderTarget.insertIndex)
       ) {
-        if (process.env.NODE_ENV !== "production") {
+        if (shouldLogDnd) {
           console.info("[dnd.drop]", {
             branch: "reorder",
             dropDateIso,
-            sourceStartDate: currentState.source.startDate,
-            hoverDateIso: currentState.hoverDateIso,
-            reorderTarget: currentState.reorderTarget,
+            sourceStartDate: currentSource.startDate,
+            hoverDateIso: dragState.hoverDateIso,
+            reorderTarget: currentReorderTarget,
           });
         }
         const inDayIds = visibleEvents
@@ -221,16 +253,16 @@ export function YearGrid({
           })
           .map((event) => event.id);
 
-        const withoutMoved = inDayIds.filter((id) => id !== currentState.draggingEventId);
+        const withoutMoved = inDayIds.filter((id) => id !== currentEventId);
         const insertAt = Math.max(
           0,
-          Math.min(currentState.reorderTarget.insertIndex, withoutMoved.length)
+          Math.min(currentReorderTarget.insertIndex, withoutMoved.length)
         );
-        withoutMoved.splice(insertAt, 0, currentState.draggingEventId);
+        withoutMoved.splice(insertAt, 0, currentEventId);
 
         onApplyDayReorder({
           dayIso: dropDateIso,
-          eventId: currentState.draggingEventId,
+          eventId: currentEventId,
           toIndex: insertAt,
           orderedIds: withoutMoved,
         });
@@ -241,27 +273,27 @@ export function YearGrid({
 
       const newStartDate = addDays(
         parseISO(dropDateIso),
-        -(currentState.source.grabOffsetDays ?? 0)
+        -(currentSource.grabOffsetDays ?? 0)
       );
-      const sourceStart = parseISO(currentState.source.startDate);
+      const sourceStart = parseISO(currentSource.startDate);
       const deltaDays = differenceInCalendarDays(newStartDate, sourceStart);
-      if (process.env.NODE_ENV !== "production") {
+      if (shouldLogDnd) {
         console.info("[dnd.drop]", {
           branch: "move-date",
           dropDateIso,
-          sourceStartDate: currentState.source.startDate,
-          hoverDateIso: currentState.hoverDateIso,
-          reorderTarget: currentState.reorderTarget,
+          sourceStartDate: currentSource.startDate,
+          hoverDateIso: dragState.hoverDateIso,
+          reorderTarget: currentReorderTarget,
         });
       }
 
       const expectedNewEnd = addDays(
         newStartDate,
-        currentState.source.durationDaysInclusive - 1
+        currentSource.durationDaysInclusive - 1
       );
       const checkDays =
         differenceInCalendarDays(expectedNewEnd, newStartDate) + 1;
-      if (checkDays !== currentState.source.durationDaysInclusive) {
+      if (checkDays !== currentSource.durationDaysInclusive) {
         clearDragState();
         return;
       }
@@ -276,6 +308,7 @@ export function YearGrid({
       eventById,
       onApplyDayReorder,
       onMoveEventByDelta,
+      shouldLogDnd,
       visibleEvents,
     ]
   );

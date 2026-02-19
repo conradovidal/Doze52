@@ -24,7 +24,7 @@ export function DayCell({
   isInMonth: boolean;
   isDropActive?: boolean;
   onDayHover?: (dateIso: string) => void;
-  onDayDrop?: (dateIso: string) => void;
+  onDayDrop?: (dateIso: string, transfer?: DataTransfer | null) => void;
 }) {
   if (!isInMonth) {
     return (
@@ -41,7 +41,7 @@ export function DayCell({
           if (!onDayDrop) return;
           e.preventDefault();
           e.stopPropagation();
-          onDayDrop(dateIso);
+          onDayDrop(dateIso, e.dataTransfer);
         }}
       />
     );
@@ -77,7 +77,7 @@ export function DayCell({
         if (!onDayDrop) return;
         e.preventDefault();
         e.stopPropagation();
-        onDayDrop(dateIso);
+        onDayDrop(dateIso, e.dataTransfer);
       }}
     >
       <div className={`flex h-3.5 flex-none items-center gap-1 px-0.5 leading-none text-[10px] ${isPast ? "text-neutral-400" : "text-neutral-600"}`}>

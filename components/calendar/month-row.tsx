@@ -16,6 +16,10 @@ import type { CalendarEvent } from "@/lib/types";
 import type { GlobalDragState } from "./year-grid";
 import { fmtMonthLabel } from "@/lib/date";
 import {
+  readCalendarEventDndPayload,
+  writeCalendarEventDndPayload,
+} from "@/lib/calendar-dnd";
+import {
   EVENT_ITEM_GAP_PX,
   EVENT_ITEM_HEIGHT_PX,
   EVENT_ITEM_LINE_HEIGHT_CLASS,
@@ -102,7 +106,7 @@ export function MonthRow({
   }) => void;
   onEventDragEnd: () => void;
   onDayHover: (dateIso: string) => void;
-  onDayDrop: (dateIso: string) => void;
+  onDayDrop: (dateIso: string, transfer?: DataTransfer | null) => void;
   onSingleDayListHover: (dayIso: string, insertIndex: number) => void;
   clearReorderTarget: () => void;
 }) {
@@ -346,8 +350,8 @@ export function MonthRow({
                 isRangeEnd={!!rangeBounds && day.iso === rangeBounds.endIso}
                 isInMonth={day.inMonth}
                 isDropActive={isDraggingAny && dragState.hoverDateIso === day.iso}
-                onDayHover={isDraggingAny ? onDayHover : undefined}
-                onDayDrop={isDraggingAny ? onDayDrop : undefined}
+                onDayHover={onDayHover}
+                onDayDrop={onDayDrop}
               />
             </div>
           ))}
@@ -408,6 +412,13 @@ export function MonthRow({
                       0,
                       Math.min(rawOffset, Math.max(0, eventDuration - 1))
                     );
+                    writeCalendarEventDndPayload(e.dataTransfer, {
+                      eventId: seg.event.id,
+                      startDate: seg.event.startDate,
+                      endDate: seg.event.endDate,
+                      grabOffsetDays,
+                      isMultiDay: true,
+                    });
                     onEventDragStart({
                       eventId: seg.event.id,
                       startDate: seg.event.startDate,
@@ -475,10 +486,19 @@ export function MonthRow({
                     }`}
                     style={{ top: `${singleDayStartOffset}px` }}
                     onDragOver={(e) => {
-                      if (!hasDragContext) return;
+                      const dragPayload = readCalendarEventDndPayload(e.dataTransfer);
+                      const hasAppDrag = Boolean(dragPayload || hasDragContext);
+                      if (!hasAppDrag) return;
                       e.preventDefault();
                       e.stopPropagation();
-                      if (!draggingSingleDay) return;
+                      onDayHover(day.iso);
+                      const isSingleDayDrag = dragPayload
+                        ? !dragPayload.isMultiDay
+                        : draggingSingleDay;
+                      if (!isSingleDayDrag) {
+                        clearReorderTarget();
+                        return;
+                      }
                       const rect = e.currentTarget.getBoundingClientRect();
                       const relativeY = Math.max(0, e.clientY - rect.top);
                       const baseIds = dayEvents
@@ -499,7 +519,7 @@ export function MonthRow({
                     onDrop={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      onDayDrop(day.iso);
+                      onDayDrop(day.iso, e.dataTransfer);
                     }}
                   >
                     <div
@@ -541,7 +561,14 @@ export function MonthRow({
                                       ? "pointer-events-none"
                                       : ""
                                 }
-                                onDragStart={() => {
+                                onDragStart={(e) => {
+                                  writeCalendarEventDndPayload(e.dataTransfer, {
+                                    eventId: event.id,
+                                    startDate: event.startDate,
+                                    endDate: event.endDate,
+                                    grabOffsetDays: 0,
+                                    isMultiDay: false,
+                                  });
                                   onEventDragStart({
                                     eventId: event.id,
                                     startDate: event.startDate,
