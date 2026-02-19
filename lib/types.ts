@@ -14,8 +14,9 @@ export type CalendarEvent = {
   color: string;
   startDate: string; // ISO yyyy-MM-dd
   endDate: string; // ISO yyyy-MM-dd
+  notes?: string;
   createdAt: string; // ISO datetime
-  dayOrder: Record<string, number>; // per-day visual order (0-based)
+  dayOrder: number; // global visual order (0-based)
 };
 
 export type Habit = {

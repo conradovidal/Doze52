@@ -29,6 +29,7 @@ type DbEvent = {
   category_id: string;
   start_date: string;
   end_date: string;
+  notes: string | null;
   created_at: string;
   updated_at: string;
   day_order: unknown;
@@ -196,14 +197,27 @@ const sanitizeIntegerField = (params: {
   return next;
 };
 
-const normalizeDayOrderFromDb = (value: unknown): Record<string, number> => {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
-  const normalized: Record<string, number> = {};
-  for (const [key, entry] of Object.entries(value)) {
-    if (typeof entry !== "number" || !Number.isFinite(entry)) continue;
-    normalized[key] = Math.trunc(entry);
+const normalizeDayOrderFromDb = (value: unknown): number => {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return Math.max(0, Math.trunc(value));
   }
-  return normalized;
+  if (
+    typeof value === "string" &&
+    value.trim().length > 0 &&
+    Number.isFinite(Number(value))
+  ) {
+    return Math.max(0, Math.trunc(Number(value)));
+  }
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const candidates = Object.values(value)
+      .filter((entry): entry is number => typeof entry === "number" && Number.isFinite(entry))
+      .map((entry) => Math.trunc(entry))
+      .filter((entry) => entry >= 0);
+    if (candidates.length > 0) {
+      return Math.min(...candidates);
+    }
+  }
+  return 0;
 };
 
 const userMessageForKind = (kind: SyncErrorKind, fallbackMessage?: string) => {
@@ -352,6 +366,7 @@ const toLocalEvent = (row: DbEvent, categories: CategoryItem[]): CalendarEvent =
     "#2563eb",
   startDate: row.start_date,
   endDate: row.end_date,
+  notes: row.notes ?? undefined,
   createdAt: row.created_at,
   dayOrder: normalizeDayOrderFromDb(row.day_order),
 });
@@ -427,7 +442,8 @@ export const fetchEvents = async (
       .from("events")
       .select("*")
       .eq("user_id", userId)
-      .order("start_date", { ascending: true });
+      .order("start_date", { ascending: true })
+      .order("day_order", { ascending: true });
     assertQuerySuccess(error, { table: "events", action: "select" });
     return ((data ?? []) as DbEvent[]).map((row) => toLocalEvent(row, categories));
   });
@@ -488,6 +504,7 @@ const saveSnapshotInternal = async (snapshot: CalendarSnapshot): Promise<void> =
         category_id: event.categoryId,
         start_date: event.startDate || todayIso(),
         end_date: event.endDate || event.startDate || todayIso(),
+        notes: event.notes?.trim() || null,
         day_order: sanitizeIntegerField({
           table: "events",
           action: "insert/update",
@@ -636,6 +653,7 @@ export const exportUserData = async () => {
       category_id: event.categoryId,
       start_date: event.startDate,
       end_date: event.endDate,
+      notes: event.notes ?? "",
       created_at: event.createdAt,
       day_order: event.dayOrder,
     }))

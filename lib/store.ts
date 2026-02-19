@@ -10,6 +10,7 @@ export type EventInput = {
   categoryId: string;
   startDate: string;
   endDate: string;
+  notes?: string;
 };
 
 type StoreState = {
@@ -44,6 +45,40 @@ const defaultCategories: CategoryItem[] = [
 ];
 const defaultCategoryId = "personal";
 
+const normalizeEventDayOrder = (value: unknown): number => {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return Math.max(0, Math.trunc(value));
+  }
+  if (typeof value === "string" && value.trim() && Number.isFinite(Number(value))) {
+    return Math.max(0, Math.trunc(Number(value)));
+  }
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const candidates = Object.values(value)
+      .filter((entry): entry is number => typeof entry === "number" && Number.isFinite(entry))
+      .map((entry) => Math.trunc(entry))
+      .filter((entry) => entry >= 0);
+    if (candidates.length > 0) return Math.min(...candidates);
+  }
+  return 0;
+};
+
+const isSingleDayEvent = (evt: Pick<CalendarEvent, "startDate" | "endDate">) =>
+  evt.startDate === evt.endDate;
+
+const nextSingleDayOrder = (events: CalendarEvent[], dayIso: string) => {
+  const maxValue = events
+    .filter((evt) => isSingleDayEvent(evt) && evt.startDate === dayIso)
+    .reduce((acc, evt) => Math.max(acc, normalizeEventDayOrder(evt.dayOrder)), -1);
+  return maxValue + 1;
+};
+
+const nextMultiDayOrder = (events: CalendarEvent[]) => {
+  const maxValue = events
+    .filter((evt) => !isSingleDayEvent(evt))
+    .reduce((acc, evt) => Math.max(acc, normalizeEventDayOrder(evt.dayOrder)), -1);
+  return maxValue + 1;
+};
+
 type LegacyEvent = Partial<CalendarEvent> & { category?: string };
 type PersistedState = {
   categories?: CategoryItem[];
@@ -75,49 +110,78 @@ export const useStore = create<StoreState>()(
             const id = evt.id ?? uid();
             const createdAt =
               evt.createdAt ?? new Date(Date.UTC(2024, 0, 1, 0, 0, idx)).toISOString();
-            const dayOrder = evt.dayOrder ?? {};
-            if (evt.id === id && evt.createdAt === createdAt && evt.dayOrder === dayOrder) return evt;
+            const dayOrder = normalizeEventDayOrder(evt.dayOrder);
+            const notes =
+              typeof evt.notes === "string" && evt.notes.trim().length > 0
+                ? evt.notes.trim()
+                : undefined;
+            if (
+              evt.id === id &&
+              evt.createdAt === createdAt &&
+              evt.dayOrder === dayOrder &&
+              evt.notes === notes
+            ) {
+              return evt;
+            }
             changed = true;
-            return { ...evt, id, createdAt, dayOrder };
+            return { ...evt, id, createdAt, dayOrder, notes };
           });
           return changed ? { events: nextEvents } : state;
         }),
       addEvent: (input) =>
+        set((state) => {
+          const isSingleDay = input.startDate === input.endDate;
+          const dayOrder = isSingleDay
+            ? nextSingleDayOrder(state.events, input.startDate)
+            : nextMultiDayOrder(state.events);
+          return {
+            events: [
+              ...state.events,
+              {
+                id: uid(),
+                title: input.title.trim(),
+                categoryId: input.categoryId,
+                color:
+                  state.categories.find((c) => c.id === input.categoryId)?.color ??
+                  "#2563eb",
+                startDate: input.startDate,
+                endDate: input.endDate,
+                notes: input.notes?.trim() || undefined,
+                createdAt: new Date().toISOString(),
+                dayOrder,
+              },
+            ],
+          };
+        }),
+      updateEvent: (id, input) =>
         set((state) => ({
-          events: [
-            ...state.events,
-            {
-              id: uid(),
+          events: state.events.map((evt) => {
+            if (evt.id !== id) return evt;
+            const prevIsSingleDay = isSingleDayEvent(evt);
+            const nextIsSingleDay = input.startDate === input.endDate;
+            const mustRecalculateOrder = prevIsSingleDay !== nextIsSingleDay;
+            const nextOrder = mustRecalculateOrder
+              ? nextIsSingleDay
+                ? nextSingleDayOrder(
+                    state.events.filter((entry) => entry.id !== id),
+                    input.startDate
+                  )
+                : nextMultiDayOrder(state.events.filter((entry) => entry.id !== id))
+              : normalizeEventDayOrder(evt.dayOrder);
+            return {
+              ...evt,
               title: input.title.trim(),
               categoryId: input.categoryId,
               color:
                 state.categories.find((c) => c.id === input.categoryId)?.color ??
-                "#2563eb",
+                evt.color,
               startDate: input.startDate,
               endDate: input.endDate,
-              createdAt: new Date().toISOString(),
-              dayOrder: {},
-            },
-          ],
-        })),
-      updateEvent: (id, input) =>
-        set((state) => ({
-          events: state.events.map((evt) =>
-            evt.id === id
-              ? {
-                  ...evt,
-                  title: input.title.trim(),
-                  categoryId: input.categoryId,
-                  color:
-                    state.categories.find((c) => c.id === input.categoryId)?.color ??
-                    evt.color,
-                  startDate: input.startDate,
-                  endDate: input.endDate,
-                  createdAt: evt.createdAt,
-                  dayOrder: evt.dayOrder ?? {},
-                }
-              : evt
-          ),
+              notes: input.notes?.trim() || undefined,
+              createdAt: evt.createdAt,
+              dayOrder: nextOrder,
+            };
+          }),
         })),
       moveEventByDelta: (id, deltaDays) =>
         set((state) => {
@@ -135,34 +199,36 @@ export const useStore = create<StoreState>()(
             }),
           };
         }),
-      reorderEventInDay: ({ eventId, dayIso, toIndex }) =>
-        set((state) => ({
-          events: state.events.map((evt) =>
-            evt.id === eventId
-              ? {
-                  ...evt,
-                  dayOrder: {
-                    ...(evt.dayOrder ?? {}),
-                    [dayIso]: Math.max(0, toIndex),
-                  },
-                }
-              : evt
-          ),
-        })),
-      normalizeDayOrder: (dayIso, eventIdsInDay) =>
+      reorderEventInDay: ({ eventId, dayIso: _dayIso, toIndex }) =>
         set((state) => {
+          void _dayIso;
+          return {
+            events: state.events.map((evt) =>
+              evt.id === eventId
+                ? {
+                    ...evt,
+                    dayOrder: Math.max(0, toIndex),
+                  }
+                : evt
+            ),
+          };
+        }),
+      normalizeDayOrder: (_dayIso, eventIdsInDay) =>
+        set((state) => {
+          void _dayIso;
           const eventSet = new Set(eventIdsInDay);
           const byId = new Map(state.events.map((evt) => [evt.id, evt]));
           const ordered = [...eventIdsInDay]
             .map((id) => byId.get(id))
             .filter(Boolean)
             .sort((a, b) => {
-              const aOrder = a!.dayOrder?.[dayIso];
-              const bOrder = b!.dayOrder?.[dayIso];
-              if (aOrder !== undefined && bOrder !== undefined) return aOrder - bOrder;
-              if (aOrder !== undefined) return -1;
-              if (bOrder !== undefined) return 1;
-              return a!.createdAt.localeCompare(b!.createdAt);
+              const byOrder =
+                normalizeEventDayOrder(a!.dayOrder) -
+                normalizeEventDayOrder(b!.dayOrder);
+              if (byOrder !== 0) return byOrder;
+              const byCreated = a!.createdAt.localeCompare(b!.createdAt);
+              if (byCreated !== 0) return byCreated;
+              return a!.id.localeCompare(b!.id);
             });
 
           const normalized = new Map<string, number>();
@@ -173,10 +239,7 @@ export const useStore = create<StoreState>()(
               if (!eventSet.has(evt.id)) return evt;
               return {
                 ...evt,
-                dayOrder: {
-                  ...(evt.dayOrder ?? {}),
-                  [dayIso]: normalized.get(evt.id) ?? 0,
-                },
+                dayOrder: normalized.get(evt.id) ?? 0,
               };
             }),
           };
@@ -278,7 +341,7 @@ export const useStore = create<StoreState>()(
     }),
     {
       name: "yiv-store",
-      version: 1,
+      version: 2,
       migrate: (state: unknown) => {
         const persisted = (state ?? {}) as PersistedState;
         const categories = persisted.categories ?? defaultCategories;
@@ -287,7 +350,11 @@ export const useStore = create<StoreState>()(
             const createdAt =
               evt.createdAt ??
               new Date(Date.UTC(2024, 0, 1, 0, 0, idx)).toISOString();
-            const dayOrder = evt.dayOrder ?? {};
+            const dayOrder = normalizeEventDayOrder(evt.dayOrder);
+            const notes =
+              typeof evt.notes === "string" && evt.notes.trim().length > 0
+                ? evt.notes.trim()
+                : undefined;
 
             if (evt.categoryId) {
               return {
@@ -295,6 +362,7 @@ export const useStore = create<StoreState>()(
                 id: evt.id ?? uid(),
                 createdAt,
                 dayOrder,
+                notes,
               };
             }
             const legacy = evt.category;
@@ -314,6 +382,7 @@ export const useStore = create<StoreState>()(
               categoryId: mappedId,
               createdAt,
               dayOrder,
+              notes,
               color:
                 categories.find((c: CategoryItem) => c.id === mappedId)?.color ??
                 evt.color ??

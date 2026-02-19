@@ -41,6 +41,7 @@ export function EventDialog({
     categoryId: string;
     startDate: string;
     endDate: string;
+    notes?: string;
   }) => Promise<void> | void;
   onDelete?: () => Promise<void> | void;
 }) {
@@ -49,6 +50,7 @@ export function EventDialog({
   const [categoryId, setCategoryId] = React.useState("");
   const [startDate, setStartDate] = React.useState("");
   const [endDate, setEndDate] = React.useState("");
+  const [notes, setNotes] = React.useState("");
   const [isSaving, setIsSaving] = React.useState(false);
   const [submitError, setSubmitError] = React.useState<string | null>(null);
 
@@ -62,6 +64,7 @@ export function EventDialog({
     setEndDate(
       initialEvent?.endDate ?? seedRange?.endDate ?? seedDate ?? ""
     );
+    setNotes(initialEvent?.notes ?? "");
     setIsSaving(false);
     setSubmitError(null);
   }, [open, initialEvent, seedDate, seedRange, categories]);
@@ -104,6 +107,18 @@ export function EventDialog({
               type="date"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
+            />
+          </div>
+          <div className="space-y-1">
+            <label htmlFor="event-notes" className="text-xs text-neutral-500">
+              Descricao
+            </label>
+            <textarea
+              id="event-notes"
+              className="min-h-20 w-full rounded-md border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-neutral-400"
+              placeholder="Descricao"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
             />
           </div>
         </div>
@@ -155,15 +170,16 @@ export function EventDialog({
                     categoryId,
                     startDate,
                     endDate,
+                    notes,
                     color:
                       categories.find((category) => category.id === categoryId)?.color ??
                       "#2563eb",
                     createdAt: initialEvent?.createdAt ?? new Date().toISOString(),
-                    dayOrder: initialEvent?.dayOrder ?? {},
+                    dayOrder: initialEvent?.dayOrder ?? 0,
                   },
                   categoryIds
                 );
-                await onSubmit({ title, categoryId, startDate, endDate });
+                await onSubmit({ title, categoryId, startDate, endDate, notes });
                 onOpenChange(false);
               } catch (error) {
                 const message =

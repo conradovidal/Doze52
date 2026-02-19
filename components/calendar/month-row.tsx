@@ -23,13 +23,15 @@ const BASE_MIN_HEIGHT_COMPACT = 48;
 const HEADER_OFFSET = 18;
 const EVENT_ROW_HEIGHT = 14;
 const EVENT_ROW_GAP = 2;
+const EVENT_ROW_STEP = EVENT_ROW_HEIGHT + EVENT_ROW_GAP;
+const SINGLE_DAY_GAP_FROM_BARS = 6;
 const BOTTOM_PADDING = 4;
 const DRAG_MODE_THRESHOLD = 10;
-const EVENT_ROW_STEP = EVENT_ROW_HEIGHT + EVENT_ROW_GAP;
 
 type ParsedEvent = CalendarEvent & {
   start: Date;
   end: Date;
+  isMultiDay: boolean;
 };
 
 type RenderSegment = {
@@ -41,11 +43,26 @@ type RenderSegment = {
 
 type DragIntent = "pending" | "move-date" | "reorder-day";
 
+const sortMultiDayEvents = (a: ParsedEvent, b: ParsedEvent) => {
+  if (a.dayOrder !== b.dayOrder) return a.dayOrder - b.dayOrder;
+  if (a.startDate !== b.startDate) return a.startDate.localeCompare(b.startDate);
+  if (a.endDate !== b.endDate) return a.endDate.localeCompare(b.endDate);
+  return a.id.localeCompare(b.id);
+};
+
+const sortSingleDayEvents = (a: ParsedEvent, b: ParsedEvent) => {
+  if (a.dayOrder !== b.dayOrder) return a.dayOrder - b.dayOrder;
+  const byTitle = a.title.localeCompare(b.title);
+  if (byTitle !== 0) return byTitle;
+  return a.id.localeCompare(b.id);
+};
+
 export function MonthRow({
   year,
   monthIndex,
   events,
   visibleCategoryIds,
+  multiDaySlotById,
   onEditEvent,
   creatingRange,
   onStartCreateRange,
@@ -64,6 +81,7 @@ export function MonthRow({
   monthIndex: number;
   events: CalendarEvent[];
   visibleCategoryIds: string[];
+  multiDaySlotById: Map<string, number>;
   onEditEvent: (id: string) => void;
   creatingRange: { startIso: string; hoverIso: string; isDragging: boolean } | null;
   onStartCreateRange: (startIso: string) => void;
@@ -89,7 +107,6 @@ export function MonthRow({
   const daysGridRef = React.useRef<HTMLDivElement | null>(null);
   const [dragIntent, setDragIntent] = React.useState<DragIntent | "idle">("idle");
   const dragStartPointRef = React.useRef<{ x: number; y: number } | null>(null);
-
   const [reorderPreview, setReorderPreview] = React.useState<{
     dayIso: string;
     row: number;
@@ -117,14 +134,92 @@ export function MonthRow({
     iso: format(date, "yyyy-MM-dd"),
     inMonth: isSameMonth(date, monthStart),
   }));
+
+  const inMonthDays = dayInfos.filter((d) => d.inMonth);
+  const monthLabel = fmtMonthLabel(monthStart);
+
+  const parsedEvents: ParsedEvent[] = events
+    .filter((evt) => visibleCategoryIds.includes(evt.categoryId))
+    .map((evt) => {
+      const start = parseISO(evt.startDate);
+      const end = parseISO(evt.endDate);
+      return {
+        ...evt,
+        start,
+        end,
+        isMultiDay: evt.endDate > evt.startDate,
+      };
+    })
+    .filter((evt) => !(evt.end < monthStart || evt.start > monthEnd));
+
+  const eventById = new Map(parsedEvents.map((evt) => [evt.id, evt]));
+  const draggingEvent = draggingEventId ? eventById.get(draggingEventId) : undefined;
+  const draggingIsSingleDay = Boolean(draggingEvent && !draggingEvent.isMultiDay);
+
+  const multiDayEvents = parsedEvents.filter((evt) => evt.isMultiDay).sort(sortMultiDayEvents);
+  const singleDayEvents = parsedEvents
+    .filter((evt) => !evt.isMultiDay)
+    .sort((a, b) => {
+      if (a.startDate !== b.startDate) return a.startDate.localeCompare(b.startDate);
+      return sortSingleDayEvents(a, b);
+    });
+
+  const singleDayByIso = new Map<string, ParsedEvent[]>();
+  for (const day of inMonthDays) {
+    singleDayByIso.set(day.iso, []);
+  }
+  for (const evt of singleDayEvents) {
+    const bucket = singleDayByIso.get(evt.startDate);
+    if (!bucket) continue;
+    bucket.push(evt);
+  }
+  for (const [iso, bucket] of singleDayByIso.entries()) {
+    singleDayByIso.set(iso, bucket.sort(sortSingleDayEvents));
+  }
+
+  const segments: RenderSegment[] = [];
+  for (const evt of multiDayEvents) {
+    const clampedStart = evt.start < monthStart ? monthStart : evt.start;
+    const clampedEnd = evt.end > monthEnd ? monthEnd : evt.end;
+    if (clampedEnd < clampedStart) continue;
+    const startCol = differenceInCalendarDays(clampedStart, gridStart) + 1;
+    const endCol = differenceInCalendarDays(clampedEnd, gridStart) + 1;
+    const slot = multiDaySlotById.get(evt.id) ?? 0;
+    segments.push({
+      event: evt,
+      row: slot + 1,
+      startCol: Math.max(1, Math.min(startCol, COLUMNS)),
+      endCol: Math.max(1, Math.min(endCol, COLUMNS)),
+    });
+  }
+
+  const maxMultiRowsBase = segments.reduce((acc, seg) => Math.max(acc, seg.row), 0);
+  const maxSingleRowsBase = Math.max(
+    0,
+    ...Array.from(singleDayByIso.values()).map((bucket) => bucket.length)
+  );
+  const singleDayRows = Math.max(maxSingleRowsBase, reorderPreview?.row ?? 0);
+  const singleDayStartOffset =
+    HEADER_OFFSET +
+    (maxMultiRowsBase > 0
+      ? maxMultiRowsBase * EVENT_ROW_HEIGHT +
+        Math.max(0, maxMultiRowsBase - 1) * EVENT_ROW_GAP +
+        SINGLE_DAY_GAP_FROM_BARS
+      : 2);
+  const singleDayContentRows = Math.max(1, singleDayRows);
+  const singleDayContentHeight =
+    singleDayContentRows * EVENT_ROW_HEIGHT +
+    Math.max(0, singleDayContentRows - 1) * EVENT_ROW_GAP;
+  const contentHeight = singleDayStartOffset + singleDayContentHeight + BOTTOM_PADDING;
+  const minHeightPx = Math.max(BASE_MIN_HEIGHT_COMPACT, contentHeight);
+
   const rangeBounds = React.useMemo(() => {
     if (!creatingRange) return null;
     const a = creatingRange.startIso;
     const b = creatingRange.hoverIso;
-    return a <= b
-      ? { startIso: a, endIso: b }
-      : { startIso: b, endIso: a };
+    return a <= b ? { startIso: a, endIso: b } : { startIso: b, endIso: a };
   }, [creatingRange]);
+
   const rangeColumns = (() => {
     if (!rangeBounds) return null;
     const selected = dayInfos
@@ -136,114 +231,6 @@ export function MonthRow({
     if (!selected.length) return null;
     return { startCol: Math.min(...selected), endCol: Math.max(...selected) };
   })();
-  const inMonthDays = dayInfos.filter((d) => d.inMonth);
-  const monthLabel = fmtMonthLabel(monthStart);
-
-  const parsedEvents: ParsedEvent[] = events
-    .filter((e) => visibleCategoryIds.includes(e.categoryId))
-    .map((e) => ({
-      ...e,
-      start: parseISO(e.startDate),
-      end: parseISO(e.endDate),
-    }))
-    .filter((e) => !(e.end < monthStart || e.start > monthEnd));
-
-  const sortForDay = React.useCallback((a: ParsedEvent, b: ParsedEvent, dayIso: string) => {
-    const aOrder = a.dayOrder?.[dayIso];
-    const bOrder = b.dayOrder?.[dayIso];
-    if (aOrder !== undefined && bOrder !== undefined) return aOrder - bOrder;
-    if (aOrder !== undefined) return -1;
-    if (bOrder !== undefined) return 1;
-    const aCreated = a.createdAt ?? "1970-01-01T00:00:00.000Z";
-    const bCreated = b.createdAt ?? "1970-01-01T00:00:00.000Z";
-    const byCreatedAt = aCreated.localeCompare(bCreated);
-    if (byCreatedAt !== 0) return byCreatedAt;
-    return a.id.localeCompare(b.id);
-  }, []);
-
-  const assignmentByDay = new Map<string, Map<string, number>>();
-  let continuationRows = new Map<string, number>();
-  let maxRowUsed = 1;
-
-  for (const day of inMonthDays) {
-    const active = parsedEvents
-      .filter((evt) => evt.start <= day.date && evt.end >= day.date)
-      .sort((a, b) => sortForDay(a, b, day.iso));
-
-    const assigned = new Map<string, number>();
-    const takenRows = new Set<number>();
-
-    for (const evt of active) {
-      const continuedRow = continuationRows.get(evt.id);
-      if (!continuedRow || takenRows.has(continuedRow)) continue;
-      assigned.set(evt.id, continuedRow);
-      takenRows.add(continuedRow);
-      maxRowUsed = Math.max(maxRowUsed, continuedRow);
-    }
-
-    for (const evt of active) {
-      if (assigned.has(evt.id)) continue;
-      let row = 1;
-      while (takenRows.has(row)) row += 1;
-      assigned.set(evt.id, row);
-      takenRows.add(row);
-      maxRowUsed = Math.max(maxRowUsed, row);
-    }
-
-    assignmentByDay.set(day.iso, assigned);
-
-    const nextContinuation = new Map<string, number>();
-    for (const evt of active) {
-      const row = assigned.get(evt.id);
-      if (!row) continue;
-      if (evt.end > day.date) nextContinuation.set(evt.id, row);
-    }
-    continuationRows = nextContinuation;
-  }
-
-  const segments: RenderSegment[] = [];
-  for (const evt of parsedEvents) {
-    let openSegment: RenderSegment | null = null;
-    for (const day of inMonthDays) {
-      const dayRow = assignmentByDay.get(day.iso)?.get(evt.id);
-      if (dayRow === undefined) {
-        if (openSegment) {
-          segments.push(openSegment);
-          openSegment = null;
-        }
-        continue;
-      }
-
-      if (
-        openSegment &&
-        openSegment.row === dayRow &&
-        openSegment.endCol + 1 === day.col
-      ) {
-        openSegment.endCol = day.col;
-      } else {
-        if (openSegment) segments.push(openSegment);
-        openSegment = {
-          event: evt,
-          row: dayRow,
-          startCol: day.col,
-          endCol: day.col,
-        };
-      }
-    }
-    if (openSegment) segments.push(openSegment);
-  }
-
-  const segmentById = new Map(segments.map((seg) => [seg.event.id, seg]));
-  if (draggingEventId && segmentById.has(draggingEventId)) {
-    maxRowUsed = Math.max(maxRowUsed, segmentById.get(draggingEventId)!.row);
-  }
-  const rowCount = Math.max(maxRowUsed, reorderPreview?.row ?? 1);
-  const contentHeight =
-    HEADER_OFFSET +
-    rowCount * EVENT_ROW_HEIGHT +
-    Math.max(0, rowCount - 1) * EVENT_ROW_GAP +
-    BOTTOM_PADDING;
-  const minHeightPx = Math.max(BASE_MIN_HEIGHT_COMPACT, contentHeight);
 
   const resolveTargetDateFromPointer = (clientX: number) => {
     const rect = daysGridRef.current?.getBoundingClientRect();
@@ -253,12 +240,12 @@ export function MonthRow({
     return gridDays[Math.max(0, Math.min(col, COLUMNS - 1))] ?? null;
   };
 
-  const resolveTargetRowFromPointer = (clientY: number) => {
+  const resolveSingleDayRowFromPointer = (clientY: number) => {
     const rect = daysGridRef.current?.getBoundingClientRect();
     if (!rect) return 1;
-    const relativeY = clientY - (rect.top + HEADER_OFFSET);
+    const relativeY = clientY - (rect.top + singleDayStartOffset);
     const raw = Math.floor(Math.max(0, relativeY) / EVENT_ROW_STEP) + 1;
-    return Math.max(1, Math.min(raw, rowCount + 1));
+    return Math.max(1, Math.min(raw, singleDayContentRows + 1));
   };
 
   const clearLocalDragState = () => {
@@ -277,6 +264,7 @@ export function MonthRow({
 
   if (
     draggingEventId &&
+    draggingEvent?.isMultiDay &&
     dragHoverPointerDate &&
     dragGrabOffsetDays !== null &&
     dragDurationDays !== null &&
@@ -285,14 +273,16 @@ export function MonthRow({
     const projectedStart = addDays(parseISO(dragHoverPointerDate), -dragGrabOffsetDays);
     const projectedEnd = addDays(projectedStart, dragDurationDays);
     if (!(projectedEnd < monthStart || projectedStart > monthEnd)) {
-      const startIndex = differenceInCalendarDays(
-        projectedStart < monthStart ? monthStart : projectedStart,
-        gridStart
-      ) + 1;
-      const endIndex = differenceInCalendarDays(
-        projectedEnd > monthEnd ? monthEnd : projectedEnd,
-        gridStart
-      ) + 1;
+      const startIndex =
+        differenceInCalendarDays(
+          projectedStart < monthStart ? monthStart : projectedStart,
+          gridStart
+        ) + 1;
+      const endIndex =
+        differenceInCalendarDays(
+          projectedEnd > monthEnd ? monthEnd : projectedEnd,
+          gridStart
+        ) + 1;
       const startCol = Math.max(1, Math.min(startIndex, COLUMNS));
       const endCol = Math.max(1, Math.min(endIndex, COLUMNS));
       if (startCol <= endCol) {
@@ -300,10 +290,7 @@ export function MonthRow({
         let row = 1;
         while (
           occupied.some(
-            (seg) =>
-              seg.row === row &&
-              seg.startCol <= endCol &&
-              seg.endCol >= startCol
+            (seg) => seg.row === row && seg.startCol <= endCol && seg.endCol >= startCol
           )
         ) {
           row += 1;
@@ -314,9 +301,7 @@ export function MonthRow({
   }
 
   return (
-    <div
-      className="flex items-stretch border-b border-neutral-200 last:border-b-0"
-    >
+    <div className="flex items-stretch border-b border-neutral-200 last:border-b-0">
       <div
         className="flex w-9 flex-none items-center justify-center text-neutral-600"
         style={{ minHeight: `${minHeightPx}px` }}
@@ -372,8 +357,8 @@ export function MonthRow({
             if (nextIntent !== dragIntent) setDragIntent(nextIntent);
           }
 
-          if (nextIntent === "reorder-day") {
-            const row = resolveTargetRowFromPointer(e.clientY);
+          if (nextIntent === "reorder-day" && draggingIsSingleDay) {
+            const row = resolveSingleDayRowFromPointer(e.clientY);
             setReorderPreview({ dayIso: targetIso, row });
             return;
           }
@@ -392,14 +377,10 @@ export function MonthRow({
           }
 
           const targetIso = format(targetDate, "yyyy-MM-dd");
-          if (dragIntent === "reorder-day" && reorderPreview) {
-            const dayDate = parseISO(reorderPreview.dayIso);
-            const baseIds = parsedEvents
-              .filter((evt) => evt.start <= dayDate && evt.end >= dayDate)
-              .sort((a, b) => sortForDay(a, b, reorderPreview.dayIso))
-              .map((evt) => evt.id)
-              .filter((id, idx, arr) => arr.indexOf(id) === idx);
-
+          if (dragIntent === "reorder-day" && reorderPreview && draggingIsSingleDay) {
+            const baseIds = (singleDayByIso.get(reorderPreview.dayIso) ?? []).map(
+              (entry) => entry.id
+            );
             const existing = baseIds.filter((id) => id !== draggingEventId);
             const insertAt = Math.max(0, Math.min(reorderPreview.row - 1, existing.length));
             existing.splice(insertAt, 0, draggingEventId);
@@ -438,16 +419,13 @@ export function MonthRow({
                 isRangeEnd={!!rangeBounds && day.iso === rangeBounds.endIso}
                 isInMonth={day.inMonth}
               />
-              </div>
+            </div>
           ))}
         </div>
 
         {rangeColumns && !draggingEventId ? (
           <div className="pointer-events-none absolute inset-x-0 top-0 z-[6]">
-            <div
-              className="grid"
-              style={{ gridTemplateColumns: "repeat(37, minmax(0, 1fr))" }}
-            >
+            <div className="grid" style={{ gridTemplateColumns: "repeat(37, minmax(0, 1fr))" }}>
               <div
                 className="rounded-sm bg-neutral-400/20 ring-1 ring-inset ring-neutral-600/45"
                 style={{
@@ -491,7 +469,10 @@ export function MonthRow({
                     const rawOffset = pointerDate
                       ? differenceInCalendarDays(pointerDate, eventStart)
                       : 0;
-                    const grabOffsetDays = Math.max(0, Math.min(rawOffset, eventDurationDays));
+                    const grabOffsetDays = Math.max(
+                      0,
+                      Math.min(rawOffset, eventDurationDays)
+                    );
                     setDragIntent("pending");
                     dragStartPointRef.current = { x: e.clientX, y: e.clientY };
                     setReorderPreview(null);
@@ -519,16 +500,72 @@ export function MonthRow({
                 }}
               />
             ) : null}
+          </div>
+        </div>
 
-            {reorderPreview && draggingEventId ? (
-              <div
-                className="pointer-events-none z-20 rounded-sm bg-neutral-500/15 ring-1 ring-neutral-400/70"
-                style={{
-                  gridColumn: `${dayInfos.find((d) => d.iso === reorderPreview.dayIso)?.col ?? 1} / ${(dayInfos.find((d) => d.iso === reorderPreview.dayIso)?.col ?? 1) + 1}`,
-                  gridRow: reorderPreview.row,
-                }}
-              />
-            ) : null}
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-[11]">
+          <div className="grid" style={{ gridTemplateColumns: "repeat(37, minmax(0, 1fr))" }}>
+            {dayInfos.map((day) => {
+              if (!day.inMonth) return null;
+              const dayEvents = singleDayByIso.get(day.iso) ?? [];
+              const visibleEvents = dayEvents.filter(
+                (event) => !(dragIntent === "reorder-day" && event.id === draggingEventId)
+              );
+              const previewIndex =
+                reorderPreview?.dayIso === day.iso ? reorderPreview.row - 1 : null;
+
+              return (
+                <div
+                  key={`single-${monthIndex}-${day.iso}`}
+                  className="relative"
+                  style={{
+                    gridColumn: `${day.col} / ${day.col + 1}`,
+                    minHeight: `${minHeightPx}px`,
+                  }}
+                >
+                  <div
+                    className="pointer-events-none absolute inset-x-0"
+                    style={{ top: `${singleDayStartOffset}px` }}
+                  >
+                    <div className="space-y-[2px]">
+                      {visibleEvents.map((event, index) => (
+                        <React.Fragment key={`single-${day.iso}-${event.id}`}>
+                          {previewIndex === index ? (
+                            <div className="h-[14px] rounded-sm bg-neutral-500/15 ring-1 ring-neutral-400/70" />
+                          ) : null}
+                          <div className="pointer-events-auto">
+                            <EventBar
+                              event={event}
+                              onClick={() => onEditEvent(event.id)}
+                              draggable
+                              isDragging={draggingEventId === event.id}
+                              onDragStart={(e) => {
+                                setDragIntent("pending");
+                                dragStartPointRef.current = { x: e.clientX, y: e.clientY };
+                                setReorderPreview(null);
+                                onDragStartEvent(
+                                  event.id,
+                                  event.startDate,
+                                  event.endDate,
+                                  0
+                                );
+                              }}
+                              onDragEnd={() => {
+                                clearLocalDragState();
+                                onDragEndEvent();
+                              }}
+                            />
+                          </div>
+                        </React.Fragment>
+                      ))}
+                      {previewIndex !== null && previewIndex >= visibleEvents.length ? (
+                        <div className="h-[14px] rounded-sm bg-neutral-500/15 ring-1 ring-neutral-400/70" />
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>

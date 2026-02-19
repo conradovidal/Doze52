@@ -48,4 +48,16 @@ export const validateEventInput = (event: CalendarEvent, categoryIds: Set<string
   if (event.endDate < event.startDate) {
     throw new ValidationError("Evento invalido: fim nao pode ser antes do inicio.");
   }
+  if (!Number.isFinite(event.dayOrder) || !Number.isInteger(event.dayOrder)) {
+    throw new ValidationError("Evento invalido: ordem deve ser inteira.");
+  }
+  if (event.dayOrder < 0) {
+    throw new ValidationError("Evento invalido: ordem nao pode ser negativa.");
+  }
+  if (event.notes !== undefined && typeof event.notes !== "string") {
+    throw new ValidationError("Evento invalido: descricao invalida.");
+  }
+  if (typeof event.notes === "string" && event.notes.length > 2000) {
+    throw new ValidationError("Evento invalido: descricao muito longa.");
+  }
 };

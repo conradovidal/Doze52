@@ -10,7 +10,7 @@ create table if not exists public.categories (
   name text not null,
   color text not null,
   visible boolean not null default true,
-  position int not null default 0,
+  position int4 not null default 0,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -22,9 +22,10 @@ create table if not exists public.events (
   category_id uuid not null,
   start_date date not null,
   end_date date not null,
+  notes text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  day_order jsonb not null default '{}'::jsonb,
+  day_order int4 not null default 0,
   constraint events_end_after_start check (end_date >= start_date)
 );
 

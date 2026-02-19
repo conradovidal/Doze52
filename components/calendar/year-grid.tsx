@@ -3,6 +3,8 @@
 import * as React from "react";
 import type { CalendarEvent, CategoryItem } from "@/lib/types";
 import { useStore } from "@/lib/store";
+import { endOfYear, format, startOfYear } from "date-fns";
+import { buildMultiDaySlotMap } from "@/lib/calendar-slotting";
 import { MonthRow } from "./month-row";
 
 export function YearGrid({
@@ -48,6 +50,15 @@ export function YearGrid({
     () => categories.filter((c) => c.visible).map((c) => c.id),
     [categories]
   );
+  const multiDaySlotById = React.useMemo(() => {
+    const rangeStartIso = format(startOfYear(new Date(year, 0, 1)), "yyyy-MM-dd");
+    const rangeEndIso = format(endOfYear(new Date(year, 0, 1)), "yyyy-MM-dd");
+    return buildMultiDaySlotMap({
+      events: events.filter((event) => visibleCategoryIds.includes(event.categoryId)),
+      rangeStartIso,
+      rangeEndIso,
+    });
+  }, [events, visibleCategoryIds, year]);
 
   return (
     <div className="w-full overflow-hidden rounded-xl border border-neutral-200">
@@ -58,6 +69,7 @@ export function YearGrid({
           monthIndex={idx}
           events={events}
           visibleCategoryIds={visibleCategoryIds}
+          multiDaySlotById={multiDaySlotById}
           onEditEvent={onEditEvent}
           creatingRange={creatingRange}
           onStartCreateRange={onStartCreateRange}
