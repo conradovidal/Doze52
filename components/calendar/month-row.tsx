@@ -592,7 +592,7 @@ export function MonthRow({
                                 isDragging={isDragged}
                                 className={
                                   isDragged
-                                    ? "pointer-events-none opacity-40"
+                                    ? "opacity-40"
                                     : draggingSingleDay
                                       ? "pointer-events-none"
                                       : ""
