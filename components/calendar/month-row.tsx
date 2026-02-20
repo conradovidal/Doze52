@@ -23,10 +23,7 @@ import {
 import {
   EVENT_ITEM_GAP_PX,
   EVENT_ITEM_HEIGHT_PX,
-  EVENT_ITEM_LINE_HEIGHT_CLASS,
-  EVENT_ITEM_PADDING_X_CLASS,
   EVENT_ITEM_RADIUS_CLASS,
-  EVENT_ITEM_TEXT_CLASS,
   MONTH_MULTI_DAY_TOP_OFFSET_PX,
   MONTH_ROW_BASE_MIN_HEIGHT_PX,
   MONTH_ROW_BOTTOM_PADDING_PX,
@@ -140,10 +137,6 @@ export function MonthRow({
     () => events.filter((evt) => visibleCategoryIds.includes(evt.categoryId)),
     [events, visibleCategoryIds]
   );
-  const globalEventById = React.useMemo(
-    () => new Map(globallyVisibleEvents.map((evt) => [evt.id, evt])),
-    [globallyVisibleEvents]
-  );
 
   const parsedEvents: ParsedEvent[] = globallyVisibleEvents
     .map((evt) => {
@@ -158,12 +151,10 @@ export function MonthRow({
     })
     .filter((evt) => !(evt.end < monthStart || evt.start > monthEnd));
 
-  const draggingEvent = dragState.draggingEventId
-    ? globalEventById.get(dragState.draggingEventId)
-    : undefined;
   const isDraggingAny = hasDragContext;
   const draggingSingleDay = Boolean(dragState.source && !dragState.source.isMultiDay);
   const draggingMultiDay = Boolean(dragState.source?.isMultiDay);
+  const sourceDayIso = draggingSingleDay ? (dragState.source?.startDate ?? null) : null;
 
   const multiDayEvents = parsedEvents.filter((evt) => evt.isMultiDay).sort(sortMultiDayEvents);
   const singleDayEvents = parsedEvents
@@ -490,7 +481,9 @@ export function MonthRow({
               const showMoveGhost =
                 draggingSingleDay &&
                 dragState.hoverDateIso === day.iso &&
-                (previewIndex === null || previewIndex < 0);
+                sourceDayIso !== null &&
+                sourceDayIso !== day.iso &&
+                previewIndex === null;
               const baseCountInDay = dayEvents.filter(
                 (event) => event.id !== draggedEventId
               ).length;
@@ -633,14 +626,11 @@ export function MonthRow({
                       ) : null}
                       {showMoveGhost ? (
                         <div
-                          className={`pointer-events-none ${EVENT_ITEM_RADIUS_CLASS} ${EVENT_ITEM_PADDING_X_CLASS} ${EVENT_ITEM_TEXT_CLASS} ${EVENT_ITEM_LINE_HEIGHT_CLASS} truncate text-white opacity-75`}
+                          className={`${EVENT_ITEM_RADIUS_CLASS} pointer-events-none bg-neutral-500/20 ring-1 ring-neutral-400/80`}
                           style={{
-                            backgroundColor: draggingEvent?.color ?? "#6b7280",
                             minHeight: `${EVENT_ITEM_HEIGHT_PX}px`,
                           }}
-                        >
-                          {draggingEvent?.title ?? "Movendo..."}
-                        </div>
+                        />
                       ) : null}
                     </div>
                   </div>
