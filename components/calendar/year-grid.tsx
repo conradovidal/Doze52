@@ -74,7 +74,6 @@ export function YearGrid({
     reorderTarget: null,
     source: null,
   });
-  const [isQueryDebugEnabled, setIsQueryDebugEnabled] = React.useState(false);
   const dragSnapshotRef = React.useRef<GlobalDragState>({
     draggingEventId: null,
     hoverDateIso: null,
@@ -82,34 +81,6 @@ export function YearGrid({
     source: null,
   });
   const didDropRef = React.useRef(false);
-  const isDevNodeEnv = process.env.NODE_ENV !== "production";
-  const isEnvDebugEnabled = process.env.NEXT_PUBLIC_DND_DEBUG === "1";
-  const shouldLogDnd = React.useMemo(
-    () => isDevNodeEnv || isEnvDebugEnabled || isQueryDebugEnabled,
-    [isDevNodeEnv, isEnvDebugEnabled, isQueryDebugEnabled]
-  );
-
-  React.useEffect(() => {
-    if (typeof window === "undefined") return;
-    const syncFromQuery = () => {
-      const params = new URLSearchParams(window.location.search);
-      setIsQueryDebugEnabled(params.get("dndDebug") === "1");
-    };
-    syncFromQuery();
-    window.addEventListener("popstate", syncFromQuery);
-    return () => {
-      window.removeEventListener("popstate", syncFromQuery);
-    };
-  }, []);
-
-  React.useEffect(() => {
-    if (!shouldLogDnd) return;
-    console.log("[dnd.debug.enabled]", {
-      fromQuery: isQueryDebugEnabled,
-      fromEnv: isEnvDebugEnabled,
-      nodeEnv: process.env.NODE_ENV,
-    });
-  }, [isEnvDebugEnabled, isQueryDebugEnabled, shouldLogDnd]);
 
   const visibleEvents = React.useMemo(
     () => events.filter((event) => visibleCategoryIds.includes(event.categoryId)),
@@ -172,20 +143,10 @@ export function YearGrid({
           durationDaysInclusive: Math.max(1, durationDaysInclusive),
         },
       };
-      if (shouldLogDnd) {
-        console.log("[dnd.dragstart]", {
-          eventId: payload.eventId,
-          startDate: payload.startDate,
-          endDate: payload.endDate,
-          isMultiDay: payload.isMultiDay,
-          grabOffsetDays: payload.grabOffsetDays,
-          durationDaysInclusive: nextState.source?.durationDaysInclusive ?? 1,
-        });
-      }
       dragSnapshotRef.current = nextState;
       setDragState(nextState);
     },
-    [shouldLogDnd]
+    []
   );
 
   const onDayHover = React.useCallback((dateIso: string) => {
@@ -218,7 +179,6 @@ export function YearGrid({
 
       let currentSource: DragSource | null = null;
       let currentEventId: string | null = null;
-      let sourceKind: "transfer" | "live" | "snapshot" | "none" = "none";
       const currentReorderTarget = dragState.reorderTarget ?? dragSnapshotRef.current.reorderTarget;
 
       if (transferPayload) {
@@ -232,48 +192,20 @@ export function YearGrid({
           durationDaysInclusive: Math.max(1, durationDaysInclusive),
         };
         currentEventId = transferPayload.eventId;
-        sourceKind = "transfer";
       } else if (hasLiveState) {
         currentSource = dragState.source;
         currentEventId = dragState.draggingEventId;
-        sourceKind = "live";
       } else if (hasSnapshot) {
         currentSource = dragSnapshotRef.current.source;
         currentEventId = dragSnapshotRef.current.draggingEventId;
-        sourceKind = "snapshot";
-      }
-
-      if (shouldLogDnd) {
-        console.log("[dnd.drop.source]", {
-          sourceKind,
-          hasLiveState,
-          hasSnapshot,
-          hasTransferPayload: Boolean(transferPayload),
-          dropDateIso,
-          draggingEventId: currentEventId ?? dragSnapshotRef.current.draggingEventId,
-        });
       }
       if (!currentSource || !currentEventId) {
-        if (shouldLogDnd) {
-          console.log("[dnd.drop.abort.no-source]", {
-            dropDateIso,
-            hasLiveState,
-            hasSnapshot,
-            hasTransferPayload: Boolean(transferPayload),
-          });
-        }
         clearDragState();
         return;
       }
 
       const sourceEvent = eventById.get(currentEventId);
       if (!sourceEvent) {
-        if (shouldLogDnd) {
-          console.log("[dnd.drop.abort.missing-event]", {
-            dropDateIso,
-            eventId: currentEventId,
-          });
-        }
         clearDragState();
         return;
       }
@@ -301,17 +233,6 @@ export function YearGrid({
           Math.min(currentReorderTarget.insertIndex, withoutMoved.length)
         );
         withoutMoved.splice(insertAt, 0, currentEventId);
-        if (shouldLogDnd) {
-          console.log("[dnd.drop]", {
-            branch: "reorder",
-            dropDateIso,
-            sourceStartDate: currentSource.startDate,
-            hoverDateIso: dragState.hoverDateIso,
-            reorderTarget: currentReorderTarget,
-            insertAt,
-            orderedIds: withoutMoved,
-          });
-        }
 
         onApplyDayReorder({
           dayIso: dropDateIso,
@@ -330,18 +251,6 @@ export function YearGrid({
       );
       const sourceStart = parseISO(currentSource.startDate);
       const deltaDays = differenceInCalendarDays(newStartDate, sourceStart);
-      if (shouldLogDnd) {
-        console.log("[dnd.drop]", {
-          branch: "move-date",
-          eventId: currentEventId,
-          dropDateIso,
-          sourceStartDate: currentSource.startDate,
-          newStartDate: format(newStartDate, "yyyy-MM-dd"),
-          deltaDays,
-          hoverDateIso: dragState.hoverDateIso,
-          reorderTarget: currentReorderTarget,
-        });
-      }
 
       const expectedNewEnd = addDays(
         newStartDate,
@@ -350,14 +259,6 @@ export function YearGrid({
       const checkDays =
         differenceInCalendarDays(expectedNewEnd, newStartDate) + 1;
       if (checkDays !== currentSource.durationDaysInclusive) {
-        if (shouldLogDnd) {
-          console.log("[dnd.drop.abort.duration-mismatch]", {
-            dropDateIso,
-            eventId: currentEventId,
-            expectedDurationDays: currentSource.durationDaysInclusive,
-            actualDurationDays: checkDays,
-          });
-        }
         clearDragState();
         return;
       }
@@ -372,26 +273,16 @@ export function YearGrid({
       eventById,
       onApplyDayReorder,
       onMoveEventByDelta,
-      shouldLogDnd,
       visibleEvents,
     ]
   );
 
   const onEventDragEnd = React.useCallback(() => {
     if (!didDropRef.current) {
-      if (shouldLogDnd) {
-        console.log("[dnd.dragend.no-drop]", {
-          draggingEventId: dragState.draggingEventId,
-          hoverDateIso: dragState.hoverDateIso,
-          reorderTarget: dragState.reorderTarget,
-          sourceStartDate: dragState.source?.startDate ?? null,
-          isMultiDay: dragState.source?.isMultiDay ?? null,
-        });
-      }
       clearDragState();
     }
     didDropRef.current = false;
-  }, [clearDragState, dragState, shouldLogDnd]);
+  }, [clearDragState]);
 
   const hasDragContext = Boolean(dragState.draggingEventId || dragState.source);
 
@@ -399,15 +290,6 @@ export function YearGrid({
     if (!dragState.draggingEventId) return;
 
     const handleWindowDrop = () => {
-      if (shouldLogDnd) {
-        console.log("[dnd.window.drop.capture]", {
-          draggingEventId: dragSnapshotRef.current.draggingEventId,
-          hoverDateIso: dragSnapshotRef.current.hoverDateIso,
-          reorderTarget: dragSnapshotRef.current.reorderTarget,
-          sourceStartDate: dragSnapshotRef.current.source?.startDate ?? null,
-          isMultiDay: dragSnapshotRef.current.source?.isMultiDay ?? null,
-        });
-      }
       window.setTimeout(() => {
         if (!didDropRef.current) {
           clearDragState();
@@ -419,7 +301,7 @@ export function YearGrid({
     return () => {
       window.removeEventListener("drop", handleWindowDrop, true);
     };
-  }, [clearDragState, dragState.draggingEventId, shouldLogDnd]);
+  }, [clearDragState, dragState.draggingEventId]);
 
   return (
     <div className="w-full overflow-hidden rounded-xl border border-neutral-200">

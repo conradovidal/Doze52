@@ -531,7 +531,13 @@ export function MonthRow({
                         : dragState.source
                           ? !dragState.source.isMultiDay
                           : null;
-                      if (!isSingleDayDrag) {
+                      if (isSingleDayDrag !== true) {
+                        clearReorderTarget();
+                        return;
+                      }
+                      const sourceDayIso =
+                        dragPayload?.startDate ?? dragState.source?.startDate ?? null;
+                      if (!sourceDayIso || sourceDayIso !== day.iso) {
                         clearReorderTarget();
                         return;
                       }
