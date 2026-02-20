@@ -1,7 +1,6 @@
 "use client";
 
 import { isBefore, isToday, startOfDay } from "date-fns";
-import { fmtDayLabel } from "@/lib/date";
 
 export function DayCell({
   date,
@@ -65,7 +64,9 @@ export function DayCell({
         today ? "ring-black" : "ring-transparent hover:ring-neutral-400/70"
       } ${isRangeSelected ? "bg-neutral-300/35 ring-neutral-500/80" : ""} ${
         isRangeStart || isRangeEnd ? "ring-neutral-700" : ""
-      } ${isDropActive ? "ring-blue-500 bg-blue-100/40" : ""} select-none`}
+      } ${isDropActive ? "ring-blue-500 bg-blue-100/40" : ""} ${
+        isPast && !isDropActive ? "opacity-80" : ""
+      } select-none`}
       style={{ minHeight: `${minHeightPx}px` }}
       onDragOver={(e) => {
         if (!onDayHover) return;
@@ -80,16 +81,13 @@ export function DayCell({
         onDayDrop(dateIso, e.dataTransfer);
       }}
     >
-      <div className={`flex h-3.5 flex-none items-center gap-1 px-0.5 leading-none text-[10px] ${isPast ? "text-neutral-400" : "text-neutral-600"}`}>
+      <div className="flex h-4 w-full flex-none items-start justify-center px-0.5 leading-none text-[10px] text-neutral-600">
         <span
           className={`relative inline-flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-medium ${
             today ? "bg-black text-white ring-1 ring-black" : ""
           } aspect-square shrink-0`}
         >
           {date.getDate()}
-        </span>
-        <span data-weekday className="font-light text-neutral-500">
-          {fmtDayLabel(date).split(" ")[1]}
         </span>
       </div>
       <div className="mt-0.5 flex-1" />
