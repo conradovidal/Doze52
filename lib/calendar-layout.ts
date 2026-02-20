@@ -1,6 +1,7 @@
 export const EVENT_ITEM_HEIGHT_PX = 14;
 export const EVENT_ITEM_MIN_HEIGHT_PX = 14;
 export const EVENT_ITEM_GAP_PX = 2;
+export const MONTH_MIN_TOTAL_EVENT_ROWS_BEFORE_GROWTH = 2;
 export const MONTH_ROW_BASE_MIN_HEIGHT_PX = 48;
 export const MONTH_MULTI_DAY_TOP_OFFSET_PX = 18;
 export const MONTH_SINGLE_DAY_GAP_FROM_BARS_PX = 6;

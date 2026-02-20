@@ -80,11 +80,11 @@ export function DayCell({
         onDayDrop(dateIso, e.dataTransfer);
       }}
     >
-      <div className="flex h-4 w-full flex-none items-start justify-center px-0.5 leading-none text-[10px] text-neutral-600">
+      <div className="grid h-4 w-full flex-none place-items-center px-0.5 text-[10px] text-neutral-600">
         <span
-          className={`relative inline-flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-medium ${
+          className={`grid h-4 w-4 place-items-center rounded-full text-[10px] font-medium leading-none tabular-nums ${
             today ? "bg-black text-white ring-1 ring-black" : ""
-          } aspect-square shrink-0`}
+          }`}
         >
           {date.getDate()}
         </span>

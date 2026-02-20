@@ -24,6 +24,7 @@ import {
   EVENT_ITEM_GAP_PX,
   EVENT_ITEM_HEIGHT_PX,
   EVENT_ITEM_RADIUS_CLASS,
+  MONTH_MIN_TOTAL_EVENT_ROWS_BEFORE_GROWTH,
   MONTH_MULTI_DAY_TOP_OFFSET_PX,
   MONTH_ROW_BASE_MIN_HEIGHT_PX,
   MONTH_ROW_BOTTOM_PADDING_PX,
@@ -192,20 +193,33 @@ export function MonthRow({
   }
 
   const maxMultiRows = segments.reduce((acc, seg) => Math.max(acc, seg.row), 0);
-  const maxSingleRows = Math.max(
-    1,
-    ...Array.from(singleDayByIso.values()).map((bucket) => bucket.length)
+  const maxSingleRowsRaw = Array.from(singleDayByIso.values()).reduce(
+    (acc, bucket) => Math.max(acc, bucket.length),
+    0
   );
-  const singleDayStartOffset =
-    MONTH_MULTI_DAY_TOP_OFFSET_PX +
-    (maxMultiRows > 0
+  const occupiedRowsTotal = maxMultiRows + maxSingleRowsRaw;
+  const rowsForHeightTotal = Math.max(
+    MONTH_MIN_TOTAL_EVENT_ROWS_BEFORE_GROWTH,
+    occupiedRowsTotal
+  );
+  const singleRowsForHeight = Math.max(0, rowsForHeightTotal - maxMultiRows);
+  const multiDayContentHeight =
+    maxMultiRows > 0
       ? maxMultiRows * EVENT_ITEM_HEIGHT_PX +
-        Math.max(0, maxMultiRows - 1) * EVENT_ITEM_GAP_PX +
-        MONTH_SINGLE_DAY_GAP_FROM_BARS_PX
-      : MONTH_SINGLE_DAY_TOP_OFFSET_NO_MULTI_PX);
+        Math.max(0, maxMultiRows - 1) * EVENT_ITEM_GAP_PX
+      : 0;
+  const hasMultiBlock = maxMultiRows > 0;
+  const hasSingleBlockForHeight = singleRowsForHeight > 0;
+  const singleDayStartOffset = hasMultiBlock
+    ? MONTH_MULTI_DAY_TOP_OFFSET_PX +
+      multiDayContentHeight +
+      (hasSingleBlockForHeight ? MONTH_SINGLE_DAY_GAP_FROM_BARS_PX : 0)
+    : MONTH_SINGLE_DAY_TOP_OFFSET_NO_MULTI_PX;
   const singleDayContentHeight =
-    maxSingleRows * EVENT_ITEM_HEIGHT_PX +
-    Math.max(0, maxSingleRows - 1) * EVENT_ITEM_GAP_PX;
+    singleRowsForHeight > 0
+      ? singleRowsForHeight * EVENT_ITEM_HEIGHT_PX +
+        Math.max(0, singleRowsForHeight - 1) * EVENT_ITEM_GAP_PX
+      : 0;
   const contentHeight =
     singleDayStartOffset + singleDayContentHeight + MONTH_ROW_BOTTOM_PADDING_PX;
   const minHeightPx = Math.max(MONTH_ROW_BASE_MIN_HEIGHT_PX, contentHeight);
