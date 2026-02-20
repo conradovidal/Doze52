@@ -124,13 +124,3 @@
     @apply bg-background text-foreground;
   }
 }
-
-[data-day-cell] {
-  container-type: inline-size;
-}
-
-@container (max-width: 44px) {
-  [data-weekday] {
-    display: none;
-  }
-}

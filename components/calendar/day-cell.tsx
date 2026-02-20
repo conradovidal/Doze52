@@ -47,26 +47,25 @@ export function DayCell({
   }
 
   const dayOfWeek = date.getDay(); // 0..6
-  const baseBg =
-    dayOfWeek === 0
-      ? "bg-neutral-100"
-      : dayOfWeek === 6
-        ? "bg-neutral-100"
-        : "bg-white";
-
+  const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
   const today = isToday(date);
   const isPast = isBefore(startOfDay(date), startOfDay(new Date()));
+  const dayToneClass = isPast
+    ? isWeekend
+      ? "bg-[#ededed]"
+      : "bg-[#f1f1f1]"
+    : isWeekend
+      ? "bg-neutral-100"
+      : "bg-neutral-50";
 
   return (
     <div
       data-day-cell
-      className={`flex w-full cursor-pointer flex-col px-1 py-0.5 ring-1 ring-inset transition-[box-shadow] duration-100 ${baseBg} ${
+      className={`flex w-full cursor-pointer flex-col px-1 py-0.5 ring-1 ring-inset transition-[box-shadow] duration-100 ${dayToneClass} ${
         today ? "ring-black" : "ring-transparent hover:ring-neutral-400/70"
       } ${isRangeSelected ? "bg-neutral-300/35 ring-neutral-500/80" : ""} ${
         isRangeStart || isRangeEnd ? "ring-neutral-700" : ""
-      } ${isDropActive ? "ring-blue-500 bg-blue-100/40" : ""} ${
-        isPast && !isDropActive ? "opacity-80" : ""
-      } select-none`}
+      } ${isDropActive ? "ring-blue-500 bg-blue-100/40" : ""} select-none`}
       style={{ minHeight: `${minHeightPx}px` }}
       onDragOver={(e) => {
         if (!onDayHover) return;
