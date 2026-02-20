@@ -28,7 +28,6 @@ import {
   MONTH_MULTI_DAY_TOP_OFFSET_PX,
   MONTH_ROW_BASE_MIN_HEIGHT_PX,
   MONTH_ROW_BOTTOM_PADDING_PX,
-  MONTH_SINGLE_DAY_GAP_FROM_BARS_PX,
   MONTH_SINGLE_DAY_TOP_OFFSET_NO_MULTI_PX,
 } from "@/lib/calendar-layout";
 import { DayCell } from "./day-cell";
@@ -192,36 +191,65 @@ export function MonthRow({
     });
   }
 
+  const occupiedMultiLanesByDay = new Map<string, Set<number>>();
+  for (const day of inMonthDays) {
+    occupiedMultiLanesByDay.set(day.iso, new Set<number>());
+  }
+  for (const seg of segments) {
+    const lane = Math.max(0, seg.row - 1);
+    for (let col = seg.startCol; col <= seg.endCol; col += 1) {
+      const day = dayInfos[col - 1];
+      if (!day?.inMonth) continue;
+      const occupied = occupiedMultiLanesByDay.get(day.iso);
+      if (!occupied) continue;
+      occupied.add(lane);
+    }
+  }
+
+  const singleLaneByEventId = new Map<string, number>();
+  let maxSingleLaneUsed = -1;
+  for (const day of inMonthDays) {
+    const dayEvents = singleDayByIso.get(day.iso) ?? [];
+    const occupied = new Set(occupiedMultiLanesByDay.get(day.iso) ?? []);
+    for (const event of dayEvents) {
+      let lane = 0;
+      while (occupied.has(lane)) {
+        lane += 1;
+      }
+      occupied.add(lane);
+      singleLaneByEventId.set(event.id, lane);
+      maxSingleLaneUsed = Math.max(maxSingleLaneUsed, lane);
+    }
+  }
+
+  const collectFreeLanes = (usedLanes: Set<number>, count: number) => {
+    const lanes: number[] = [];
+    let lane = 0;
+    while (lanes.length < count) {
+      if (!usedLanes.has(lane)) {
+        lanes.push(lane);
+      }
+      lane += 1;
+    }
+    return lanes;
+  };
+
   const maxMultiRows = segments.reduce((acc, seg) => Math.max(acc, seg.row), 0);
-  const maxSingleRowsRaw = Array.from(singleDayByIso.values()).reduce(
-    (acc, bucket) => Math.max(acc, bucket.length),
-    0
-  );
-  const occupiedRowsTotal = maxMultiRows + maxSingleRowsRaw;
+  const maxMultiLaneUsed = maxMultiRows > 0 ? maxMultiRows - 1 : -1;
+  const maxLaneUsedInMonth = Math.max(maxMultiLaneUsed, maxSingleLaneUsed);
   const rowsForHeightTotal = Math.max(
     MONTH_MIN_TOTAL_EVENT_ROWS_BEFORE_GROWTH,
-    occupiedRowsTotal
+    maxLaneUsedInMonth + 1
   );
-  const singleRowsForHeight = Math.max(0, rowsForHeightTotal - maxMultiRows);
-  const multiDayContentHeight =
-    maxMultiRows > 0
-      ? maxMultiRows * EVENT_ITEM_HEIGHT_PX +
-        Math.max(0, maxMultiRows - 1) * EVENT_ITEM_GAP_PX
-      : 0;
-  const hasMultiBlock = maxMultiRows > 0;
-  const hasSingleBlockForHeight = singleRowsForHeight > 0;
-  const singleDayStartOffset = hasMultiBlock
-    ? MONTH_MULTI_DAY_TOP_OFFSET_PX +
-      multiDayContentHeight +
-      (hasSingleBlockForHeight ? MONTH_SINGLE_DAY_GAP_FROM_BARS_PX : 0)
+  const hasAnyMultiDayInMonth = maxMultiRows > 0;
+  const eventsTopOffset = hasAnyMultiDayInMonth
+    ? MONTH_MULTI_DAY_TOP_OFFSET_PX
     : MONTH_SINGLE_DAY_TOP_OFFSET_NO_MULTI_PX;
-  const singleDayContentHeight =
-    singleRowsForHeight > 0
-      ? singleRowsForHeight * EVENT_ITEM_HEIGHT_PX +
-        Math.max(0, singleRowsForHeight - 1) * EVENT_ITEM_GAP_PX
-      : 0;
+  const eventBandHeightPx =
+    rowsForHeightTotal * EVENT_ITEM_HEIGHT_PX +
+    Math.max(0, rowsForHeightTotal - 1) * EVENT_ITEM_GAP_PX;
   const contentHeight =
-    singleDayStartOffset + singleDayContentHeight + MONTH_ROW_BOTTOM_PADDING_PX;
+    eventsTopOffset + eventBandHeightPx + MONTH_ROW_BOTTOM_PADDING_PX;
   const minHeightPx = Math.max(MONTH_ROW_BASE_MIN_HEIGHT_PX, contentHeight);
 
   const rangeBounds = React.useMemo(() => {
@@ -409,7 +437,7 @@ export function MonthRow({
               gridTemplateColumns: "repeat(37, minmax(0, 1fr))",
               gap: `${EVENT_ITEM_GAP_PX}px 0px`,
               gridAutoRows: `${EVENT_ITEM_HEIGHT_PX}px`,
-              paddingTop: `${MONTH_MULTI_DAY_TOP_OFFSET_PX}px`,
+              paddingTop: `${eventsTopOffset}px`,
             }}
           >
             {segments.map((seg, idx) => (
@@ -478,7 +506,7 @@ export function MonthRow({
           </div>
         </div>
 
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-[11]">
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-[9]">
           <div
             className="grid"
             style={{ gridTemplateColumns: "repeat(37, minmax(0, 1fr))" }}
@@ -487,6 +515,8 @@ export function MonthRow({
               if (!day.inMonth) return null;
               const dayEvents = singleDayByIso.get(day.iso) ?? [];
               const draggedEventId = dragState.draggingEventId;
+              const occupiedMultiLanes = occupiedMultiLanesByDay.get(day.iso) ?? new Set<number>();
+              const getSingleLane = (eventId: string) => singleLaneByEventId.get(eventId) ?? 0;
 
               const previewIndex =
                 dragState.reorderTarget?.dayIso === day.iso
@@ -498,9 +528,28 @@ export function MonthRow({
                 sourceDayIso !== null &&
                 sourceDayIso !== day.iso &&
                 previewIndex === null;
-              const baseCountInDay = dayEvents.filter(
-                (event) => event.id !== draggedEventId
-              ).length;
+
+              let previewLane: number | null = null;
+              if (previewIndex !== null) {
+                const baseEvents = dayEvents.filter((event) => event.id !== draggedEventId);
+                const usedForInsert = new Set<number>(occupiedMultiLanes);
+                for (const event of baseEvents) {
+                  usedForInsert.add(getSingleLane(event.id));
+                }
+                const insertLanes = collectFreeLanes(usedForInsert, baseEvents.length + 1);
+                const clampedIndex = Math.max(0, Math.min(previewIndex, baseEvents.length));
+                previewLane = insertLanes[clampedIndex] ?? null;
+              }
+
+              let moveGhostLane: number | null = null;
+              if (showMoveGhost) {
+                const usedForGhost = new Set<number>(occupiedMultiLanes);
+                for (const event of dayEvents) {
+                  if (event.id === draggedEventId) continue;
+                  usedForGhost.add(getSingleLane(event.id));
+                }
+                moveGhostLane = collectFreeLanes(usedForGhost, 1)[0] ?? 0;
+              }
 
               return (
                 <div
@@ -517,7 +566,10 @@ export function MonthRow({
                         ? "pointer-events-none"
                         : "pointer-events-auto"
                     }`}
-                    style={{ top: `${singleDayStartOffset}px` }}
+                    style={{
+                      top: `${eventsTopOffset}px`,
+                      minHeight: `${eventBandHeightPx}px`,
+                    }}
                     onDragOver={(e) => {
                       // Keep the target droppable even if drag context detection is flaky.
                       e.preventDefault();
@@ -548,16 +600,33 @@ export function MonthRow({
                         clearReorderTarget();
                         return;
                       }
+
+                      const baseEvents = dayEvents.filter((event) => event.id !== draggedEventId);
+                      const usedForInsert = new Set<number>(occupiedMultiLanes);
+                      for (const event of baseEvents) {
+                        usedForInsert.add(getSingleLane(event.id));
+                      }
+                      const insertLanes = collectFreeLanes(usedForInsert, baseEvents.length + 1);
+                      if (!insertLanes.length) {
+                        clearReorderTarget();
+                        return;
+                      }
+
                       const rect = e.currentTarget.getBoundingClientRect();
                       const relativeY = Math.max(0, e.clientY - rect.top);
-                      const baseIds = dayEvents
-                        .map((event) => event.id)
-                        .filter((id) => id !== draggedEventId);
-                      const step = EVENT_ROW_STEP;
-                      const insertIndex = Math.max(
+                      const hoveredLane = Math.max(
                         0,
-                        Math.min(Math.floor((relativeY + step / 2) / step), baseIds.length)
+                        Math.floor((relativeY + EVENT_ROW_STEP / 2) / EVENT_ROW_STEP)
                       );
+                      let insertIndex = 0;
+                      let bestDistance = Number.POSITIVE_INFINITY;
+                      for (let i = 0; i < insertLanes.length; i += 1) {
+                        const distance = Math.abs(insertLanes[i] - hoveredLane);
+                        if (distance < bestDistance) {
+                          bestDistance = distance;
+                          insertIndex = i;
+                        }
+                      }
                       onSingleDayListHover(day.iso, insertIndex);
                     }}
                     onDragLeave={(e) => {
@@ -570,78 +639,66 @@ export function MonthRow({
                       e.stopPropagation();
                       onDayDrop(day.iso, e.dataTransfer);
                     }}
-                  >
-                    <div
-                      className="flex flex-col"
-                      style={{ gap: `${EVENT_ITEM_GAP_PX}px` }}
                     >
-                      {(() => {
-                        let nonDraggedSeen = 0;
-                        let placeholderRendered = false;
-                        return dayEvents.map((event) => {
-                          const isDragged = event.id === draggedEventId;
-                          const shouldRenderPlaceholderBefore =
-                            !placeholderRendered &&
-                            previewIndex !== null &&
-                            previewIndex === nonDraggedSeen;
-                          if (shouldRenderPlaceholderBefore) {
-                            placeholderRendered = true;
-                          }
-                          if (!isDragged) {
-                            nonDraggedSeen += 1;
-                          }
-                          return (
-                            <React.Fragment key={`single-${day.iso}-${event.id}`}>
-                              {shouldRenderPlaceholderBefore ? (
-                                <div
-                                  className={`${EVENT_ITEM_RADIUS_CLASS} bg-neutral-500/15 ring-1 ring-neutral-400/70`}
-                                  style={{ minHeight: `${EVENT_ITEM_HEIGHT_PX}px` }}
-                                />
-                              ) : null}
-                              <EventBar
-                                event={event}
-                                onClick={() => onEditEvent(event.id)}
-                                draggable
-                                isDragging={isDragged}
-                                className={
-                                  isDragged
-                                    ? "opacity-40"
-                                    : draggingSingleDay
-                                      ? "pointer-events-none"
-                                      : ""
-                                }
-                                onDragStart={(e) => {
-                                  writeCalendarEventDndPayload(e.dataTransfer, {
-                                    eventId: event.id,
-                                    startDate: event.startDate,
-                                    endDate: event.endDate,
-                                    grabOffsetDays: 0,
-                                    isMultiDay: false,
-                                  });
-                                  onEventDragStart({
-                                    eventId: event.id,
-                                    startDate: event.startDate,
-                                    endDate: event.endDate,
-                                    grabOffsetDays: 0,
-                                    isMultiDay: false,
-                                  });
-                                }}
-                                onDragEnd={onEventDragEnd}
-                              />
-                            </React.Fragment>
-                          );
-                        });
-                      })()}
-                      {previewIndex !== null && previewIndex >= baseCountInDay ? (
+                    <div className="relative" style={{ minHeight: `${eventBandHeightPx}px` }}>
+                      {previewLane !== null ? (
                         <div
-                          className={`${EVENT_ITEM_RADIUS_CLASS} bg-neutral-500/15 ring-1 ring-neutral-400/70`}
-                          style={{ minHeight: `${EVENT_ITEM_HEIGHT_PX}px` }}
-                        />
+                          className="absolute inset-x-0 z-0"
+                          style={{ top: `${previewLane * EVENT_ROW_STEP}px` }}
+                        >
+                          <div
+                            className={`${EVENT_ITEM_RADIUS_CLASS} bg-neutral-500/15 ring-1 ring-neutral-400/70`}
+                            style={{ minHeight: `${EVENT_ITEM_HEIGHT_PX}px` }}
+                          />
+                        </div>
                       ) : null}
-                      {showMoveGhost ? (
+                      {dayEvents.map((event) => {
+                        const isDragged = event.id === draggedEventId;
+                        const lane = getSingleLane(event.id);
+                        return (
+                          <div
+                            key={`single-${day.iso}-${event.id}`}
+                            className="absolute inset-x-0 z-10 pointer-events-auto"
+                            style={{ top: `${lane * EVENT_ROW_STEP}px` }}
+                          >
+                            <EventBar
+                              event={event}
+                              onClick={() => onEditEvent(event.id)}
+                              draggable
+                              isDragging={isDragged}
+                              className={
+                                isDragged
+                                  ? "opacity-40"
+                                  : draggingSingleDay
+                                    ? "pointer-events-none"
+                                    : ""
+                              }
+                              onDragStart={(e) => {
+                                writeCalendarEventDndPayload(e.dataTransfer, {
+                                  eventId: event.id,
+                                  startDate: event.startDate,
+                                  endDate: event.endDate,
+                                  grabOffsetDays: 0,
+                                  isMultiDay: false,
+                                });
+                                onEventDragStart({
+                                  eventId: event.id,
+                                  startDate: event.startDate,
+                                  endDate: event.endDate,
+                                  grabOffsetDays: 0,
+                                  isMultiDay: false,
+                                });
+                              }}
+                              onDragEnd={onEventDragEnd}
+                            />
+                          </div>
+                        );
+                      })}
+                      {showMoveGhost && moveGhostLane !== null ? (
                         <div
-                          className={`${EVENT_ITEM_RADIUS_CLASS} pointer-events-none bg-neutral-500/20 ring-1 ring-neutral-400/80`}
+                          className={`absolute inset-x-0 z-20 ${EVENT_ITEM_RADIUS_CLASS} pointer-events-none bg-neutral-500/20 ring-1 ring-neutral-400/80`}
                           style={{
+                            top: `${moveGhostLane * EVENT_ROW_STEP}px`,
                             minHeight: `${EVENT_ITEM_HEIGHT_PX}px`,
                           }}
                         />
