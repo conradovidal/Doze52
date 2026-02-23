@@ -7,13 +7,89 @@ import { EventDialog } from "@/components/event-dialog";
 import { AppHeader } from "@/components/app-header";
 import { AuthDialog } from "@/components/auth/auth-dialog";
 import { Button } from "@/components/ui/button";
-import { useStore, type EventInput } from "@/lib/store";
+import {
+  getOnboardingDefaultCategories,
+  isOnboardingCategoriesSnapshot,
+  ONBOARDING_DEFAULT_CATEGORY_ID,
+  useStore,
+  type EventInput,
+} from "@/lib/store";
 import { useAuth } from "@/lib/auth";
-import { loadRemoteData, saveSnapshot, SyncError } from "@/lib/sync";
+import {
+  loadRemoteData,
+  saveSnapshot,
+  SyncError,
+  type CalendarSnapshot,
+} from "@/lib/sync";
 import { logDevError, logProdError } from "@/lib/safe-log";
 import { getSupabaseBrowserClient, hasSupabaseEnv } from "@/lib/supabase";
 
 const getTodayIso = () => format(new Date(), "yyyy-MM-dd");
+const toSnapshotHash = (snapshot: CalendarSnapshot) => JSON.stringify(snapshot);
+
+const ensureSnapshotCategoryCoverage = (
+  snapshot: CalendarSnapshot
+): CalendarSnapshot => {
+  const categories =
+    snapshot.categories.length > 0
+      ? snapshot.categories
+      : getOnboardingDefaultCategories();
+  const categoryIds = new Set(categories.map((category) => category.id));
+  const fallbackCategoryId = categoryIds.has(ONBOARDING_DEFAULT_CATEGORY_ID)
+    ? ONBOARDING_DEFAULT_CATEGORY_ID
+    : (categories[0]?.id ?? ONBOARDING_DEFAULT_CATEGORY_ID);
+  const colorByCategoryId = new Map(
+    categories.map((category) => [category.id, category.color])
+  );
+
+  const events = snapshot.events.map((event) => {
+    const categoryId = categoryIds.has(event.categoryId)
+      ? event.categoryId
+      : fallbackCategoryId;
+    const color = colorByCategoryId.get(categoryId) ?? event.color;
+    if (categoryId === event.categoryId && color === event.color) {
+      return event;
+    }
+    return { ...event, categoryId, color };
+  });
+
+  return { categories, events };
+};
+
+const filterAnonymousDraft = (snapshot: CalendarSnapshot): CalendarSnapshot => ({
+  categories: snapshot.categories.filter((category) => !category.userId),
+  events: snapshot.events.filter((event) => !event.userId),
+});
+
+const hasRelevantLocalDraft = (snapshot: CalendarSnapshot) =>
+  snapshot.events.length > 0 ||
+  !isOnboardingCategoriesSnapshot(snapshot.categories);
+
+const mergeSnapshots = (
+  remoteSnapshot: CalendarSnapshot,
+  localSnapshot: CalendarSnapshot
+): CalendarSnapshot => {
+  const mergedCategories = [...remoteSnapshot.categories];
+  const categoryIds = new Set(mergedCategories.map((category) => category.id));
+  for (const category of localSnapshot.categories) {
+    if (!category.id || categoryIds.has(category.id)) continue;
+    mergedCategories.push(category);
+    categoryIds.add(category.id);
+  }
+
+  const mergedEvents = [...remoteSnapshot.events];
+  const eventIds = new Set(mergedEvents.map((event) => event.id));
+  for (const event of localSnapshot.events) {
+    if (!event.id || eventIds.has(event.id)) continue;
+    mergedEvents.push(event);
+    eventIds.add(event.id);
+  }
+
+  return ensureSnapshotCategoryCoverage({
+    categories: mergedCategories,
+    events: mergedEvents,
+  });
+};
 
 export default function HomePage() {
   const initialYear = React.useMemo(() => {
@@ -25,6 +101,7 @@ export default function HomePage() {
   const categories = useStore((s) => s.categories);
   const ensureEventMetadata = useStore((s) => s.ensureEventMetadata);
   const replaceAllData = useStore((s) => s.replaceAllData);
+  const resetToOnboardingData = useStore((s) => s.resetToOnboardingData);
   const addEvent = useStore((s) => s.addEvent);
   const updateEvent = useStore((s) => s.updateEvent);
   const deleteEvent = useStore((s) => s.deleteEvent);
@@ -64,6 +141,14 @@ export default function HomePage() {
   const [todayIso, setTodayIso] = React.useState<string>(() => getTodayIso());
   const lastSyncedHashRef = React.useRef<string>("");
   const saveTimerRef = React.useRef<number | null>(null);
+  const previousSessionUserIdRef = React.useRef<string | null>(null);
+  const categoriesRef = React.useRef(categories);
+  const eventsRef = React.useRef(events);
+
+  React.useEffect(() => {
+    categoriesRef.current = categories;
+    eventsRef.current = events;
+  }, [categories, events]);
 
   const editingEvent = editingId ? getEventById(editingId) : null;
 
@@ -198,14 +283,33 @@ export default function HomePage() {
 
   React.useEffect(() => {
     if (windowContext !== "main") return;
-    if (!session?.user.id) {
+    if (authLoading) return;
+    const currentUserId = session?.user.id ?? null;
+    const previousUserId = previousSessionUserIdRef.current;
+    const hasUserBoundLocalData =
+      categories.some((category) => Boolean(category.userId)) ||
+      events.some((event) => Boolean(event.userId));
+
+    if (!currentUserId) {
+      if (previousUserId || hasUserBoundLocalData) {
+        resetToOnboardingData();
+      }
       setRemoteReady(false);
       setSyncBlocked(false);
       setSyncError(null);
       lastSyncedHashRef.current = "";
+      previousSessionUserIdRef.current = null;
       return;
     }
-  }, [session?.user.id, windowContext]);
+    previousSessionUserIdRef.current = currentUserId;
+  }, [
+    authLoading,
+    categories,
+    events,
+    resetToOnboardingData,
+    session?.user.id,
+    windowContext,
+  ]);
 
   const bootstrapRemote = React.useCallback(() => {
     if (windowContext !== "main") return () => {};
@@ -215,10 +319,27 @@ export default function HomePage() {
       setIsSyncing(true);
       setSyncError(null);
       try {
-        const snapshot = await loadRemoteData();
+        const localSnapshot = filterAnonymousDraft(
+          ensureSnapshotCategoryCoverage({
+            categories: categoriesRef.current,
+            events: eventsRef.current,
+          })
+        );
+        const localDraftIsRelevant = hasRelevantLocalDraft(localSnapshot);
+        const remoteSnapshot = await loadRemoteData();
         if (cancelled) return;
-        replaceAllData(snapshot);
-        lastSyncedHashRef.current = JSON.stringify(snapshot);
+        let nextSnapshot = ensureSnapshotCategoryCoverage(remoteSnapshot);
+        if (localDraftIsRelevant) {
+          nextSnapshot = mergeSnapshots(remoteSnapshot, localSnapshot);
+        }
+        const remoteHash = toSnapshotHash(remoteSnapshot);
+        const nextHash = toSnapshotHash(nextSnapshot);
+        replaceAllData(nextSnapshot);
+        if (localDraftIsRelevant && nextHash !== remoteHash) {
+          await saveSnapshot(nextSnapshot);
+          if (cancelled) return;
+        }
+        lastSyncedHashRef.current = nextHash;
         setRemoteReady(true);
         setSyncBlocked(false);
       } catch (error) {

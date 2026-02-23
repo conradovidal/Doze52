@@ -17,6 +17,7 @@ type StoreState = {
   events: CalendarEvent[];
   categories: CategoryItem[];
   replaceAllData: (payload: { categories: CategoryItem[]; events: CalendarEvent[] }) => void;
+  resetToOnboardingData: () => void;
   markLocalImported: (userId: string) => void;
   isLocalImported: (userId: string) => boolean;
   ensureEventMetadata: () => void;
@@ -38,12 +39,104 @@ type StoreState = {
 };
 
 const uid = () => crypto.randomUUID();
-const defaultCategories: CategoryItem[] = [
-  { id: "personal", name: "Pessoal", color: "#2563eb", visible: true },
-  { id: "travel", name: "Viagens", color: "#16a34a", visible: true },
-  { id: "birthday", name: "Aniversarios", color: "#f59e0b", visible: true },
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const LEGACY_CATEGORY_ID_MAP: Record<string, string> = {
+  personal: "33333333-3333-4333-8333-333333333333",
+  travel: "22222222-2222-4222-8222-222222222222",
+  birthday: "11111111-1111-4111-8111-111111111111",
+  work: "33333333-3333-4333-8333-333333333333",
+  health: "33333333-3333-4333-8333-333333333333",
+  other: "33333333-3333-4333-8333-333333333333",
+};
+
+const isUuid = (value: string) => UUID_RE.test(value);
+
+const mapLegacyCategoryId = (rawId: string | undefined | null) => {
+  if (!rawId) return null;
+  return LEGACY_CATEGORY_ID_MAP[rawId] ?? rawId;
+};
+
+export const ONBOARDING_CATEGORY_IDS = {
+  birthday: "11111111-1111-4111-8111-111111111111",
+  travel: "22222222-2222-4222-8222-222222222222",
+  events: "33333333-3333-4333-8333-333333333333",
+} as const;
+
+export const ONBOARDING_DEFAULT_CATEGORY_ID = ONBOARDING_CATEGORY_IDS.events;
+
+export const ONBOARDING_DEFAULT_CATEGORIES: CategoryItem[] = [
+  {
+    id: ONBOARDING_CATEGORY_IDS.birthday,
+    name: "Aniversarios",
+    color: "#f59e0b",
+    visible: true,
+  },
+  {
+    id: ONBOARDING_CATEGORY_IDS.travel,
+    name: "Ferias/Viagens",
+    color: "#16a34a",
+    visible: true,
+  },
+  {
+    id: ONBOARDING_CATEGORY_IDS.events,
+    name: "Eventos",
+    color: "#2563eb",
+    visible: true,
+  },
 ];
-const defaultCategoryId = "personal";
+
+export const getOnboardingDefaultCategories = (): CategoryItem[] =>
+  ONBOARDING_DEFAULT_CATEGORIES.map((category) => ({ ...category }));
+
+export const isOnboardingCategoriesSnapshot = (categories: CategoryItem[]) => {
+  if (categories.length !== ONBOARDING_DEFAULT_CATEGORIES.length) return false;
+  return ONBOARDING_DEFAULT_CATEGORIES.every((expected, index) => {
+    const received = categories[index];
+    if (!received) return false;
+    return (
+      received.id === expected.id &&
+      received.name === expected.name &&
+      received.color.toLowerCase() === expected.color.toLowerCase() &&
+      received.visible === expected.visible
+    );
+  });
+};
+
+const defaultCategories: CategoryItem[] = getOnboardingDefaultCategories();
+const defaultCategoryId = ONBOARDING_DEFAULT_CATEGORY_ID;
+
+const normalizePersistedCategories = (
+  persistedCategories: CategoryItem[] | undefined
+) => {
+  const source =
+    persistedCategories && persistedCategories.length > 0
+      ? persistedCategories
+      : defaultCategories;
+  const seen = new Set<string>();
+  const next: CategoryItem[] = [];
+
+  for (const category of source) {
+    const mapped = mapLegacyCategoryId(category.id);
+    const normalizedId =
+      mapped && mapped.trim() && isUuid(mapped) ? mapped : uid();
+    if (seen.has(normalizedId)) continue;
+    seen.add(normalizedId);
+    next.push({
+      ...category,
+      id: normalizedId,
+      name: category.name?.trim() || "Categoria",
+      color:
+        typeof category.color === "string" && category.color.trim().length > 0
+          ? category.color
+          : "#2563eb",
+      visible: typeof category.visible === "boolean" ? category.visible : true,
+    });
+  }
+
+  return next.length > 0 ? next : getOnboardingDefaultCategories();
+};
 
 const normalizeEventDayOrder = (value: unknown): number => {
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -89,11 +182,16 @@ export const useStore = create<StoreState>()(
   persist(
     (set, get) => ({
       events: [],
-      categories: defaultCategories,
+      categories: getOnboardingDefaultCategories(),
       replaceAllData: ({ categories, events }) =>
         set({
           categories,
           events,
+        }),
+      resetToOnboardingData: () =>
+        set({
+          categories: getOnboardingDefaultCategories(),
+          events: [],
         }),
       markLocalImported: (userId) => {
         if (typeof window === "undefined") return;
@@ -327,10 +425,17 @@ export const useStore = create<StoreState>()(
     }),
     {
       name: "yiv-store",
-      version: 2,
+      version: 3,
       migrate: (state: unknown) => {
         const persisted = (state ?? {}) as PersistedState;
-        const categories = persisted.categories ?? defaultCategories;
+        const categories = normalizePersistedCategories(persisted.categories);
+        const categoryIds = new Set(categories.map((category) => category.id));
+        const fallbackCategoryId = categoryIds.has(defaultCategoryId)
+          ? defaultCategoryId
+          : (categories[0]?.id ?? defaultCategoryId);
+        const fallbackColor =
+          categories.find((category) => category.id === fallbackCategoryId)?.color ??
+          "#2563eb";
         const events =
           persisted.events?.map((evt, idx) => {
             const createdAt =
@@ -341,38 +446,28 @@ export const useStore = create<StoreState>()(
               typeof evt.notes === "string" && evt.notes.trim().length > 0
                 ? evt.notes.trim()
                 : undefined;
-
-            if (evt.categoryId) {
-              return {
-                ...evt,
-                id: evt.id ?? uid(),
-                createdAt,
-                dayOrder,
-                notes,
-              };
-            }
-            const legacy = evt.category;
-            const mappedId =
-              legacy === "personal"
-                ? "personal"
-                : legacy === "work"
-                  ? "personal"
-                  : legacy === "health"
-                    ? "personal"
-                    : legacy === "other"
-                      ? "personal"
-                      : defaultCategoryId;
+            const mappedCategoryId =
+              mapLegacyCategoryId(evt.categoryId) ??
+              mapLegacyCategoryId(evt.category) ??
+              fallbackCategoryId;
+            const categoryId = categoryIds.has(mappedCategoryId)
+              ? mappedCategoryId
+              : fallbackCategoryId;
+            const normalizedId =
+              typeof evt.id === "string" && evt.id.trim() && isUuid(evt.id)
+                ? evt.id
+                : uid();
             return {
               ...evt,
-              id: evt.id ?? uid(),
-              categoryId: mappedId,
+              id: normalizedId,
+              categoryId,
               createdAt,
               dayOrder,
               notes,
               color:
-                categories.find((c: CategoryItem) => c.id === mappedId)?.color ??
+                categories.find((c: CategoryItem) => c.id === categoryId)?.color ??
                 evt.color ??
-                "#2563eb",
+                fallbackColor,
             };
           }) ?? [];
         return { ...persisted, categories, events };
