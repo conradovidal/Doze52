@@ -24,6 +24,7 @@ import {
   EVENT_ITEM_GAP_PX,
   EVENT_ITEM_HEIGHT_PX,
   EVENT_ITEM_RADIUS_CLASS,
+  MONTH_EVENTS_MIN_TOP_OFFSET_PX,
   MONTH_MIN_TOTAL_EVENT_ROWS_BEFORE_GROWTH,
   MONTH_MULTI_DAY_TOP_OFFSET_PX,
   MONTH_ROW_BASE_MIN_HEIGHT_PX,
@@ -244,9 +245,12 @@ export function MonthRow({
     maxLaneUsedInMonth + 1
   );
   const hasAnyMultiDayInMonth = maxMultiRows > 0;
-  const eventsTopOffset = hasAnyMultiDayInMonth
-    ? MONTH_MULTI_DAY_TOP_OFFSET_PX
-    : MONTH_SINGLE_DAY_TOP_OFFSET_NO_MULTI_PX;
+  const eventsTopOffset = Math.max(
+    hasAnyMultiDayInMonth
+      ? MONTH_MULTI_DAY_TOP_OFFSET_PX
+      : MONTH_SINGLE_DAY_TOP_OFFSET_NO_MULTI_PX,
+    MONTH_EVENTS_MIN_TOP_OFFSET_PX
+  );
   const eventBandHeightPx =
     rowsForHeightTotal * EVENT_ITEM_HEIGHT_PX +
     Math.max(0, rowsForHeightTotal - 1) * EVENT_ITEM_GAP_PX;
