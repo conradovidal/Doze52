@@ -13,6 +13,8 @@ import { loadRemoteData, saveSnapshot, SyncError } from "@/lib/sync";
 import { logDevError, logProdError } from "@/lib/safe-log";
 import { getSupabaseBrowserClient, hasSupabaseEnv } from "@/lib/supabase";
 
+const getTodayIso = () => format(new Date(), "yyyy-MM-dd");
+
 export default function HomePage() {
   const initialYear = React.useMemo(() => {
     const currentYear = new Date().getFullYear();
@@ -59,6 +61,7 @@ export default function HomePage() {
   const [popupStatusMessage, setPopupStatusMessage] = React.useState(
     "Finalizando login..."
   );
+  const [todayIso, setTodayIso] = React.useState<string>(() => getTodayIso());
   const lastSyncedHashRef = React.useRef<string>("");
   const saveTimerRef = React.useRef<number | null>(null);
 
@@ -141,6 +144,48 @@ export default function HomePage() {
     if (windowContext !== "main") return;
     ensureEventMetadata();
   }, [ensureEventMetadata, windowContext]);
+
+  React.useEffect(() => {
+    if (windowContext !== "main") return;
+    let rolloverTimer: number | null = null;
+
+    const refreshTodayIso = () => {
+      const nextTodayIso = getTodayIso();
+      setTodayIso((prev) => (prev === nextTodayIso ? prev : nextTodayIso));
+    };
+
+    const scheduleNextRollover = () => {
+      const now = new Date();
+      const nextMidnight = new Date(now);
+      nextMidnight.setHours(24, 0, 1, 0);
+      const delayMs = Math.max(1000, nextMidnight.getTime() - now.getTime());
+      rolloverTimer = window.setTimeout(() => {
+        refreshTodayIso();
+        scheduleNextRollover();
+      }, delayMs);
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== "visible") return;
+      refreshTodayIso();
+    };
+    const handleFocus = () => {
+      refreshTodayIso();
+    };
+
+    refreshTodayIso();
+    scheduleNextRollover();
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", handleFocus);
+
+    return () => {
+      if (rolloverTimer !== null) {
+        window.clearTimeout(rolloverTimer);
+      }
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", handleFocus);
+    };
+  }, [windowContext]);
 
   React.useEffect(() => {
     if (windowContext !== "main") return;
@@ -332,6 +377,7 @@ export default function HomePage() {
 
       <YearGrid
         year={year}
+        todayIso={todayIso}
         events={events}
         onEditEvent={handleEditEvent}
         creatingRange={creatingRange}

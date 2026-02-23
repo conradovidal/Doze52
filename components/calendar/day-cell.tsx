@@ -1,10 +1,9 @@
 "use client";
 
-import { isBefore, isToday, startOfDay } from "date-fns";
-
 export function DayCell({
   date,
   dateIso,
+  todayIso,
   minHeightPx,
   isRangeSelected,
   isRangeStart,
@@ -16,6 +15,7 @@ export function DayCell({
 }: {
   date: Date;
   dateIso: string;
+  todayIso: string;
   minHeightPx: number;
   isRangeSelected: boolean;
   isRangeStart: boolean;
@@ -48,8 +48,8 @@ export function DayCell({
 
   const dayOfWeek = date.getDay(); // 0..6
   const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-  const today = isToday(date);
-  const isPast = isBefore(startOfDay(date), startOfDay(new Date()));
+  const today = dateIso === todayIso;
+  const isPast = dateIso < todayIso;
   const dayToneClass = isPast
     ? isWeekend
       ? "bg-[#ededed]"

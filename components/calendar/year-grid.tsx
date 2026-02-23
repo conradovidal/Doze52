@@ -38,6 +38,7 @@ export type GlobalDragState = {
 
 export function YearGrid({
   year,
+  todayIso,
   events,
   onEditEvent,
   creatingRange,
@@ -48,6 +49,7 @@ export function YearGrid({
   onApplyDayReorder,
 }: {
   year: number;
+  todayIso: string;
   events: CalendarEvent[];
   onEditEvent: (id: string) => void;
   creatingRange: { startIso: string; hoverIso: string; isDragging: boolean } | null;
@@ -309,6 +311,7 @@ export function YearGrid({
         <MonthRow
           key={idx}
           year={year}
+          todayIso={todayIso}
           monthIndex={idx}
           events={events}
           visibleCategoryIds={visibleCategoryIds}

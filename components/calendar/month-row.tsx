@@ -65,6 +65,7 @@ const sortSingleDayEvents = (a: ParsedEvent, b: ParsedEvent) => {
 
 export function MonthRow({
   year,
+  todayIso,
   monthIndex,
   events,
   visibleCategoryIds,
@@ -84,6 +85,7 @@ export function MonthRow({
   clearReorderTarget,
 }: {
   year: number;
+  todayIso: string;
   monthIndex: number;
   events: CalendarEvent[];
   visibleCategoryIds: string[];
@@ -398,6 +400,7 @@ export function MonthRow({
               <DayCell
                 date={day.date}
                 dateIso={day.iso}
+                todayIso={todayIso}
                 minHeightPx={minHeightPx}
                 isRangeSelected={
                   !!rangeBounds &&
@@ -451,6 +454,7 @@ export function MonthRow({
               >
                 <EventBar
                   event={seg.event}
+                  todayIso={todayIso}
                   onClick={() => onEditEvent(seg.event.id)}
                   draggable
                   isDragging={dragState.draggingEventId === seg.event.id}
@@ -663,6 +667,7 @@ export function MonthRow({
                           >
                             <EventBar
                               event={event}
+                              todayIso={todayIso}
                               onClick={() => onEditEvent(event.id)}
                               draggable
                               isDragging={isDragged}

@@ -1,6 +1,5 @@
 "use client";
 
-import { isBefore, parseISO, startOfDay } from "date-fns";
 import type { CalendarEvent } from "@/lib/types";
 import * as React from "react";
 import {
@@ -12,6 +11,7 @@ import {
 
 export function EventBar({
   event,
+  todayIso,
   onClick,
   draggable = false,
   onDragStart,
@@ -22,6 +22,7 @@ export function EventBar({
   className,
 }: {
   event: CalendarEvent;
+  todayIso: string;
   onClick?: () => void;
   draggable?: boolean;
   onDragStart?: (e: React.DragEvent<HTMLButtonElement>) => void;
@@ -31,8 +32,7 @@ export function EventBar({
   isEnd?: boolean;
   className?: string;
 }) {
-  const today = startOfDay(new Date());
-  const isPast = isBefore(parseISO(event.endDate), today);
+  const isPast = event.endDate < todayIso;
   const isDragCycleRef = React.useRef(false);
   const lastDragEndAtRef = React.useRef(0);
   const radius =
