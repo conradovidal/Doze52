@@ -45,7 +45,7 @@ export function DayCell({
       } select-none`}
       style={{ minHeight: `${minHeightPx}px` }}
     >
-      <div className={`flex h-3.5 flex-none items-center gap-1 px-0.5 leading-none text-[10px] ${isPast ? "text-neutral-400" : "text-neutral-600"}`}>
+      <div className={`flex h-4 flex-none items-center gap-1 px-0.5 leading-none text-[10px] ${isPast ? "text-neutral-400" : "text-neutral-600"}`}>
         <span
           className={`relative inline-flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-medium ${
             today ? "bg-black text-white ring-1 ring-black" : ""

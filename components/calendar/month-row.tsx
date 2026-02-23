@@ -20,7 +20,7 @@ import { EventBar } from "./event-bar";
 
 const COLUMNS = 37;
 const BASE_MIN_HEIGHT_COMPACT = 48;
-const HEADER_OFFSET = 18;
+const HEADER_OFFSET = 20;
 const EVENT_ROW_HEIGHT = 14;
 const EVENT_ROW_GAP = 2;
 const BOTTOM_PADDING = 4;
@@ -461,8 +461,9 @@ export function MonthRow({
 
         <div className="pointer-events-none absolute inset-x-0 top-0 z-10">
           <div
-            className="grid gap-y-[2px] pt-[18px]"
+            className="grid gap-y-[2px]"
             style={{
+              paddingTop: `${HEADER_OFFSET}px`,
               gridTemplateColumns: "repeat(37, minmax(0, 1fr))",
               gridAutoRows: `${EVENT_ROW_HEIGHT}px`,
             }}
