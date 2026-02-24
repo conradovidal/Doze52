@@ -1,0 +1,31 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 712 180"
+  role="img"
+  aria-labelledby="title"
+>
+  <title id="title">doze 52</title>
+  <rect x="366" y="24" width="326" height="132" fill="#EDCF59" />
+  <text
+    x="8"
+    y="132"
+    fill="#5B5C5E"
+    font-family="Arial Black, Arial, Helvetica, sans-serif"
+    font-size="152"
+    font-weight="900"
+    letter-spacing="0"
+  >
+    doze
+  </text>
+  <text
+    x="438"
+    y="132"
+    fill="#5B5C5E"
+    font-family="Arial Black, Arial, Helvetica, sans-serif"
+    font-size="152"
+    font-weight="900"
+    letter-spacing="0"
+  >
+    52
+  </text>
+</svg>

@@ -28,39 +28,35 @@ export function AppHeader({
 }: AppHeaderProps) {
   return (
     <header className="mb-6">
-      <div className="grid grid-cols-[1fr_auto_1fr] items-end">
-        <div />
-        <div className="flex flex-col items-center gap-1.5">
-          <div className="inline-flex w-fit flex-col items-center">
-            <div className="inline-flex w-full items-baseline gap-2 leading-none">
-              <span className="inline-flex items-baseline gap-3 font-sans text-2xl font-medium tracking-[0.08em] text-neutral-900">
-                <span>DOZE</span>
-                <span>52</span>
-              </span>
-              <Select value={String(year)} onValueChange={(v) => onYearChange(Number(v))}>
-                <SelectTrigger className="relative top-[1px] h-7 min-w-[72px] align-middle border-transparent bg-transparent px-1.5 font-sans text-xl leading-none font-normal text-neutral-700 shadow-none hover:bg-transparent focus-visible:border-transparent focus-visible:ring-0 [&_svg]:ml-1 [&_svg]:opacity-80 [&_svg]:text-neutral-600">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="2025">2025</SelectItem>
-                  <SelectItem value="2026">2026</SelectItem>
-                  <SelectItem value="2027">2027</SelectItem>
-                </SelectContent>
-              </Select>
+      <div className="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-2 md:grid-cols-[auto_1fr_auto] md:gap-4">
+        <div className="justify-self-start">
+          <img src="/logo-doze52.svg" alt="doze 52" className="h-7 w-auto md:h-8" />
+        </div>
+        <div className="justify-self-end md:col-start-3">
+          <div className="flex min-h-9 items-center justify-end gap-1.5">
+            <Select value={String(year)} onValueChange={(v) => onYearChange(Number(v))}>
+              <SelectTrigger className="h-8 min-w-[72px] border-transparent bg-transparent px-1.5 font-sans text-xl leading-none font-normal text-neutral-700 shadow-none hover:bg-transparent focus-visible:border-transparent focus-visible:ring-0 [&_svg]:ml-1 [&_svg]:opacity-80 [&_svg]:text-neutral-600">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="2025">2025</SelectItem>
+                <SelectItem value="2026">2026</SelectItem>
+                <SelectItem value="2027">2027</SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="flex min-h-9 min-w-[96px] items-center justify-end">
+              {authLoading ? null : isAuthenticated ? (
+                <UserMenu />
+              ) : (
+                <Button size="sm" className="h-8" onClick={onOpenAuthDialog}>
+                  Entrar
+                </Button>
+              )}
             </div>
           </div>
-          <CategoryBar compact />
         </div>
-        <div className="self-end justify-self-end">
-          <div className="flex h-8 min-w-[96px] items-center justify-end">
-            {authLoading ? null : isAuthenticated ? (
-              <UserMenu />
-            ) : (
-              <Button size="sm" className="h-8" onClick={onOpenAuthDialog}>
-                Entrar
-              </Button>
-            )}
-          </div>
+        <div className="col-span-2 flex justify-center md:col-span-1 md:col-start-2 md:row-start-1">
+          <CategoryBar compact />
         </div>
       </div>
     </header>
