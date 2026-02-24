@@ -5,7 +5,7 @@
   aria-labelledby="title"
 >
   <title id="title">doze 52</title>
-  <rect x="366" y="24" width="326" height="132" fill="#EDCF59" />
+  <rect x="366" y="14" width="326" height="152" fill="#EDCF59" />
   <text
     x="8"
     y="132"
@@ -18,8 +18,10 @@
     doze
   </text>
   <text
-    x="438"
-    y="132"
+    x="529"
+    y="90"
+    text-anchor="middle"
+    dominant-baseline="middle"
     fill="#5B5C5E"
     font-family="Arial Black, Arial, Helvetica, sans-serif"
     font-size="152"
