@@ -63,6 +63,12 @@ export class SyncError extends Error {
 }
 
 let saveInFlight: Promise<void> | null = null;
+let pendingSnapshot: CalendarSnapshot | null = null;
+
+const cloneSnapshot = (snapshot: CalendarSnapshot): CalendarSnapshot => ({
+  categories: snapshot.categories.map((category) => ({ ...category })),
+  events: snapshot.events.map((event) => ({ ...event })),
+});
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const genericSyncMessage = "Falha de sincronizacao. Tente novamente.";
@@ -467,8 +473,15 @@ export const loadRemoteData = async (): Promise<CalendarSnapshot> => {
 };
 
 export const saveSnapshot = async (snapshot: CalendarSnapshot): Promise<void> => {
+  pendingSnapshot = cloneSnapshot(snapshot);
   if (saveInFlight) return saveInFlight;
-  saveInFlight = saveSnapshotInternal(snapshot).finally(() => {
+  saveInFlight = (async () => {
+    while (pendingSnapshot) {
+      const nextSnapshot = pendingSnapshot;
+      pendingSnapshot = null;
+      await saveSnapshotInternal(nextSnapshot);
+    }
+  })().finally(() => {
     saveInFlight = null;
   });
   return saveInFlight;

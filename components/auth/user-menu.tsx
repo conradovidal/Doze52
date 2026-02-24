@@ -5,14 +5,19 @@ import { LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useAuth } from "@/lib/auth";
-import { exportUserData } from "@/lib/sync";
+import { exportUserData, saveSnapshot } from "@/lib/sync";
 import { logDevError, logProdError } from "@/lib/safe-log";
+import { useStore } from "@/lib/store";
 
 export function UserMenu() {
   const { session, signOut } = useAuth();
+  const categories = useStore((state) => state.categories);
+  const events = useStore((state) => state.events);
   const [brokenAvatar, setBrokenAvatar] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [signOutError, setSignOutError] = useState<string | null>(null);
 
   const metadata = session?.user.metadata ?? {};
   const fullName =
@@ -37,6 +42,25 @@ export function UserMenu() {
     (displayName || session?.user.email || "").trim().charAt(0).toUpperCase() || "?";
 
   if (!session) return null;
+
+  const handleSignOut = async () => {
+    try {
+      setIsSigningOut(true);
+      setSignOutError(null);
+      await saveSnapshot({ categories, events });
+      await signOut();
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Nao foi possivel salvar antes de sair. Tente novamente.";
+      logDevError("user-menu.sign-out", { message });
+      logProdError("Falha ao salvar dados antes do logout.");
+      setSignOutError("Nao foi possivel salvar antes de sair. Tente novamente.");
+    } finally {
+      setIsSigningOut(false);
+    }
+  };
 
   return (
     <Popover>
@@ -64,9 +88,15 @@ export function UserMenu() {
             <p className="truncate text-sm">{displayName}</p>
             <p className="truncate text-xs text-neutral-500">{email}</p>
           </div>
-          <Button variant="ghost" size="sm" className="w-full justify-start" onClick={() => signOut()}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-start"
+            onClick={handleSignOut}
+            disabled={isSigningOut}
+          >
             <LogOut size={14} className="mr-2" />
-            Sair
+            {isSigningOut ? "Salvando..." : "Sair"}
           </Button>
           <Button
             variant="ghost"
@@ -94,6 +124,7 @@ export function UserMenu() {
             {isExporting ? "Exportando..." : "Exportar dados"}
           </Button>
           {exportError ? <p className="text-xs text-red-600">{exportError}</p> : null}
+          {signOutError ? <p className="text-xs text-red-600">{signOutError}</p> : null}
         </div>
       </PopoverContent>
     </Popover>

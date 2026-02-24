@@ -102,6 +102,8 @@ export default function HomePage() {
   const ensureEventMetadata = useStore((s) => s.ensureEventMetadata);
   const replaceAllData = useStore((s) => s.replaceAllData);
   const resetToOnboardingData = useStore((s) => s.resetToOnboardingData);
+  const markLocalImported = useStore((s) => s.markLocalImported);
+  const isLocalImported = useStore((s) => s.isLocalImported);
   const addEvent = useStore((s) => s.addEvent);
   const updateEvent = useStore((s) => s.updateEvent);
   const deleteEvent = useStore((s) => s.deleteEvent);
@@ -313,7 +315,8 @@ export default function HomePage() {
 
   const bootstrapRemote = React.useCallback(() => {
     if (windowContext !== "main") return () => {};
-    if (!session?.user.id) return () => {};
+    const userId = session?.user.id;
+    if (!userId) return () => {};
     let cancelled = false;
     const run = async () => {
       setIsSyncing(true);
@@ -328,17 +331,25 @@ export default function HomePage() {
         const localDraftIsRelevant = hasRelevantLocalDraft(localSnapshot);
         const remoteSnapshot = await loadRemoteData();
         if (cancelled) return;
-        let nextSnapshot = ensureSnapshotCategoryCoverage(remoteSnapshot);
+        const remoteIsEmpty =
+          remoteSnapshot.categories.length === 0 && remoteSnapshot.events.length === 0;
+        const alreadyImported = isLocalImported(userId);
+        const remoteHash = toSnapshotHash(remoteSnapshot);
+        let nextSnapshot: CalendarSnapshot = remoteSnapshot;
+
         if (localDraftIsRelevant) {
           nextSnapshot = mergeSnapshots(remoteSnapshot, localSnapshot);
+        } else if (remoteIsEmpty && !alreadyImported) {
+          nextSnapshot = ensureSnapshotCategoryCoverage(remoteSnapshot);
         }
-        const remoteHash = toSnapshotHash(remoteSnapshot);
+
         const nextHash = toSnapshotHash(nextSnapshot);
         replaceAllData(nextSnapshot);
-        if (localDraftIsRelevant && nextHash !== remoteHash) {
+        if (nextHash !== remoteHash) {
           await saveSnapshot(nextSnapshot);
           if (cancelled) return;
         }
+        markLocalImported(userId);
         lastSyncedHashRef.current = nextHash;
         setRemoteReady(true);
         setSyncBlocked(false);
@@ -365,7 +376,13 @@ export default function HomePage() {
     return () => {
       cancelled = true;
     };
-  }, [replaceAllData, session?.user.id, windowContext]);
+  }, [
+    isLocalImported,
+    markLocalImported,
+    replaceAllData,
+    session?.user.id,
+    windowContext,
+  ]);
 
   React.useEffect(() => {
     const cleanup = bootstrapRemote();
