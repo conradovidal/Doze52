@@ -3,6 +3,11 @@
 import { create } from "zustand";
 import { addDays, format, parseISO } from "date-fns";
 import { persist } from "zustand/middleware";
+import {
+  CATEGORY_PRESET_COLORS,
+  ONBOARDING_CATEGORY_COLOR_BY_ID,
+  PREVIOUS_ONBOARDING_COLOR_BY_ID,
+} from "./category-palette";
 import type { CalendarEvent, CategoryItem } from "./types";
 
 export type EventInput = {
@@ -65,24 +70,27 @@ export const ONBOARDING_CATEGORY_IDS = {
 } as const;
 
 export const ONBOARDING_DEFAULT_CATEGORY_ID = ONBOARDING_CATEGORY_IDS.events;
+const defaultCategoryColor =
+  ONBOARDING_CATEGORY_COLOR_BY_ID[ONBOARDING_DEFAULT_CATEGORY_ID] ??
+  CATEGORY_PRESET_COLORS[0];
 
 export const ONBOARDING_DEFAULT_CATEGORIES: CategoryItem[] = [
   {
     id: ONBOARDING_CATEGORY_IDS.birthday,
     name: "Aniversarios",
-    color: "#f59e0b",
+    color: ONBOARDING_CATEGORY_COLOR_BY_ID[ONBOARDING_CATEGORY_IDS.birthday],
     visible: true,
   },
   {
     id: ONBOARDING_CATEGORY_IDS.travel,
     name: "Ferias/Viagens",
-    color: "#16a34a",
+    color: ONBOARDING_CATEGORY_COLOR_BY_ID[ONBOARDING_CATEGORY_IDS.travel],
     visible: true,
   },
   {
     id: ONBOARDING_CATEGORY_IDS.events,
     name: "Eventos",
-    color: "#2563eb",
+    color: ONBOARDING_CATEGORY_COLOR_BY_ID[ONBOARDING_CATEGORY_IDS.events],
     visible: true,
   },
 ];
@@ -106,6 +114,25 @@ export const isOnboardingCategoriesSnapshot = (categories: CategoryItem[]) => {
 
 const defaultCategories: CategoryItem[] = getOnboardingDefaultCategories();
 const defaultCategoryId = ONBOARDING_DEFAULT_CATEGORY_ID;
+const normalizeColorForCompare = (value: string | undefined | null) =>
+  (value ?? "").trim().toLowerCase();
+
+const migrateOnboardingCategoryColors = (categories: CategoryItem[]) =>
+  categories.map((category) => {
+    const previousColor = PREVIOUS_ONBOARDING_COLOR_BY_ID[category.id];
+    const nextColor = ONBOARDING_CATEGORY_COLOR_BY_ID[category.id];
+    if (!previousColor || !nextColor) return category;
+    if (
+      normalizeColorForCompare(category.color) !==
+      normalizeColorForCompare(previousColor)
+    ) {
+      return category;
+    }
+    return {
+      ...category,
+      color: nextColor,
+    };
+  });
 
 const normalizePersistedCategories = (
   persistedCategories: CategoryItem[] | undefined
@@ -130,7 +157,7 @@ const normalizePersistedCategories = (
       color:
         typeof category.color === "string" && category.color.trim().length > 0
           ? category.color
-          : "#2563eb",
+          : defaultCategoryColor,
       visible: typeof category.visible === "boolean" ? category.visible : true,
     });
   }
@@ -241,7 +268,7 @@ export const useStore = create<StoreState>()(
                 categoryId: input.categoryId,
                 color:
                   state.categories.find((c) => c.id === input.categoryId)?.color ??
-                  "#2563eb",
+                  defaultCategoryColor,
                 startDate: input.startDate,
                 endDate: input.endDate,
                 notes: input.notes?.trim() || undefined,
@@ -369,7 +396,8 @@ export const useStore = create<StoreState>()(
           const nextCategories = state.categories.filter((c) => c.id !== id);
           const fallbackId = nextCategories[0]?.id ?? defaultCategoryId;
           const fallbackColor =
-            nextCategories.find((c) => c.id === fallbackId)?.color ?? "#2563eb";
+            nextCategories.find((c) => c.id === fallbackId)?.color ??
+            defaultCategoryColor;
           return {
             categories: nextCategories,
             events: state.events.map((evt) =>
@@ -425,17 +453,19 @@ export const useStore = create<StoreState>()(
     }),
     {
       name: "yiv-store",
-      version: 3,
+      version: 4,
       migrate: (state: unknown) => {
         const persisted = (state ?? {}) as PersistedState;
-        const categories = normalizePersistedCategories(persisted.categories);
+        const categories = migrateOnboardingCategoryColors(
+          normalizePersistedCategories(persisted.categories)
+        );
         const categoryIds = new Set(categories.map((category) => category.id));
         const fallbackCategoryId = categoryIds.has(defaultCategoryId)
           ? defaultCategoryId
           : (categories[0]?.id ?? defaultCategoryId);
         const fallbackColor =
           categories.find((category) => category.id === fallbackCategoryId)?.color ??
-          "#2563eb";
+          defaultCategoryColor;
         const events =
           persisted.events?.map((evt, idx) => {
             const createdAt =

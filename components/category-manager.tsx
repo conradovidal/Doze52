@@ -12,19 +12,9 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { CATEGORY_PRESET_COLORS } from "@/lib/category-palette";
 import { useStore } from "@/lib/store";
-
-const PASTEL_COLORS = [
-  "#5B8DEF",
-  "#4DBA9A",
-  "#E9A23B",
-  "#E57F8E",
-  "#9B7BEA",
-  "#54B6D9",
-  "#8DBD5A",
-  "#B79B7A",
-];
-const DEFAULT_CATEGORY_COLOR = PASTEL_COLORS[0];
+const DEFAULT_CATEGORY_COLOR = CATEGORY_PRESET_COLORS[0];
 
 const normalizeHashPrefix = (value: string) => {
   const trimmed = value.trim();
@@ -108,7 +98,9 @@ export function CategoryManager({
   const isEdit = mode === "edit";
   const canDelete = categories.length > 1;
   const normalizedColor = color.toLowerCase();
-  const isPresetColor = PASTEL_COLORS.some((c) => c.toLowerCase() === normalizedColor);
+  const isPresetColor = CATEGORY_PRESET_COLORS.some(
+    (c) => c.toLowerCase() === normalizedColor
+  );
 
   const handleSave = async () => {
     if (!canSave) return;
@@ -192,7 +184,7 @@ export function CategoryManager({
           <div className="space-y-2">
             <div className="text-sm text-neutral-600">Cor da categoria</div>
             <div className="flex flex-wrap items-center gap-3">
-              {PASTEL_COLORS.map((preset) => {
+              {CATEGORY_PRESET_COLORS.map((preset) => {
                 const selected = preset.toLowerCase() === normalizedColor;
                 return (
                   <button
