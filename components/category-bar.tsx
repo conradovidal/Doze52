@@ -109,7 +109,9 @@ export function CategoryBar({ compact = false }: { compact?: boolean }) {
   };
 
   return (
-    <div className={`${compact ? "" : "mb-4"} flex items-center gap-2`}>
+    <div
+      className={`${compact ? "w-full justify-start md:w-auto md:justify-center" : "mb-4 justify-start"} flex flex-wrap items-center gap-2 md:flex-nowrap`}
+    >
       {displayedCategories.map((c) => {
         const categoryIndex = categories.findIndex((category) => category.id === c.id);
         const canMoveLeft = categoryIndex > 0;

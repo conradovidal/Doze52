@@ -499,36 +499,42 @@ export default function HomePage() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-none px-4 py-8">
-      <AppHeader
-        year={year}
-        onYearChange={setYear}
-        authLoading={authLoading}
-        isAuthenticated={Boolean(session)}
-        onOpenAuthDialog={() => setAuthDialogOpen(true)}
-      />
+    <main className="mx-auto w-full max-w-none overflow-x-hidden px-4 py-8">
+      <div className="sticky top-0 z-30 bg-neutral-50/95 backdrop-blur supports-[backdrop-filter]:bg-neutral-50/85 md:static md:bg-transparent md:backdrop-blur-none">
+        <AppHeader
+          year={year}
+          onYearChange={setYear}
+          authLoading={authLoading}
+          isAuthenticated={Boolean(session)}
+          onOpenAuthDialog={() => setAuthDialogOpen(true)}
+        />
+      </div>
       {!hasSupabaseEnv ? (
         <p className="mb-3 text-center text-sm text-amber-700">
           Supabase nao configurado neste ambiente.
         </p>
       ) : null}
 
-      <YearGrid
-        year={year}
-        todayIso={todayIso}
-        events={events}
-        onEditEvent={handleEditEvent}
-        creatingRange={creatingRange}
-        onStartCreateRange={handleStartCreateRange}
-        onHoverCreateRange={handleHoverCreateRange}
-        onFinishCreateRange={handleFinishCreateRange}
-        onMoveEventByDelta={moveEventByDelta}
-        onApplyDayReorder={({ dayIso, eventId, toIndex, orderedIds }) => {
-          void eventId;
-          void toIndex;
-          normalizeDayOrder(dayIso, orderedIds);
-        }}
-      />
+      <div className="overflow-x-auto md:overflow-visible">
+        <div className="w-[200%] md:w-full">
+          <YearGrid
+            year={year}
+            todayIso={todayIso}
+            events={events}
+            onEditEvent={handleEditEvent}
+            creatingRange={creatingRange}
+            onStartCreateRange={handleStartCreateRange}
+            onHoverCreateRange={handleHoverCreateRange}
+            onFinishCreateRange={handleFinishCreateRange}
+            onMoveEventByDelta={moveEventByDelta}
+            onApplyDayReorder={({ dayIso, eventId, toIndex, orderedIds }) => {
+              void eventId;
+              void toIndex;
+              normalizeDayOrder(dayIso, orderedIds);
+            }}
+          />
+        </div>
+      </div>
       {syncError ? (
         <div className="mt-2 flex flex-col items-center gap-2">
           <p className="text-center text-xs text-red-600">{syncError}</p>
