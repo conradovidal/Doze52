@@ -322,9 +322,9 @@ export function MonthRow({
   }
 
   return (
-    <div className="flex items-stretch border-b border-neutral-200 last:border-b-0">
+    <div className="flex items-stretch border-b border-border last:border-b-0">
       <div
-        className="flex w-9 flex-none items-center justify-center text-neutral-600"
+        className="flex w-9 flex-none items-center justify-center text-muted-foreground"
         style={{ minHeight: `${minHeightPx}px` }}
       >
         <span className="-rotate-90 text-[11px] font-medium tracking-wide">{monthLabel}</span>
@@ -394,7 +394,7 @@ export function MonthRow({
           style={{ gridTemplateColumns: "repeat(37, minmax(0, 1fr))" }}
         >
           {dayInfos.map((day) => (
-            <div key={`${monthIndex}-${day.col}`} className="border-l border-neutral-200">
+            <div key={`${monthIndex}-${day.col}`} className="border-l border-border">
               <DayCell
                 date={day.date}
                 dateIso={day.iso}
@@ -421,7 +421,7 @@ export function MonthRow({
           <div className="pointer-events-none absolute inset-x-0 top-0 z-[6]">
             <div className="grid" style={{ gridTemplateColumns: "repeat(37, minmax(0, 1fr))" }}>
               <div
-                className="rounded-sm bg-neutral-400/20 ring-1 ring-inset ring-neutral-600/45"
+                className="rounded-sm bg-foreground/10 ring-1 ring-inset ring-border"
                 style={{
                   gridColumn: `${rangeColumns.startCol} / ${rangeColumns.endCol + 1}`,
                   minHeight: `${minHeightPx}px`,
@@ -495,7 +495,7 @@ export function MonthRow({
 
             {projectedMultiPreview ? (
               <div
-                className={`${EVENT_ITEM_RADIUS_CLASS} pointer-events-none z-20 bg-neutral-500/20 ring-1 ring-neutral-400/80`}
+                className={`${EVENT_ITEM_RADIUS_CLASS} pointer-events-none z-20 bg-foreground/12 ring-1 ring-border/90`}
                 style={{
                   gridColumn: `${projectedMultiPreview.startCol} / ${
                     projectedMultiPreview.endCol + 1
@@ -649,7 +649,7 @@ export function MonthRow({
                           style={{ top: `${previewLane * EVENT_ROW_STEP}px` }}
                         >
                           <div
-                            className={`${EVENT_ITEM_RADIUS_CLASS} bg-neutral-500/15 ring-1 ring-neutral-400/70`}
+                            className={`${EVENT_ITEM_RADIUS_CLASS} bg-foreground/10 ring-1 ring-border/80`}
                             style={{ minHeight: `${EVENT_ITEM_HEIGHT_PX}px` }}
                           />
                         </div>
@@ -699,7 +699,7 @@ export function MonthRow({
                       })}
                       {showMoveGhost && moveGhostLane !== null ? (
                         <div
-                          className={`absolute inset-x-0 z-20 ${EVENT_ITEM_RADIUS_CLASS} pointer-events-none bg-neutral-500/20 ring-1 ring-neutral-400/80`}
+                          className={`absolute inset-x-0 z-20 ${EVENT_ITEM_RADIUS_CLASS} pointer-events-none bg-foreground/12 ring-1 ring-border/90`}
                           style={{
                             top: `${moveGhostLane * EVENT_ROW_STEP}px`,
                             minHeight: `${EVENT_ITEM_HEIGHT_PX}px`,

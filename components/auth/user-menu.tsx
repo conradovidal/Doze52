@@ -71,11 +71,11 @@ export function UserMenu() {
             <img
               src={avatarUrl}
               alt="Perfil"
-              className="h-9 w-9 rounded-full border border-neutral-200 object-cover"
+              className="h-9 w-9 rounded-full border border-border object-cover"
               onError={() => setBrokenAvatar(true)}
             />
           ) : (
-            <span className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-neutral-200 bg-neutral-200 text-xs text-neutral-700">
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border bg-muted text-xs text-muted-foreground">
               {fallbackInitial}
             </span>
           )}
@@ -84,9 +84,9 @@ export function UserMenu() {
       <PopoverContent align="end" className="w-56 rounded-xl">
         <div className="space-y-3">
           <div>
-            <p className="text-xs text-neutral-500">Conectado como</p>
+            <p className="text-xs text-muted-foreground">Conectado como</p>
             <p className="truncate text-sm">{displayName}</p>
-            <p className="truncate text-xs text-neutral-500">{email}</p>
+            <p className="truncate text-xs text-muted-foreground">{email}</p>
           </div>
           <Button
             variant="ghost"

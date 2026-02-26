@@ -10,6 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 type AppHeaderProps = {
   year: number;
@@ -35,7 +36,7 @@ export function AppHeader({
         <div className="min-w-0 w-full justify-self-end md:col-start-3 md:w-auto">
           <div className="flex min-h-9 flex-wrap items-center justify-end gap-1.5">
             <Select value={String(year)} onValueChange={(v) => onYearChange(Number(v))}>
-              <SelectTrigger className="h-8 min-w-[72px] shrink-0 border-transparent bg-transparent px-1.5 font-sans text-xl leading-none font-normal text-neutral-700 shadow-none hover:bg-transparent focus-visible:border-transparent focus-visible:ring-0 [&_svg]:ml-1 [&_svg]:opacity-80 [&_svg]:text-neutral-600">
+              <SelectTrigger className="h-8 min-w-[72px] shrink-0 border-transparent bg-transparent px-1.5 font-sans text-xl leading-none font-normal text-foreground shadow-none hover:bg-transparent focus-visible:border-transparent focus-visible:ring-0 [&_svg]:ml-1 [&_svg]:opacity-80 [&_svg]:text-muted-foreground">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -44,6 +45,7 @@ export function AppHeader({
                 <SelectItem value="2027">2027</SelectItem>
               </SelectContent>
             </Select>
+            <ThemeToggle />
             <div className="flex min-h-9 min-w-0 items-center justify-end sm:min-w-[96px]">
               {authLoading ? null : isAuthenticated ? (
                 <UserMenu />

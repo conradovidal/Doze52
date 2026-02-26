@@ -289,11 +289,13 @@ export function AuthDialog({
           <DialogTitle>{mode === "login" ? "Entrar" : "Criar conta"}</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
-          <div className="flex rounded-lg bg-neutral-100 p-1">
+          <div className="flex rounded-lg bg-muted p-1">
             <button
               type="button"
               className={`flex-1 rounded-md px-3 py-1.5 text-sm ${
-                mode === "login" ? "bg-white font-medium shadow-sm" : "text-neutral-600"
+                mode === "login"
+                  ? "bg-background font-medium text-foreground shadow-sm"
+                  : "text-muted-foreground"
               }`}
               onClick={() => setMode("login")}
             >
@@ -302,7 +304,9 @@ export function AuthDialog({
             <button
               type="button"
               className={`flex-1 rounded-md px-3 py-1.5 text-sm ${
-                mode === "signup" ? "bg-white font-medium shadow-sm" : "text-neutral-600"
+                mode === "signup"
+                  ? "bg-background font-medium text-foreground shadow-sm"
+                  : "text-muted-foreground"
               }`}
               onClick={() => setMode("signup")}
             >

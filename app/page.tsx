@@ -493,14 +493,14 @@ export default function HomePage() {
   if (windowContext === "popup") {
     return (
       <main className="flex min-h-screen items-center justify-center px-4">
-        <p className="text-sm text-neutral-600">{popupStatusMessage}</p>
+        <p className="text-sm text-muted-foreground">{popupStatusMessage}</p>
       </main>
     );
   }
 
   return (
     <main className="mx-auto w-full max-w-none overflow-x-hidden px-4 py-8">
-      <div className="sticky top-0 z-30 bg-neutral-50/95 backdrop-blur supports-[backdrop-filter]:bg-neutral-50/85 md:static md:bg-transparent md:backdrop-blur-none">
+      <div className="sticky top-0 z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85 md:static md:bg-transparent md:backdrop-blur-none">
         <AppHeader
           year={year}
           onYearChange={setYear}
@@ -552,7 +552,7 @@ export default function HomePage() {
         </div>
       ) : null}
       {isSyncing && session ? (
-        <p className="mt-1 text-center text-xs text-neutral-500">salvando...</p>
+        <p className="mt-1 text-center text-xs text-muted-foreground">salvando...</p>
       ) : null}
 
       <EventDialog
@@ -578,7 +578,7 @@ export default function HomePage() {
       />
       <AuthDialog open={authDialogOpen} onOpenChange={setAuthDialogOpen} />
       {isDevBuildInfoVisible ? (
-        <footer className="mt-4 text-center text-[11px] text-neutral-400">
+        <footer className="mt-4 text-center text-[11px] text-muted-foreground/80">
           build: {buildLabel}
         </footer>
       ) : null}

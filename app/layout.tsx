@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth";
 import { EnvBadge } from "@/components/env-badge";
+import { ThemeProvider } from "@/lib/theme";
+import { ThemeInitScript } from "@/components/theme-init-script";
 
 export const metadata: Metadata = {
   title: "doze 52 | Sistema de estruturação de foco",
@@ -21,12 +23,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="pt-BR">
-      <body className="min-h-screen bg-neutral-50 text-neutral-900">
-        <AuthProvider>
-          {children}
-          <EnvBadge />
-        </AuthProvider>
+    <html lang="pt-BR" suppressHydrationWarning>
+      <body className="min-h-screen bg-background text-foreground">
+        <ThemeInitScript />
+        <ThemeProvider>
+          <AuthProvider>
+            {children}
+            <EnvBadge />
+          </AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -28,7 +28,7 @@ export function DayCell({
   if (!isInMonth) {
     return (
       <div
-        className={`w-full bg-neutral-200 ${isDropActive ? "ring-1 ring-inset ring-blue-500 bg-blue-100/30" : ""}`}
+        className={`w-full bg-neutral-200 dark:bg-neutral-900/80 ${isDropActive ? "ring-1 ring-inset ring-blue-500 bg-blue-100/30 dark:bg-blue-900/30" : ""}`}
         style={{ minHeight: `${minHeightPx}px` }}
         onDragOver={(e) => {
           if (!onDayHover) return;
@@ -52,20 +52,26 @@ export function DayCell({
   const isPast = dateIso < todayIso;
   const dayToneClass = isPast
     ? isWeekend
-      ? "bg-[#ededed]"
-      : "bg-[#f1f1f1]"
+      ? "bg-neutral-200 dark:bg-neutral-900/85"
+      : "bg-neutral-100 dark:bg-neutral-900/70"
     : isWeekend
-      ? "bg-neutral-100"
-      : "bg-neutral-50";
+      ? "bg-neutral-100 dark:bg-neutral-900/55"
+      : "bg-neutral-50 dark:bg-neutral-900/35";
 
   return (
     <div
       data-day-cell
       className={`flex w-full cursor-pointer flex-col px-1 py-0.5 ring-1 ring-inset transition-[box-shadow] duration-100 ${dayToneClass} ${
-        today ? "ring-black" : "ring-transparent hover:ring-neutral-400/70"
-      } ${isRangeSelected ? "bg-neutral-300/35 ring-neutral-500/80" : ""} ${
-        isRangeStart || isRangeEnd ? "ring-neutral-700" : ""
-      } ${isDropActive ? "ring-blue-500 bg-blue-100/40" : ""} select-none`}
+        today
+          ? "ring-neutral-900 dark:ring-neutral-100"
+          : "ring-transparent hover:ring-neutral-400/70 dark:hover:ring-neutral-600/70"
+      } ${
+        isRangeSelected
+          ? "bg-neutral-300/35 ring-neutral-500/80 dark:bg-neutral-700/35 dark:ring-neutral-500/85"
+          : ""
+      } ${isRangeStart || isRangeEnd ? "ring-neutral-700 dark:ring-neutral-300" : ""} ${
+        isDropActive ? "ring-blue-500 bg-blue-100/40 dark:bg-blue-900/35" : ""
+      } select-none`}
       style={{ minHeight: `${minHeightPx}px` }}
       onDragOver={(e) => {
         if (!onDayHover) return;
@@ -80,10 +86,12 @@ export function DayCell({
         onDayDrop(dateIso, e.dataTransfer);
       }}
     >
-      <div className="grid h-4 w-full flex-none place-items-center px-0.5 text-[10px] text-neutral-600">
+      <div className="grid h-4 w-full flex-none place-items-center px-0.5 text-[10px] text-muted-foreground">
         <span
           className={`grid h-4 w-4 place-items-center rounded-full text-[10px] font-medium leading-none tabular-nums ${
-            today ? "bg-black text-white ring-1 ring-black" : ""
+            today
+              ? "bg-neutral-900 text-white ring-1 ring-neutral-900 dark:bg-neutral-100 dark:text-neutral-900 dark:ring-neutral-100"
+              : ""
           }`}
         >
           {date.getDate()}

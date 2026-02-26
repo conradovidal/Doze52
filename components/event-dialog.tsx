@@ -110,12 +110,12 @@ export function EventDialog({
             />
           </div>
           <div className="space-y-1">
-            <label htmlFor="event-notes" className="text-xs text-neutral-500">
+            <label htmlFor="event-notes" className="text-xs text-muted-foreground">
               Descricao
             </label>
             <textarea
               id="event-notes"
-              className="min-h-20 w-full rounded-md border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-neutral-400"
+              className="min-h-20 w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
               placeholder="Descricao"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
