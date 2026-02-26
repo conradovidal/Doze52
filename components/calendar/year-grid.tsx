@@ -13,6 +13,11 @@ import type { CalendarEvent, CategoryItem } from "@/lib/types";
 import { useStore } from "@/lib/store";
 import { buildMultiDaySlotMap } from "@/lib/calendar-slotting";
 import { readCalendarEventDndPayload } from "@/lib/calendar-dnd";
+import {
+  compareEventsByVisualPriority,
+  isRenderableEventDateRange,
+  isSingleDayEvent,
+} from "@/lib/event-order";
 import { MonthRow } from "./month-row";
 
 type ReorderTarget = {
@@ -85,7 +90,12 @@ export function YearGrid({
   const didDropRef = React.useRef(false);
 
   const visibleEvents = React.useMemo(
-    () => events.filter((event) => visibleCategoryIds.includes(event.categoryId)),
+    () =>
+      events.filter(
+        (event) =>
+          visibleCategoryIds.includes(event.categoryId) &&
+          isRenderableEventDateRange(event)
+      ),
     [events, visibleCategoryIds]
   );
   const eventById = React.useMemo(
@@ -220,13 +230,8 @@ export function YearGrid({
         Number.isInteger(currentReorderTarget.insertIndex)
       ) {
         const inDayIds = visibleEvents
-          .filter((event) => event.startDate === dropDateIso && event.endDate === dropDateIso)
-          .sort((a, b) => {
-            if (a.dayOrder !== b.dayOrder) return a.dayOrder - b.dayOrder;
-            const byTitle = a.title.localeCompare(b.title);
-            if (byTitle !== 0) return byTitle;
-            return a.id.localeCompare(b.id);
-          })
+          .filter((event) => event.startDate === dropDateIso && isSingleDayEvent(event))
+          .sort(compareEventsByVisualPriority)
           .map((event) => event.id);
 
         const withoutMoved = inDayIds.filter((id) => id !== currentEventId);

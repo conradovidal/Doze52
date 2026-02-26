@@ -1,14 +1,12 @@
 import { parseISO } from "date-fns";
 import type { CalendarEvent } from "@/lib/types";
+import {
+  compareEventsForContinuousSlotting,
+  isRenderableEventDateRange,
+  isSingleDayEvent,
+} from "@/lib/event-order";
 
 const toDate = (iso: string) => parseISO(iso);
-
-const compareMultiDay = (a: CalendarEvent, b: CalendarEvent) => {
-  if (a.dayOrder !== b.dayOrder) return a.dayOrder - b.dayOrder;
-  if (a.startDate !== b.startDate) return a.startDate.localeCompare(b.startDate);
-  if (a.endDate !== b.endDate) return a.endDate.localeCompare(b.endDate);
-  return a.id.localeCompare(b.id);
-};
 
 export const buildMultiDaySlotMap = (params: {
   events: CalendarEvent[];
@@ -21,8 +19,9 @@ export const buildMultiDaySlotMap = (params: {
   const lastEndBySlot: Date[] = [];
 
   const candidates = params.events
-    .filter((event) => event.endDate > event.startDate)
-    .sort(compareMultiDay);
+    .filter((event) => !isSingleDayEvent(event))
+    .filter(isRenderableEventDateRange)
+    .sort(compareEventsForContinuousSlotting);
 
   for (const event of candidates) {
     const eventStart = toDate(event.startDate);

@@ -31,6 +31,10 @@ import {
   MONTH_ROW_BOTTOM_PADDING_PX,
   MONTH_SINGLE_DAY_TOP_OFFSET_NO_MULTI_PX,
 } from "@/lib/calendar-layout";
+import {
+  compareEventsByVisualPriority,
+  isRenderableEventDateRange,
+} from "@/lib/event-order";
 import { DayCell } from "./day-cell";
 import { EventBar } from "./event-bar";
 
@@ -50,19 +54,8 @@ type RenderSegment = {
   endCol: number;
 };
 
-const sortMultiDayEvents = (a: ParsedEvent, b: ParsedEvent) => {
-  if (a.dayOrder !== b.dayOrder) return a.dayOrder - b.dayOrder;
-  if (a.startDate !== b.startDate) return a.startDate.localeCompare(b.startDate);
-  if (a.endDate !== b.endDate) return a.endDate.localeCompare(b.endDate);
-  return a.id.localeCompare(b.id);
-};
-
-const sortSingleDayEvents = (a: ParsedEvent, b: ParsedEvent) => {
-  if (a.dayOrder !== b.dayOrder) return a.dayOrder - b.dayOrder;
-  const byTitle = a.title.localeCompare(b.title);
-  if (byTitle !== 0) return byTitle;
-  return a.id.localeCompare(b.id);
-};
+const sortByVisualPriority = (a: ParsedEvent, b: ParsedEvent) =>
+  compareEventsByVisualPriority(a, b);
 
 export function MonthRow({
   year,
@@ -142,6 +135,7 @@ export function MonthRow({
   );
 
   const parsedEvents: ParsedEvent[] = globallyVisibleEvents
+    .filter(isRenderableEventDateRange)
     .map((evt) => {
       const start = parseISO(evt.startDate);
       const end = parseISO(evt.endDate);
@@ -159,12 +153,12 @@ export function MonthRow({
   const draggingMultiDay = Boolean(dragState.source?.isMultiDay);
   const sourceDayIso = draggingSingleDay ? (dragState.source?.startDate ?? null) : null;
 
-  const multiDayEvents = parsedEvents.filter((evt) => evt.isMultiDay).sort(sortMultiDayEvents);
+  const multiDayEvents = parsedEvents.filter((evt) => evt.isMultiDay).sort(sortByVisualPriority);
   const singleDayEvents = parsedEvents
     .filter((evt) => !evt.isMultiDay)
     .sort((a, b) => {
       if (a.startDate !== b.startDate) return a.startDate.localeCompare(b.startDate);
-      return sortSingleDayEvents(a, b);
+      return sortByVisualPriority(a, b);
     });
 
   const singleDayByIso = new Map<string, ParsedEvent[]>();
@@ -175,7 +169,7 @@ export function MonthRow({
     singleDayByIso.get(evt.startDate)?.push(evt);
   }
   for (const [iso, bucket] of singleDayByIso.entries()) {
-    singleDayByIso.set(iso, bucket.sort(sortSingleDayEvents));
+    singleDayByIso.set(iso, bucket.sort(sortByVisualPriority));
   }
 
   const segments: RenderSegment[] = [];

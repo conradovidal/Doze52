@@ -16,7 +16,7 @@ export type CalendarEvent = {
   endDate: string; // ISO yyyy-MM-dd
   notes?: string;
   createdAt: string; // ISO datetime
-  dayOrder: number; // global visual order (0-based)
+  dayOrder: number; // manual tie-break order for same-day events (0-based)
 };
 
 export type Habit = {
