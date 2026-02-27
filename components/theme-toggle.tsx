@@ -16,14 +16,14 @@ export function ThemeToggle() {
       aria-pressed={isLight}
       title={isLight ? "Luz acesa (tema claro)" : "Luz apagada (tema escuro)"}
       className={cn(
-        "inline-flex h-8 w-8 items-center justify-center rounded-full border transition-colors",
+        "inline-flex h-9 w-9 items-center justify-center rounded-full border transition-colors",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70",
         isLight
           ? "border-foreground/30 bg-foreground text-background shadow-sm"
           : "border-border bg-muted text-muted-foreground hover:bg-accent"
       )}
     >
-      {isLight ? <Lightbulb size={14} /> : <LightbulbOff size={14} />}
+      {isLight ? <Lightbulb size={15} /> : <LightbulbOff size={15} />}
     </button>
   );
 }

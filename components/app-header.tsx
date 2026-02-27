@@ -34,10 +34,10 @@ export function AppHeader({
           <img src="/logo-doze52.svg" alt="doze 52" className="h-7 w-auto md:h-[2.6rem]" />
         </div>
         <div className="min-w-0 w-full justify-self-end md:col-start-3 md:w-auto">
-          <div className="grid min-h-9 grid-cols-[minmax(72px,max-content)_40px_minmax(96px,max-content)] items-center justify-end gap-1.5">
+          <div className="grid min-h-9 grid-cols-[minmax(72px,max-content)_44px_minmax(96px,max-content)] items-center justify-end gap-1.5">
             <div className="justify-self-end">
               <Select value={String(year)} onValueChange={(v) => onYearChange(Number(v))}>
-                <SelectTrigger className="h-8 min-w-[72px] shrink-0 border-transparent bg-transparent px-1.5 font-sans text-xl leading-none font-normal text-foreground shadow-none hover:bg-transparent focus-visible:border-transparent focus-visible:ring-0 [&_svg]:ml-1 [&_svg]:opacity-80 [&_svg]:text-muted-foreground">
+                <SelectTrigger className="h-8 min-w-[72px] shrink-0 border border-border/60 bg-muted px-1.5 font-sans text-xl leading-none font-normal text-foreground shadow-sm hover:bg-accent focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring/40 [&_svg]:ml-1 [&_svg]:opacity-80 [&_svg]:text-muted-foreground dark:bg-muted/60 dark:hover:bg-accent/80">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
