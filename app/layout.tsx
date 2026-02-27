@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth";
-import { EnvBadge } from "@/components/env-badge";
 import { ThemeProvider } from "@/lib/theme";
 import { ThemeInitScript } from "@/components/theme-init-script";
 
@@ -29,7 +28,6 @@ export default function RootLayout({
         <ThemeProvider>
           <AuthProvider>
             {children}
-            <EnvBadge />
           </AuthProvider>
         </ThemeProvider>
       </body>

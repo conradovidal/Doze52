@@ -28,7 +28,7 @@ export function DayCell({
   if (!isInMonth) {
     return (
       <div
-        className={`w-full bg-neutral-200 dark:bg-neutral-900/80 ${isDropActive ? "ring-1 ring-inset ring-blue-500 bg-blue-100/30 dark:bg-blue-900/30" : ""}`}
+        className={`w-full bg-neutral-200 dark:bg-neutral-900/80 ${isDropActive ? "ring-1 ring-inset ring-border bg-foreground/10" : ""}`}
         style={{ minHeight: `${minHeightPx}px` }}
         onDragOver={(e) => {
           if (!onDayHover) return;
@@ -70,7 +70,7 @@ export function DayCell({
           ? "bg-neutral-300/35 ring-neutral-500/80 dark:bg-neutral-700/35 dark:ring-neutral-500/85"
           : ""
       } ${isRangeStart || isRangeEnd ? "ring-neutral-700 dark:ring-neutral-300" : ""} ${
-        isDropActive ? "ring-blue-500 bg-blue-100/40 dark:bg-blue-900/35" : ""
+        isDropActive ? "ring-border bg-foreground/10" : ""
       } select-none`}
       style={{ minHeight: `${minHeightPx}px` }}
       onDragOver={(e) => {

@@ -34,19 +34,23 @@ export function AppHeader({
           <img src="/logo-doze52.svg" alt="doze 52" className="h-7 w-auto md:h-[2.6rem]" />
         </div>
         <div className="min-w-0 w-full justify-self-end md:col-start-3 md:w-auto">
-          <div className="flex min-h-9 flex-wrap items-center justify-end gap-1.5">
-            <Select value={String(year)} onValueChange={(v) => onYearChange(Number(v))}>
-              <SelectTrigger className="h-8 min-w-[72px] shrink-0 border-transparent bg-transparent px-1.5 font-sans text-xl leading-none font-normal text-foreground shadow-none hover:bg-transparent focus-visible:border-transparent focus-visible:ring-0 [&_svg]:ml-1 [&_svg]:opacity-80 [&_svg]:text-muted-foreground">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="2025">2025</SelectItem>
-                <SelectItem value="2026">2026</SelectItem>
-                <SelectItem value="2027">2027</SelectItem>
-              </SelectContent>
-            </Select>
-            <ThemeToggle />
-            <div className="flex min-h-9 min-w-0 items-center justify-end sm:min-w-[96px]">
+          <div className="grid min-h-9 grid-cols-[minmax(72px,max-content)_40px_minmax(96px,max-content)] items-center justify-end gap-1.5">
+            <div className="justify-self-end">
+              <Select value={String(year)} onValueChange={(v) => onYearChange(Number(v))}>
+                <SelectTrigger className="h-8 min-w-[72px] shrink-0 border-transparent bg-transparent px-1.5 font-sans text-xl leading-none font-normal text-foreground shadow-none hover:bg-transparent focus-visible:border-transparent focus-visible:ring-0 [&_svg]:ml-1 [&_svg]:opacity-80 [&_svg]:text-muted-foreground">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="2025">2025</SelectItem>
+                  <SelectItem value="2026">2026</SelectItem>
+                  <SelectItem value="2027">2027</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center justify-center">
+              <ThemeToggle />
+            </div>
+            <div className="flex min-h-9 min-w-[96px] items-center justify-end">
               {authLoading ? null : isAuthenticated ? (
                 <UserMenu />
               ) : (

@@ -19,7 +19,7 @@ export function ThemeToggle() {
         "inline-flex h-8 w-8 items-center justify-center rounded-full border transition-colors",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70",
         isLight
-          ? "border-amber-300 bg-amber-100 text-amber-700 shadow-[0_0_16px_rgba(245,158,11,0.35)]"
+          ? "border-foreground/30 bg-foreground text-background shadow-sm"
           : "border-border bg-muted text-muted-foreground hover:bg-accent"
       )}
     >
