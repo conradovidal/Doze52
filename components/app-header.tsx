@@ -34,7 +34,7 @@ export function AppHeader({
           <img src="/logo-doze52.svg" alt="doze 52" className="h-7 w-auto md:h-[2.6rem]" />
         </div>
         <div className="min-w-0 w-full justify-self-end md:col-start-3 md:w-auto">
-          <div className="grid min-h-9 grid-cols-[minmax(72px,max-content)_44px_minmax(96px,max-content)] items-center justify-end gap-1.5">
+          <div className="grid min-h-9 grid-cols-[minmax(72px,max-content)_80px_minmax(96px,max-content)] items-center justify-end gap-1.5">
             <div className="justify-self-end">
               <Select value={String(year)} onValueChange={(v) => onYearChange(Number(v))}>
                 <SelectTrigger className="h-8 min-w-[72px] shrink-0 border border-neutral-200 bg-neutral-100 px-1.5 font-sans text-xl leading-none font-normal text-neutral-900 shadow-sm hover:bg-neutral-200 focus-visible:border-neutral-400 focus-visible:ring-1 focus-visible:ring-neutral-300 [&_svg]:ml-1 [&_svg]:opacity-80 [&_svg]:text-neutral-500 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 dark:hover:bg-neutral-700 dark:focus-visible:border-neutral-500 dark:focus-visible:ring-neutral-600 dark:[&_svg]:text-neutral-400">
