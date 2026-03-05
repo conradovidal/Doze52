@@ -21,10 +21,10 @@ import {
   SyncError,
   type CalendarSnapshot,
 } from "@/lib/sync";
+import { getTodayIsoInTimeZone } from "@/lib/date";
 import { logDevError, logProdError } from "@/lib/safe-log";
 import { getSupabaseBrowserClient, hasSupabaseEnv } from "@/lib/supabase";
 
-const getTodayIso = () => format(new Date(), "yyyy-MM-dd");
 const toSnapshotHash = (snapshot: CalendarSnapshot) => JSON.stringify(snapshot);
 
 const ensureSnapshotCategoryCoverage = (
@@ -140,7 +140,7 @@ export default function HomePage() {
   const [popupStatusMessage, setPopupStatusMessage] = React.useState(
     "Finalizando login..."
   );
-  const [todayIso, setTodayIso] = React.useState<string>(() => getTodayIso());
+  const [todayIso, setTodayIso] = React.useState<string>("");
   const lastSyncedHashRef = React.useRef<string>("");
   const saveTimerRef = React.useRef<number | null>(null);
   const previousSessionUserIdRef = React.useRef<string | null>(null);
@@ -235,13 +235,19 @@ export default function HomePage() {
   React.useEffect(() => {
     if (windowContext !== "main") return;
     let rolloverTimer: number | null = null;
+    let refreshInterval: number | null = null;
+    const browserTimeZone =
+      Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
 
     const refreshTodayIso = () => {
-      const nextTodayIso = getTodayIso();
+      const nextTodayIso = getTodayIsoInTimeZone(browserTimeZone);
       setTodayIso((prev) => (prev === nextTodayIso ? prev : nextTodayIso));
     };
 
     const scheduleNextRollover = () => {
+      if (rolloverTimer !== null) {
+        window.clearTimeout(rolloverTimer);
+      }
       const now = new Date();
       const nextMidnight = new Date(now);
       nextMidnight.setHours(24, 0, 1, 0);
@@ -252,25 +258,40 @@ export default function HomePage() {
       }, delayMs);
     };
 
-    const handleVisibilityChange = () => {
-      if (document.visibilityState !== "visible") return;
+    const refreshAndReschedule = () => {
       refreshTodayIso();
-    };
-    const handleFocus = () => {
-      refreshTodayIso();
+      scheduleNextRollover();
     };
 
-    refreshTodayIso();
-    scheduleNextRollover();
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== "visible") return;
+      refreshAndReschedule();
+    };
+    const handleFocus = () => {
+      refreshAndReschedule();
+    };
+    const handlePageShow = () => {
+      refreshAndReschedule();
+    };
+
+    refreshAndReschedule();
+    refreshInterval = window.setInterval(() => {
+      refreshTodayIso();
+    }, 60_000);
     document.addEventListener("visibilitychange", handleVisibilityChange);
     window.addEventListener("focus", handleFocus);
+    window.addEventListener("pageshow", handlePageShow);
 
     return () => {
       if (rolloverTimer !== null) {
         window.clearTimeout(rolloverTimer);
       }
+      if (refreshInterval !== null) {
+        window.clearInterval(refreshInterval);
+      }
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("focus", handleFocus);
+      window.removeEventListener("pageshow", handlePageShow);
     };
   }, [windowContext]);
 
