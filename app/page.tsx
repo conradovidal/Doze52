@@ -111,9 +111,6 @@ export default function HomePage() {
   const normalizeDayOrder = useStore((s) => s.normalizeDayOrder);
   const getEventById = useStore((s) => s.getEventById);
   const { session, loading: authLoading } = useAuth();
-  const isDevBuildInfoVisible = process.env.NODE_ENV !== "production";
-  const commitSha = process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA ?? "local";
-  const buildLabel = commitSha === "local" ? "local" : commitSha.slice(0, 7);
 
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [authDialogOpen, setAuthDialogOpen] = React.useState(false);
@@ -598,11 +595,6 @@ export default function HomePage() {
         }
       />
       <AuthDialog open={authDialogOpen} onOpenChange={setAuthDialogOpen} />
-      {isDevBuildInfoVisible ? (
-        <footer className="mt-4 text-center text-[11px] text-muted-foreground/80">
-          build: {buildLabel}
-        </footer>
-      ) : null}
     </main>
   );
 }
