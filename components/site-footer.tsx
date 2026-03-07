@@ -1,8 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Github, Instagram, Mail } from "lucide-react";
-import { useAuth } from "@/lib/auth";
+import { Github, Instagram } from "lucide-react";
 
 function BrandXIcon({ className }: { className?: string }) {
   return (
@@ -26,15 +25,9 @@ type FooterLink = {
 };
 
 export function SiteFooter() {
-  const { user } = useAuth();
-  const contactBody = [
-    "Ola, time Doze52!",
-    "",
-    `Meu email: ${user?.email ?? ""}`,
-    "",
-    "Mensagem:",
-  ].join("\n");
-  const contactHref = `mailto:doze52cal@gmail.com?subject=${encodeURIComponent("Contato Doze52")}&body=${encodeURIComponent(contactBody)}`;
+  const supportEmail = "doze52cal@gmail.com";
+  const gmailComposeUrl = `https://mail.google.com/mail/?view=cm&fs=1&tf=1&to=${encodeURIComponent(supportEmail)}`;
+  const mailtoUrl = `mailto:${supportEmail}`;
 
   const socialLinks: FooterLink[] = [
     {
@@ -57,13 +50,6 @@ export function SiteFooter() {
       ariaLabel: "Repositorio do doze52 no GitHub",
       external: true,
       icon: Github,
-    },
-    {
-      label: "Contato",
-      href: contactHref,
-      ariaLabel: "Contato por email do doze52",
-      external: false,
-      icon: Mail,
     },
   ];
 
@@ -92,6 +78,24 @@ export function SiteFooter() {
               ) : null}
             </span>
           ))}
+          <span className="hidden text-muted-foreground/60 sm:inline">|</span>
+          <a
+            href={mailtoUrl}
+            aria-label={`Enviar e-mail para ${supportEmail}`}
+            className="inline-flex items-center gap-1.5 transition-colors hover:text-foreground"
+            onClick={(event) => {
+              const popup = window.open(
+                gmailComposeUrl,
+                "_blank",
+                "noopener,noreferrer",
+              );
+              if (popup) {
+                event.preventDefault();
+              }
+            }}
+          >
+            <span>{supportEmail}</span>
+          </a>
         </nav>
       </div>
     </footer>
