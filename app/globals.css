@@ -80,6 +80,12 @@
   --sidebar-accent-foreground: oklch(0.208 0.042 265.755);
   --sidebar-border: oklch(0.929 0.013 255.508);
   --sidebar-ring: oklch(0.704 0.04 256.788);
+  --cal-cell-weekday: 220 14% 97%;
+  --cal-cell-weekend: 220 14% 95%;
+  --cal-cell-outside: 220 10% 89%;
+  --cal-cell-weekday-past: 220 14% 94%;
+  --cal-cell-weekend-past: 220 12% 92%;
+  --cal-cell-outside-past: 220 10% 86%;
 }
 
 .dark {
@@ -114,6 +120,12 @@
   --sidebar-accent-foreground: oklch(0.98 0 0);
   --sidebar-border: oklch(1 0 0 / 14%);
   --sidebar-ring: oklch(0.62 0 0);
+  --cal-cell-weekday: 0 0% 21%;
+  --cal-cell-weekend: 0 0% 15%;
+  --cal-cell-outside: 0 0% 9%;
+  --cal-cell-weekday-past: 0 0% 17%;
+  --cal-cell-weekend-past: 0 0% 12%;
+  --cal-cell-outside-past: 0 0% 7%;
 }
 
 @layer base {

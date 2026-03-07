@@ -25,10 +25,16 @@ export function DayCell({
   onDayHover?: (dateIso: string) => void;
   onDayDrop?: (dateIso: string, transfer?: DataTransfer | null) => void;
 }) {
+  const isPast = dateIso < todayIso;
+
   if (!isInMonth) {
     return (
       <div
-        className={`w-full bg-neutral-200 dark:bg-neutral-900/80 ${isDropActive ? "ring-1 ring-inset ring-border bg-foreground/10" : ""}`}
+        className={`w-full bg-neutral-200 ${
+          isPast
+            ? "dark:bg-[hsl(var(--cal-cell-outside-past))]"
+            : "dark:bg-[hsl(var(--cal-cell-outside))]"
+        } ${isDropActive ? "ring-1 ring-inset ring-border bg-foreground/10" : ""}`}
         style={{ minHeight: `${minHeightPx}px` }}
         onDragOver={(e) => {
           if (!onDayHover) return;
@@ -49,14 +55,16 @@ export function DayCell({
   const dayOfWeek = date.getDay(); // 0..6
   const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
   const today = dateIso === todayIso;
-  const isPast = dateIso < todayIso;
   const dayToneClass = isPast
     ? isWeekend
-      ? "bg-neutral-200 dark:bg-neutral-900/85"
-      : "bg-neutral-100 dark:bg-neutral-900/70"
+      ? "bg-neutral-200 dark:bg-[hsl(var(--cal-cell-weekend-past))]"
+      : "bg-neutral-100 dark:bg-[hsl(var(--cal-cell-weekday-past))]"
     : isWeekend
-      ? "bg-neutral-100 dark:bg-neutral-900/55"
-      : "bg-neutral-50 dark:bg-neutral-900/35";
+      ? "bg-neutral-100 dark:bg-[hsl(var(--cal-cell-weekend))]"
+      : "bg-neutral-50 dark:bg-[hsl(var(--cal-cell-weekday))]";
+  const dayNumberToneClass = isWeekend
+    ? "text-muted-foreground dark:text-neutral-300"
+    : "text-muted-foreground dark:text-neutral-200";
 
   return (
     <div
@@ -86,7 +94,7 @@ export function DayCell({
         onDayDrop(dateIso, e.dataTransfer);
       }}
     >
-      <div className="grid h-4 w-full flex-none place-items-center px-0.5 text-[10px] text-muted-foreground">
+      <div className={`grid h-4 w-full flex-none place-items-center px-0.5 text-[10px] ${dayNumberToneClass}`}>
         <span
           className={`grid h-4 w-4 place-items-center rounded-full text-[10px] font-medium leading-none tabular-nums ${
             today
