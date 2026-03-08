@@ -2,8 +2,10 @@ export const CALENDAR_EVENT_DND_MIME = "application/x-doze52-event-dnd";
 
 export type CalendarEventDndPayload = {
   eventId: string;
+  sourceEventId: string;
   startDate: string;
   endDate: string;
+  recurrenceType?: "weekly" | "monthly" | "yearly";
   isMultiDay: boolean;
   grabOffsetDays: number;
 };
@@ -21,10 +23,16 @@ const isValidPayload = (value: unknown): value is CalendarEventDndPayload => {
   return (
     typeof candidate.eventId === "string" &&
     candidate.eventId.length > 0 &&
+    typeof candidate.sourceEventId === "string" &&
+    candidate.sourceEventId.length > 0 &&
     typeof candidate.startDate === "string" &&
     candidate.startDate.length > 0 &&
     typeof candidate.endDate === "string" &&
     candidate.endDate.length > 0 &&
+    (candidate.recurrenceType === undefined ||
+      candidate.recurrenceType === "weekly" ||
+      candidate.recurrenceType === "monthly" ||
+      candidate.recurrenceType === "yearly") &&
     typeof candidate.isMultiDay === "boolean" &&
     typeof candidate.grabOffsetDays === "number" &&
     Number.isFinite(candidate.grabOffsetDays)

@@ -1,6 +1,6 @@
 "use client";
 
-import type { CalendarEvent } from "@/lib/types";
+import type { AnchorPoint, CalendarEvent } from "@/lib/types";
 import * as React from "react";
 import {
   EVENT_ITEM_HEIGHT_PX,
@@ -23,7 +23,7 @@ export function EventBar({
 }: {
   event: CalendarEvent;
   todayIso: string;
-  onClick?: () => void;
+  onClick?: (payload: { anchorPoint: AnchorPoint }) => void;
   draggable?: boolean;
   onDragStart?: (e: React.DragEvent<HTMLButtonElement>) => void;
   onDragEnd?: () => void;
@@ -57,7 +57,10 @@ export function EventBar({
           return;
         }
         e.stopPropagation();
-        onClick?.();
+        const rect = e.currentTarget.getBoundingClientRect();
+        onClick?.({
+          anchorPoint: { x: rect.right, y: rect.bottom },
+        });
       }}
       onDragStart={(e) => {
         e.stopPropagation();

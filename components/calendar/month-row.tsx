@@ -12,7 +12,7 @@ import {
   startOfMonth,
   startOfWeek,
 } from "date-fns";
-import type { CalendarEvent } from "@/lib/types";
+import type { AnchorPoint, CalendarRenderEvent } from "@/lib/types";
 import type { GlobalDragState } from "./year-grid";
 import { fmtMonthLabel } from "@/lib/date";
 import {
@@ -41,7 +41,7 @@ import { EventBar } from "./event-bar";
 const COLUMNS = 37;
 const EVENT_ROW_STEP = EVENT_ITEM_HEIGHT_PX + EVENT_ITEM_GAP_PX;
 
-type ParsedEvent = CalendarEvent & {
+type ParsedEvent = CalendarRenderEvent & {
   start: Date;
   end: Date;
   isMultiDay: boolean;
@@ -81,20 +81,26 @@ export function MonthRow({
   year: number;
   todayIso: string;
   monthIndex: number;
-  events: CalendarEvent[];
+  events: CalendarRenderEvent[];
   visibleCategoryIds: string[];
   multiDaySlotById: Map<string, number>;
   dragState: GlobalDragState;
   hasDragContext: boolean;
-  onEditEvent: (id: string) => void;
+  onEditEvent: (payload: {
+    eventId: string;
+    sourceEventId: string;
+    anchorPoint: AnchorPoint;
+  }) => void;
   creatingRange: { startIso: string; hoverIso: string; isDragging: boolean } | null;
   onStartCreateRange: (startIso: string) => void;
   onHoverCreateRange: (hoverIso: string) => void;
-  onFinishCreateRange: (endIso?: string) => void;
+  onFinishCreateRange: (endIso?: string, anchorPoint?: AnchorPoint) => void;
   onEventDragStart: (payload: {
     eventId: string;
+    sourceEventId: string;
     startDate: string;
     endDate: string;
+    recurrenceType?: "weekly" | "monthly" | "yearly";
     grabOffsetDays: number;
     isMultiDay: boolean;
   }) => void;
@@ -385,7 +391,10 @@ export function MonthRow({
             onFinishCreateRange();
             return;
           }
-          onFinishCreateRange(format(targetDate, "yyyy-MM-dd"));
+          onFinishCreateRange(format(targetDate, "yyyy-MM-dd"), {
+            x: e.clientX,
+            y: e.clientY,
+          });
         }}
       >
         <div
@@ -453,7 +462,13 @@ export function MonthRow({
                 <EventBar
                   event={seg.event}
                   todayIso={todayIso}
-                  onClick={() => onEditEvent(seg.event.id)}
+                  onClick={({ anchorPoint }) =>
+                    onEditEvent({
+                      eventId: seg.event.id,
+                      sourceEventId: seg.event.sourceEventId,
+                      anchorPoint,
+                    })
+                  }
                   draggable
                   isDragging={dragState.draggingEventId === seg.event.id}
                   className={
@@ -475,15 +490,19 @@ export function MonthRow({
                     );
                     writeCalendarEventDndPayload(e.dataTransfer, {
                       eventId: seg.event.id,
+                      sourceEventId: seg.event.sourceEventId,
                       startDate: seg.event.startDate,
                       endDate: seg.event.endDate,
+                      recurrenceType: seg.event.recurrenceType,
                       grabOffsetDays,
                       isMultiDay: true,
                     });
                     onEventDragStart({
                       eventId: seg.event.id,
+                      sourceEventId: seg.event.sourceEventId,
                       startDate: seg.event.startDate,
                       endDate: seg.event.endDate,
+                      recurrenceType: seg.event.recurrenceType,
                       grabOffsetDays,
                       isMultiDay: true,
                     });
@@ -596,6 +615,12 @@ export function MonthRow({
                         clearReorderTarget();
                         return;
                       }
+                      const recurrenceType =
+                        dragPayload?.recurrenceType ?? dragState.source?.recurrenceType;
+                      if (recurrenceType) {
+                        clearReorderTarget();
+                        return;
+                      }
                       const sourceDayIso =
                         dragPayload?.startDate ?? dragState.source?.startDate ?? null;
                       if (!sourceDayIso || sourceDayIso !== day.iso) {
@@ -666,7 +691,13 @@ export function MonthRow({
                             <EventBar
                               event={event}
                               todayIso={todayIso}
-                              onClick={() => onEditEvent(event.id)}
+                              onClick={({ anchorPoint }) =>
+                                onEditEvent({
+                                  eventId: event.id,
+                                  sourceEventId: event.sourceEventId,
+                                  anchorPoint,
+                                })
+                              }
                               draggable
                               isDragging={isDragged}
                               className={
@@ -679,15 +710,19 @@ export function MonthRow({
                               onDragStart={(e) => {
                                 writeCalendarEventDndPayload(e.dataTransfer, {
                                   eventId: event.id,
+                                  sourceEventId: event.sourceEventId,
                                   startDate: event.startDate,
                                   endDate: event.endDate,
+                                  recurrenceType: event.recurrenceType,
                                   grabOffsetDays: 0,
                                   isMultiDay: false,
                                 });
                                 onEventDragStart({
                                   eventId: event.id,
+                                  sourceEventId: event.sourceEventId,
                                   startDate: event.startDate,
                                   endDate: event.endDate,
+                                  recurrenceType: event.recurrenceType,
                                   grabOffsetDays: 0,
                                   isMultiDay: false,
                                 });

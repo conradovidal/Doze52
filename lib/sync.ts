@@ -1,4 +1,8 @@
-import type { CalendarEvent, CategoryItem } from "@/lib/types";
+import type {
+  CalendarEvent,
+  CalendarProfile,
+  CategoryItem,
+} from "@/lib/types";
 import {
   getSupabaseBrowserClient,
   hasSupabaseEnv,
@@ -9,11 +13,23 @@ import {
   ValidationError,
   validateCategoryInput,
   validateEventInput,
+  validateProfileInput,
 } from "@/lib/validation";
+
+type DbProfile = {
+  id: string;
+  user_id: string;
+  name: string;
+  color: string;
+  position: number;
+  created_at: string;
+  updated_at: string;
+};
 
 type DbCategory = {
   id: string;
   user_id: string;
+  profile_id: string;
   name: string;
   color: string;
   visible: boolean;
@@ -30,12 +46,15 @@ type DbEvent = {
   start_date: string;
   end_date: string;
   notes: string | null;
+  recurrence_type: string | null;
+  recurrence_until: string | null;
   created_at: string;
   updated_at: string;
   day_order: unknown;
 };
 
 export type CalendarSnapshot = {
+  profiles: CalendarProfile[];
   categories: CategoryItem[];
   events: CalendarEvent[];
 };
@@ -66,6 +85,7 @@ let saveInFlight: Promise<void> | null = null;
 let pendingSnapshot: CalendarSnapshot | null = null;
 
 const cloneSnapshot = (snapshot: CalendarSnapshot): CalendarSnapshot => ({
+  profiles: snapshot.profiles.map((profile) => ({ ...profile })),
   categories: snapshot.categories.map((category) => ({ ...category })),
   events: snapshot.events.map((event) => ({ ...event })),
 });
@@ -75,7 +95,7 @@ const genericSyncMessage = "Falha de sincronizacao. Tente novamente.";
 
 type QueryAction = "select" | "insert/update" | "delete" | "getUser";
 type QueryMeta = {
-  table: "categories" | "events" | "auth";
+  table: "calendar_profiles" | "categories" | "events" | "auth";
   action: QueryAction;
 };
 
@@ -154,7 +174,7 @@ const safeSupabaseMessage = (message: string) => {
 };
 
 const logSanitizedField = (params: {
-  table: "categories" | "events";
+  table: "calendar_profiles" | "categories" | "events";
   action: "insert/update";
   field: string;
   original: unknown;
@@ -172,7 +192,7 @@ const logSanitizedField = (params: {
 };
 
 const sanitizeIntegerField = (params: {
-  table: "categories" | "events";
+  table: "calendar_profiles" | "categories" | "events";
   action: "insert/update";
   field: string;
   value: unknown;
@@ -224,6 +244,29 @@ const normalizeDayOrderFromDb = (value: unknown): number => {
     }
   }
   return 0;
+};
+
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const isIsoDate = (value: unknown): value is string =>
+  typeof value === "string" && ISO_DATE_RE.test(value);
+
+const normalizeRecurrenceType = (
+  value: unknown
+): CalendarEvent["recurrenceType"] | undefined => {
+  if (value === "weekly" || value === "monthly" || value === "yearly") {
+    return value;
+  }
+  return undefined;
+};
+
+const normalizeRecurrenceUntil = (params: {
+  recurrenceType: CalendarEvent["recurrenceType"];
+  recurrenceUntil: unknown;
+  startDate: string;
+}) => {
+  if (!params.recurrenceType || !isIsoDate(params.recurrenceUntil)) return undefined;
+  if (params.recurrenceUntil < params.startDate) return undefined;
+  return params.recurrenceUntil;
 };
 
 const userMessageForKind = (kind: SyncErrorKind, fallbackMessage?: string) => {
@@ -330,11 +373,7 @@ const classifySyncError = (error: unknown): SyncError => {
     );
   }
   if (isTransientError(message)) {
-    return new SyncError(
-      "network",
-      userMessageForKind("network"),
-      true
-    );
+    return new SyncError("network", userMessageForKind("network"), true);
   }
   return new SyncError("unknown", userMessageForKind("unknown", message), false);
 };
@@ -354,28 +393,50 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 1): Promise<T> {
   throw classifySyncError(lastError);
 }
 
+const toLocalProfile = (row: DbProfile): CalendarProfile => ({
+  id: row.id,
+  userId: row.user_id,
+  name: row.name,
+  color: row.color,
+  position: sanitizeIntegerField({
+    table: "calendar_profiles",
+    action: "insert/update",
+    field: "position",
+    value: row.position,
+    fallback: 0,
+  }) as number,
+});
+
 const toLocalCategory = (row: DbCategory): CategoryItem => ({
   id: row.id,
   userId: row.user_id,
+  profileId: row.profile_id,
   name: row.name,
   color: row.color,
   visible: row.visible,
 });
 
-const toLocalEvent = (row: DbEvent, categories: CategoryItem[]): CalendarEvent => ({
-  id: row.id,
-  title: row.title,
-  userId: row.user_id,
-  categoryId: row.category_id,
-  color:
-    categories.find((c) => c.id === row.category_id)?.color ??
-    "#2563eb",
-  startDate: row.start_date,
-  endDate: row.end_date,
-  notes: row.notes ?? undefined,
-  createdAt: row.created_at,
-  dayOrder: normalizeDayOrderFromDb(row.day_order),
-});
+const toLocalEvent = (row: DbEvent, categories: CategoryItem[]): CalendarEvent => {
+  const recurrenceType = normalizeRecurrenceType(row.recurrence_type);
+  return {
+    id: row.id,
+    title: row.title,
+    userId: row.user_id,
+    categoryId: row.category_id,
+    color: categories.find((c) => c.id === row.category_id)?.color ?? "#2563eb",
+    startDate: row.start_date,
+    endDate: row.end_date,
+    notes: row.notes ?? undefined,
+    recurrenceType,
+    recurrenceUntil: normalizeRecurrenceUntil({
+      recurrenceType,
+      recurrenceUntil: row.recurrence_until,
+      startDate: row.start_date,
+    }),
+    createdAt: row.created_at,
+    dayOrder: normalizeDayOrderFromDb(row.day_order),
+  };
+};
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
 const nowIso = () => new Date().toISOString();
@@ -383,11 +444,21 @@ const ensureRowId = (id: string | undefined) =>
   id && id.trim() ? id : crypto.randomUUID();
 
 const validateSnapshot = (snapshot: CalendarSnapshot) => {
+  const profileIds = new Set<string>();
+  for (const profile of snapshot.profiles) {
+    validateProfileInput(profile);
+    profileIds.add(profile.id);
+  }
+
   const categoryIds = new Set<string>();
   for (const category of snapshot.categories) {
     validateCategoryInput(category);
+    if (!profileIds.has(category.profileId)) {
+      throw new ValidationError("Categoria invalida: perfil nao encontrado.");
+    }
     categoryIds.add(category.id);
   }
+
   for (const event of snapshot.events) {
     validateEventInput(event, categoryIds);
   }
@@ -424,6 +495,20 @@ const getCurrentUserIdOrThrow = async () => {
   return userId;
 };
 
+export const fetchProfiles = async (): Promise<CalendarProfile[]> => {
+  const supabase = ensureSupabase();
+  const userId = await getCurrentUserIdOrThrow();
+  return withRetry(async () => {
+    const { data, error } = await supabase
+      .from("calendar_profiles")
+      .select("*")
+      .eq("user_id", userId)
+      .order("position", { ascending: true });
+    assertQuerySuccess(error, { table: "calendar_profiles", action: "select" });
+    return ((data ?? []) as DbProfile[]).map(toLocalProfile);
+  });
+};
+
 export const fetchCategories = async (): Promise<CategoryItem[]> => {
   const supabase = ensureSupabase();
   const userId = await getCurrentUserIdOrThrow();
@@ -457,9 +542,10 @@ export const fetchEvents = async (
 
 export const loadRemoteData = async (): Promise<CalendarSnapshot> => {
   try {
+    const profiles = await fetchProfiles();
     const categories = await fetchCategories();
     const events = await fetchEvents(categories);
-    return { categories, events };
+    return { profiles, categories, events };
   } catch (error) {
     const syncError = classifySyncError(error);
     logDevError("sync.loadRemoteData", {
@@ -495,9 +581,24 @@ const saveSnapshotInternal = async (snapshot: CalendarSnapshot): Promise<void> =
     validateSnapshot(snapshot);
 
     await withRetry(async () => {
+      const profileRows = snapshot.profiles.map((profile, index) => ({
+        id: ensureRowId(profile.id),
+        user_id: userId,
+        name: profile.name.trim(),
+        color: profile.color,
+        position: sanitizeIntegerField({
+          table: "calendar_profiles",
+          action: "insert/update",
+          field: "position",
+          value: profile.position ?? index,
+          fallback: index,
+        }),
+      }));
+
       const categoryRows = snapshot.categories.map((category, index) => ({
         id: ensureRowId(category.id),
         user_id: userId,
+        profile_id: category.profileId,
         name: category.name.trim(),
         color: category.color,
         visible: category.visible,
@@ -518,6 +619,9 @@ const saveSnapshotInternal = async (snapshot: CalendarSnapshot): Promise<void> =
         start_date: event.startDate || todayIso(),
         end_date: event.endDate || event.startDate || todayIso(),
         notes: event.notes?.trim() || null,
+        recurrence_type: event.recurrenceType ?? null,
+        recurrence_until:
+          event.recurrenceType && event.recurrenceUntil ? event.recurrenceUntil : null,
         day_order: sanitizeIntegerField({
           table: "events",
           action: "insert/update",
@@ -528,11 +632,16 @@ const saveSnapshotInternal = async (snapshot: CalendarSnapshot): Promise<void> =
         created_at: event.createdAt || nowIso(),
       }));
 
-      const [currentCategories, currentEvents] = await Promise.all([
+      const [currentProfiles, currentCategories, currentEvents] = await Promise.all([
+        supabase.from("calendar_profiles").select("id").eq("user_id", userId),
         supabase.from("categories").select("id").eq("user_id", userId),
         supabase.from("events").select("id").eq("user_id", userId),
       ]);
 
+      assertQuerySuccess(currentProfiles.error, {
+        table: "calendar_profiles",
+        action: "select",
+      });
       assertQuerySuccess(currentCategories.error, {
         table: "categories",
         action: "select",
@@ -541,6 +650,16 @@ const saveSnapshotInternal = async (snapshot: CalendarSnapshot): Promise<void> =
         table: "events",
         action: "select",
       });
+
+      if (profileRows.length > 0) {
+        const { error } = await supabase
+          .from("calendar_profiles")
+          .upsert(profileRows, { onConflict: "id" });
+        assertQuerySuccess(error, {
+          table: "calendar_profiles",
+          action: "insert/update",
+        });
+      }
 
       if (categoryRows.length > 0) {
         const { error } = await supabase
@@ -562,6 +681,23 @@ const saveSnapshotInternal = async (snapshot: CalendarSnapshot): Promise<void> =
         });
       }
 
+      const localEventIds = new Set(eventRows.map((row) => row.id));
+      const remoteEventIds = ((currentEvents.data ?? []) as { id: string }[]).map(
+        (row) => row.id
+      );
+      const eventsToDelete = remoteEventIds.filter((id) => !localEventIds.has(id));
+      if (eventsToDelete.length > 0) {
+        const { error } = await supabase
+          .from("events")
+          .delete()
+          .eq("user_id", userId)
+          .in("id", eventsToDelete);
+        assertQuerySuccess(error, {
+          table: "events",
+          action: "delete",
+        });
+      }
+
       const localCategoryIds = new Set(categoryRows.map((row) => row.id));
       const remoteCategoryIds = ((currentCategories.data ?? []) as { id: string }[]).map(
         (row) => row.id
@@ -579,19 +715,19 @@ const saveSnapshotInternal = async (snapshot: CalendarSnapshot): Promise<void> =
         });
       }
 
-      const localEventIds = new Set(eventRows.map((row) => row.id));
-      const remoteEventIds = ((currentEvents.data ?? []) as { id: string }[]).map(
+      const localProfileIds = new Set(profileRows.map((row) => row.id));
+      const remoteProfileIds = ((currentProfiles.data ?? []) as { id: string }[]).map(
         (row) => row.id
       );
-      const eventsToDelete = remoteEventIds.filter((id) => !localEventIds.has(id));
-      if (eventsToDelete.length > 0) {
+      const profilesToDelete = remoteProfileIds.filter((id) => !localProfileIds.has(id));
+      if (profilesToDelete.length > 0) {
         const { error } = await supabase
-          .from("events")
+          .from("calendar_profiles")
           .delete()
           .eq("user_id", userId)
-          .in("id", eventsToDelete);
+          .in("id", profilesToDelete);
         assertQuerySuccess(error, {
-          table: "events",
+          table: "calendar_profiles",
           action: "delete",
         });
       }
@@ -644,9 +780,24 @@ export const exportUserData = async () => {
     "application/json"
   );
 
+  const profilesCsv = toCsv(
+    snapshot.profiles.map((profile) => ({
+      id: profile.id,
+      name: profile.name,
+      color: profile.color,
+      position: profile.position,
+    }))
+  );
+  downloadFile(
+    `doze52-profiles-${stamp}.csv`,
+    profilesCsv,
+    "text/csv;charset=utf-8"
+  );
+
   const categoriesCsv = toCsv(
     snapshot.categories.map((category, index) => ({
       id: category.id,
+      profile_id: category.profileId,
       name: category.name,
       color: category.color,
       visible: category.visible,
@@ -667,6 +818,8 @@ export const exportUserData = async () => {
       start_date: event.startDate,
       end_date: event.endDate,
       notes: event.notes ?? "",
+      recurrence_type: event.recurrenceType ?? "",
+      recurrence_until: event.recurrenceUntil ?? "",
       created_at: event.createdAt,
       day_order: event.dayOrder,
     }))

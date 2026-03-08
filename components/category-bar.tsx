@@ -12,20 +12,54 @@ import {
   Plus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { isCalendarProfilesFeatureEnabled } from "@/lib/feature-flags";
 import { useStore } from "@/lib/store";
 import { CategoryManager } from "./category-manager";
-import type { CategoryItem } from "@/lib/types";
+import type { AnchorPoint, CategoryItem } from "@/lib/types";
+
+const moveInArray = (arr: CategoryItem[], sourceId: string, targetId: string) => {
+  const sourceIndex = arr.findIndex((c) => c.id === sourceId);
+  const targetIndex = arr.findIndex((c) => c.id === targetId);
+  if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) return arr;
+  const next = [...arr];
+  const [moved] = next.splice(sourceIndex, 1);
+  next.splice(targetIndex, 0, moved);
+  return next;
+};
+
+const applyProfileOrderToAll = (
+  allCategories: CategoryItem[],
+  profileId: string,
+  orderedInProfile: CategoryItem[]
+) => {
+  let profileCursor = 0;
+  const nextCategories = allCategories.map((category) => {
+    if (category.profileId !== profileId) return category;
+    const replacement = orderedInProfile[profileCursor] ?? category;
+    profileCursor += 1;
+    return replacement;
+  });
+  return nextCategories.map((category) => category.id);
+};
 
 export function CategoryBar({ compact = false }: { compact?: boolean }) {
+  const profiles = useStore((s) => s.profiles);
+  const selectedProfileIds = useStore((s) => s.selectedProfileIds);
   const categories = useStore((s) => s.categories);
   const toggleCategoryVisibility = useStore((s) => s.toggleCategoryVisibility);
-  const setAllCategoriesVisibility = useStore((s) => s.setAllCategoriesVisibility);
+  const updateCategory = useStore((s) => s.updateCategory);
   const setCategoriesOrder = useStore((s) => s.setCategoriesOrder);
 
   const [isEditMode, setIsEditMode] = React.useState(false);
   const [editingCategoryId, setEditingCategoryId] = React.useState<string | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = React.useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = React.useState(false);
+  const [createAnchorPoint, setCreateAnchorPoint] = React.useState<AnchorPoint | undefined>(
+    undefined
+  );
+  const [editAnchorPoint, setEditAnchorPoint] = React.useState<AnchorPoint | undefined>(
+    undefined
+  );
   const [dragSourceId, setDragSourceId] = React.useState<string | null>(null);
   const [dragOverId, setDragOverId] = React.useState<string | null>(null);
   const [previewOrder, setPreviewOrder] = React.useState<CategoryItem[] | null>(null);
@@ -36,21 +70,37 @@ export function CategoryBar({ compact = false }: { compact?: boolean }) {
     previewOrderRef.current = previewOrder;
   }, [previewOrder]);
 
-  const displayedCategories = previewOrder ?? categories;
-  const allVisible = categories.length > 0 && categories.every((c) => c.visible);
+  const activeProfileIds = React.useMemo(() => {
+    if (!isCalendarProfilesFeatureEnabled) {
+      return new Set(profiles.map((profile) => profile.id));
+    }
+    return new Set(selectedProfileIds);
+  }, [profiles, selectedProfileIds]);
 
-  const moveInArray = React.useCallback(
-    (arr: CategoryItem[], sourceId: string, targetId: string) => {
-      const sourceIndex = arr.findIndex((c) => c.id === sourceId);
-      const targetIndex = arr.findIndex((c) => c.id === targetId);
-      if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) return arr;
-      const next = [...arr];
-      const [moved] = next.splice(sourceIndex, 1);
-      next.splice(targetIndex, 0, moved);
-      return next;
-    },
-    []
+  const baseCategories = React.useMemo(
+    () => categories.filter((category) => activeProfileIds.has(category.profileId)),
+    [categories, activeProfileIds]
   );
+
+  const editableProfileId =
+    isCalendarProfilesFeatureEnabled && selectedProfileIds.length === 1
+      ? selectedProfileIds[0]
+      : isCalendarProfilesFeatureEnabled
+        ? null
+        : profiles[0]?.id ?? null;
+
+  const canEditCategories = !isCalendarProfilesFeatureEnabled || Boolean(editableProfileId);
+
+  const displayedCategories = React.useMemo(() => {
+    if (previewOrder) return previewOrder;
+    if (isEditMode && editableProfileId) {
+      return baseCategories.filter((category) => category.profileId === editableProfileId);
+    }
+    return baseCategories;
+  }, [baseCategories, editableProfileId, isEditMode, previewOrder]);
+
+  const allVisible =
+    displayedCategories.length > 0 && displayedCategories.every((category) => category.visible);
 
   const clearDragState = React.useCallback(
     (options?: { resetDidDrop?: boolean }) => {
@@ -65,161 +115,194 @@ export function CategoryBar({ compact = false }: { compact?: boolean }) {
     []
   );
 
-  const openEditCategory = (categoryId: string) => {
+  const openEditCategory = (categoryId: string, anchorPoint?: AnchorPoint) => {
     setEditingCategoryId(categoryId);
+    setEditAnchorPoint(anchorPoint);
     setIsEditModalOpen(true);
   };
 
   const commitPreviewOrder = React.useCallback(
     (finalOrder: CategoryItem[] | null) => {
-      if (!isEditMode || !finalOrder) return;
-      const nextIds = finalOrder.map((c) => c.id);
-      const currentIds = categories.map((c) => c.id);
-      if (
-        nextIds.length === currentIds.length &&
-        nextIds.every((id, idx) => id === currentIds[idx])
-      ) {
+      if (!isEditMode || !finalOrder || !editableProfileId) return;
+
+      const sourceIds =
+        categories
+          .filter((category) => category.profileId === editableProfileId)
+          .map((category) => category.id) ?? [];
+      const nextIds = finalOrder.map((category) => category.id);
+      const didChange =
+        sourceIds.length === nextIds.length &&
+        sourceIds.some((id, index) => id !== nextIds[index]);
+      if (!didChange) {
         return;
       }
-      setCategoriesOrder(nextIds);
+
+      const fullOrderIds = applyProfileOrderToAll(categories, editableProfileId, finalOrder);
+      setCategoriesOrder(fullOrderIds);
     },
-    [categories, isEditMode, setCategoriesOrder]
+    [categories, editableProfileId, isEditMode, setCategoriesOrder]
   );
 
   const moveCategoryByDelta = React.useCallback(
     (categoryId: string, delta: -1 | 1) => {
-      const sourceIndex = categories.findIndex((category) => category.id === categoryId);
+      if (!editableProfileId) return;
+      const profileCategories = categories.filter(
+        (category) => category.profileId === editableProfileId
+      );
+      const sourceIndex = profileCategories.findIndex((category) => category.id === categoryId);
       if (sourceIndex === -1) return;
       const targetIndex = sourceIndex + delta;
-      if (targetIndex < 0 || targetIndex >= categories.length) return;
-      const next = [...categories];
+      if (targetIndex < 0 || targetIndex >= profileCategories.length) return;
+      const next = [...profileCategories];
       const [moved] = next.splice(sourceIndex, 1);
       next.splice(targetIndex, 0, moved);
-      setCategoriesOrder(next.map((category) => category.id));
+      const fullOrderIds = applyProfileOrderToAll(categories, editableProfileId, next);
+      setCategoriesOrder(fullOrderIds);
       clearDragState();
     },
-    [categories, clearDragState, setCategoriesOrder]
+    [categories, clearDragState, editableProfileId, setCategoriesOrder]
   );
 
   const handleToggleEditMode = (enabled: boolean) => {
     if (!enabled) {
       clearDragState();
     }
+    if (enabled && !canEditCategories) return;
     setIsEditMode(enabled);
   };
 
+  const profileNameById = React.useMemo(
+    () => new Map(profiles.map((profile) => [profile.id, profile.name])),
+    [profiles]
+  );
+  const showProfileHint = isCalendarProfilesFeatureEnabled && selectedProfileIds.length > 1;
+
   return (
     <div
-      className={`${compact ? "w-full justify-start md:w-auto md:justify-center" : "mb-4 justify-start"} flex flex-wrap items-center gap-2 md:flex-nowrap`}
+      className={`${compact ? "w-full justify-start" : "mb-4 justify-start"} flex flex-wrap items-center gap-2`}
     >
-      {displayedCategories.map((c) => {
-        const categoryIndex = categories.findIndex((category) => category.id === c.id);
+      {displayedCategories.map((category) => {
+        const profileCategories = editableProfileId
+          ? categories.filter((entry) => entry.profileId === editableProfileId)
+          : categories;
+        const categoryIndex = profileCategories.findIndex((entry) => entry.id === category.id);
         const canMoveLeft = categoryIndex > 0;
-        const canMoveRight = categoryIndex >= 0 && categoryIndex < categories.length - 1;
+        const canMoveRight =
+          categoryIndex >= 0 && categoryIndex < profileCategories.length - 1;
 
         return (
           <div
-            key={c.id}
-            draggable={isEditMode}
+            key={category.id}
+            draggable={isEditMode && Boolean(editableProfileId)}
             role={isEditMode ? undefined : "button"}
             tabIndex={isEditMode ? undefined : 0}
-            onDragStart={(e) => {
+            onDragStart={(event) => {
               if (!isEditMode) return;
               didDropRef.current = false;
-              setDragSourceId(c.id);
-              setDragOverId(c.id);
-              setPreviewOrder(categories);
-              previewOrderRef.current = categories;
-              e.dataTransfer.effectAllowed = "move";
+              setDragSourceId(category.id);
+              setDragOverId(category.id);
+              setPreviewOrder(displayedCategories);
+              previewOrderRef.current = displayedCategories;
+              event.dataTransfer.effectAllowed = "move";
             }}
             onDragEnter={() => {
-              if (!isEditMode || !dragSourceId || dragSourceId === c.id) return;
-              setDragOverId(c.id);
+              if (!isEditMode || !dragSourceId || dragSourceId === category.id) return;
+              setDragOverId(category.id);
               const nextOrder = moveInArray(
-                previewOrderRef.current ?? categories,
+                previewOrderRef.current ?? displayedCategories,
                 dragSourceId,
-                c.id
+                category.id
               );
               setPreviewOrder(nextOrder);
               previewOrderRef.current = nextOrder;
             }}
-            onDragOver={(e) => {
+            onDragOver={(event) => {
               if (!isEditMode) return;
-              e.preventDefault();
+              event.preventDefault();
             }}
-            onDrop={(e) => {
+            onDrop={(event) => {
               if (!isEditMode) return;
-              e.preventDefault();
+              event.preventDefault();
               didDropRef.current = true;
-              commitPreviewOrder(previewOrderRef.current ?? previewOrder ?? categories);
+              commitPreviewOrder(
+                previewOrderRef.current ?? previewOrder ?? displayedCategories
+              );
               clearDragState({ resetDidDrop: false });
             }}
             onDragEnd={() => {
               if (!didDropRef.current) {
-                commitPreviewOrder(previewOrderRef.current ?? previewOrder ?? categories);
+                commitPreviewOrder(
+                  previewOrderRef.current ?? previewOrder ?? displayedCategories
+                );
               }
               clearDragState();
             }}
             onClick={() => {
               if (isEditMode) return;
-              toggleCategoryVisibility(c.id);
+              toggleCategoryVisibility(category.id);
             }}
-            onKeyDown={(e) => {
+            onKeyDown={(event) => {
               if (isEditMode) return;
-              if (e.key !== "Enter" && e.key !== " ") return;
-              e.preventDefault();
-              toggleCategoryVisibility(c.id);
+              if (event.key !== "Enter" && event.key !== " ") return;
+              event.preventDefault();
+              toggleCategoryVisibility(category.id);
             }}
             className={`flex items-center gap-1 rounded-full px-3 py-1 text-xs text-white transition-opacity ${
-              c.visible ? "opacity-100" : "opacity-40"
+              category.visible ? "opacity-100" : "opacity-40"
             } ${isEditMode ? "cursor-grab" : "cursor-pointer"} ${
-              isEditMode && dragOverId === c.id ? "ring-2 ring-white/50" : ""
+              isEditMode && dragOverId === category.id ? "ring-2 ring-white/50" : ""
             }`}
-            style={{ backgroundColor: c.color }}
+            style={{ backgroundColor: category.color }}
           >
             {isEditMode ? (
               <GripVertical size={12} />
             ) : (
               <span className="h-2 w-2 rounded-full bg-white/80" />
             )}
-            <span className="font-medium">{c.name}</span>
+            <span className="font-medium">{category.name}</span>
+            {showProfileHint ? (
+              <span className="rounded-full bg-black/20 px-1.5 py-0.5 text-[10px] uppercase tracking-wide">
+                {profileNameById.get(category.profileId) ?? "Perfil"}
+              </span>
+            ) : null}
             {isEditMode ? (
               <>
                 <button
                   type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    moveCategoryByDelta(c.id, -1);
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    moveCategoryByDelta(category.id, -1);
                   }}
                   disabled={!canMoveLeft}
                   className="ml-1 inline-flex rounded p-0.5 hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40"
-                  aria-label={`Mover categoria ${c.name} para esquerda`}
+                  aria-label={`Mover categoria ${category.name} para esquerda`}
                 >
                   <ChevronLeft size={12} />
                 </button>
                 <button
                   type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    moveCategoryByDelta(c.id, 1);
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    moveCategoryByDelta(category.id, 1);
                   }}
                   disabled={!canMoveRight}
                   className="inline-flex rounded p-0.5 hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40"
-                  aria-label={`Mover categoria ${c.name} para direita`}
+                  aria-label={`Mover categoria ${category.name} para direita`}
                 >
                   <ChevronRight size={12} />
                 </button>
                 <button
                   type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    openEditCategory(c.id);
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    const rect = event.currentTarget.getBoundingClientRect();
+                    openEditCategory(category.id, { x: rect.right, y: rect.bottom });
                   }}
                   className="inline-flex rounded p-0.5 hover:bg-white/20"
-                  aria-label={`Editar categoria ${c.name}`}
+                  aria-label={`Editar categoria ${category.name}`}
                 >
                   <Pencil size={12} />
                 </button>
@@ -231,7 +314,16 @@ export function CategoryBar({ compact = false }: { compact?: boolean }) {
 
       {isEditMode ? (
         <>
-          <Button variant="secondary" size="sm" onClick={() => setIsCreateModalOpen(true)}>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={(event) => {
+              const rect = event.currentTarget.getBoundingClientRect();
+              setCreateAnchorPoint({ x: rect.right, y: rect.bottom });
+              setIsCreateModalOpen(true);
+            }}
+            disabled={!editableProfileId}
+          >
             <Plus size={14} />
           </Button>
           <Button variant="default" size="sm" onClick={() => handleToggleEditMode(false)}>
@@ -244,12 +336,29 @@ export function CategoryBar({ compact = false }: { compact?: boolean }) {
           <Button
             variant="ghost"
             size="sm"
-            title={allVisible ? "Ocultar todas" : "Mostrar todas"}
-            onClick={() => setAllCategoriesVisibility(!allVisible)}
+            title={allVisible ? "Ocultar categorias visiveis" : "Mostrar categorias visiveis"}
+            onClick={() => {
+              displayedCategories.forEach((category) => {
+                if (category.visible !== !allVisible) {
+                  updateCategory(category.id, { visible: !allVisible });
+                }
+              });
+            }}
+            disabled={displayedCategories.length === 0}
           >
             {allVisible ? <Eye size={14} /> : <EyeOff size={14} />}
           </Button>
-          <Button variant="ghost" size="sm" onClick={() => handleToggleEditMode(true)}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleToggleEditMode(true)}
+            disabled={!canEditCategories || displayedCategories.length === 0}
+            title={
+              !canEditCategories
+                ? "Selecione apenas um perfil para editar categorias"
+                : undefined
+            }
+          >
             Editar
           </Button>
         </>
@@ -258,13 +367,26 @@ export function CategoryBar({ compact = false }: { compact?: boolean }) {
       <CategoryManager
         mode="create"
         open={isCreateModalOpen}
-        onOpenChange={setIsCreateModalOpen}
+        onOpenChange={(open) => {
+          setIsCreateModalOpen(open);
+          if (!open) {
+            setCreateAnchorPoint(undefined);
+          }
+        }}
+        profileId={editableProfileId ?? undefined}
+        anchorPoint={createAnchorPoint}
       />
       <CategoryManager
         mode="edit"
         open={isEditModalOpen}
-        onOpenChange={setIsEditModalOpen}
+        onOpenChange={(open) => {
+          setIsEditModalOpen(open);
+          if (!open) {
+            setEditAnchorPoint(undefined);
+          }
+        }}
         categoryId={editingCategoryId ?? undefined}
+        anchorPoint={editAnchorPoint}
       />
     </div>
   );

@@ -8,9 +8,12 @@ import { AppHeader } from "@/components/app-header";
 import { AuthDialog } from "@/components/auth/auth-dialog";
 import { Button } from "@/components/ui/button";
 import {
+  getOnboardingDefaultProfiles,
   getOnboardingDefaultCategories,
+  isOnboardingProfilesSnapshot,
   isOnboardingCategoriesSnapshot,
   ONBOARDING_DEFAULT_CATEGORY_ID,
+  ONBOARDING_DEFAULT_PROFILE_ID,
   useStore,
   type EventInput,
 } from "@/lib/store";
@@ -24,22 +27,40 @@ import {
 import { getTodayIsoInTimeZone } from "@/lib/date";
 import { logDevError, logProdError } from "@/lib/safe-log";
 import { getSupabaseBrowserClient, hasSupabaseEnv } from "@/lib/supabase";
+import { expandEventsForYear } from "@/lib/recurrence";
+import type { AnchorPoint } from "@/lib/types";
 
 const toSnapshotHash = (snapshot: CalendarSnapshot) => JSON.stringify(snapshot);
 
-const ensureSnapshotCategoryCoverage = (
+const ensureSnapshotCoverage = (
   snapshot: CalendarSnapshot
 ): CalendarSnapshot => {
+  const profiles =
+    snapshot.profiles.length > 0
+      ? snapshot.profiles
+      : getOnboardingDefaultProfiles();
+  const profileIds = new Set(profiles.map((profile) => profile.id));
+  const fallbackProfileId = profileIds.has(ONBOARDING_DEFAULT_PROFILE_ID)
+    ? ONBOARDING_DEFAULT_PROFILE_ID
+    : (profiles[0]?.id ?? ONBOARDING_DEFAULT_PROFILE_ID);
+
   const categories =
     snapshot.categories.length > 0
       ? snapshot.categories
       : getOnboardingDefaultCategories();
-  const categoryIds = new Set(categories.map((category) => category.id));
+  const normalizedCategories = categories.map((category) => ({
+    ...category,
+    profileId: profileIds.has(category.profileId)
+      ? category.profileId
+      : fallbackProfileId,
+  }));
+
+  const categoryIds = new Set(normalizedCategories.map((category) => category.id));
   const fallbackCategoryId = categoryIds.has(ONBOARDING_DEFAULT_CATEGORY_ID)
     ? ONBOARDING_DEFAULT_CATEGORY_ID
-    : (categories[0]?.id ?? ONBOARDING_DEFAULT_CATEGORY_ID);
+    : (normalizedCategories[0]?.id ?? ONBOARDING_DEFAULT_CATEGORY_ID);
   const colorByCategoryId = new Map(
-    categories.map((category) => [category.id, category.color])
+    normalizedCategories.map((category) => [category.id, category.color])
   );
 
   const events = snapshot.events.map((event) => {
@@ -53,22 +74,32 @@ const ensureSnapshotCategoryCoverage = (
     return { ...event, categoryId, color };
   });
 
-  return { categories, events };
+  return { profiles, categories: normalizedCategories, events };
 };
 
 const filterAnonymousDraft = (snapshot: CalendarSnapshot): CalendarSnapshot => ({
+  profiles: snapshot.profiles.filter((profile) => !profile.userId),
   categories: snapshot.categories.filter((category) => !category.userId),
   events: snapshot.events.filter((event) => !event.userId),
 });
 
 const hasRelevantLocalDraft = (snapshot: CalendarSnapshot) =>
   snapshot.events.length > 0 ||
+  !isOnboardingProfilesSnapshot(snapshot.profiles) ||
   !isOnboardingCategoriesSnapshot(snapshot.categories);
 
 const mergeSnapshots = (
   remoteSnapshot: CalendarSnapshot,
   localSnapshot: CalendarSnapshot
 ): CalendarSnapshot => {
+  const mergedProfiles = [...remoteSnapshot.profiles];
+  const profileIds = new Set(mergedProfiles.map((profile) => profile.id));
+  for (const profile of localSnapshot.profiles) {
+    if (!profile.id || profileIds.has(profile.id)) continue;
+    mergedProfiles.push(profile);
+    profileIds.add(profile.id);
+  }
+
   const mergedCategories = [...remoteSnapshot.categories];
   const categoryIds = new Set(mergedCategories.map((category) => category.id));
   for (const category of localSnapshot.categories) {
@@ -85,7 +116,8 @@ const mergeSnapshots = (
     eventIds.add(event.id);
   }
 
-  return ensureSnapshotCategoryCoverage({
+  return ensureSnapshotCoverage({
+    profiles: mergedProfiles,
     categories: mergedCategories,
     events: mergedEvents,
   });
@@ -97,6 +129,7 @@ export default function HomePage() {
     return currentYear >= 2025 && currentYear <= 2027 ? currentYear : 2026;
   }, []);
   const [year, setYear] = React.useState<number>(initialYear);
+  const profiles = useStore((s) => s.profiles);
   const events = useStore((s) => s.events);
   const categories = useStore((s) => s.categories);
   const ensureEventMetadata = useStore((s) => s.ensureEventMetadata);
@@ -114,6 +147,12 @@ export default function HomePage() {
 
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [authDialogOpen, setAuthDialogOpen] = React.useState(false);
+  const [dialogAnchorPoint, setDialogAnchorPoint] = React.useState<AnchorPoint | undefined>(
+    undefined
+  );
+  const [authDialogAnchorPoint, setAuthDialogAnchorPoint] = React.useState<
+    AnchorPoint | undefined
+  >(undefined);
   const [editingId, setEditingId] = React.useState<string | null>(null);
   const [seedRange, setSeedRange] = React.useState<{
     startDate: string;
@@ -141,15 +180,18 @@ export default function HomePage() {
   const lastSyncedHashRef = React.useRef<string>("");
   const saveTimerRef = React.useRef<number | null>(null);
   const previousSessionUserIdRef = React.useRef<string | null>(null);
+  const profilesRef = React.useRef(profiles);
   const categoriesRef = React.useRef(categories);
   const eventsRef = React.useRef(events);
 
   React.useEffect(() => {
+    profilesRef.current = profiles;
     categoriesRef.current = categories;
     eventsRef.current = events;
-  }, [categories, events]);
+  }, [profiles, categories, events]);
 
   const editingEvent = editingId ? getEventById(editingId) : null;
+  const renderEvents = React.useMemo(() => expandEventsForYear(events, year), [events, year]);
 
   React.useEffect(() => {
     if (windowContext !== "popup") return;
@@ -307,6 +349,7 @@ export default function HomePage() {
     const currentUserId = session?.user.id ?? null;
     const previousUserId = previousSessionUserIdRef.current;
     const hasUserBoundLocalData =
+      profiles.some((profile) => Boolean(profile.userId)) ||
       categories.some((category) => Boolean(category.userId)) ||
       events.some((event) => Boolean(event.userId));
 
@@ -326,6 +369,7 @@ export default function HomePage() {
     authLoading,
     categories,
     events,
+    profiles,
     resetToOnboardingData,
     session?.user.id,
     windowContext,
@@ -341,7 +385,8 @@ export default function HomePage() {
       setSyncError(null);
       try {
         const localSnapshot = filterAnonymousDraft(
-          ensureSnapshotCategoryCoverage({
+          ensureSnapshotCoverage({
+            profiles: profilesRef.current,
             categories: categoriesRef.current,
             events: eventsRef.current,
           })
@@ -350,7 +395,9 @@ export default function HomePage() {
         const remoteSnapshot = await loadRemoteData();
         if (cancelled) return;
         const remoteIsEmpty =
-          remoteSnapshot.categories.length === 0 && remoteSnapshot.events.length === 0;
+          remoteSnapshot.profiles.length === 0 &&
+          remoteSnapshot.categories.length === 0 &&
+          remoteSnapshot.events.length === 0;
         const alreadyImported = isLocalImported(userId);
         const remoteHash = toSnapshotHash(remoteSnapshot);
         let nextSnapshot: CalendarSnapshot = remoteSnapshot;
@@ -358,7 +405,7 @@ export default function HomePage() {
         if (localDraftIsRelevant) {
           nextSnapshot = mergeSnapshots(remoteSnapshot, localSnapshot);
         } else if (remoteIsEmpty && !alreadyImported) {
-          nextSnapshot = ensureSnapshotCategoryCoverage(remoteSnapshot);
+          nextSnapshot = ensureSnapshotCoverage(remoteSnapshot);
         }
 
         const nextHash = toSnapshotHash(nextSnapshot);
@@ -410,7 +457,7 @@ export default function HomePage() {
   React.useEffect(() => {
     if (windowContext !== "main") return;
     if (!session?.user.id || !remoteReady || syncBlocked || syncError) return;
-    const nextSnapshot = { categories, events };
+    const nextSnapshot = { profiles, categories, events };
     const nextHash = JSON.stringify(nextSnapshot);
     if (nextHash === lastSyncedHashRef.current) return;
 
@@ -449,6 +496,7 @@ export default function HomePage() {
   }, [
     categories,
     events,
+    profiles,
     remoteReady,
     session?.user.id,
     syncBlocked,
@@ -456,8 +504,14 @@ export default function HomePage() {
     windowContext,
   ]);
 
-  const handleEditEvent = (id: string) => {
-    setEditingId(id);
+  const handleEditEvent = (payload: {
+    eventId: string;
+    sourceEventId: string;
+    anchorPoint: AnchorPoint;
+  }) => {
+    void payload.eventId;
+    setEditingId(payload.sourceEventId);
+    setDialogAnchorPoint(payload.anchorPoint);
     setSeedRange(null);
     setCreatingRange(null);
     setDialogOpen(true);
@@ -480,7 +534,7 @@ export default function HomePage() {
     });
   };
 
-  const handleFinishCreateRange = React.useCallback((endIso?: string) => {
+  const handleFinishCreateRange = React.useCallback((endIso?: string, anchorPoint?: AnchorPoint) => {
     setCreatingRange((prev) => {
       if (!prev) return prev;
       const resolvedEnd = endIso ?? prev.hoverIso;
@@ -493,6 +547,7 @@ export default function HomePage() {
         endDate: format(normalizedEnd, "yyyy-MM-dd"),
       });
       setEditingId(null);
+      setDialogAnchorPoint(anchorPoint);
       setDialogOpen(true);
       return null;
     });
@@ -500,9 +555,9 @@ export default function HomePage() {
 
   React.useEffect(() => {
     if (windowContext !== "main") return;
-    const onWindowMouseUp = () => {
+    const onWindowMouseUp = (event: MouseEvent) => {
       if (!creatingRange) return;
-      handleFinishCreateRange();
+      handleFinishCreateRange(undefined, { x: event.clientX, y: event.clientY });
     };
     window.addEventListener("mouseup", onWindowMouseUp);
     return () => window.removeEventListener("mouseup", onWindowMouseUp);
@@ -524,7 +579,10 @@ export default function HomePage() {
           onYearChange={setYear}
           authLoading={authLoading}
           isAuthenticated={Boolean(session)}
-          onOpenAuthDialog={() => setAuthDialogOpen(true)}
+          onOpenAuthDialog={(anchorPoint) => {
+            setAuthDialogAnchorPoint(anchorPoint);
+            setAuthDialogOpen(true);
+          }}
         />
       </div>
       {!hasSupabaseEnv ? (
@@ -538,7 +596,7 @@ export default function HomePage() {
           <YearGrid
             year={year}
             todayIso={todayIso}
-            events={events}
+            events={renderEvents}
             onEditEvent={handleEditEvent}
             creatingRange={creatingRange}
             onStartCreateRange={handleStartCreateRange}
@@ -578,23 +636,35 @@ export default function HomePage() {
         onOpenChange={(open) => {
           setDialogOpen(open);
           if (!open) {
+            setDialogAnchorPoint(undefined);
             setSeedRange(null);
             setCreatingRange(null);
           }
         }}
         initialEvent={editingEvent}
         seedRange={seedRange}
+        anchorPoint={dialogAnchorPoint}
         onSubmit={handleSubmit}
         onDelete={
           editingId
             ? () => {
                 deleteEvent(editingId);
+                setDialogAnchorPoint(undefined);
                 setDialogOpen(false);
               }
             : undefined
         }
       />
-      <AuthDialog open={authDialogOpen} onOpenChange={setAuthDialogOpen} />
+      <AuthDialog
+        open={authDialogOpen}
+        onOpenChange={(open) => {
+          setAuthDialogOpen(open);
+          if (!open) {
+            setAuthDialogAnchorPoint(undefined);
+          }
+        }}
+        anchorPoint={authDialogAnchorPoint}
+      />
     </main>
   );
 }

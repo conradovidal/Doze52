@@ -1,6 +1,7 @@
 "use client";
 
 import { CategoryBar } from "@/components/category-bar";
+import { ProfileBar } from "@/components/profile-bar";
 import { UserMenu } from "@/components/auth/user-menu";
 import {
   Select,
@@ -11,13 +12,14 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
+import type { AnchorPoint } from "@/lib/types";
 
 type AppHeaderProps = {
   year: number;
   onYearChange: (year: number) => void;
   authLoading: boolean;
   isAuthenticated: boolean;
-  onOpenAuthDialog: () => void;
+  onOpenAuthDialog: (anchorPoint?: AnchorPoint) => void;
 };
 
 export function AppHeader({
@@ -28,7 +30,7 @@ export function AppHeader({
   onOpenAuthDialog,
 }: AppHeaderProps) {
   return (
-    <header className="mb-6">
+    <header className="mb-6 space-y-3">
       <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-2 md:grid-cols-[auto_1fr_auto] md:gap-4">
         <div className="justify-self-start">
           <img src="/logo-doze52.svg" alt="doze 52" className="h-7 w-auto md:h-[2.6rem]" />
@@ -52,17 +54,23 @@ export function AppHeader({
               {authLoading ? null : isAuthenticated ? (
                 <UserMenu />
               ) : (
-                <Button size="sm" className="h-9" onClick={onOpenAuthDialog}>
+                <Button
+                  size="sm"
+                  className="h-9"
+                  onClick={(event) => {
+                    const rect = event.currentTarget.getBoundingClientRect();
+                    onOpenAuthDialog({ x: rect.right, y: rect.bottom });
+                  }}
+                >
                   Entrar
                 </Button>
               )}
             </div>
           </div>
         </div>
-        <div className="col-span-2 flex w-full justify-start md:col-span-1 md:col-start-2 md:row-start-1 md:justify-center">
-          <CategoryBar compact />
-        </div>
       </div>
+      <ProfileBar compact />
+      <CategoryBar compact />
     </header>
   );
 }

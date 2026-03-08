@@ -9,7 +9,7 @@ import {
   parseISO,
   startOfYear,
 } from "date-fns";
-import type { CalendarEvent, CategoryItem } from "@/lib/types";
+import type { AnchorPoint, CalendarRenderEvent, CategoryItem } from "@/lib/types";
 import { useStore } from "@/lib/store";
 import { buildMultiDaySlotMap } from "@/lib/calendar-slotting";
 import { readCalendarEventDndPayload } from "@/lib/calendar-dnd";
@@ -27,8 +27,10 @@ type ReorderTarget = {
 
 type DragSource = {
   eventId: string;
+  sourceEventId: string;
   startDate: string;
   endDate: string;
+  recurrenceType?: "weekly" | "monthly" | "yearly";
   isMultiDay: boolean;
   grabOffsetDays: number;
   durationDaysInclusive: number;
@@ -55,12 +57,16 @@ export function YearGrid({
 }: {
   year: number;
   todayIso: string;
-  events: CalendarEvent[];
-  onEditEvent: (id: string) => void;
+  events: CalendarRenderEvent[];
+  onEditEvent: (payload: {
+    eventId: string;
+    sourceEventId: string;
+    anchorPoint: AnchorPoint;
+  }) => void;
   creatingRange: { startIso: string; hoverIso: string; isDragging: boolean } | null;
   onStartCreateRange: (startIso: string) => void;
   onHoverCreateRange: (hoverIso: string) => void;
-  onFinishCreateRange: (endIso?: string) => void;
+  onFinishCreateRange: (endIso?: string, anchorPoint?: AnchorPoint) => void;
   onMoveEventByDelta: (eventId: string, deltaDays: number) => void;
   onApplyDayReorder: (payload: {
     dayIso: string;
@@ -70,9 +76,15 @@ export function YearGrid({
   }) => void;
 }) {
   const categories = useStore((s) => s.categories as CategoryItem[]);
+  const selectedProfileIds = useStore((s) => s.selectedProfileIds);
   const visibleCategoryIds = React.useMemo(
-    () => categories.filter((c) => c.visible).map((c) => c.id),
-    [categories]
+    () => {
+      const selectedProfiles = new Set(selectedProfileIds);
+      return categories
+        .filter((category) => category.visible && selectedProfiles.has(category.profileId))
+        .map((category) => category.id);
+    },
+    [categories, selectedProfileIds]
   );
 
   const [dragState, setDragState] = React.useState<GlobalDragState>({
@@ -97,10 +109,6 @@ export function YearGrid({
           isRenderableEventDateRange(event)
       ),
     [events, visibleCategoryIds]
-  );
-  const eventById = React.useMemo(
-    () => new Map(events.map((event) => [event.id, event])),
-    [events]
   );
 
   const multiDaySlotById = React.useMemo(() => {
@@ -135,8 +143,10 @@ export function YearGrid({
   const onEventDragStart = React.useCallback(
     (payload: {
       eventId: string;
+      sourceEventId: string;
       startDate: string;
       endDate: string;
+      recurrenceType?: "weekly" | "monthly" | "yearly";
       grabOffsetDays: number;
       isMultiDay: boolean;
     }) => {
@@ -191,6 +201,7 @@ export function YearGrid({
 
       let currentSource: DragSource | null = null;
       let currentEventId: string | null = null;
+      let currentSourceEventId: string | null = null;
       const currentReorderTarget = dragState.reorderTarget ?? dragSnapshotRef.current.reorderTarget;
 
       if (transferPayload) {
@@ -204,46 +215,49 @@ export function YearGrid({
           durationDaysInclusive: Math.max(1, durationDaysInclusive),
         };
         currentEventId = transferPayload.eventId;
+        currentSourceEventId = transferPayload.sourceEventId;
       } else if (hasLiveState) {
         currentSource = dragState.source;
         currentEventId = dragState.draggingEventId;
+        currentSourceEventId = dragState.source?.sourceEventId ?? null;
       } else if (hasSnapshot) {
         currentSource = dragSnapshotRef.current.source;
         currentEventId = dragSnapshotRef.current.draggingEventId;
+        currentSourceEventId = dragSnapshotRef.current.source?.sourceEventId ?? null;
       }
-      if (!currentSource || !currentEventId) {
-        clearDragState();
-        return;
-      }
-
-      const sourceEvent = eventById.get(currentEventId);
-      if (!sourceEvent) {
+      if (!currentSource || !currentEventId || !currentSourceEventId) {
         clearDragState();
         return;
       }
 
       if (
         !currentSource.isMultiDay &&
+        !currentSource.recurrenceType &&
         currentSource.startDate === dropDateIso &&
         currentReorderTarget &&
         currentReorderTarget.dayIso === dropDateIso &&
         Number.isInteger(currentReorderTarget.insertIndex)
       ) {
         const inDayIds = visibleEvents
-          .filter((event) => event.startDate === dropDateIso && isSingleDayEvent(event))
+          .filter(
+            (event) =>
+              event.startDate === dropDateIso &&
+              isSingleDayEvent(event) &&
+              !event.recurrenceType
+          )
           .sort(compareEventsByVisualPriority)
-          .map((event) => event.id);
+          .map((event) => event.sourceEventId);
 
-        const withoutMoved = inDayIds.filter((id) => id !== currentEventId);
+        const withoutMoved = inDayIds.filter((id) => id !== currentSourceEventId);
         const insertAt = Math.max(
           0,
           Math.min(currentReorderTarget.insertIndex, withoutMoved.length)
         );
-        withoutMoved.splice(insertAt, 0, currentEventId);
+        withoutMoved.splice(insertAt, 0, currentSourceEventId);
 
         onApplyDayReorder({
           dayIso: dropDateIso,
-          eventId: currentEventId,
+          eventId: currentSourceEventId,
           toIndex: insertAt,
           orderedIds: withoutMoved,
         });
@@ -270,14 +284,13 @@ export function YearGrid({
         return;
       }
 
-      onMoveEventByDelta(sourceEvent.id, deltaDays);
+      onMoveEventByDelta(currentSourceEventId, deltaDays);
       didDropRef.current = true;
       clearDragState();
     },
     [
       clearDragState,
       dragState,
-      eventById,
       onApplyDayReorder,
       onMoveEventByDelta,
       visibleEvents,

@@ -12,14 +12,17 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth";
+import type { AnchorPoint } from "@/lib/types";
 import { GoogleButton } from "./google-button";
 
 export function AuthDialog({
   open,
   onOpenChange,
+  anchorPoint,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  anchorPoint?: AnchorPoint;
 }) {
   const router = useRouter();
   const {
@@ -284,7 +287,12 @@ export function AuthDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[420px]">
+      <DialogContent
+        anchorPoint={anchorPoint}
+        desktopPlacement="bottom-end"
+        mobileMode="sheet"
+        className="sm:max-w-[420px]"
+      >
         <DialogHeader>
           <DialogTitle>{mode === "login" ? "Entrar" : "Criar conta"}</DialogTitle>
         </DialogHeader>

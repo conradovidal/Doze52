@@ -14,6 +14,8 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CATEGORY_PRESET_COLORS } from "@/lib/category-palette";
 import { useStore } from "@/lib/store";
+import type { AnchorPoint } from "@/lib/types";
+
 const DEFAULT_CATEGORY_COLOR = CATEGORY_PRESET_COLORS[0];
 
 const normalizeHashPrefix = (value: string) => {
@@ -44,7 +46,9 @@ type CategoryManagerProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   categoryId?: string;
+  profileId?: string;
   onCreated?: (id: string) => void;
+  anchorPoint?: AnchorPoint;
 };
 
 export function CategoryManager({
@@ -52,9 +56,12 @@ export function CategoryManager({
   open,
   onOpenChange,
   categoryId,
+  profileId,
   onCreated,
+  anchorPoint,
 }: CategoryManagerProps) {
   const categories = useStore((s) => s.categories);
+  const profiles = useStore((s) => s.profiles);
   const createCategory = useStore((s) => s.createCategory);
   const updateCategory = useStore((s) => s.updateCategory);
   const deleteCategory = useStore((s) => s.deleteCategory);
@@ -71,6 +78,10 @@ export function CategoryManager({
   const [customPopoverOpen, setCustomPopoverOpen] = React.useState(false);
   const [isSaving, setIsSaving] = React.useState(false);
   const [saveError, setSaveError] = React.useState<string | null>(null);
+  const effectiveCreateProfileId = profileId ?? profiles[0]?.id ?? "";
+  const effectiveProfileId = category?.profileId ?? effectiveCreateProfileId;
+  const effectiveProfileName =
+    profiles.find((profile) => profile.id === effectiveProfileId)?.name ?? "";
 
   React.useEffect(() => {
     if (!open) return;
@@ -94,8 +105,8 @@ export function CategoryManager({
     setSaveError(null);
   }, [open, mode, category]);
 
-  const canSave = name.trim().length > 0;
   const isEdit = mode === "edit";
+  const canSave = name.trim().length > 0 && (isEdit || Boolean(effectiveCreateProfileId));
   const canDelete = categories.length > 1;
   const normalizedColor = color.toLowerCase();
   const isPresetColor = CATEGORY_PRESET_COLORS.some(
@@ -113,7 +124,15 @@ export function CategoryManager({
         onOpenChange(false);
         return;
       }
-      const id = createCategory({ name: name.trim(), color });
+      if (!effectiveCreateProfileId) {
+        setSaveError("Selecione um perfil antes de criar a categoria.");
+        return;
+      }
+      const id = createCategory({
+        name: name.trim(),
+        color,
+        profileId: effectiveCreateProfileId,
+      });
       if (id) onCreated?.(id);
       onOpenChange(false);
     } catch (error) {
@@ -158,11 +177,23 @@ export function CategoryManager({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[480px]">
+      <DialogContent
+        anchorPoint={anchorPoint}
+        desktopPlacement="right-start"
+        mobileMode="sheet"
+        className="sm:max-w-[480px]"
+      >
         <DialogHeader>
           <DialogTitle>{isEdit ? "Editar categoria" : "Nova categoria"}</DialogTitle>
         </DialogHeader>
         <div className="space-y-5">
+          <div className="space-y-2">
+            <div className="text-sm text-neutral-600">Perfil</div>
+            <div className="rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm">
+              {effectiveProfileName || "Perfil nao selecionado"}
+            </div>
+          </div>
+
           <div className="space-y-2">
             <div className="text-sm text-neutral-600">Nome da categoria</div>
             <Input value={name} onChange={(e) => setName(e.target.value)} />

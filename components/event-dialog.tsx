@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import type { CalendarEvent } from "@/lib/types";
+import type { AnchorPoint, CalendarEvent, RecurrenceType } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -18,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { isCalendarProfilesFeatureEnabled } from "@/lib/feature-flags";
 import { useStore } from "@/lib/store";
 import { logDevError, logProdError } from "@/lib/safe-log";
 import { ValidationError, validateEventInput } from "@/lib/validation";
@@ -28,6 +29,7 @@ export function EventDialog({
   initialEvent,
   seedDate,
   seedRange,
+  anchorPoint,
   onSubmit,
   onDelete,
 }: {
@@ -36,77 +38,200 @@ export function EventDialog({
   initialEvent?: CalendarEvent | null;
   seedDate?: string;
   seedRange?: { startDate: string; endDate: string } | null;
+  anchorPoint?: AnchorPoint;
   onSubmit: (payload: {
     title: string;
     categoryId: string;
     startDate: string;
     endDate: string;
     notes?: string;
+    recurrenceType?: RecurrenceType;
+    recurrenceUntil?: string;
   }) => Promise<void> | void;
   onDelete?: () => Promise<void> | void;
 }) {
   const categories = useStore((s) => s.categories);
+  const profiles = useStore((s) => s.profiles);
+  const selectedProfileIds = useStore((s) => s.selectedProfileIds);
+
   const [title, setTitle] = React.useState("");
+  const [profileId, setProfileId] = React.useState("");
   const [categoryId, setCategoryId] = React.useState("");
   const [startDate, setStartDate] = React.useState("");
   const [endDate, setEndDate] = React.useState("");
   const [notes, setNotes] = React.useState("");
+  const [recurrenceType, setRecurrenceType] = React.useState<
+    "none" | "weekly" | "monthly" | "yearly"
+  >("none");
+  const [recurrenceUntil, setRecurrenceUntil] = React.useState("");
   const [isSaving, setIsSaving] = React.useState(false);
   const [submitError, setSubmitError] = React.useState<string | null>(null);
 
+  const categoryById = React.useMemo(
+    () => new Map(categories.map((category) => [category.id, category])),
+    [categories]
+  );
+
+  const selectedProfileSet = React.useMemo(
+    () => new Set(selectedProfileIds),
+    [selectedProfileIds]
+  );
+
+  const initialProfileFromEvent = initialEvent
+    ? categoryById.get(initialEvent.categoryId)?.profileId ?? ""
+    : "";
+
+  const profileOptions = React.useMemo(() => {
+    if (!isCalendarProfilesFeatureEnabled) {
+      return profiles;
+    }
+    const filtered = profiles.filter(
+      (profile) =>
+        selectedProfileSet.has(profile.id) || profile.id === initialProfileFromEvent
+    );
+    return filtered.length > 0 ? filtered : profiles;
+  }, [initialProfileFromEvent, profiles, selectedProfileSet]);
+
+  const categoriesForProfile = React.useMemo(() => {
+    if (!isCalendarProfilesFeatureEnabled) {
+      return categories;
+    }
+    if (!profileId) return [];
+    return categories.filter((category) => category.profileId === profileId);
+  }, [categories, profileId]);
+
   React.useEffect(() => {
     if (!open) return;
+
     setTitle(initialEvent?.title ?? "");
-    setCategoryId(initialEvent?.categoryId ?? categories[0]?.id ?? "");
-    setStartDate(
-      initialEvent?.startDate ?? seedRange?.startDate ?? seedDate ?? ""
-    );
-    setEndDate(
-      initialEvent?.endDate ?? seedRange?.endDate ?? seedDate ?? ""
-    );
+
+    const nextProfileId =
+      initialProfileFromEvent || profileOptions[0]?.id || profiles[0]?.id || "";
+    setProfileId(nextProfileId);
+
+    const availableCategories = isCalendarProfilesFeatureEnabled
+      ? categories.filter((category) => category.profileId === nextProfileId)
+      : categories;
+
+    const nextCategoryId =
+      initialEvent?.categoryId &&
+      availableCategories.some((category) => category.id === initialEvent.categoryId)
+        ? initialEvent.categoryId
+        : availableCategories[0]?.id ?? "";
+
+    setCategoryId(nextCategoryId);
+
+    setStartDate(initialEvent?.startDate ?? seedRange?.startDate ?? seedDate ?? "");
+    setEndDate(initialEvent?.endDate ?? seedRange?.endDate ?? seedDate ?? "");
     setNotes(initialEvent?.notes ?? "");
+    setRecurrenceType(initialEvent?.recurrenceType ?? "none");
+    setRecurrenceUntil(initialEvent?.recurrenceUntil ?? "");
     setIsSaving(false);
     setSubmitError(null);
-  }, [open, initialEvent, seedDate, seedRange, categories]);
+  }, [
+    open,
+    categories,
+    initialEvent,
+    initialProfileFromEvent,
+    profileOptions,
+    profiles,
+    seedDate,
+    seedRange,
+  ]);
 
-  const canSave = title.trim() && startDate && endDate && categoryId;
+  React.useEffect(() => {
+    if (!open || !isCalendarProfilesFeatureEnabled) return;
+    if (!categoriesForProfile.some((category) => category.id === categoryId)) {
+      setCategoryId(categoriesForProfile[0]?.id ?? "");
+    }
+  }, [open, categoryId, categoriesForProfile]);
+
+  const canSave =
+    title.trim().length > 0 &&
+    startDate.length > 0 &&
+    endDate.length > 0 &&
+    categoryId.length > 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[420px]">
+      <DialogContent
+        anchorPoint={anchorPoint}
+        desktopPlacement="right-start"
+        mobileMode="sheet"
+        className="sm:max-w-[420px]"
+      >
         <DialogHeader>
-          <DialogTitle>
-            {initialEvent ? "Editar evento" : "Novo evento"}
-          </DialogTitle>
+          <DialogTitle>{initialEvent ? "Editar evento" : "Novo evento"}</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
           <Input
             placeholder="Titulo"
             value={title}
-            onChange={(e) => setTitle(e.target.value)}
+            onChange={(event) => setTitle(event.target.value)}
           />
-          <Select value={categoryId} onValueChange={(v) => setCategoryId(v)}>
+
+          {isCalendarProfilesFeatureEnabled ? (
+            <Select value={profileId} onValueChange={(value) => setProfileId(value)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Perfil" />
+              </SelectTrigger>
+              <SelectContent>
+                {profileOptions.map((profile) => (
+                  <SelectItem key={profile.id} value={profile.id}>
+                    {profile.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : null}
+
+          <Select value={categoryId} onValueChange={(value) => setCategoryId(value)}>
             <SelectTrigger>
               <SelectValue placeholder="Categoria" />
             </SelectTrigger>
             <SelectContent>
-              {categories.map((c) => (
-                <SelectItem key={c.id} value={c.id}>
-                  {c.name}
+              {categoriesForProfile.map((category) => (
+                <SelectItem key={category.id} value={category.id}>
+                  {category.name}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
+
           <div className="grid grid-cols-2 gap-2">
             <Input
               type="date"
               value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
+              onChange={(event) => setStartDate(event.target.value)}
             />
             <Input
               type="date"
               value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
+              onChange={(event) => setEndDate(event.target.value)}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <Select
+              value={recurrenceType}
+              onValueChange={(value) =>
+                setRecurrenceType(value as "none" | "weekly" | "monthly" | "yearly")
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Recorrencia" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Sem recorrencia</SelectItem>
+                <SelectItem value="weekly">Semanal</SelectItem>
+                <SelectItem value="monthly">Mensal</SelectItem>
+                <SelectItem value="yearly">Anual</SelectItem>
+              </SelectContent>
+            </Select>
+            <Input
+              type="date"
+              disabled={recurrenceType === "none"}
+              value={recurrenceUntil}
+              onChange={(event) => setRecurrenceUntil(event.target.value)}
             />
           </div>
           <div className="space-y-1">
@@ -118,7 +243,7 @@ export function EventDialog({
               className="min-h-20 w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
               placeholder="Descricao"
               value={notes}
-              onChange={(e) => setNotes(e.target.value)}
+              onChange={(event) => setNotes(event.target.value)}
             />
           </div>
         </div>
@@ -143,9 +268,7 @@ export function EventDialog({
                     hasInitialEvent: Boolean(initialEvent),
                   });
                   logProdError("Falha ao excluir evento.");
-                  setSubmitError(
-                    message
-                  );
+                  setSubmitError(message);
                 } finally {
                   setIsSaving(false);
                 }
@@ -171,6 +294,11 @@ export function EventDialog({
                     startDate,
                     endDate,
                     notes,
+                    recurrenceType: recurrenceType === "none" ? undefined : recurrenceType,
+                    recurrenceUntil:
+                      recurrenceType === "none" || recurrenceUntil.length === 0
+                        ? undefined
+                        : recurrenceUntil,
                     color:
                       categories.find((category) => category.id === categoryId)?.color ??
                       "#2563eb",
@@ -179,7 +307,18 @@ export function EventDialog({
                   },
                   categoryIds
                 );
-                await onSubmit({ title, categoryId, startDate, endDate, notes });
+                await onSubmit({
+                  title,
+                  categoryId,
+                  startDate,
+                  endDate,
+                  notes,
+                  recurrenceType: recurrenceType === "none" ? undefined : recurrenceType,
+                  recurrenceUntil:
+                    recurrenceType === "none" || recurrenceUntil.length === 0
+                      ? undefined
+                      : recurrenceUntil,
+                });
                 onOpenChange(false);
               } catch (error) {
                 const message =
@@ -193,9 +332,7 @@ export function EventDialog({
                   hasInitialEvent: Boolean(initialEvent),
                 });
                 logProdError("Falha ao salvar evento.");
-                setSubmitError(
-                  message
-                );
+                setSubmitError(message);
               } finally {
                 setIsSaving(false);
               }

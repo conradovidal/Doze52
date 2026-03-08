@@ -11,6 +11,7 @@ import { useStore } from "@/lib/store";
 
 export function UserMenu() {
   const { session, signOut } = useAuth();
+  const profiles = useStore((state) => state.profiles);
   const categories = useStore((state) => state.categories);
   const events = useStore((state) => state.events);
   const [brokenAvatar, setBrokenAvatar] = useState(false);
@@ -47,7 +48,7 @@ export function UserMenu() {
     try {
       setIsSigningOut(true);
       setSignOutError(null);
-      await saveSnapshot({ categories, events });
+      await saveSnapshot({ profiles, categories, events });
       await signOut();
     } catch (error) {
       const message =

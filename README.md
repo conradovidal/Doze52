@@ -128,7 +128,7 @@ rg -n "service_role|SUPABASE_SERVICE_ROLE|sb_secret|sbp_"
 4. Confirm tables used by sync (`loadRemoteData`, `saveSnapshot`, `exportUserData`):
 - `public.categories`
 - `public.events`
-  - expected columns in `events`: `id, user_id, title, category_id, start_date, end_date, notes, day_order, created_at, updated_at`
+  - expected columns in `events`: `id, user_id, title, category_id, start_date, end_date, notes, recurrence_type, recurrence_until, day_order, created_at, updated_at`
 5. Confirm minimum RLS/policies per table:
 - RLS `enabled` and `force`.
 - Policies `SELECT/INSERT/UPDATE/DELETE` with `auth.uid() = user_id`.

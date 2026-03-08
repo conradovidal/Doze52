@@ -8,7 +8,8 @@ import {
   ONBOARDING_CATEGORY_COLOR_BY_ID,
   PREVIOUS_ONBOARDING_COLOR_BY_ID,
 } from "./category-palette";
-import type { CalendarEvent, CategoryItem } from "./types";
+import { isCalendarProfilesFeatureEnabled } from "./feature-flags";
+import type { CalendarEvent, CalendarProfile, CategoryItem } from "./types";
 
 export type EventInput = {
   title: string;
@@ -16,16 +17,33 @@ export type EventInput = {
   startDate: string;
   endDate: string;
   notes?: string;
+  recurrenceType?: CalendarEvent["recurrenceType"];
+  recurrenceUntil?: string;
 };
 
 type StoreState = {
+  profiles: CalendarProfile[];
+  selectedProfileIds: string[];
   events: CalendarEvent[];
   categories: CategoryItem[];
-  replaceAllData: (payload: { categories: CategoryItem[]; events: CalendarEvent[] }) => void;
+  replaceAllData: (payload: {
+    profiles: CalendarProfile[];
+    categories: CategoryItem[];
+    events: CalendarEvent[];
+  }) => void;
   resetToOnboardingData: () => void;
   markLocalImported: (userId: string) => void;
   isLocalImported: (userId: string) => boolean;
   ensureEventMetadata: () => void;
+  setSelectedProfiles: (profileIds: string[]) => void;
+  toggleSelectedProfile: (profileId: string) => void;
+  createProfile: (input: { name: string; color: string }) => string;
+  updateProfile: (
+    id: string,
+    patch: Partial<Pick<CalendarProfile, "name" | "color">>
+  ) => void;
+  deleteProfile: (input: { profileId: string; reassignToProfileId: string }) => void;
+  setProfilesOrder: (orderedIds: string[]) => void;
   addEvent: (input: EventInput) => void;
   updateEvent: (id: string, input: EventInput) => void;
   moveEventByDelta: (id: string, deltaDays: number) => void;
@@ -33,8 +51,8 @@ type StoreState = {
   normalizeDayOrder: (dayIso: string, eventIdsInDay: string[]) => void;
   deleteEvent: (id: string) => void;
   getEventById: (id: string) => CalendarEvent | undefined;
-  createCategory: (input: { name: string; color: string }) => string;
-  addCategory: (name: string, color: string) => void;
+  createCategory: (input: { name: string; color: string; profileId: string }) => string;
+  addCategory: (name: string, color: string, profileId?: string) => void;
   updateCategory: (id: string, patch: Partial<Omit<CategoryItem, "id">>) => void;
   deleteCategory: (id: string) => void;
   toggleCategoryVisibility: (id: string) => void;
@@ -56,6 +74,8 @@ const LEGACY_CATEGORY_ID_MAP: Record<string, string> = {
   other: "33333333-3333-4333-8333-333333333333",
 };
 
+const DEFAULT_PROFILE_COLOR = "#64748B";
+
 const isUuid = (value: string) => UUID_RE.test(value);
 
 const mapLegacyCategoryId = (rawId: string | undefined | null) => {
@@ -63,56 +83,204 @@ const mapLegacyCategoryId = (rawId: string | undefined | null) => {
   return LEGACY_CATEGORY_ID_MAP[rawId] ?? rawId;
 };
 
+export const ONBOARDING_PROFILE_IDS = {
+  professional: "44444444-4444-4444-8444-444444444441",
+  personal: "44444444-4444-4444-8444-444444444442",
+  family: "44444444-4444-4444-8444-444444444443",
+} as const;
+
+export const ONBOARDING_DEFAULT_PROFILE_ID = ONBOARDING_PROFILE_IDS.personal;
+
 export const ONBOARDING_CATEGORY_IDS = {
   birthday: "11111111-1111-4111-8111-111111111111",
   travel: "22222222-2222-4222-8222-222222222222",
   events: "33333333-3333-4333-8333-333333333333",
+  workMeetings: "55555555-5555-4555-8555-555555555551",
+  workDeliveries: "55555555-5555-4555-8555-555555555552",
+  workTrips: "55555555-5555-4555-8555-555555555553",
+  familySchool: "66666666-6666-4666-8666-666666666661",
+  familyHealth: "66666666-6666-4666-8666-666666666662",
+  familyMoments: "66666666-6666-4666-8666-666666666663",
 } as const;
 
 export const ONBOARDING_DEFAULT_CATEGORY_ID = ONBOARDING_CATEGORY_IDS.events;
+
 const defaultCategoryColor =
   ONBOARDING_CATEGORY_COLOR_BY_ID[ONBOARDING_DEFAULT_CATEGORY_ID] ??
   CATEGORY_PRESET_COLORS[0];
 
-export const ONBOARDING_DEFAULT_CATEGORIES: CategoryItem[] = [
+const getLegacyDefaultProfiles = (): CalendarProfile[] => [
+  {
+    id: ONBOARDING_PROFILE_IDS.personal,
+    name: "Pessoal",
+    color: DEFAULT_PROFILE_COLOR,
+    position: 0,
+  },
+];
+
+const getFeatureDefaultProfiles = (): CalendarProfile[] => [
+  {
+    id: ONBOARDING_PROFILE_IDS.professional,
+    name: "Profissional",
+    color: "#2563EB",
+    position: 0,
+  },
+  {
+    id: ONBOARDING_PROFILE_IDS.personal,
+    name: "Pessoal",
+    color: DEFAULT_PROFILE_COLOR,
+    position: 1,
+  },
+  {
+    id: ONBOARDING_PROFILE_IDS.family,
+    name: "Familia",
+    color: "#16A34A",
+    position: 2,
+  },
+];
+
+export const getOnboardingDefaultProfiles = (): CalendarProfile[] => {
+  const source = isCalendarProfilesFeatureEnabled
+    ? getFeatureDefaultProfiles()
+    : getLegacyDefaultProfiles();
+  return source.map((profile) => ({ ...profile }));
+};
+
+export const isOnboardingProfilesSnapshot = (profiles: CalendarProfile[]) => {
+  const expected = getOnboardingDefaultProfiles();
+  if (profiles.length !== expected.length) return false;
+  return expected.every((defaultProfile, index) => {
+    const received = profiles[index];
+    if (!received) return false;
+    return (
+      received.id === defaultProfile.id &&
+      received.name === defaultProfile.name &&
+      received.color.toLowerCase() === defaultProfile.color.toLowerCase() &&
+      received.position === defaultProfile.position
+    );
+  });
+};
+
+const getLegacyDefaultCategories = (): CategoryItem[] => [
   {
     id: ONBOARDING_CATEGORY_IDS.birthday,
+    profileId: ONBOARDING_PROFILE_IDS.personal,
     name: "Aniversarios",
     color: ONBOARDING_CATEGORY_COLOR_BY_ID[ONBOARDING_CATEGORY_IDS.birthday],
     visible: true,
   },
   {
     id: ONBOARDING_CATEGORY_IDS.travel,
+    profileId: ONBOARDING_PROFILE_IDS.personal,
     name: "Ferias/Viagens",
     color: ONBOARDING_CATEGORY_COLOR_BY_ID[ONBOARDING_CATEGORY_IDS.travel],
     visible: true,
   },
   {
     id: ONBOARDING_CATEGORY_IDS.events,
+    profileId: ONBOARDING_PROFILE_IDS.personal,
     name: "Eventos",
     color: ONBOARDING_CATEGORY_COLOR_BY_ID[ONBOARDING_CATEGORY_IDS.events],
     visible: true,
   },
 ];
 
+const getFeatureDefaultCategories = (): CategoryItem[] => [
+  {
+    id: ONBOARDING_CATEGORY_IDS.workMeetings,
+    profileId: ONBOARDING_PROFILE_IDS.professional,
+    name: "Reunioes",
+    color: CATEGORY_PRESET_COLORS[0],
+    visible: true,
+  },
+  {
+    id: ONBOARDING_CATEGORY_IDS.workDeliveries,
+    profileId: ONBOARDING_PROFILE_IDS.professional,
+    name: "Entregas",
+    color: CATEGORY_PRESET_COLORS[4],
+    visible: true,
+  },
+  {
+    id: ONBOARDING_CATEGORY_IDS.workTrips,
+    profileId: ONBOARDING_PROFILE_IDS.professional,
+    name: "Viagens Trabalho",
+    color: CATEGORY_PRESET_COLORS[5],
+    visible: true,
+  },
+  {
+    id: ONBOARDING_CATEGORY_IDS.birthday,
+    profileId: ONBOARDING_PROFILE_IDS.personal,
+    name: "Aniversarios",
+    color: ONBOARDING_CATEGORY_COLOR_BY_ID[ONBOARDING_CATEGORY_IDS.birthday],
+    visible: true,
+  },
+  {
+    id: ONBOARDING_CATEGORY_IDS.travel,
+    profileId: ONBOARDING_PROFILE_IDS.personal,
+    name: "Ferias/Viagens",
+    color: ONBOARDING_CATEGORY_COLOR_BY_ID[ONBOARDING_CATEGORY_IDS.travel],
+    visible: true,
+  },
+  {
+    id: ONBOARDING_CATEGORY_IDS.events,
+    profileId: ONBOARDING_PROFILE_IDS.personal,
+    name: "Eventos",
+    color: ONBOARDING_CATEGORY_COLOR_BY_ID[ONBOARDING_CATEGORY_IDS.events],
+    visible: true,
+  },
+  {
+    id: ONBOARDING_CATEGORY_IDS.familySchool,
+    profileId: ONBOARDING_PROFILE_IDS.family,
+    name: "Escola",
+    color: CATEGORY_PRESET_COLORS[1],
+    visible: true,
+  },
+  {
+    id: ONBOARDING_CATEGORY_IDS.familyHealth,
+    profileId: ONBOARDING_PROFILE_IDS.family,
+    name: "Saude Familia",
+    color: CATEGORY_PRESET_COLORS[2],
+    visible: true,
+  },
+  {
+    id: ONBOARDING_CATEGORY_IDS.familyMoments,
+    profileId: ONBOARDING_PROFILE_IDS.family,
+    name: "Momentos",
+    color: CATEGORY_PRESET_COLORS[6],
+    visible: true,
+  },
+];
+
+const getTemplateCategories = (options?: { legacyOnly?: boolean }) => {
+  if (options?.legacyOnly) return getLegacyDefaultCategories();
+  return isCalendarProfilesFeatureEnabled
+    ? getFeatureDefaultCategories()
+    : getLegacyDefaultCategories();
+};
+
+export const ONBOARDING_DEFAULT_CATEGORIES: CategoryItem[] = getTemplateCategories();
+
 export const getOnboardingDefaultCategories = (): CategoryItem[] =>
-  ONBOARDING_DEFAULT_CATEGORIES.map((category) => ({ ...category }));
+  getTemplateCategories().map((category) => ({ ...category }));
 
 export const isOnboardingCategoriesSnapshot = (categories: CategoryItem[]) => {
-  if (categories.length !== ONBOARDING_DEFAULT_CATEGORIES.length) return false;
-  return ONBOARDING_DEFAULT_CATEGORIES.every((expected, index) => {
+  const expected = getOnboardingDefaultCategories();
+  if (categories.length !== expected.length) return false;
+  return expected.every((defaultCategory, index) => {
     const received = categories[index];
     if (!received) return false;
     return (
-      received.id === expected.id &&
-      received.name === expected.name &&
-      received.color.toLowerCase() === expected.color.toLowerCase() &&
-      received.visible === expected.visible
+      received.id === defaultCategory.id &&
+      received.profileId === defaultCategory.profileId &&
+      received.name === defaultCategory.name &&
+      received.color.toLowerCase() === defaultCategory.color.toLowerCase() &&
+      received.visible === defaultCategory.visible
     );
   });
 };
 
-const defaultCategories: CategoryItem[] = getOnboardingDefaultCategories();
+const defaultProfiles: CalendarProfile[] = getOnboardingDefaultProfiles();
+const defaultProfileId = ONBOARDING_DEFAULT_PROFILE_ID;
 const defaultCategoryId = ONBOARDING_DEFAULT_CATEGORY_ID;
 const normalizeColorForCompare = (value: string | undefined | null) =>
   (value ?? "").trim().toLowerCase();
@@ -134,25 +302,90 @@ const migrateOnboardingCategoryColors = (categories: CategoryItem[]) =>
     };
   });
 
-const normalizePersistedCategories = (
-  persistedCategories: CategoryItem[] | undefined
+const getAllProfileIds = (profiles: CalendarProfile[]) => profiles.map((profile) => profile.id);
+
+const ensureSelectedProfileIds = (
+  selectedIds: string[] | undefined,
+  profiles: CalendarProfile[]
 ) => {
+  if (profiles.length === 0) return [];
+  const valid = new Set(getAllProfileIds(profiles));
+  const next = (selectedIds ?? []).filter((id, index, arr) => {
+    if (!valid.has(id)) return false;
+    return arr.indexOf(id) === index;
+  });
+  return next.length > 0 ? next : getAllProfileIds(profiles);
+};
+
+const normalizePersistedProfiles = (
+  persistedProfiles: CalendarProfile[] | undefined,
+  options: { forLegacyData: boolean }
+) => {
+  const fallback = options.forLegacyData
+    ? getLegacyDefaultProfiles()
+    : getOnboardingDefaultProfiles();
+  const source =
+    persistedProfiles && persistedProfiles.length > 0 ? persistedProfiles : fallback;
+  const seen = new Set<string>();
+  const next: CalendarProfile[] = [];
+
+  for (const profile of source) {
+    const normalizedId =
+      profile.id && profile.id.trim() && isUuid(profile.id) ? profile.id : uid();
+    if (seen.has(normalizedId)) continue;
+    seen.add(normalizedId);
+    next.push({
+      ...profile,
+      id: normalizedId,
+      name: profile.name?.trim() || "Perfil",
+      color:
+        typeof profile.color === "string" && profile.color.trim().length > 0
+          ? profile.color
+          : DEFAULT_PROFILE_COLOR,
+      position: next.length,
+    });
+  }
+
+  return next.length > 0 ? next : fallback;
+};
+
+const normalizePersistedCategories = (
+  persistedCategories: CategoryItem[] | undefined,
+  profiles: CalendarProfile[],
+  options: { forLegacyData: boolean }
+) => {
+  const fallbackCategories = options.forLegacyData
+    ? getTemplateCategories({ legacyOnly: true })
+    : getOnboardingDefaultCategories();
   const source =
     persistedCategories && persistedCategories.length > 0
       ? persistedCategories
-      : defaultCategories;
+      : fallbackCategories;
+  const profileIds = new Set(profiles.map((profile) => profile.id));
+  const fallbackProfileId = profileIds.has(defaultProfileId)
+    ? defaultProfileId
+    : (profiles[0]?.id ?? defaultProfileId);
   const seen = new Set<string>();
   const next: CategoryItem[] = [];
 
   for (const category of source) {
-    const mapped = mapLegacyCategoryId(category.id);
-    const normalizedId =
-      mapped && mapped.trim() && isUuid(mapped) ? mapped : uid();
-    if (seen.has(normalizedId)) continue;
-    seen.add(normalizedId);
+    const mappedCategoryId = mapLegacyCategoryId(category.id);
+    const normalizedCategoryId =
+      mappedCategoryId && mappedCategoryId.trim() && isUuid(mappedCategoryId)
+        ? mappedCategoryId
+        : uid();
+    if (seen.has(normalizedCategoryId)) continue;
+    seen.add(normalizedCategoryId);
+
+    const normalizedProfileId =
+      category.profileId && profileIds.has(category.profileId)
+        ? category.profileId
+        : fallbackProfileId;
+
     next.push({
       ...category,
-      id: normalizedId,
+      id: normalizedCategoryId,
+      profileId: normalizedProfileId,
       name: category.name?.trim() || "Categoria",
       color:
         typeof category.color === "string" && category.color.trim().length > 0
@@ -182,6 +415,32 @@ const normalizeEventDayOrder = (value: unknown): number => {
   return 0;
 };
 
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const isIsoDate = (value: unknown): value is string => {
+  if (typeof value !== "string" || !ISO_DATE_RE.test(value)) return false;
+  const parsed = parseISO(value);
+  return !Number.isNaN(parsed.getTime());
+};
+
+const normalizeRecurrenceType = (
+  value: unknown
+): CalendarEvent["recurrenceType"] | undefined => {
+  if (value === "weekly" || value === "monthly" || value === "yearly") {
+    return value;
+  }
+  return undefined;
+};
+
+const normalizeRecurrenceUntil = (params: {
+  value: unknown;
+  recurrenceType: CalendarEvent["recurrenceType"];
+  startDate: string;
+}): string | undefined => {
+  if (!params.recurrenceType || !isIsoDate(params.value)) return undefined;
+  if (params.value < params.startDate) return undefined;
+  return params.value;
+};
+
 const isSingleDayEvent = (evt: Pick<CalendarEvent, "startDate" | "endDate">) =>
   evt.startDate === evt.endDate;
 
@@ -201,6 +460,8 @@ const nextMultiDayOrder = (events: CalendarEvent[]) => {
 
 type LegacyEvent = Partial<CalendarEvent> & { category?: string };
 type PersistedState = {
+  profiles?: CalendarProfile[];
+  selectedProfileIds?: string[];
   categories?: CategoryItem[];
   events?: LegacyEvent[];
 };
@@ -208,17 +469,38 @@ type PersistedState = {
 export const useStore = create<StoreState>()(
   persist(
     (set, get) => ({
+      profiles: getOnboardingDefaultProfiles(),
+      selectedProfileIds: getAllProfileIds(defaultProfiles),
       events: [],
       categories: getOnboardingDefaultCategories(),
-      replaceAllData: ({ categories, events }) =>
-        set({
-          categories,
-          events,
+      replaceAllData: ({ profiles, categories, events }) =>
+        set((state) => {
+          const hasLegacyData = categories.length > 0 || events.length > 0;
+          const nextProfiles = normalizePersistedProfiles(profiles, {
+            forLegacyData: hasLegacyData && profiles.length === 0,
+          });
+          const nextCategories = normalizePersistedCategories(categories, nextProfiles, {
+            forLegacyData: hasLegacyData && categories.length === 0,
+          });
+          return {
+            profiles: nextProfiles,
+            selectedProfileIds: ensureSelectedProfileIds(
+              state.selectedProfileIds,
+              nextProfiles
+            ),
+            categories: nextCategories,
+            events,
+          };
         }),
       resetToOnboardingData: () =>
-        set({
-          categories: getOnboardingDefaultCategories(),
-          events: [],
+        set(() => {
+          const profiles = getOnboardingDefaultProfiles();
+          return {
+            profiles,
+            selectedProfileIds: getAllProfileIds(profiles),
+            categories: getOnboardingDefaultCategories(),
+            events: [],
+          };
         }),
       markLocalImported: (userId) => {
         if (typeof window === "undefined") return;
@@ -253,12 +535,129 @@ export const useStore = create<StoreState>()(
           });
           return changed ? { events: nextEvents } : state;
         }),
+      setSelectedProfiles: (profileIds) =>
+        set((state) => ({
+          selectedProfileIds: ensureSelectedProfileIds(profileIds, state.profiles),
+        })),
+      toggleSelectedProfile: (profileId) =>
+        set((state) => {
+          const profileExists = state.profiles.some((profile) => profile.id === profileId);
+          if (!profileExists) return state;
+          const selected = new Set(ensureSelectedProfileIds(state.selectedProfileIds, state.profiles));
+          if (selected.has(profileId)) {
+            selected.delete(profileId);
+          } else {
+            selected.add(profileId);
+          }
+          const next = Array.from(selected);
+          return {
+            selectedProfileIds: ensureSelectedProfileIds(next, state.profiles),
+          };
+        }),
+      createProfile: (input) => {
+        const name = input.name.trim();
+        if (!name) return "";
+        const id = uid();
+        set((state) => {
+          const nextProfiles = [
+            ...state.profiles,
+            {
+              id,
+              name,
+              color: input.color || DEFAULT_PROFILE_COLOR,
+              position: state.profiles.length,
+            },
+          ];
+          const wasAllSelected =
+            ensureSelectedProfileIds(state.selectedProfileIds, state.profiles).length ===
+            state.profiles.length;
+          return {
+            profiles: nextProfiles,
+            selectedProfileIds: wasAllSelected
+              ? [...state.selectedProfileIds, id]
+              : ensureSelectedProfileIds(state.selectedProfileIds, nextProfiles),
+          };
+        });
+        return id;
+      },
+      updateProfile: (id, patch) =>
+        set((state) => ({
+          profiles: state.profiles.map((profile) => {
+            if (profile.id !== id) return profile;
+            return {
+              ...profile,
+              ...patch,
+              name: patch.name?.trim() || profile.name,
+              color: patch.color || profile.color,
+            };
+          }),
+        })),
+      deleteProfile: ({ profileId, reassignToProfileId }) =>
+        set((state) => {
+          if (state.profiles.length <= 1) return state;
+          if (!state.profiles.some((profile) => profile.id === profileId)) return state;
+
+          const availableTarget = state.profiles.find(
+            (profile) => profile.id === reassignToProfileId && profile.id !== profileId
+          );
+          const fallbackTarget = state.profiles.find((profile) => profile.id !== profileId);
+          const targetProfileId = availableTarget?.id ?? fallbackTarget?.id;
+          if (!targetProfileId) return state;
+
+          const nextProfiles = state.profiles
+            .filter((profile) => profile.id !== profileId)
+            .map((profile, index) => ({ ...profile, position: index }));
+
+          return {
+            profiles: nextProfiles,
+            selectedProfileIds: ensureSelectedProfileIds(
+              state.selectedProfileIds.filter((id) => id !== profileId),
+              nextProfiles
+            ),
+            categories: state.categories.map((category) =>
+              category.profileId === profileId
+                ? { ...category, profileId: targetProfileId }
+                : category
+            ),
+          };
+        }),
+      setProfilesOrder: (orderedIds) =>
+        set((state) => {
+          const byId = new Map(state.profiles.map((profile) => [profile.id, profile]));
+          const next: CalendarProfile[] = [];
+          for (const id of orderedIds) {
+            const found = byId.get(id);
+            if (!found) continue;
+            next.push(found);
+            byId.delete(id);
+          }
+          for (const profile of state.profiles) {
+            if (byId.has(profile.id)) next.push(profile);
+          }
+          const normalized = next.map((profile, index) => ({
+            ...profile,
+            position: index,
+          }));
+          return {
+            profiles: normalized,
+            selectedProfileIds: ensureSelectedProfileIds(
+              state.selectedProfileIds,
+              normalized
+            ),
+          };
+        }),
       addEvent: (input) =>
         set((state) => {
           const isSingleDay = input.startDate === input.endDate;
           const dayOrder = isSingleDay
             ? nextSingleDayOrder(state.events, input.startDate)
             : nextMultiDayOrder(state.events);
+          const recurrenceType = normalizeRecurrenceType(input.recurrenceType);
+          const recurrenceUntil = normalizeRecurrenceUntil({
+            value: input.recurrenceUntil,
+            recurrenceType,
+            startDate: input.startDate,
+          });
           return {
             events: [
               ...state.events,
@@ -272,6 +671,8 @@ export const useStore = create<StoreState>()(
                 startDate: input.startDate,
                 endDate: input.endDate,
                 notes: input.notes?.trim() || undefined,
+                recurrenceType,
+                recurrenceUntil,
                 createdAt: new Date().toISOString(),
                 dayOrder,
               },
@@ -293,6 +694,12 @@ export const useStore = create<StoreState>()(
                   )
                 : nextMultiDayOrder(state.events.filter((entry) => entry.id !== id))
               : normalizeEventDayOrder(evt.dayOrder);
+            const recurrenceType = normalizeRecurrenceType(input.recurrenceType);
+            const recurrenceUntil = normalizeRecurrenceUntil({
+              value: input.recurrenceUntil,
+              recurrenceType,
+              startDate: input.startDate,
+            });
             return {
               ...evt,
               title: input.title.trim(),
@@ -303,6 +710,8 @@ export const useStore = create<StoreState>()(
               startDate: input.startDate,
               endDate: input.endDate,
               notes: input.notes?.trim() || undefined,
+              recurrenceType,
+              recurrenceUntil,
               createdAt: evt.createdAt,
               dayOrder: nextOrder,
             };
@@ -320,6 +729,9 @@ export const useStore = create<StoreState>()(
                 ...evt,
                 startDate: format(movedStart, "yyyy-MM-dd"),
                 endDate: format(movedEnd, "yyyy-MM-dd"),
+                recurrenceUntil: evt.recurrenceUntil
+                  ? format(addDays(parseISO(evt.recurrenceUntil), deltaDays), "yyyy-MM-dd")
+                  : undefined,
               };
             }),
           };
@@ -364,21 +776,43 @@ export const useStore = create<StoreState>()(
         const name = input.name.trim();
         if (!name) return "";
         const id = uid();
-        set((state) => ({
-          categories: [
-            ...state.categories,
-            { id, name, color: input.color, visible: true },
-          ],
-        }));
+        set((state) => {
+          const fallbackProfileId =
+            state.selectedProfileIds[0] ?? state.profiles[0]?.id ?? defaultProfileId;
+          const profileId = state.profiles.some((profile) => profile.id === input.profileId)
+            ? input.profileId
+            : fallbackProfileId;
+          return {
+            categories: [
+              ...state.categories,
+              {
+                id,
+                profileId,
+                name,
+                color: input.color,
+                visible: true,
+              },
+            ],
+          };
+        });
         return id;
       },
-      addCategory: (name, color) =>
-        get().createCategory({ name, color }),
+      addCategory: (name, color, profileId) => {
+        const currentProfileId =
+          profileId ?? get().selectedProfileIds[0] ?? get().profiles[0]?.id ?? defaultProfileId;
+        get().createCategory({ name, color, profileId: currentProfileId });
+      },
       updateCategory: (id, patch) =>
         set((state) => {
-          const nextCategories = state.categories.map((c) =>
-            c.id === id ? { ...c, ...patch } : c
-          );
+          const fallbackProfileId = state.profiles[0]?.id ?? defaultProfileId;
+          const nextCategories = state.categories.map((c) => {
+            if (c.id !== id) return c;
+            const nextProfileId =
+              patch.profileId && state.profiles.some((profile) => profile.id === patch.profileId)
+                ? patch.profileId
+                : c.profileId || fallbackProfileId;
+            return { ...c, ...patch, profileId: nextProfileId };
+          });
           const nextColor = nextCategories.find((c) => c.id === id)?.color;
           return {
             categories: nextCategories,
@@ -393,11 +827,17 @@ export const useStore = create<StoreState>()(
       deleteCategory: (id) =>
         set((state) => {
           if (state.categories.length <= 1) return state;
+          const targetCategory = state.categories.find((category) => category.id === id);
+          if (!targetCategory) return state;
+
           const nextCategories = state.categories.filter((c) => c.id !== id);
-          const fallbackId = nextCategories[0]?.id ?? defaultCategoryId;
-          const fallbackColor =
-            nextCategories.find((c) => c.id === fallbackId)?.color ??
-            defaultCategoryColor;
+          const fallbackSameProfile = nextCategories.find(
+            (category) => category.profileId === targetCategory.profileId
+          );
+          const fallbackCategory = fallbackSameProfile ?? nextCategories[0];
+          const fallbackId = fallbackCategory?.id ?? defaultCategoryId;
+          const fallbackColor = fallbackCategory?.color ?? defaultCategoryColor;
+
           return {
             categories: nextCategories,
             events: state.events.map((evt) =>
@@ -453,12 +893,27 @@ export const useStore = create<StoreState>()(
     }),
     {
       name: "yiv-store",
-      version: 4,
+      version: 6,
       migrate: (state: unknown) => {
         const persisted = (state ?? {}) as PersistedState;
+        const hasLegacyData =
+          (persisted.categories?.length ?? 0) > 0 || (persisted.events?.length ?? 0) > 0;
+        const hasPersistedProfiles = (persisted.profiles?.length ?? 0) > 0;
+        const useLegacyDefaults = hasLegacyData && !hasPersistedProfiles;
+
+        const profiles = normalizePersistedProfiles(persisted.profiles, {
+          forLegacyData: useLegacyDefaults,
+        });
         const categories = migrateOnboardingCategoryColors(
-          normalizePersistedCategories(persisted.categories)
+          normalizePersistedCategories(persisted.categories, profiles, {
+            forLegacyData: useLegacyDefaults,
+          })
         );
+        const selectedProfileIds = ensureSelectedProfileIds(
+          persisted.selectedProfileIds,
+          profiles
+        );
+
         const categoryIds = new Set(categories.map((category) => category.id));
         const fallbackCategoryId = categoryIds.has(defaultCategoryId)
           ? defaultCategoryId
@@ -466,6 +921,7 @@ export const useStore = create<StoreState>()(
         const fallbackColor =
           categories.find((category) => category.id === fallbackCategoryId)?.color ??
           defaultCategoryColor;
+
         const events =
           persisted.events?.map((evt, idx) => {
             const createdAt =
@@ -476,6 +932,12 @@ export const useStore = create<StoreState>()(
               typeof evt.notes === "string" && evt.notes.trim().length > 0
                 ? evt.notes.trim()
                 : undefined;
+            const recurrenceType = normalizeRecurrenceType(evt.recurrenceType);
+            const recurrenceUntil = normalizeRecurrenceUntil({
+              value: evt.recurrenceUntil,
+              recurrenceType,
+              startDate: evt.startDate ?? "",
+            });
             const mappedCategoryId =
               mapLegacyCategoryId(evt.categoryId) ??
               mapLegacyCategoryId(evt.category) ??
@@ -494,13 +956,22 @@ export const useStore = create<StoreState>()(
               createdAt,
               dayOrder,
               notes,
+              recurrenceType,
+              recurrenceUntil,
               color:
                 categories.find((c: CategoryItem) => c.id === categoryId)?.color ??
                 evt.color ??
                 fallbackColor,
             };
           }) ?? [];
-        return { ...persisted, categories, events };
+
+        return {
+          ...persisted,
+          profiles,
+          selectedProfileIds,
+          categories,
+          events,
+        };
       },
     }
   )

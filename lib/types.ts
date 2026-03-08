@@ -1,10 +1,21 @@
-export type CategoryItem = {
+export type CalendarProfile = {
   id: string;
   userId?: string;
   name: string;
   color: string;
+  position: number;
+};
+
+export type CategoryItem = {
+  id: string;
+  userId?: string;
+  profileId: string;
+  name: string;
+  color: string;
   visible: boolean;
 };
+
+export type RecurrenceType = "weekly" | "monthly" | "yearly";
 
 export type CalendarEvent = {
   id: string;
@@ -15,8 +26,20 @@ export type CalendarEvent = {
   startDate: string; // ISO yyyy-MM-dd
   endDate: string; // ISO yyyy-MM-dd
   notes?: string;
+  recurrenceType?: RecurrenceType;
+  recurrenceUntil?: string; // ISO yyyy-MM-dd
   createdAt: string; // ISO datetime
   dayOrder: number; // manual tie-break order for same-day events (0-based)
+};
+
+export type CalendarRenderEvent = CalendarEvent & {
+  sourceEventId: string;
+  isOccurrence: boolean;
+};
+
+export type AnchorPoint = {
+  x: number;
+  y: number;
 };
 
 export type Habit = {
