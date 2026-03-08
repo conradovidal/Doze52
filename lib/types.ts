@@ -1,8 +1,11 @@
+import type { ProfileIconId } from "./profile-icons";
+
 export type CalendarProfile = {
   id: string;
   userId?: string;
   name: string;
   color: string;
+  icon: ProfileIconId;
   position: number;
 };
 

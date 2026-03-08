@@ -8,6 +8,10 @@ import {
   ONBOARDING_CATEGORY_COLOR_BY_ID,
   PREVIOUS_ONBOARDING_COLOR_BY_ID,
 } from "./category-palette";
+import {
+  normalizeProfileIconId,
+  type ProfileIconId,
+} from "./profile-icons";
 import type { CalendarEvent, CalendarProfile, CategoryItem } from "./types";
 
 export type EventInput = {
@@ -36,10 +40,10 @@ type StoreState = {
   ensureEventMetadata: () => void;
   setSelectedProfiles: (profileIds: string[]) => void;
   toggleSelectedProfile: (profileId: string) => void;
-  createProfile: (input: { name: string; color: string }) => string;
+  createProfile: (input: { name: string; icon: ProfileIconId }) => string;
   updateProfile: (
     id: string,
-    patch: Partial<Pick<CalendarProfile, "name" | "color">>
+    patch: Partial<Pick<CalendarProfile, "name" | "icon">>
   ) => void;
   deleteProfile: (input: { profileId: string; reassignToProfileId: string }) => void;
   setProfilesOrder: (orderedIds: string[]) => void;
@@ -113,6 +117,7 @@ const getLegacyDefaultProfiles = (): CalendarProfile[] => [
     id: ONBOARDING_PROFILE_IDS.personal,
     name: "Pessoal",
     color: DEFAULT_PROFILE_COLOR,
+    icon: "user",
     position: 0,
   },
 ];
@@ -121,19 +126,22 @@ const getFeatureDefaultProfiles = (): CalendarProfile[] => [
   {
     id: ONBOARDING_PROFILE_IDS.professional,
     name: "Profissional",
-    color: "#2563EB",
+    color: DEFAULT_PROFILE_COLOR,
+    icon: "briefcase",
     position: 0,
   },
   {
     id: ONBOARDING_PROFILE_IDS.personal,
     name: "Pessoal",
     color: DEFAULT_PROFILE_COLOR,
+    icon: "user",
     position: 1,
   },
   {
     id: ONBOARDING_PROFILE_IDS.family,
     name: "Familia",
-    color: "#16A34A",
+    color: DEFAULT_PROFILE_COLOR,
+    icon: "users",
     position: 2,
   },
 ];
@@ -152,6 +160,7 @@ export const isOnboardingProfilesSnapshot = (profiles: CalendarProfile[]) => {
       received.id === defaultProfile.id &&
       received.name === defaultProfile.name &&
       received.color.toLowerCase() === defaultProfile.color.toLowerCase() &&
+      received.icon === defaultProfile.icon &&
       received.position === defaultProfile.position
     );
   });
@@ -328,14 +337,17 @@ const normalizePersistedProfiles = (
       profile.id && profile.id.trim() && isUuid(profile.id) ? profile.id : uid();
     if (seen.has(normalizedId)) continue;
     seen.add(normalizedId);
+    const normalizedName = profile.name?.trim() || "Perfil";
+    const normalizedColor = DEFAULT_PROFILE_COLOR;
     next.push({
       ...profile,
       id: normalizedId,
-      name: profile.name?.trim() || "Perfil",
-      color:
-        typeof profile.color === "string" && profile.color.trim().length > 0
-          ? profile.color
-          : DEFAULT_PROFILE_COLOR,
+      name: normalizedName,
+      color: normalizedColor,
+      icon: normalizeProfileIconId(
+        (profile as { icon?: unknown }).icon,
+        normalizedName
+      ),
       position: next.length,
     });
   }
@@ -552,13 +564,15 @@ export const useStore = create<StoreState>()(
         const name = input.name.trim();
         if (!name) return "";
         const id = uid();
+        const icon = normalizeProfileIconId(input.icon, name);
         set((state) => {
           const nextProfiles = [
             ...state.profiles,
             {
               id,
               name,
-              color: input.color || DEFAULT_PROFILE_COLOR,
+              color: DEFAULT_PROFILE_COLOR,
+              icon,
               position: state.profiles.length,
             },
           ];
@@ -578,11 +592,12 @@ export const useStore = create<StoreState>()(
         set((state) => ({
           profiles: state.profiles.map((profile) => {
             if (profile.id !== id) return profile;
+            const nextName = patch.name?.trim() || profile.name;
             return {
               ...profile,
-              ...patch,
-              name: patch.name?.trim() || profile.name,
-              color: patch.color || profile.color,
+              name: nextName,
+              color: DEFAULT_PROFILE_COLOR,
+              icon: normalizeProfileIconId(patch.icon ?? profile.icon, nextName),
             };
           }),
         })),
@@ -887,7 +902,7 @@ export const useStore = create<StoreState>()(
     }),
     {
       name: "yiv-store",
-      version: 6,
+      version: 7,
       migrate: (state: unknown) => {
         const persisted = (state ?? {}) as PersistedState;
         const hasLegacyData =

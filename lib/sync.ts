@@ -3,6 +3,7 @@ import type {
   CalendarProfile,
   CategoryItem,
 } from "@/lib/types";
+import { DEFAULT_PROFILE_ICON, normalizeProfileIconId } from "@/lib/profile-icons";
 import {
   getSupabaseBrowserClient,
   hasSupabaseEnv,
@@ -21,6 +22,7 @@ type DbProfile = {
   user_id: string;
   name: string;
   color: string;
+  icon?: string | null;
   position: number;
   created_at: string;
   updated_at: string;
@@ -83,6 +85,7 @@ export class SyncError extends Error {
 
 let saveInFlight: Promise<void> | null = null;
 let pendingSnapshot: CalendarSnapshot | null = null;
+const DEFAULT_PROFILE_COLOR = "#64748B";
 
 const cloneSnapshot = (snapshot: CalendarSnapshot): CalendarSnapshot => ({
   profiles: snapshot.profiles.map((profile) => ({ ...profile })),
@@ -397,7 +400,8 @@ const toLocalProfile = (row: DbProfile): CalendarProfile => ({
   id: row.id,
   userId: row.user_id,
   name: row.name,
-  color: row.color,
+  color: DEFAULT_PROFILE_COLOR,
+  icon: normalizeProfileIconId(row.icon ?? DEFAULT_PROFILE_ICON, row.name),
   position: sanitizeIntegerField({
     table: "calendar_profiles",
     action: "insert/update",
@@ -585,7 +589,8 @@ const saveSnapshotInternal = async (snapshot: CalendarSnapshot): Promise<void> =
         id: ensureRowId(profile.id),
         user_id: userId,
         name: profile.name.trim(),
-        color: profile.color,
+        color: DEFAULT_PROFILE_COLOR,
+        icon: normalizeProfileIconId(profile.icon, profile.name),
         position: sanitizeIntegerField({
           table: "calendar_profiles",
           action: "insert/update",
@@ -785,6 +790,7 @@ export const exportUserData = async () => {
       id: profile.id,
       name: profile.name,
       color: profile.color,
+      icon: profile.icon,
       position: profile.position,
     }))
   );

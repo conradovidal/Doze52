@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { ChevronLeft, ChevronRight, Plus, Trash2 } from "lucide-react";
+import { ProfileIcon } from "@/components/profile-icon";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -18,9 +19,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DEFAULT_PROFILE_ICON,
+  PROFILE_ICON_OPTIONS,
+  type ProfileIconId,
+} from "@/lib/profile-icons";
 import { useStore } from "@/lib/store";
-
-const DEFAULT_PROFILE_COLOR = "#64748B";
 
 type ProfileManagerProps = {
   open: boolean;
@@ -34,16 +38,21 @@ export function ProfileManager({ open, onOpenChange }: ProfileManagerProps) {
   const deleteProfile = useStore((s) => s.deleteProfile);
   const setProfilesOrder = useStore((s) => s.setProfilesOrder);
 
+  const [editorMode, setEditorMode] = React.useState<"create" | "edit">("edit");
   const [editingProfileId, setEditingProfileId] = React.useState<string | null>(null);
   const [name, setName] = React.useState("");
-  const [color, setColor] = React.useState(DEFAULT_PROFILE_COLOR);
+  const [icon, setIcon] = React.useState<ProfileIconId>(DEFAULT_PROFILE_ICON);
   const [reassignProfileId, setReassignProfileId] = React.useState<string>("");
   const [isSaving, setIsSaving] = React.useState(false);
   const [saveError, setSaveError] = React.useState<string | null>(null);
+  const initializedRef = React.useRef(false);
 
   const editingProfile = React.useMemo(
-    () => profiles.find((profile) => profile.id === editingProfileId) ?? null,
-    [profiles, editingProfileId]
+    () =>
+      editorMode === "edit"
+        ? profiles.find((profile) => profile.id === editingProfileId) ?? null
+        : null,
+    [editorMode, profiles, editingProfileId]
   );
 
   const reorder = React.useCallback(
@@ -61,9 +70,10 @@ export function ProfileManager({ open, onOpenChange }: ProfileManagerProps) {
   );
 
   const startCreate = React.useCallback(() => {
+    setEditorMode("create");
     setEditingProfileId(null);
     setName("");
-    setColor(DEFAULT_PROFILE_COLOR);
+    setIcon(DEFAULT_PROFILE_ICON);
     setReassignProfileId(profiles[0]?.id ?? "");
     setSaveError(null);
   }, [profiles]);
@@ -72,9 +82,10 @@ export function ProfileManager({ open, onOpenChange }: ProfileManagerProps) {
     (profileId: string) => {
       const profile = profiles.find((entry) => entry.id === profileId);
       if (!profile) return;
+      setEditorMode("edit");
       setEditingProfileId(profile.id);
       setName(profile.name);
-      setColor(profile.color || DEFAULT_PROFILE_COLOR);
+      setIcon(profile.icon);
       const fallbackReassign = profiles.find((entry) => entry.id !== profile.id)?.id ?? "";
       setReassignProfileId(fallbackReassign);
       setSaveError(null);
@@ -83,25 +94,52 @@ export function ProfileManager({ open, onOpenChange }: ProfileManagerProps) {
   );
 
   React.useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      initializedRef.current = false;
+      return;
+    }
+    if (initializedRef.current) return;
+    initializedRef.current = true;
+
     if (profiles.length === 0) {
       startCreate();
       return;
     }
 
-    const firstProfile = profiles[0];
-    const keepCurrent = editingProfileId
-      ? profiles.find((profile) => profile.id === editingProfileId)
-      : null;
-    if (keepCurrent) {
-      startEdit(keepCurrent.id);
+    const preferredId =
+      editingProfileId && profiles.some((profile) => profile.id === editingProfileId)
+        ? editingProfileId
+        : profiles[0]?.id;
+    if (!preferredId) {
+      startCreate();
       return;
     }
-    startEdit(firstProfile.id);
+    startEdit(preferredId);
   }, [open, profiles, editingProfileId, startCreate, startEdit]);
 
+  React.useEffect(() => {
+    if (!open || editorMode !== "edit") return;
+    if (profiles.length === 0) {
+      startCreate();
+      return;
+    }
+    if (!editingProfileId) {
+      startEdit(profiles[0].id);
+      return;
+    }
+    const current = profiles.find((profile) => profile.id === editingProfileId);
+    if (!current) {
+      startEdit(profiles[0].id);
+      return;
+    }
+    const fallbackReassign = profiles.find((entry) => entry.id !== current.id)?.id ?? "";
+    setReassignProfileId(fallbackReassign);
+    setName(current.name);
+    setIcon(current.icon);
+  }, [open, editorMode, profiles, editingProfileId, startCreate, startEdit]);
+
   const canSave = name.trim().length > 0;
-  const isEditMode = Boolean(editingProfile);
+  const isEditMode = editorMode === "edit" && Boolean(editingProfile);
 
   const handleSave = async () => {
     if (!canSave) return;
@@ -111,12 +149,14 @@ export function ProfileManager({ open, onOpenChange }: ProfileManagerProps) {
       if (editingProfile) {
         updateProfile(editingProfile.id, {
           name: name.trim(),
-          color,
+          icon,
         });
       } else {
-        const createdId = createProfile({ name: name.trim(), color });
+        const createdId = createProfile({ name: name.trim(), icon });
         if (createdId) {
+          setEditorMode("edit");
           setEditingProfileId(createdId);
+          setSaveError(null);
         }
       }
     } catch (error) {
@@ -187,10 +227,7 @@ export function ProfileManager({ open, onOpenChange }: ProfileManagerProps) {
                     onClick={() => startEdit(profile.id)}
                     className="flex min-w-0 flex-1 items-center gap-2 rounded px-2 py-1 text-left hover:bg-neutral-100 dark:hover:bg-neutral-800"
                   >
-                    <span
-                      className="h-3 w-3 shrink-0 rounded-full"
-                      style={{ backgroundColor: profile.color }}
-                    />
+                    <ProfileIcon icon={profile.icon} className="text-neutral-500" />
                     <span className="truncate text-sm">{profile.name}</span>
                   </button>
                   <button
@@ -237,23 +274,27 @@ export function ProfileManager({ open, onOpenChange }: ProfileManagerProps) {
             </div>
 
             <div className="space-y-1">
-              <label htmlFor="profile-color" className="text-sm text-neutral-600">
-                Cor
+              <label htmlFor="profile-icon" className="text-sm text-neutral-600">
+                Icone
               </label>
-              <div className="flex items-center gap-2">
-                <input
-                  id="profile-color"
-                  type="color"
-                  value={color}
-                  onChange={(event) => setColor(event.target.value)}
-                  className="h-10 w-10 cursor-pointer rounded-md border border-neutral-200 p-0"
-                />
-                <Input
-                  value={color}
-                  onChange={(event) => setColor(event.target.value)}
-                  placeholder="#64748B"
-                />
-              </div>
+              <Select
+                value={icon}
+                onValueChange={(value) => setIcon(value as ProfileIconId)}
+              >
+                <SelectTrigger id="profile-icon">
+                  <SelectValue placeholder="Selecione um icone" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PROFILE_ICON_OPTIONS.map((option) => (
+                    <SelectItem key={option.id} value={option.id}>
+                      <span className="inline-flex items-center gap-2">
+                        <ProfileIcon icon={option.id} size={14} />
+                        {option.label}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             {isEditMode && profiles.length > 1 ? (

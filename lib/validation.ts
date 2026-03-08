@@ -1,5 +1,6 @@
 import { parseISO } from "date-fns";
 import type { CalendarEvent, CalendarProfile, CategoryItem } from "@/lib/types";
+import { isProfileIconId } from "@/lib/profile-icons";
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const HEX_COLOR_RE = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
@@ -49,6 +50,9 @@ export const validateProfileInput = (profile: CalendarProfile) => {
   }
   if (!HEX_COLOR_RE.test(profile.color)) {
     throw new ValidationError("Perfil invalido: cor fora do padrao.");
+  }
+  if (!isProfileIconId(profile.icon)) {
+    throw new ValidationError("Perfil invalido: icone fora do padrao.");
   }
   if (!Number.isFinite(profile.position) || !Number.isInteger(profile.position)) {
     throw new ValidationError("Perfil invalido: posicao deve ser inteira.");

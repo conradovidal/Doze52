@@ -9,6 +9,7 @@ create table if not exists public.calendar_profiles (
   user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
   name text not null,
   color text not null,
+  icon text not null default 'folder',
   position int4 not null default 0,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()

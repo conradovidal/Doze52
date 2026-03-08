@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Check } from "lucide-react";
+import { ProfileIcon } from "@/components/profile-icon";
 import { Button } from "@/components/ui/button";
 import { useStore } from "@/lib/store";
 import { ProfileManager } from "@/components/profile-manager";
@@ -56,10 +57,7 @@ export function ProfileBar({ compact = false }: { compact?: boolean }) {
                   : "border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800"
               }`}
             >
-              <span
-                className="h-2 w-2 rounded-full"
-                style={{ backgroundColor: profile.color }}
-              />
+              <ProfileIcon icon={profile.icon} size={12} className="shrink-0" />
               {selected ? <Check size={12} /> : null}
               <span>{profile.name}</span>
             </button>
