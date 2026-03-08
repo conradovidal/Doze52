@@ -42,7 +42,6 @@ const applyProfileOrderToAll = (
 };
 
 export function CategoryBar({ compact = false }: { compact?: boolean }) {
-  const profiles = useStore((s) => s.profiles);
   const selectedProfileIds = useStore((s) => s.selectedProfileIds);
   const categories = useStore((s) => s.categories);
   const toggleCategoryVisibility = useStore((s) => s.toggleCategoryVisibility);
@@ -79,7 +78,7 @@ export function CategoryBar({ compact = false }: { compact?: boolean }) {
     [categories, activeProfileIds]
   );
 
-  const editableProfileId = selectedProfileIds.length === 1 ? selectedProfileIds[0] : null;
+  const editableProfileId = selectedProfileIds[0] ?? null;
 
   const canEditCategories = Boolean(editableProfileId);
 
@@ -162,12 +161,6 @@ export function CategoryBar({ compact = false }: { compact?: boolean }) {
     if (enabled && !canEditCategories) return;
     setIsEditMode(enabled);
   };
-
-  const profileNameById = React.useMemo(
-    () => new Map(profiles.map((profile) => [profile.id, profile.name])),
-    [profiles]
-  );
-  const showProfileHint = selectedProfileIds.length > 1;
 
   return (
     <div
@@ -252,11 +245,6 @@ export function CategoryBar({ compact = false }: { compact?: boolean }) {
               <span className="h-2 w-2 rounded-full bg-white/80" />
             )}
             <span className="font-medium">{category.name}</span>
-            {showProfileHint ? (
-              <span className="rounded-full bg-black/20 px-1.5 py-0.5 text-[10px] uppercase tracking-wide">
-                {profileNameById.get(category.profileId) ?? "Perfil"}
-              </span>
-            ) : null}
             {isEditMode ? (
               <>
                 <button

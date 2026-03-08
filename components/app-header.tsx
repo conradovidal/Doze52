@@ -30,8 +30,8 @@ export function AppHeader({
   onOpenAuthDialog,
 }: AppHeaderProps) {
   return (
-    <header className="mb-6 space-y-3">
-      <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-2 md:grid-cols-[auto_1fr_auto] md:gap-4">
+    <header className="mb-4 space-y-2">
+      <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-1 md:grid-cols-[auto_1fr_auto] md:gap-3">
         <div className="justify-self-start">
           <img src="/logo-doze52.svg" alt="doze 52" className="h-7 w-auto md:h-[2.6rem]" />
         </div>

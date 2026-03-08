@@ -29,9 +29,14 @@ import { useStore } from "@/lib/store";
 type ProfileManagerProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onProfileCreated?: (profileId: string) => void;
 };
 
-export function ProfileManager({ open, onOpenChange }: ProfileManagerProps) {
+export function ProfileManager({
+  open,
+  onOpenChange,
+  onProfileCreated,
+}: ProfileManagerProps) {
   const profiles = useStore((s) => s.profiles);
   const createProfile = useStore((s) => s.createProfile);
   const updateProfile = useStore((s) => s.updateProfile);
@@ -154,9 +159,8 @@ export function ProfileManager({ open, onOpenChange }: ProfileManagerProps) {
       } else {
         const createdId = createProfile({ name: name.trim(), icon });
         if (createdId) {
-          setEditorMode("edit");
-          setEditingProfileId(createdId);
-          setSaveError(null);
+          onOpenChange(false);
+          onProfileCreated?.(createdId);
         }
       }
     } catch (error) {

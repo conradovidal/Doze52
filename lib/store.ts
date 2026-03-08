@@ -318,7 +318,7 @@ const ensureSelectedProfileIds = (
     if (!valid.has(id)) return false;
     return arr.indexOf(id) === index;
   });
-  return next.length > 0 ? next : [allProfileIds[0]];
+  return next.length > 0 ? [next[0]] : [allProfileIds[0]];
 };
 
 const normalizePersistedProfiles = (
@@ -477,7 +477,7 @@ export const useStore = create<StoreState>()(
   persist(
     (set, get) => ({
       profiles: getOnboardingDefaultProfiles(),
-      selectedProfileIds: getAllProfileIds(defaultProfiles),
+      selectedProfileIds: ensureSelectedProfileIds(undefined, defaultProfiles),
       events: [],
       categories: getOnboardingDefaultCategories(),
       replaceAllData: ({ profiles, categories, events }) =>
@@ -504,7 +504,7 @@ export const useStore = create<StoreState>()(
           const profiles = getOnboardingDefaultProfiles();
           return {
             profiles,
-            selectedProfileIds: getAllProfileIds(profiles),
+            selectedProfileIds: ensureSelectedProfileIds(undefined, profiles),
             categories: getOnboardingDefaultCategories(),
             events: [],
           };
@@ -550,18 +550,13 @@ export const useStore = create<StoreState>()(
         set((state) => {
           const profileExists = state.profiles.some((profile) => profile.id === profileId);
           if (!profileExists) return state;
-          const selected = new Set(ensureSelectedProfileIds(state.selectedProfileIds, state.profiles));
-          if (selected.has(profileId)) {
-            if (selected.size === 1) {
-              return state;
-            }
-            selected.delete(profileId);
-          } else {
-            selected.add(profileId);
-          }
-          const next = Array.from(selected);
+          const currentSelectedId = ensureSelectedProfileIds(
+            state.selectedProfileIds,
+            state.profiles
+          )[0];
+          if (currentSelectedId === profileId) return state;
           return {
-            selectedProfileIds: ensureSelectedProfileIds(next, state.profiles),
+            selectedProfileIds: [profileId],
           };
         }),
       createProfile: (input) => {
@@ -580,14 +575,9 @@ export const useStore = create<StoreState>()(
               position: state.profiles.length,
             },
           ];
-          const wasAllSelected =
-            ensureSelectedProfileIds(state.selectedProfileIds, state.profiles).length ===
-            state.profiles.length;
           return {
             profiles: nextProfiles,
-            selectedProfileIds: wasAllSelected
-              ? [...state.selectedProfileIds, id]
-              : ensureSelectedProfileIds(state.selectedProfileIds, nextProfiles),
+            selectedProfileIds: [id],
           };
         });
         return id;
@@ -906,7 +896,7 @@ export const useStore = create<StoreState>()(
     }),
     {
       name: "yiv-store",
-      version: 7,
+      version: 8,
       migrate: (state: unknown) => {
         const persisted = (state ?? {}) as PersistedState;
         const hasLegacyData =

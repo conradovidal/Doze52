@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Check } from "lucide-react";
+import { CategoryManager } from "@/components/category-manager";
 import { ProfileIcon } from "@/components/profile-icon";
 import { Button } from "@/components/ui/button";
 import { useStore } from "@/lib/store";
@@ -13,6 +14,9 @@ export function ProfileBar({ compact = false }: { compact?: boolean }) {
   const toggleSelectedProfile = useStore((s) => s.toggleSelectedProfile);
 
   const [managerOpen, setManagerOpen] = React.useState(false);
+  const [pendingCategoryProfileId, setPendingCategoryProfileId] = React.useState<
+    string | null
+  >(null);
 
   if (profiles.length === 0) {
     return null;
@@ -49,7 +53,23 @@ export function ProfileBar({ compact = false }: { compact?: boolean }) {
         </Button>
       </div>
 
-      <ProfileManager open={managerOpen} onOpenChange={setManagerOpen} />
+      <ProfileManager
+        open={managerOpen}
+        onOpenChange={setManagerOpen}
+        onProfileCreated={(profileId) => {
+          setPendingCategoryProfileId(profileId);
+        }}
+      />
+      <CategoryManager
+        mode="create"
+        open={Boolean(pendingCategoryProfileId)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingCategoryProfileId(null);
+          }
+        }}
+        profileId={pendingCategoryProfileId ?? undefined}
+      />
     </>
   );
 }
