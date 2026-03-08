@@ -312,12 +312,13 @@ const ensureSelectedProfileIds = (
   profiles: CalendarProfile[]
 ) => {
   if (profiles.length === 0) return [];
-  const valid = new Set(getAllProfileIds(profiles));
+  const allProfileIds = getAllProfileIds(profiles);
+  const valid = new Set(allProfileIds);
   const next = (selectedIds ?? []).filter((id, index, arr) => {
     if (!valid.has(id)) return false;
     return arr.indexOf(id) === index;
   });
-  return next.length > 0 ? next : getAllProfileIds(profiles);
+  return next.length > 0 ? next : [allProfileIds[0]];
 };
 
 const normalizePersistedProfiles = (
@@ -551,6 +552,9 @@ export const useStore = create<StoreState>()(
           if (!profileExists) return state;
           const selected = new Set(ensureSelectedProfileIds(state.selectedProfileIds, state.profiles));
           if (selected.has(profileId)) {
+            if (selected.size === 1) {
+              return state;
+            }
             selected.delete(profileId);
           } else {
             selected.add(profileId);

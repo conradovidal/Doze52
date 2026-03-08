@@ -171,7 +171,7 @@ export function CategoryBar({ compact = false }: { compact?: boolean }) {
 
   return (
     <div
-      className={`${compact ? "w-full justify-start" : "mb-4 justify-start"} flex flex-wrap items-center gap-2`}
+      className={`${compact ? "w-full justify-center" : "mb-4 justify-center"} flex flex-wrap items-center gap-2`}
     >
       {displayedCategories.map((category) => {
         const profileCategories = editableProfileId
