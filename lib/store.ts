@@ -8,7 +8,6 @@ import {
   ONBOARDING_CATEGORY_COLOR_BY_ID,
   PREVIOUS_ONBOARDING_COLOR_BY_ID,
 } from "./category-palette";
-import { isCalendarProfilesFeatureEnabled } from "./feature-flags";
 import type { CalendarEvent, CalendarProfile, CategoryItem } from "./types";
 
 export type EventInput = {
@@ -140,10 +139,7 @@ const getFeatureDefaultProfiles = (): CalendarProfile[] => [
 ];
 
 export const getOnboardingDefaultProfiles = (): CalendarProfile[] => {
-  const source = isCalendarProfilesFeatureEnabled
-    ? getFeatureDefaultProfiles()
-    : getLegacyDefaultProfiles();
-  return source.map((profile) => ({ ...profile }));
+  return getFeatureDefaultProfiles().map((profile) => ({ ...profile }));
 };
 
 export const isOnboardingProfilesSnapshot = (profiles: CalendarProfile[]) => {
@@ -253,9 +249,7 @@ const getFeatureDefaultCategories = (): CategoryItem[] => [
 
 const getTemplateCategories = (options?: { legacyOnly?: boolean }) => {
   if (options?.legacyOnly) return getLegacyDefaultCategories();
-  return isCalendarProfilesFeatureEnabled
-    ? getFeatureDefaultCategories()
-    : getLegacyDefaultCategories();
+  return getFeatureDefaultCategories();
 };
 
 export const ONBOARDING_DEFAULT_CATEGORIES: CategoryItem[] = getTemplateCategories();

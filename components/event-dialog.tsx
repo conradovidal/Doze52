@@ -18,7 +18,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { isCalendarProfilesFeatureEnabled } from "@/lib/feature-flags";
 import { useStore } from "@/lib/store";
 import { logDevError, logProdError } from "@/lib/safe-log";
 import { ValidationError, validateEventInput } from "@/lib/validation";
@@ -82,9 +81,6 @@ export function EventDialog({
     : "";
 
   const profileOptions = React.useMemo(() => {
-    if (!isCalendarProfilesFeatureEnabled) {
-      return profiles;
-    }
     const filtered = profiles.filter(
       (profile) =>
         selectedProfileSet.has(profile.id) || profile.id === initialProfileFromEvent
@@ -93,9 +89,6 @@ export function EventDialog({
   }, [initialProfileFromEvent, profiles, selectedProfileSet]);
 
   const categoriesForProfile = React.useMemo(() => {
-    if (!isCalendarProfilesFeatureEnabled) {
-      return categories;
-    }
     if (!profileId) return [];
     return categories.filter((category) => category.profileId === profileId);
   }, [categories, profileId]);
@@ -109,9 +102,9 @@ export function EventDialog({
       initialProfileFromEvent || profileOptions[0]?.id || profiles[0]?.id || "";
     setProfileId(nextProfileId);
 
-    const availableCategories = isCalendarProfilesFeatureEnabled
-      ? categories.filter((category) => category.profileId === nextProfileId)
-      : categories;
+    const availableCategories = categories.filter(
+      (category) => category.profileId === nextProfileId
+    );
 
     const nextCategoryId =
       initialEvent?.categoryId &&
@@ -140,7 +133,7 @@ export function EventDialog({
   ]);
 
   React.useEffect(() => {
-    if (!open || !isCalendarProfilesFeatureEnabled) return;
+    if (!open) return;
     if (!categoriesForProfile.some((category) => category.id === categoryId)) {
       setCategoryId(categoriesForProfile[0]?.id ?? "");
     }
@@ -170,20 +163,18 @@ export function EventDialog({
             onChange={(event) => setTitle(event.target.value)}
           />
 
-          {isCalendarProfilesFeatureEnabled ? (
-            <Select value={profileId} onValueChange={(value) => setProfileId(value)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Perfil" />
-              </SelectTrigger>
-              <SelectContent>
-                {profileOptions.map((profile) => (
-                  <SelectItem key={profile.id} value={profile.id}>
-                    {profile.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          ) : null}
+          <Select value={profileId} onValueChange={(value) => setProfileId(value)}>
+            <SelectTrigger>
+              <SelectValue placeholder="Perfil" />
+            </SelectTrigger>
+            <SelectContent>
+              {profileOptions.map((profile) => (
+                <SelectItem key={profile.id} value={profile.id}>
+                  {profile.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
           <Select value={categoryId} onValueChange={(value) => setCategoryId(value)}>
             <SelectTrigger>

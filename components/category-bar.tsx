@@ -12,7 +12,6 @@ import {
   Plus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { isCalendarProfilesFeatureEnabled } from "@/lib/feature-flags";
 import { useStore } from "@/lib/store";
 import { CategoryManager } from "./category-manager";
 import type { AnchorPoint, CategoryItem } from "@/lib/types";
@@ -70,26 +69,19 @@ export function CategoryBar({ compact = false }: { compact?: boolean }) {
     previewOrderRef.current = previewOrder;
   }, [previewOrder]);
 
-  const activeProfileIds = React.useMemo(() => {
-    if (!isCalendarProfilesFeatureEnabled) {
-      return new Set(profiles.map((profile) => profile.id));
-    }
-    return new Set(selectedProfileIds);
-  }, [profiles, selectedProfileIds]);
+  const activeProfileIds = React.useMemo(
+    () => new Set(selectedProfileIds),
+    [selectedProfileIds]
+  );
 
   const baseCategories = React.useMemo(
     () => categories.filter((category) => activeProfileIds.has(category.profileId)),
     [categories, activeProfileIds]
   );
 
-  const editableProfileId =
-    isCalendarProfilesFeatureEnabled && selectedProfileIds.length === 1
-      ? selectedProfileIds[0]
-      : isCalendarProfilesFeatureEnabled
-        ? null
-        : profiles[0]?.id ?? null;
+  const editableProfileId = selectedProfileIds.length === 1 ? selectedProfileIds[0] : null;
 
-  const canEditCategories = !isCalendarProfilesFeatureEnabled || Boolean(editableProfileId);
+  const canEditCategories = Boolean(editableProfileId);
 
   const displayedCategories = React.useMemo(() => {
     if (previewOrder) return previewOrder;
@@ -175,7 +167,7 @@ export function CategoryBar({ compact = false }: { compact?: boolean }) {
     () => new Map(profiles.map((profile) => [profile.id, profile.name])),
     [profiles]
   );
-  const showProfileHint = isCalendarProfilesFeatureEnabled && selectedProfileIds.length > 1;
+  const showProfileHint = selectedProfileIds.length > 1;
 
   return (
     <div

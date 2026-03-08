@@ -3,7 +3,6 @@
 import * as React from "react";
 import { Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { isCalendarProfilesFeatureEnabled } from "@/lib/feature-flags";
 import { useStore } from "@/lib/store";
 import { ProfileManager } from "@/components/profile-manager";
 
@@ -14,10 +13,6 @@ export function ProfileBar({ compact = false }: { compact?: boolean }) {
   const toggleSelectedProfile = useStore((s) => s.toggleSelectedProfile);
 
   const [managerOpen, setManagerOpen] = React.useState(false);
-
-  if (!isCalendarProfilesFeatureEnabled) {
-    return null;
-  }
 
   if (profiles.length === 0) {
     return null;
