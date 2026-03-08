@@ -31,7 +31,7 @@ export function AppHeader({
 }: AppHeaderProps) {
   return (
     <header className="mb-1 space-y-0">
-      <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-0 md:grid-cols-[auto_1fr_auto] md:gap-1">
+      <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-0 md:grid-cols-[auto_1fr_auto] md:gap-x-1 md:gap-y-0">
         <div className="justify-self-start">
           <img src="/logo-doze52.svg" alt="doze 52" className="h-7 w-auto md:h-[2.6rem]" />
         </div>
@@ -68,8 +68,10 @@ export function AppHeader({
             </div>
           </div>
         </div>
+        <div className="col-span-2 row-start-2 min-w-0 md:col-span-1 md:col-start-2 md:row-start-1">
+          <ProfileBar compact />
+        </div>
       </div>
-      <ProfileBar compact />
       <CategoryBar compact />
     </header>
   );

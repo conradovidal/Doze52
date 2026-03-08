@@ -572,7 +572,7 @@ export default function HomePage() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-none overflow-x-hidden px-4 pt-0 pb-4 md:pb-6">
+    <main className="mx-auto w-full max-w-none overflow-x-hidden px-4 pt-2 pb-4 md:pb-6">
       <div className="sticky top-0 z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85 md:static md:bg-transparent md:backdrop-blur-none">
         <AppHeader
           year={year}
