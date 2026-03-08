@@ -338,8 +338,9 @@ export function CategoryBar({ compact = false }: { compact?: boolean }) {
                 ? "Selecione apenas um perfil para editar categorias"
                 : undefined
             }
+            aria-label="Editar categorias"
           >
-            Editar
+            <Pencil size={14} />
           </Button>
         </>
       )}

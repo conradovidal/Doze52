@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Check } from "lucide-react";
+import { Pencil } from "lucide-react";
 import { CategoryManager } from "@/components/category-manager";
 import { ProfileIcon } from "@/components/profile-icon";
 import { Button } from "@/components/ui/button";
@@ -43,13 +43,18 @@ export function ProfileBar({ compact = false }: { compact?: boolean }) {
               }`}
             >
               <ProfileIcon icon={profile.icon} size={12} className="shrink-0" />
-              {selected ? <Check size={12} /> : null}
               <span>{profile.name}</span>
             </button>
           );
         })}
-        <Button variant="ghost" size="sm" onClick={() => setManagerOpen(true)}>
-          Gerenciar
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          onClick={() => setManagerOpen(true)}
+          aria-label="Gerenciar perfis"
+          title="Gerenciar perfis"
+        >
+          <Pencil size={14} />
         </Button>
       </div>
 
