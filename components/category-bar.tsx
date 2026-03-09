@@ -41,14 +41,23 @@ const applyProfileOrderToAll = (
   return nextCategories.map((category) => category.id);
 };
 
-export function CategoryBar({ compact = false }: { compact?: boolean }) {
+type CategoryBarProps = {
+  compact?: boolean;
+  isGlobalEditMode?: boolean;
+  onGlobalEditModeChange?: (enabled: boolean) => void;
+};
+
+export function CategoryBar({
+  compact = false,
+  isGlobalEditMode = false,
+  onGlobalEditModeChange,
+}: CategoryBarProps) {
   const selectedProfileIds = useStore((s) => s.selectedProfileIds);
   const categories = useStore((s) => s.categories);
   const toggleCategoryVisibility = useStore((s) => s.toggleCategoryVisibility);
   const updateCategory = useStore((s) => s.updateCategory);
   const setCategoriesOrder = useStore((s) => s.setCategoriesOrder);
 
-  const [isEditMode, setIsEditMode] = React.useState(false);
   const [editingCategoryId, setEditingCategoryId] = React.useState<string | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = React.useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = React.useState(false);
@@ -63,6 +72,7 @@ export function CategoryBar({ compact = false }: { compact?: boolean }) {
   const [previewOrder, setPreviewOrder] = React.useState<CategoryItem[] | null>(null);
   const didDropRef = React.useRef(false);
   const previewOrderRef = React.useRef<CategoryItem[] | null>(null);
+  const isEditMode = isGlobalEditMode;
 
   React.useEffect(() => {
     previewOrderRef.current = previewOrder;
@@ -105,6 +115,12 @@ export function CategoryBar({ compact = false }: { compact?: boolean }) {
     },
     []
   );
+
+  React.useEffect(() => {
+    if (!isEditMode) {
+      clearDragState();
+    }
+  }, [isEditMode, clearDragState]);
 
   const openEditCategory = (categoryId: string, anchorPoint?: AnchorPoint) => {
     setEditingCategoryId(categoryId);
@@ -159,7 +175,7 @@ export function CategoryBar({ compact = false }: { compact?: boolean }) {
       clearDragState();
     }
     if (enabled && !canEditCategories) return;
-    setIsEditMode(enabled);
+    onGlobalEditModeChange?.(enabled);
   };
 
   return (
@@ -332,7 +348,7 @@ export function CategoryBar({ compact = false }: { compact?: boolean }) {
             variant="ghost"
             size="sm"
             onClick={() => handleToggleEditMode(true)}
-            disabled={!canEditCategories || displayedCategories.length === 0}
+            disabled={!canEditCategories}
             title={
               !canEditCategories
                 ? "Selecione apenas um perfil para editar categorias"

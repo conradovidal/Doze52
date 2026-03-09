@@ -1,19 +1,27 @@
 "use client";
 
 import * as React from "react";
-import { Pencil } from "lucide-react";
+import { Pencil, Plus } from "lucide-react";
 import { CategoryManager } from "@/components/category-manager";
 import { ProfileIcon } from "@/components/profile-icon";
 import { Button } from "@/components/ui/button";
 import { useStore } from "@/lib/store";
-import { ProfileManager } from "@/components/profile-manager";
+import { ProfileManager, type ProfileManagerIntent } from "@/components/profile-manager";
 
-export function ProfileBar({ compact = false }: { compact?: boolean }) {
+type ProfileBarProps = {
+  compact?: boolean;
+  isGlobalEditMode?: boolean;
+};
+
+export function ProfileBar({ compact = false, isGlobalEditMode = false }: ProfileBarProps) {
   const profiles = useStore((s) => s.profiles);
   const selectedProfileIds = useStore((s) => s.selectedProfileIds);
   const toggleSelectedProfile = useStore((s) => s.toggleSelectedProfile);
 
   const [managerOpen, setManagerOpen] = React.useState(false);
+  const [managerIntent, setManagerIntent] = React.useState<ProfileManagerIntent | null>(
+    null
+  );
   const [pendingCategoryProfileId, setPendingCategoryProfileId] = React.useState<
     string | null
   >(null);
@@ -23,6 +31,14 @@ export function ProfileBar({ compact = false }: { compact?: boolean }) {
   }
 
   const selectedSet = new Set(selectedProfileIds);
+  const openCreateManager = () => {
+    setManagerIntent({ mode: "create" });
+    setManagerOpen(true);
+  };
+  const openEditManager = (profileId: string) => {
+    setManagerIntent({ mode: "edit", profileId });
+    setManagerOpen(true);
+  };
 
   return (
     <>
@@ -31,36 +47,64 @@ export function ProfileBar({ compact = false }: { compact?: boolean }) {
       >
         {profiles.map((profile) => {
           const selected = selectedSet.has(profile.id);
+          const chipClass = `inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs transition ${
+            selected
+              ? "border-neutral-800 bg-neutral-900 text-white dark:border-neutral-100 dark:bg-neutral-100 dark:text-neutral-900"
+              : "border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800"
+          }`;
+
+          if (isGlobalEditMode) {
+            return (
+              <div key={profile.id} className={chipClass}>
+                <ProfileIcon icon={profile.icon} size={12} className="shrink-0" />
+                <span>{profile.name}</span>
+                <button
+                  type="button"
+                  onClick={() => openEditManager(profile.id)}
+                  className="ml-1 inline-flex rounded p-0.5 hover:bg-black/10 dark:hover:bg-white/10"
+                  aria-label={`Editar perfil ${profile.name}`}
+                  title={`Editar perfil ${profile.name}`}
+                >
+                  <Pencil size={12} />
+                </button>
+              </div>
+            );
+          }
+
           return (
             <button
               key={profile.id}
               type="button"
               onClick={() => toggleSelectedProfile(profile.id)}
-              className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs transition ${
-                selected
-                  ? "border-neutral-800 bg-neutral-900 text-white dark:border-neutral-100 dark:bg-neutral-100 dark:text-neutral-900"
-                  : "border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800"
-              }`}
+              className={chipClass}
             >
               <ProfileIcon icon={profile.icon} size={12} className="shrink-0" />
               <span>{profile.name}</span>
             </button>
           );
         })}
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          onClick={() => setManagerOpen(true)}
-          aria-label="Gerenciar perfis"
-          title="Gerenciar perfis"
-        >
-          <Pencil size={14} />
-        </Button>
+        {isGlobalEditMode ? (
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={openCreateManager}
+            aria-label="Criar novo perfil"
+            title="Novo perfil"
+          >
+            <Plus size={14} />
+          </Button>
+        ) : null}
       </div>
 
       <ProfileManager
         open={managerOpen}
-        onOpenChange={setManagerOpen}
+        onOpenChange={(open) => {
+          setManagerOpen(open);
+          if (!open) {
+            setManagerIntent(null);
+          }
+        }}
+        intent={managerIntent ?? undefined}
         onProfileCreated={(profileId) => {
           setPendingCategoryProfileId(profileId);
         }}

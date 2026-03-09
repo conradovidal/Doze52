@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import { CategoryBar } from "@/components/category-bar";
 import { ProfileBar } from "@/components/profile-bar";
 import { UserMenu } from "@/components/auth/user-menu";
@@ -29,6 +30,8 @@ export function AppHeader({
   isAuthenticated,
   onOpenAuthDialog,
 }: AppHeaderProps) {
+  const [isGlobalEditMode, setIsGlobalEditMode] = React.useState(false);
+
   return (
     <header className="mb-1 space-y-0">
       <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-0 md:grid-cols-[auto_1fr_auto] md:gap-x-1 md:gap-y-0">
@@ -69,10 +72,14 @@ export function AppHeader({
           </div>
         </div>
         <div className="col-span-2 row-start-2 min-w-0 md:col-span-1 md:col-start-2 md:row-start-1">
-          <ProfileBar compact />
+          <ProfileBar compact isGlobalEditMode={isGlobalEditMode} />
         </div>
       </div>
-      <CategoryBar compact />
+      <CategoryBar
+        compact
+        isGlobalEditMode={isGlobalEditMode}
+        onGlobalEditModeChange={setIsGlobalEditMode}
+      />
     </header>
   );
 }

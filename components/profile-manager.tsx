@@ -26,15 +26,21 @@ import {
 } from "@/lib/profile-icons";
 import { useStore } from "@/lib/store";
 
+export type ProfileManagerIntent =
+  | { mode: "create" }
+  | { mode: "edit"; profileId: string };
+
 type ProfileManagerProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  intent?: ProfileManagerIntent;
   onProfileCreated?: (profileId: string) => void;
 };
 
 export function ProfileManager({
   open,
   onOpenChange,
+  intent,
   onProfileCreated,
 }: ProfileManagerProps) {
   const profiles = useStore((s) => s.profiles);
@@ -111,6 +117,19 @@ export function ProfileManager({
       return;
     }
 
+    if (intent?.mode === "create") {
+      startCreate();
+      return;
+    }
+
+    if (intent?.mode === "edit") {
+      const intendedProfile = profiles.find((profile) => profile.id === intent.profileId);
+      if (intendedProfile) {
+        startEdit(intendedProfile.id);
+        return;
+      }
+    }
+
     const preferredId =
       editingProfileId && profiles.some((profile) => profile.id === editingProfileId)
         ? editingProfileId
@@ -120,7 +139,7 @@ export function ProfileManager({
       return;
     }
     startEdit(preferredId);
-  }, [open, profiles, editingProfileId, startCreate, startEdit]);
+  }, [open, intent, profiles, editingProfileId, startCreate, startEdit]);
 
   React.useEffect(() => {
     if (!open || editorMode !== "edit") return;
