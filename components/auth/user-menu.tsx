@@ -66,17 +66,17 @@ export function UserMenu() {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" className="h-9 w-9 overflow-hidden rounded-full p-0">
+        <Button variant="outline" size="sm" className="h-10 w-10 overflow-hidden rounded-full p-0">
           {avatarUrl && !brokenAvatar ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={avatarUrl}
               alt="Perfil"
-              className="h-9 w-9 rounded-full border border-border object-cover"
+              className="h-10 w-10 rounded-full border border-border object-cover"
               onError={() => setBrokenAvatar(true)}
             />
           ) : (
-            <span className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border bg-muted text-xs text-muted-foreground">
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border bg-muted text-xs text-muted-foreground">
               {fallbackInitial}
             </span>
           )}
