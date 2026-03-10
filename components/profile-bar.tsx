@@ -8,10 +8,11 @@ import { Button } from "@/components/ui/button";
 import { useStore } from "@/lib/store";
 import { ProfileManager, type ProfileManagerIntent } from "@/components/profile-manager";
 import type { CalendarProfile } from "@/lib/types";
+import { useFlipReorder } from "@/lib/use-flip-reorder";
 
 const MOBILE_LONG_PRESS_MS = 300;
 const ADD_BUTTON_CLASS =
-  "border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800";
+  "h-8 w-8 rounded-full border-neutral-300 bg-white p-0 text-neutral-700 shadow-sm hover:border-neutral-400 hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:border-neutral-600 dark:hover:bg-neutral-800";
 
 const moveInArray = <T extends { id: string }>(
   arr: T[],
@@ -89,6 +90,10 @@ export function ProfileBar({
   React.useEffect(() => clearLongPressTimer, [clearLongPressTimer]);
 
   const displayedProfiles = previewOrder ?? profiles;
+  const registerProfileNode = useFlipReorder(
+    displayedProfiles.map((profile) => profile.id),
+    { durationMs: 160 }
+  );
 
   const commitProfilesOrder = React.useCallback(
     (finalOrder: CalendarProfile[] | null) => {
@@ -123,11 +128,11 @@ export function ProfileBar({
   return (
     <>
       <div
-        className={`${compact ? "w-full justify-center" : "mb-3 justify-center"} flex flex-wrap items-center gap-2`}
+        className={`${compact ? "w-full min-h-8 justify-center" : "mb-2 min-h-8 justify-center"} flex flex-wrap items-center gap-2`}
       >
         {displayedProfiles.map((profile) => {
           const selected = selectedSet.has(profile.id);
-          const chipClass = `inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs transition-all duration-150 ${
+          const chipClass = `inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs transition-colors duration-150 ${
             selected
               ? "border-neutral-500 bg-neutral-300 text-neutral-900 hover:bg-neutral-400 dark:border-neutral-500 dark:bg-neutral-600 dark:text-neutral-100 dark:hover:bg-neutral-500"
               : "border-neutral-300 bg-neutral-100 text-neutral-700 hover:bg-neutral-200 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
@@ -139,6 +144,7 @@ export function ProfileBar({
             return (
               <div
                 key={profile.id}
+                ref={(node) => registerProfileNode(profile.id, node)}
                 data-profile-chip-id={profile.id}
                 draggable
                 onDragStart={(event) => {
@@ -250,6 +256,7 @@ export function ProfileBar({
           return (
             <button
               key={profile.id}
+              ref={(node) => registerProfileNode(profile.id, node)}
               type="button"
               onClick={() => toggleSelectedProfile(profile.id)}
               className={chipClass}

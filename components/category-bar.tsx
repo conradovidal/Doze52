@@ -4,12 +4,13 @@ import * as React from "react";
 import { Eye, EyeOff, GripVertical, Pencil, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useStore } from "@/lib/store";
+import { useFlipReorder } from "@/lib/use-flip-reorder";
 import { CategoryManager } from "./category-manager";
 import type { AnchorPoint, CategoryItem } from "@/lib/types";
 
 const MOBILE_LONG_PRESS_MS = 300;
 const ADD_BUTTON_CLASS =
-  "border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800";
+  "h-8 w-8 rounded-full border-neutral-300 bg-white p-0 text-neutral-700 shadow-sm hover:border-neutral-400 hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:border-neutral-600 dark:hover:bg-neutral-800";
 
 const moveInArray = (arr: CategoryItem[], sourceId: string, targetId: string) => {
   const sourceIndex = arr.findIndex((c) => c.id === sourceId);
@@ -87,6 +88,10 @@ export function CategoryBar({ compact = false, isGlobalEditMode = false }: Categ
     }
     return baseCategories;
   }, [baseCategories, editableProfileId, isEditMode, previewOrder]);
+  const registerCategoryNode = useFlipReorder(
+    displayedCategories.map((category) => category.id),
+    { durationMs: 160 }
+  );
   const allVisible =
     displayedCategories.length > 0 && displayedCategories.every((category) => category.visible);
 
@@ -146,11 +151,12 @@ export function CategoryBar({ compact = false, isGlobalEditMode = false }: Categ
 
   return (
     <div
-      className={`${compact ? "w-full justify-center" : "mb-4 justify-center"} flex flex-wrap items-center gap-2`}
+      className={`${compact ? "w-full min-h-8 justify-center" : "mb-2 min-h-8 justify-center"} flex flex-wrap items-center gap-2`}
     >
       {displayedCategories.map((category) => (
         <div
           key={category.id}
+          ref={(node) => registerCategoryNode(category.id, node)}
           data-category-chip-id={category.id}
           draggable={isEditMode && Boolean(editableProfileId)}
           role={isEditMode ? undefined : "button"}
@@ -250,7 +256,7 @@ export function CategoryBar({ compact = false, isGlobalEditMode = false }: Categ
             event.preventDefault();
             toggleCategoryVisibility(category.id);
           }}
-          className={`flex items-center gap-1 rounded-full px-3 py-1 text-xs text-white transition-all duration-150 ${
+          className={`flex items-center gap-1 rounded-full px-3 py-1 text-xs text-white transition-colors duration-150 ${
             category.visible ? "opacity-100" : "opacity-40"
           } ${isEditMode ? "cursor-grab" : "cursor-pointer"} ${
             isEditMode && dragOverId === category.id ? "ring-2 ring-white/50" : ""
