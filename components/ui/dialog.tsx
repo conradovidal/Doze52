@@ -7,6 +7,11 @@ import { Dialog as DialogPrimitive } from "radix-ui"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 
+const DIALOG_MOTION_CLASS =
+  "duration-[160ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
+const DIALOG_EDGE_MARGIN = 12
+const DIALOG_ANCHOR_OFFSET = 8
+
 function Dialog({
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Root>) {
@@ -39,7 +44,8 @@ function DialogOverlay({
     <DialogPrimitive.Overlay
       data-slot="dialog-overlay"
       className={cn(
-        "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50",
+        "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/40",
+        DIALOG_MOTION_CLASS,
         className
       )}
       {...props}
@@ -51,9 +57,10 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
-  anchorPoint: _anchorPoint,
-  desktopPlacement: _desktopPlacement = "bottom-start",
-  mobileMode: _mobileMode = "center",
+  anchorPoint,
+  desktopPlacement = "bottom-start",
+  mobileMode = "center",
+  style,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
@@ -61,19 +68,123 @@ function DialogContent({
   desktopPlacement?: "bottom-start" | "bottom-end" | "right-start"
   mobileMode?: "sheet" | "center"
 }) {
-  void _anchorPoint
-  void _desktopPlacement
-  void _mobileMode
+  const contentRef = React.useRef<HTMLDivElement | null>(null)
+  const [isMobileViewport, setIsMobileViewport] = React.useState(false)
+  const [anchoredPosition, setAnchoredPosition] = React.useState<{
+    top: number
+    left: number
+  } | null>(null)
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") return
+    const mediaQuery = window.matchMedia("(max-width: 639px)")
+    const onViewportChange = () => setIsMobileViewport(mediaQuery.matches)
+    onViewportChange()
+    mediaQuery.addEventListener("change", onViewportChange)
+    return () => mediaQuery.removeEventListener("change", onViewportChange)
+  }, [])
+
+  const shouldUseAnchoredDesktop = Boolean(anchorPoint) && !isMobileViewport
+  const shouldUseMobileSheet = isMobileViewport && mobileMode === "sheet"
+
+  const resolveAnchoredPosition = React.useCallback(() => {
+    if (
+      typeof window === "undefined" ||
+      !anchorPoint ||
+      !shouldUseAnchoredDesktop ||
+      !contentRef.current
+    ) {
+      setAnchoredPosition(null)
+      return
+    }
+
+    const node = contentRef.current
+    const width = node.offsetWidth
+    const height = node.offsetHeight
+    const viewportWidth = window.innerWidth
+    const viewportHeight = window.innerHeight
+
+    let left = anchorPoint.x
+    let top = anchorPoint.y
+
+    if (desktopPlacement === "right-start") {
+      left = anchorPoint.x + DIALOG_ANCHOR_OFFSET
+      top = anchorPoint.y
+      if (left + width > viewportWidth - DIALOG_EDGE_MARGIN) {
+        left = anchorPoint.x - width - DIALOG_ANCHOR_OFFSET
+      }
+    } else if (desktopPlacement === "bottom-end") {
+      left = anchorPoint.x - width
+      top = anchorPoint.y + DIALOG_ANCHOR_OFFSET
+      if (top + height > viewportHeight - DIALOG_EDGE_MARGIN) {
+        top = anchorPoint.y - height - DIALOG_ANCHOR_OFFSET
+      }
+    } else {
+      left = anchorPoint.x
+      top = anchorPoint.y + DIALOG_ANCHOR_OFFSET
+      if (top + height > viewportHeight - DIALOG_EDGE_MARGIN) {
+        top = anchorPoint.y - height - DIALOG_ANCHOR_OFFSET
+      }
+    }
+
+    left = Math.max(
+      DIALOG_EDGE_MARGIN,
+      Math.min(left, viewportWidth - width - DIALOG_EDGE_MARGIN)
+    )
+    top = Math.max(
+      DIALOG_EDGE_MARGIN,
+      Math.min(top, viewportHeight - height - DIALOG_EDGE_MARGIN)
+    )
+
+    setAnchoredPosition({ top: Math.round(top), left: Math.round(left) })
+  }, [anchorPoint, desktopPlacement, shouldUseAnchoredDesktop])
+
+  React.useLayoutEffect(() => {
+    if (!shouldUseAnchoredDesktop) {
+      setAnchoredPosition(null)
+      return
+    }
+
+    const frameId = window.requestAnimationFrame(resolveAnchoredPosition)
+    const onReposition = () => resolveAnchoredPosition()
+
+    window.addEventListener("resize", onReposition)
+    window.addEventListener("scroll", onReposition, true)
+    return () => {
+      window.cancelAnimationFrame(frameId)
+      window.removeEventListener("resize", onReposition)
+      window.removeEventListener("scroll", onReposition, true)
+    }
+  }, [resolveAnchoredPosition, shouldUseAnchoredDesktop])
+
+  const isAnchoringPending = shouldUseAnchoredDesktop && !anchoredPosition
+  const resolvedStyle =
+    shouldUseAnchoredDesktop && anchoredPosition
+      ? {
+          ...style,
+          top: `${anchoredPosition.top}px`,
+          left: `${anchoredPosition.left}px`,
+        }
+      : style
 
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay />
       <DialogPrimitive.Content
+        ref={contentRef}
         data-slot="dialog-content"
         className={cn(
-          "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg duration-200 outline-none sm:max-w-lg",
+          "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed z-50 grid gap-4 border shadow-lg outline-none",
+          DIALOG_MOTION_CLASS,
+          shouldUseMobileSheet
+            ? "data-[state=closed]:slide-out-to-bottom-4 data-[state=open]:slide-in-from-bottom-4 top-auto right-auto bottom-3 left-1/2 max-h-[calc(100dvh-1.5rem)] w-[calc(100%-1.5rem)] translate-x-[-50%] translate-y-0 rounded-2xl p-4"
+            : shouldUseAnchoredDesktop
+              ? "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 top-0 left-0 w-full max-w-[calc(100%-1.5rem)] translate-x-0 translate-y-0 rounded-xl p-5 sm:max-w-lg"
+              : "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 top-[50%] left-[50%] w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] rounded-lg p-6 sm:max-w-lg",
+          isAnchoringPending ? "opacity-0" : "",
           className
         )}
+        style={resolvedStyle}
         {...props}
       >
         {children}

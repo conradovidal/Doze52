@@ -11,6 +11,7 @@ import type { CalendarProfile } from "@/lib/types";
 import { useFlipReorder } from "@/lib/use-flip-reorder";
 
 const MOBILE_LONG_PRESS_MS = 300;
+const MOTION_CLASS = "duration-[160ms] ease-[cubic-bezier(0.22,1,0.36,1)]";
 const ADD_BUTTON_CLASS =
   "h-8 w-8 rounded-full border-neutral-300 bg-white p-0 text-neutral-700 shadow-sm hover:border-neutral-400 hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:border-neutral-600 dark:hover:bg-neutral-800";
 
@@ -132,7 +133,7 @@ export function ProfileBar({
       >
         {displayedProfiles.map((profile) => {
           const selected = selectedSet.has(profile.id);
-          const chipClass = `inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs transition-colors duration-150 ${
+          const chipClass = `inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs transition-colors ${MOTION_CLASS} ${
             selected
               ? "border-neutral-500 bg-neutral-300 text-neutral-900 hover:bg-neutral-400 dark:border-neutral-500 dark:bg-neutral-600 dark:text-neutral-100 dark:hover:bg-neutral-500"
               : "border-neutral-300 bg-neutral-100 text-neutral-700 hover:bg-neutral-200 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"

@@ -9,6 +9,7 @@ import { CategoryManager } from "./category-manager";
 import type { AnchorPoint, CategoryItem } from "@/lib/types";
 
 const MOBILE_LONG_PRESS_MS = 300;
+const MOTION_CLASS = "duration-[160ms] ease-[cubic-bezier(0.22,1,0.36,1)]";
 const ADD_BUTTON_CLASS =
   "h-8 w-8 rounded-full border-neutral-300 bg-white p-0 text-neutral-700 shadow-sm hover:border-neutral-400 hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:border-neutral-600 dark:hover:bg-neutral-800";
 
@@ -256,7 +257,7 @@ export function CategoryBar({ compact = false, isGlobalEditMode = false }: Categ
             event.preventDefault();
             toggleCategoryVisibility(category.id);
           }}
-          className={`flex items-center gap-1 rounded-full px-3 py-1 text-xs text-white transition-colors duration-150 ${
+          className={`flex items-center gap-1 rounded-full px-3 py-1 text-xs text-white transition-colors ${MOTION_CLASS} ${
             category.visible ? "opacity-100" : "opacity-40"
           } ${isEditMode ? "cursor-grab" : "cursor-pointer"} ${
             isEditMode && dragOverId === category.id ? "ring-2 ring-white/50" : ""

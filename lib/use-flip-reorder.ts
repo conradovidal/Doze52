@@ -7,7 +7,7 @@ type FlipOptions = {
   easing?: string;
 };
 
-const DEFAULT_DURATION_MS = 150;
+const DEFAULT_DURATION_MS = 160;
 const DEFAULT_EASING = "cubic-bezier(0.22, 1, 0.36, 1)";
 
 export function useFlipReorder(
