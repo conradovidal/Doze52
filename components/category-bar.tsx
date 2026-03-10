@@ -1,20 +1,13 @@
 "use client";
 
 import * as React from "react";
-import {
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  Eye,
-  EyeOff,
-  GripVertical,
-  Pencil,
-  Plus,
-} from "lucide-react";
+import { Check, Eye, EyeOff, GripVertical, Pencil, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useStore } from "@/lib/store";
 import { CategoryManager } from "./category-manager";
 import type { AnchorPoint, CategoryItem } from "@/lib/types";
+
+const MOBILE_LONG_PRESS_MS = 300;
 
 const moveInArray = (arr: CategoryItem[], sourceId: string, targetId: string) => {
   const sourceIndex = arr.findIndex((c) => c.id === sourceId);
@@ -69,52 +62,45 @@ export function CategoryBar({
   );
   const [dragSourceId, setDragSourceId] = React.useState<string | null>(null);
   const [dragOverId, setDragOverId] = React.useState<string | null>(null);
-  const [previewOrder, setPreviewOrder] = React.useState<CategoryItem[] | null>(null);
-  const didDropRef = React.useRef(false);
-  const previewOrderRef = React.useRef<CategoryItem[] | null>(null);
+
+  const longPressTimerRef = React.useRef<number | null>(null);
+  const activePointerIdRef = React.useRef<number | null>(null);
+  const isTouchDraggingRef = React.useRef(false);
+
   const isEditMode = isGlobalEditMode;
-
-  React.useEffect(() => {
-    previewOrderRef.current = previewOrder;
-  }, [previewOrder]);
-
   const activeProfileIds = React.useMemo(
     () => new Set(selectedProfileIds),
     [selectedProfileIds]
   );
-
   const baseCategories = React.useMemo(
     () => categories.filter((category) => activeProfileIds.has(category.profileId)),
     [categories, activeProfileIds]
   );
-
   const editableProfileId = selectedProfileIds[0] ?? null;
-
   const canEditCategories = Boolean(editableProfileId);
-
   const displayedCategories = React.useMemo(() => {
-    if (previewOrder) return previewOrder;
     if (isEditMode && editableProfileId) {
       return baseCategories.filter((category) => category.profileId === editableProfileId);
     }
     return baseCategories;
-  }, [baseCategories, editableProfileId, isEditMode, previewOrder]);
-
+  }, [baseCategories, editableProfileId, isEditMode]);
   const allVisible =
     displayedCategories.length > 0 && displayedCategories.every((category) => category.visible);
 
-  const clearDragState = React.useCallback(
-    (options?: { resetDidDrop?: boolean }) => {
-      setDragSourceId(null);
-      setDragOverId(null);
-      setPreviewOrder(null);
-      previewOrderRef.current = null;
-      if (options?.resetDidDrop ?? true) {
-        didDropRef.current = false;
-      }
-    },
-    []
-  );
+  const clearLongPressTimer = React.useCallback(() => {
+    if (longPressTimerRef.current !== null) {
+      window.clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }, []);
+
+  const clearDragState = React.useCallback(() => {
+    clearLongPressTimer();
+    activePointerIdRef.current = null;
+    isTouchDraggingRef.current = false;
+    setDragSourceId(null);
+    setDragOverId(null);
+  }, [clearLongPressTimer]);
 
   React.useEffect(() => {
     if (!isEditMode) {
@@ -122,53 +108,36 @@ export function CategoryBar({
     }
   }, [isEditMode, clearDragState]);
 
+  React.useEffect(() => clearLongPressTimer, [clearLongPressTimer]);
+
+  const resolveCategoryIdFromPoint = React.useCallback((x: number, y: number) => {
+    if (typeof document === "undefined") return null;
+    const node = document.elementFromPoint(x, y) as HTMLElement | null;
+    return node?.closest<HTMLElement>("[data-category-chip-id]")?.dataset.categoryChipId ?? null;
+  }, []);
+
+  const reorderCategoriesByIds = React.useCallback(
+    (sourceId: string, targetId: string) => {
+      if (!editableProfileId || sourceId === targetId) return;
+      const profileCategories = categories.filter(
+        (category) => category.profileId === editableProfileId
+      );
+      const reordered = moveInArray(profileCategories, sourceId, targetId);
+      const didChange = reordered.some(
+        (category, index) => category.id !== profileCategories[index]?.id
+      );
+      if (!didChange) return;
+      const fullOrderIds = applyProfileOrderToAll(categories, editableProfileId, reordered);
+      setCategoriesOrder(fullOrderIds);
+    },
+    [categories, editableProfileId, setCategoriesOrder]
+  );
+
   const openEditCategory = (categoryId: string, anchorPoint?: AnchorPoint) => {
     setEditingCategoryId(categoryId);
     setEditAnchorPoint(anchorPoint);
     setIsEditModalOpen(true);
   };
-
-  const commitPreviewOrder = React.useCallback(
-    (finalOrder: CategoryItem[] | null) => {
-      if (!isEditMode || !finalOrder || !editableProfileId) return;
-
-      const sourceIds =
-        categories
-          .filter((category) => category.profileId === editableProfileId)
-          .map((category) => category.id) ?? [];
-      const nextIds = finalOrder.map((category) => category.id);
-      const didChange =
-        sourceIds.length === nextIds.length &&
-        sourceIds.some((id, index) => id !== nextIds[index]);
-      if (!didChange) {
-        return;
-      }
-
-      const fullOrderIds = applyProfileOrderToAll(categories, editableProfileId, finalOrder);
-      setCategoriesOrder(fullOrderIds);
-    },
-    [categories, editableProfileId, isEditMode, setCategoriesOrder]
-  );
-
-  const moveCategoryByDelta = React.useCallback(
-    (categoryId: string, delta: -1 | 1) => {
-      if (!editableProfileId) return;
-      const profileCategories = categories.filter(
-        (category) => category.profileId === editableProfileId
-      );
-      const sourceIndex = profileCategories.findIndex((category) => category.id === categoryId);
-      if (sourceIndex === -1) return;
-      const targetIndex = sourceIndex + delta;
-      if (targetIndex < 0 || targetIndex >= profileCategories.length) return;
-      const next = [...profileCategories];
-      const [moved] = next.splice(sourceIndex, 1);
-      next.splice(targetIndex, 0, moved);
-      const fullOrderIds = applyProfileOrderToAll(categories, editableProfileId, next);
-      setCategoriesOrder(fullOrderIds);
-      clearDragState();
-    },
-    [categories, clearDragState, editableProfileId, setCategoriesOrder]
-  );
 
   const handleToggleEditMode = (enabled: boolean) => {
     if (!enabled) {
@@ -182,131 +151,130 @@ export function CategoryBar({
     <div
       className={`${compact ? "w-full justify-center" : "mb-4 justify-center"} flex flex-wrap items-center gap-2`}
     >
-      {displayedCategories.map((category) => {
-        const profileCategories = editableProfileId
-          ? categories.filter((entry) => entry.profileId === editableProfileId)
-          : categories;
-        const categoryIndex = profileCategories.findIndex((entry) => entry.id === category.id);
-        const canMoveLeft = categoryIndex > 0;
-        const canMoveRight =
-          categoryIndex >= 0 && categoryIndex < profileCategories.length - 1;
-
-        return (
-          <div
-            key={category.id}
-            draggable={isEditMode && Boolean(editableProfileId)}
-            role={isEditMode ? undefined : "button"}
-            tabIndex={isEditMode ? undefined : 0}
-            onDragStart={(event) => {
-              if (!isEditMode) return;
-              didDropRef.current = false;
+      {displayedCategories.map((category) => (
+        <div
+          key={category.id}
+          data-category-chip-id={category.id}
+          draggable={isEditMode && Boolean(editableProfileId)}
+          role={isEditMode ? undefined : "button"}
+          tabIndex={isEditMode ? undefined : 0}
+          onDragStart={(event) => {
+            if (!isEditMode) return;
+            setDragSourceId(category.id);
+            setDragOverId(category.id);
+            event.dataTransfer.effectAllowed = "move";
+          }}
+          onDragEnter={() => {
+            if (!isEditMode || !dragSourceId || dragSourceId === category.id) return;
+            setDragOverId(category.id);
+          }}
+          onDragOver={(event) => {
+            if (!isEditMode) return;
+            event.preventDefault();
+          }}
+          onDrop={(event) => {
+            if (!isEditMode) return;
+            event.preventDefault();
+            if (dragSourceId) {
+              reorderCategoriesByIds(dragSourceId, category.id);
+            }
+            clearDragState();
+          }}
+          onDragEnd={() => {
+            clearDragState();
+          }}
+          onPointerDown={(event) => {
+            if (!isEditMode || event.pointerType !== "touch") return;
+            activePointerIdRef.current = event.pointerId;
+            event.currentTarget.setPointerCapture(event.pointerId);
+            clearLongPressTimer();
+            longPressTimerRef.current = window.setTimeout(() => {
+              isTouchDraggingRef.current = true;
               setDragSourceId(category.id);
               setDragOverId(category.id);
-              setPreviewOrder(displayedCategories);
-              previewOrderRef.current = displayedCategories;
-              event.dataTransfer.effectAllowed = "move";
-            }}
-            onDragEnter={() => {
-              if (!isEditMode || !dragSourceId || dragSourceId === category.id) return;
-              setDragOverId(category.id);
-              const nextOrder = moveInArray(
-                previewOrderRef.current ?? displayedCategories,
-                dragSourceId,
-                category.id
-              );
-              setPreviewOrder(nextOrder);
-              previewOrderRef.current = nextOrder;
-            }}
-            onDragOver={(event) => {
-              if (!isEditMode) return;
+            }, MOBILE_LONG_PRESS_MS);
+          }}
+          onPointerMove={(event) => {
+            if (!isEditMode || event.pointerType !== "touch") return;
+            if (activePointerIdRef.current !== event.pointerId) return;
+            if (!isTouchDraggingRef.current) return;
+            event.preventDefault();
+            const targetId = resolveCategoryIdFromPoint(event.clientX, event.clientY);
+            if (targetId) {
+              setDragOverId(targetId);
+            }
+          }}
+          onPointerUp={(event) => {
+            if (!isEditMode || event.pointerType !== "touch") return;
+            if (activePointerIdRef.current !== event.pointerId) return;
+            clearLongPressTimer();
+            try {
+              event.currentTarget.releasePointerCapture(event.pointerId);
+            } catch {
+              // no-op
+            }
+            if (isTouchDraggingRef.current && dragSourceId && dragOverId) {
+              reorderCategoriesByIds(dragSourceId, dragOverId);
+            }
+            clearDragState();
+          }}
+          onPointerCancel={(event) => {
+            if (!isEditMode || event.pointerType !== "touch") return;
+            if (activePointerIdRef.current !== event.pointerId) return;
+            clearDragState();
+          }}
+          onContextMenu={(event) => {
+            if (isEditMode) {
               event.preventDefault();
-            }}
-            onDrop={(event) => {
-              if (!isEditMode) return;
-              event.preventDefault();
-              didDropRef.current = true;
-              commitPreviewOrder(
-                previewOrderRef.current ?? previewOrder ?? displayedCategories
-              );
-              clearDragState({ resetDidDrop: false });
-            }}
-            onDragEnd={() => {
-              if (!didDropRef.current) {
-                commitPreviewOrder(
-                  previewOrderRef.current ?? previewOrder ?? displayedCategories
-                );
-              }
-              clearDragState();
-            }}
-            onClick={() => {
-              if (isEditMode) return;
-              toggleCategoryVisibility(category.id);
-            }}
-            onKeyDown={(event) => {
-              if (isEditMode) return;
-              if (event.key !== "Enter" && event.key !== " ") return;
-              event.preventDefault();
-              toggleCategoryVisibility(category.id);
-            }}
-            className={`flex items-center gap-1 rounded-full px-3 py-1 text-xs text-white transition-opacity ${
-              category.visible ? "opacity-100" : "opacity-40"
-            } ${isEditMode ? "cursor-grab" : "cursor-pointer"} ${
-              isEditMode && dragOverId === category.id ? "ring-2 ring-white/50" : ""
-            }`}
-            style={{ backgroundColor: category.color }}
-          >
-            {isEditMode ? (
-              <GripVertical size={12} />
-            ) : (
-              <span className="h-2 w-2 rounded-full bg-white/80" />
-            )}
-            <span className="font-medium">{category.name}</span>
-            {isEditMode ? (
-              <>
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    moveCategoryByDelta(category.id, -1);
-                  }}
-                  disabled={!canMoveLeft}
-                  className="ml-1 inline-flex rounded p-0.5 hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40"
-                  aria-label={`Mover categoria ${category.name} para esquerda`}
-                >
-                  <ChevronLeft size={12} />
-                </button>
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    moveCategoryByDelta(category.id, 1);
-                  }}
-                  disabled={!canMoveRight}
-                  className="inline-flex rounded p-0.5 hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40"
-                  aria-label={`Mover categoria ${category.name} para direita`}
-                >
-                  <ChevronRight size={12} />
-                </button>
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    const rect = event.currentTarget.getBoundingClientRect();
-                    openEditCategory(category.id, { x: rect.right, y: rect.bottom });
-                  }}
-                  className="inline-flex rounded p-0.5 hover:bg-white/20"
-                  aria-label={`Editar categoria ${category.name}`}
-                >
-                  <Pencil size={12} />
-                </button>
-              </>
-            ) : null}
-          </div>
-        );
-      })}
+            }
+          }}
+          onClick={() => {
+            if (isEditMode) return;
+            toggleCategoryVisibility(category.id);
+          }}
+          onKeyDown={(event) => {
+            if (isEditMode) return;
+            if (event.key !== "Enter" && event.key !== " ") return;
+            event.preventDefault();
+            toggleCategoryVisibility(category.id);
+          }}
+          className={`flex items-center gap-1 rounded-full px-3 py-1 text-xs text-white transition-opacity ${
+            category.visible ? "opacity-100" : "opacity-40"
+          } ${isEditMode ? "cursor-grab" : "cursor-pointer"} ${
+            isEditMode && dragOverId === category.id ? "ring-2 ring-white/50" : ""
+          }`}
+          style={{ backgroundColor: category.color }}
+        >
+          {isEditMode ? (
+            <GripVertical size={12} />
+          ) : (
+            <span className="h-2 w-2 rounded-full bg-white/80" />
+          )}
+          <span className="font-medium">{category.name}</span>
+          {isEditMode ? (
+            <button
+              type="button"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                const rect = event.currentTarget.getBoundingClientRect();
+                openEditCategory(category.id, { x: rect.right, y: rect.bottom });
+              }}
+              onPointerDown={(event) => {
+                event.stopPropagation();
+              }}
+              onDragStart={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+              }}
+              className="ml-1 inline-flex rounded p-0.5 hover:bg-white/20"
+              aria-label={`Editar categoria ${category.name}`}
+            >
+              <Pencil size={12} />
+            </button>
+          ) : null}
+        </div>
+      ))}
 
       {isEditMode ? (
         <>
