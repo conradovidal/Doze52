@@ -30,6 +30,7 @@ export function DayCell({
   if (!isInMonth) {
     return (
       <div
+        data-day-iso={dateIso}
         className={`w-full bg-neutral-200 ${
           isPast
             ? "dark:bg-[hsl(var(--cal-cell-outside-past))]"
@@ -69,6 +70,7 @@ export function DayCell({
   return (
     <div
       data-day-cell
+      data-day-iso={dateIso}
       className={`flex w-full cursor-pointer flex-col px-1 py-0.5 ring-1 ring-inset transition-[box-shadow] duration-100 ${dayToneClass} ${
         today
           ? "ring-neutral-900 dark:ring-neutral-100"

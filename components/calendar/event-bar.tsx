@@ -59,7 +59,10 @@ export function EventBar({
         e.stopPropagation();
         const rect = e.currentTarget.getBoundingClientRect();
         onClick?.({
-          anchorPoint: { x: rect.right, y: rect.bottom },
+          anchorPoint: {
+            x: rect.left + rect.width / 2,
+            y: rect.top + rect.height / 2,
+          },
         });
       }}
       onDragStart={(e) => {

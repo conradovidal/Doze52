@@ -284,6 +284,18 @@ export function MonthRow({
     return gridDays[Math.max(0, Math.min(col, COLUMNS - 1))] ?? null;
   };
 
+  const resolveDayAnchorPoint = (iso: string): AnchorPoint | undefined => {
+    const node = daysGridRef.current?.querySelector<HTMLElement>(
+      `[data-day-cell][data-day-iso="${iso}"]`
+    );
+    if (!node) return undefined;
+    const rect = node.getBoundingClientRect();
+    return {
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2,
+    };
+  };
+
   let projectedMultiPreview:
     | { row: number; startCol: number; endCol: number }
     | null = null;
@@ -391,10 +403,14 @@ export function MonthRow({
             onFinishCreateRange();
             return;
           }
-          onFinishCreateRange(format(targetDate, "yyyy-MM-dd"), {
-            x: e.clientX,
-            y: e.clientY,
-          });
+          const targetIso = format(targetDate, "yyyy-MM-dd");
+          onFinishCreateRange(
+            targetIso,
+            resolveDayAnchorPoint(targetIso) ?? {
+              x: e.clientX,
+              y: e.clientY,
+            }
+          );
         }}
       >
         <div
