@@ -72,14 +72,14 @@ export function AppHeader({
           </div>
         </div>
         <div className="col-span-2 row-start-2 min-w-0 md:col-span-1 md:col-start-2 md:row-start-1">
-          <ProfileBar compact isGlobalEditMode={isGlobalEditMode} />
+          <ProfileBar
+            compact
+            isGlobalEditMode={isGlobalEditMode}
+            onGlobalEditModeChange={setIsGlobalEditMode}
+          />
         </div>
       </div>
-      <CategoryBar
-        compact
-        isGlobalEditMode={isGlobalEditMode}
-        onGlobalEditModeChange={setIsGlobalEditMode}
-      />
+      <CategoryBar compact isGlobalEditMode={isGlobalEditMode} />
     </header>
   );
 }

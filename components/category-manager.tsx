@@ -11,6 +11,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CATEGORY_PRESET_COLORS } from "@/lib/category-palette";
 import { useStore } from "@/lib/store";
@@ -76,6 +83,7 @@ export function CategoryManager({
   const [customHexDraft, setCustomHexDraft] = React.useState(DEFAULT_CATEGORY_COLOR);
   const [customHexError, setCustomHexError] = React.useState(false);
   const [customPopoverOpen, setCustomPopoverOpen] = React.useState(false);
+  const [profileDraftId, setProfileDraftId] = React.useState("");
   const [isSaving, setIsSaving] = React.useState(false);
   const [saveError, setSaveError] = React.useState<string | null>(null);
   const effectiveCreateProfileId = profileId ?? profiles[0]?.id ?? "";
@@ -92,6 +100,7 @@ export function CategoryManager({
       setCustomHexDraft(initial);
       setCustomHexError(false);
       setCustomPopoverOpen(false);
+      setProfileDraftId(category?.profileId ?? effectiveCreateProfileId);
       setIsSaving(false);
       setSaveError(null);
       return;
@@ -101,12 +110,13 @@ export function CategoryManager({
     setCustomHexDraft(DEFAULT_CATEGORY_COLOR);
     setCustomHexError(false);
     setCustomPopoverOpen(false);
+    setProfileDraftId(effectiveCreateProfileId);
     setIsSaving(false);
     setSaveError(null);
-  }, [open, mode, category]);
+  }, [open, mode, category, effectiveCreateProfileId]);
 
   const isEdit = mode === "edit";
-  const canSave = name.trim().length > 0 && (isEdit || Boolean(effectiveCreateProfileId));
+  const canSave = name.trim().length > 0 && Boolean(profileDraftId);
   const canDelete = categories.length > 1;
   const normalizedColor = color.toLowerCase();
   const isPresetColor = CATEGORY_PRESET_COLORS.some(
@@ -120,18 +130,22 @@ export function CategoryManager({
       setSaveError(null);
       if (isEdit) {
         if (!categoryId) return;
-        updateCategory(categoryId, { name: name.trim(), color });
+        updateCategory(categoryId, {
+          name: name.trim(),
+          color,
+          profileId: profileDraftId,
+        });
         onOpenChange(false);
         return;
       }
-      if (!effectiveCreateProfileId) {
+      if (!profileDraftId) {
         setSaveError("Selecione um perfil antes de criar a categoria.");
         return;
       }
       const id = createCategory({
         name: name.trim(),
         color,
-        profileId: effectiveCreateProfileId,
+        profileId: profileDraftId,
       });
       if (id) onCreated?.(id);
       onOpenChange(false);
@@ -189,9 +203,24 @@ export function CategoryManager({
         <div className="space-y-5">
           <div className="space-y-2">
             <div className="text-sm text-neutral-600">Perfil</div>
-            <div className="rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm">
-              {effectiveProfileName || "Perfil nao selecionado"}
-            </div>
+            {isEdit ? (
+              <Select value={profileDraftId} onValueChange={setProfileDraftId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione um perfil" />
+                </SelectTrigger>
+                <SelectContent>
+                  {profiles.map((profile) => (
+                    <SelectItem key={profile.id} value={profile.id}>
+                      {profile.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <div className="rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm">
+                {effectiveProfileName || "Perfil nao selecionado"}
+              </div>
+            )}
           </div>
 
           <div className="space-y-2">

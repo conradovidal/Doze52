@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { GripVertical, Pencil, Plus } from "lucide-react";
+import { Check, GripVertical, Pencil, Plus } from "lucide-react";
 import { CategoryManager } from "@/components/category-manager";
 import { ProfileIcon } from "@/components/profile-icon";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,8 @@ import { ProfileManager, type ProfileManagerIntent } from "@/components/profile-
 import type { CalendarProfile } from "@/lib/types";
 
 const MOBILE_LONG_PRESS_MS = 300;
+const ADD_BUTTON_CLASS =
+  "border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800";
 
 const moveInArray = <T extends { id: string }>(
   arr: T[],
@@ -28,9 +30,14 @@ const moveInArray = <T extends { id: string }>(
 type ProfileBarProps = {
   compact?: boolean;
   isGlobalEditMode?: boolean;
+  onGlobalEditModeChange?: (enabled: boolean) => void;
 };
 
-export function ProfileBar({ compact = false, isGlobalEditMode = false }: ProfileBarProps) {
+export function ProfileBar({
+  compact = false,
+  isGlobalEditMode = false,
+  onGlobalEditModeChange,
+}: ProfileBarProps) {
   const profiles = useStore((s) => s.profiles);
   const selectedProfileIds = useStore((s) => s.selectedProfileIds);
   const setProfilesOrder = useStore((s) => s.setProfilesOrder);
@@ -45,10 +52,16 @@ export function ProfileBar({ compact = false, isGlobalEditMode = false }: Profil
   >(null);
   const [dragSourceId, setDragSourceId] = React.useState<string | null>(null);
   const [dragOverId, setDragOverId] = React.useState<string | null>(null);
+  const [previewOrder, setPreviewOrder] = React.useState<CalendarProfile[] | null>(null);
 
   const longPressTimerRef = React.useRef<number | null>(null);
   const activePointerIdRef = React.useRef<number | null>(null);
   const isTouchDraggingRef = React.useRef(false);
+  const previewOrderRef = React.useRef<CalendarProfile[] | null>(null);
+
+  React.useEffect(() => {
+    previewOrderRef.current = previewOrder;
+  }, [previewOrder]);
 
   const clearLongPressTimer = React.useCallback(() => {
     if (longPressTimerRef.current !== null) {
@@ -61,8 +74,10 @@ export function ProfileBar({ compact = false, isGlobalEditMode = false }: Profil
     clearLongPressTimer();
     activePointerIdRef.current = null;
     isTouchDraggingRef.current = false;
+    previewOrderRef.current = null;
     setDragSourceId(null);
     setDragOverId(null);
+    setPreviewOrder(null);
   }, [clearLongPressTimer]);
 
   React.useEffect(() => {
@@ -73,13 +88,14 @@ export function ProfileBar({ compact = false, isGlobalEditMode = false }: Profil
 
   React.useEffect(() => clearLongPressTimer, [clearLongPressTimer]);
 
+  const displayedProfiles = previewOrder ?? profiles;
+
   const commitProfilesOrder = React.useCallback(
-    (sourceId: string, targetId: string) => {
-      if (sourceId === targetId) return;
-      const reordered = moveInArray<CalendarProfile>(profiles, sourceId, targetId);
-      const didChange = reordered.some((profile, index) => profile.id !== profiles[index]?.id);
+    (finalOrder: CalendarProfile[] | null) => {
+      if (!finalOrder || finalOrder.length === 0) return;
+      const didChange = finalOrder.some((profile, index) => profile.id !== profiles[index]?.id);
       if (!didChange) return;
-      setProfilesOrder(reordered.map((profile) => profile.id));
+      setProfilesOrder(finalOrder.map((profile) => profile.id));
     },
     [profiles, setProfilesOrder]
   );
@@ -109,14 +125,15 @@ export function ProfileBar({ compact = false, isGlobalEditMode = false }: Profil
       <div
         className={`${compact ? "w-full justify-center" : "mb-3 justify-center"} flex flex-wrap items-center gap-2`}
       >
-        {profiles.map((profile) => {
+        {displayedProfiles.map((profile) => {
           const selected = selectedSet.has(profile.id);
-          const chipClass = `inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs transition ${
+          const chipClass = `inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs transition-all duration-150 ${
             selected
-              ? "border-neutral-800 bg-neutral-900 text-white dark:border-neutral-100 dark:bg-neutral-100 dark:text-neutral-900"
-              : "border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800"
+              ? "border-neutral-500 bg-neutral-300 text-neutral-900 hover:bg-neutral-400 dark:border-neutral-500 dark:bg-neutral-600 dark:text-neutral-100 dark:hover:bg-neutral-500"
+              : "border-neutral-300 bg-neutral-100 text-neutral-700 hover:bg-neutral-200 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
           }`;
-          const dragRing = isGlobalEditMode && dragOverId === profile.id ? "ring-2 ring-neutral-400/80" : "";
+          const dragRing =
+            isGlobalEditMode && dragOverId === profile.id ? "ring-2 ring-neutral-400/80" : "";
 
           if (isGlobalEditMode) {
             return (
@@ -127,20 +144,27 @@ export function ProfileBar({ compact = false, isGlobalEditMode = false }: Profil
                 onDragStart={(event) => {
                   setDragSourceId(profile.id);
                   setDragOverId(profile.id);
+                  setPreviewOrder(displayedProfiles);
+                  previewOrderRef.current = displayedProfiles;
                   event.dataTransfer.effectAllowed = "move";
                 }}
                 onDragEnter={() => {
                   if (!dragSourceId || dragSourceId === profile.id) return;
                   setDragOverId(profile.id);
+                  const nextOrder = moveInArray(
+                    previewOrderRef.current ?? displayedProfiles,
+                    dragSourceId,
+                    profile.id
+                  );
+                  setPreviewOrder(nextOrder);
+                  previewOrderRef.current = nextOrder;
                 }}
                 onDragOver={(event) => {
                   event.preventDefault();
                 }}
                 onDrop={(event) => {
                   event.preventDefault();
-                  if (dragSourceId) {
-                    commitProfilesOrder(dragSourceId, profile.id);
-                  }
+                  commitProfilesOrder(previewOrderRef.current ?? previewOrder ?? displayedProfiles);
                   clearDragState();
                 }}
                 onDragEnd={() => {
@@ -155,17 +179,25 @@ export function ProfileBar({ compact = false, isGlobalEditMode = false }: Profil
                     isTouchDraggingRef.current = true;
                     setDragSourceId(profile.id);
                     setDragOverId(profile.id);
+                    setPreviewOrder(displayedProfiles);
+                    previewOrderRef.current = displayedProfiles;
                   }, MOBILE_LONG_PRESS_MS);
                 }}
                 onPointerMove={(event) => {
                   if (event.pointerType !== "touch") return;
                   if (activePointerIdRef.current !== event.pointerId) return;
-                  if (!isTouchDraggingRef.current) return;
+                  if (!isTouchDraggingRef.current || !dragSourceId) return;
                   event.preventDefault();
                   const targetId = resolveProfileIdFromPoint(event.clientX, event.clientY);
-                  if (targetId) {
-                    setDragOverId(targetId);
-                  }
+                  if (!targetId || targetId === dragOverId) return;
+                  setDragOverId(targetId);
+                  const nextOrder = moveInArray(
+                    previewOrderRef.current ?? displayedProfiles,
+                    dragSourceId,
+                    targetId
+                  );
+                  setPreviewOrder(nextOrder);
+                  previewOrderRef.current = nextOrder;
                 }}
                 onPointerUp={(event) => {
                   if (event.pointerType !== "touch") return;
@@ -176,8 +208,10 @@ export function ProfileBar({ compact = false, isGlobalEditMode = false }: Profil
                   } catch {
                     // no-op
                   }
-                  if (isTouchDraggingRef.current && dragSourceId && dragOverId) {
-                    commitProfilesOrder(dragSourceId, dragOverId);
+                  if (isTouchDraggingRef.current) {
+                    commitProfilesOrder(
+                      previewOrderRef.current ?? previewOrder ?? displayedProfiles
+                    );
                   }
                   clearDragState();
                 }}
@@ -225,17 +259,36 @@ export function ProfileBar({ compact = false, isGlobalEditMode = false }: Profil
             </button>
           );
         })}
+
         {isGlobalEditMode ? (
           <Button
-            variant="secondary"
+            variant="outline"
             size="sm"
             onClick={openCreateManager}
+            className={ADD_BUTTON_CLASS}
             aria-label="Criar novo perfil"
             title="Novo perfil"
           >
             <Plus size={14} />
           </Button>
         ) : null}
+
+        <Button
+          variant={isGlobalEditMode ? "default" : "ghost"}
+          size="sm"
+          onClick={() => onGlobalEditModeChange?.(!isGlobalEditMode)}
+          aria-label={isGlobalEditMode ? "Finalizar edição" : "Ativar edição"}
+          title={isGlobalEditMode ? "Finalizar edição" : "Editar perfis e categorias"}
+        >
+          {isGlobalEditMode ? (
+            <>
+              <Check size={14} />
+              Done
+            </>
+          ) : (
+            <Pencil size={14} />
+          )}
+        </Button>
       </div>
 
       <ProfileManager

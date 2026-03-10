@@ -52,7 +52,8 @@ export function ProfileManager({
   const [editingProfileId, setEditingProfileId] = React.useState<string | null>(null);
   const [name, setName] = React.useState("");
   const [icon, setIcon] = React.useState<ProfileIconId>(DEFAULT_PROFILE_ICON);
-  const [reassignProfileId, setReassignProfileId] = React.useState<string>("");
+  const [deleteTargetProfileId, setDeleteTargetProfileId] = React.useState<string>("");
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = React.useState(false);
   const [isSaving, setIsSaving] = React.useState(false);
   const [saveError, setSaveError] = React.useState<string | null>(null);
   const initializedRef = React.useRef(false);
@@ -70,9 +71,10 @@ export function ProfileManager({
     setEditingProfileId(null);
     setName("");
     setIcon(DEFAULT_PROFILE_ICON);
-    setReassignProfileId(profiles[0]?.id ?? "");
+    setDeleteTargetProfileId("");
+    setConfirmDeleteOpen(false);
     setSaveError(null);
-  }, [profiles]);
+  }, []);
 
   const startEdit = React.useCallback(
     (profileId: string) => {
@@ -83,7 +85,8 @@ export function ProfileManager({
       setName(profile.name);
       setIcon(profile.icon);
       const fallbackReassign = profiles.find((entry) => entry.id !== profile.id)?.id ?? "";
-      setReassignProfileId(fallbackReassign);
+      setDeleteTargetProfileId(fallbackReassign);
+      setConfirmDeleteOpen(false);
       setSaveError(null);
     },
     [profiles]
@@ -142,7 +145,7 @@ export function ProfileManager({
       return;
     }
     const fallbackReassign = profiles.find((entry) => entry.id !== current.id)?.id ?? "";
-    setReassignProfileId(fallbackReassign);
+    setDeleteTargetProfileId(fallbackReassign);
     setName(current.name);
     setIcon(current.icon);
   }, [open, editorMode, profiles, editingProfileId, startCreate, startEdit]);
@@ -186,9 +189,13 @@ export function ProfileManager({
   const handleDelete = async () => {
     if (!editingProfile) return;
     if (profiles.length <= 1) return;
+    if (!deleteTargetProfileId || deleteTargetProfileId === editingProfile.id) {
+      setSaveError("Selecione um perfil de destino para reatribuir as categorias.");
+      return;
+    }
     const target =
-      reassignProfileId && reassignProfileId !== editingProfile.id
-        ? reassignProfileId
+      deleteTargetProfileId && deleteTargetProfileId !== editingProfile.id
+        ? deleteTargetProfileId
         : profiles.find((profile) => profile.id !== editingProfile.id)?.id;
     if (!target) return;
 
@@ -196,6 +203,7 @@ export function ProfileManager({
       setIsSaving(true);
       setSaveError(null);
       deleteProfile({ profileId: editingProfile.id, reassignToProfileId: target });
+      setConfirmDeleteOpen(false);
       onOpenChange(false);
     } catch (error) {
       setSaveError(
@@ -208,8 +216,26 @@ export function ProfileManager({
     }
   };
 
+  const openDeleteConfirm = () => {
+    if (!editingProfile || profiles.length <= 1) return;
+    const fallbackTarget = profiles.find((profile) => profile.id !== editingProfile.id)?.id;
+    setDeleteTargetProfileId((current) =>
+      current && current !== editingProfile.id ? current : (fallbackTarget ?? "")
+    );
+    setConfirmDeleteOpen(true);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) {
+          setConfirmDeleteOpen(false);
+        }
+        onOpenChange(nextOpen);
+      }}
+    >
       <DialogContent className="sm:max-w-[520px]">
         <DialogHeader>
           <DialogTitle>{isEditMode ? "Editar perfil" : "Novo perfil"}</DialogTitle>
@@ -252,31 +278,11 @@ export function ProfileManager({
               </SelectContent>
             </Select>
           </div>
-
-          {isEditMode && profiles.length > 1 ? (
-            <div className="space-y-1">
-              <label className="text-sm text-neutral-600">Reatribuir categorias para</label>
-              <Select value={reassignProfileId} onValueChange={setReassignProfileId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Perfil de destino" />
-                </SelectTrigger>
-                <SelectContent>
-                  {profiles
-                    .filter((profile) => profile.id !== editingProfile?.id)
-                    .map((profile) => (
-                      <SelectItem key={profile.id} value={profile.id}>
-                        {profile.name}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-            </div>
-          ) : null}
         </div>
 
         <DialogFooter className="sm:justify-between">
           {canDelete ? (
-            <Button variant="destructive" onClick={handleDelete} disabled={isSaving}>
+            <Button variant="destructive" onClick={openDeleteConfirm} disabled={isSaving}>
               <Trash2 size={14} className="mr-1" />
               Excluir
             </Button>
@@ -296,5 +302,48 @@ export function ProfileManager({
         {saveError ? <p className="text-sm text-red-600">{saveError}</p> : null}
       </DialogContent>
     </Dialog>
+    <Dialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
+      <DialogContent className="sm:max-w-[460px]">
+        <DialogHeader>
+          <DialogTitle>Excluir perfil</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <p className="text-sm text-neutral-600">
+            As categorias deste perfil serao reatribuidas para:
+          </p>
+          <Select value={deleteTargetProfileId} onValueChange={setDeleteTargetProfileId}>
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione o perfil de destino" />
+            </SelectTrigger>
+            <SelectContent>
+              {profiles
+                .filter((profile) => profile.id !== editingProfile?.id)
+                .map((profile) => (
+                  <SelectItem key={profile.id} value={profile.id}>
+                    {profile.name}
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <DialogFooter>
+          <Button
+            variant="ghost"
+            onClick={() => setConfirmDeleteOpen(false)}
+            disabled={isSaving}
+          >
+            Cancelar
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={handleDelete}
+            disabled={!deleteTargetProfileId || isSaving}
+          >
+            Confirmar exclusao
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }

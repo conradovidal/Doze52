@@ -1,13 +1,15 @@
 "use client";
 
 import * as React from "react";
-import { Check, Eye, EyeOff, GripVertical, Pencil, Plus } from "lucide-react";
+import { Eye, EyeOff, GripVertical, Pencil, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useStore } from "@/lib/store";
 import { CategoryManager } from "./category-manager";
 import type { AnchorPoint, CategoryItem } from "@/lib/types";
 
 const MOBILE_LONG_PRESS_MS = 300;
+const ADD_BUTTON_CLASS =
+  "border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800";
 
 const moveInArray = (arr: CategoryItem[], sourceId: string, targetId: string) => {
   const sourceIndex = arr.findIndex((c) => c.id === sourceId);
@@ -37,14 +39,9 @@ const applyProfileOrderToAll = (
 type CategoryBarProps = {
   compact?: boolean;
   isGlobalEditMode?: boolean;
-  onGlobalEditModeChange?: (enabled: boolean) => void;
 };
 
-export function CategoryBar({
-  compact = false,
-  isGlobalEditMode = false,
-  onGlobalEditModeChange,
-}: CategoryBarProps) {
+export function CategoryBar({ compact = false, isGlobalEditMode = false }: CategoryBarProps) {
   const selectedProfileIds = useStore((s) => s.selectedProfileIds);
   const categories = useStore((s) => s.categories);
   const toggleCategoryVisibility = useStore((s) => s.toggleCategoryVisibility);
@@ -62,10 +59,16 @@ export function CategoryBar({
   );
   const [dragSourceId, setDragSourceId] = React.useState<string | null>(null);
   const [dragOverId, setDragOverId] = React.useState<string | null>(null);
+  const [previewOrder, setPreviewOrder] = React.useState<CategoryItem[] | null>(null);
 
   const longPressTimerRef = React.useRef<number | null>(null);
   const activePointerIdRef = React.useRef<number | null>(null);
   const isTouchDraggingRef = React.useRef(false);
+  const previewOrderRef = React.useRef<CategoryItem[] | null>(null);
+
+  React.useEffect(() => {
+    previewOrderRef.current = previewOrder;
+  }, [previewOrder]);
 
   const isEditMode = isGlobalEditMode;
   const activeProfileIds = React.useMemo(
@@ -77,13 +80,13 @@ export function CategoryBar({
     [categories, activeProfileIds]
   );
   const editableProfileId = selectedProfileIds[0] ?? null;
-  const canEditCategories = Boolean(editableProfileId);
   const displayedCategories = React.useMemo(() => {
+    if (previewOrder) return previewOrder;
     if (isEditMode && editableProfileId) {
       return baseCategories.filter((category) => category.profileId === editableProfileId);
     }
     return baseCategories;
-  }, [baseCategories, editableProfileId, isEditMode]);
+  }, [baseCategories, editableProfileId, isEditMode, previewOrder]);
   const allVisible =
     displayedCategories.length > 0 && displayedCategories.every((category) => category.visible);
 
@@ -98,8 +101,10 @@ export function CategoryBar({
     clearLongPressTimer();
     activePointerIdRef.current = null;
     isTouchDraggingRef.current = false;
+    previewOrderRef.current = null;
     setDragSourceId(null);
     setDragOverId(null);
+    setPreviewOrder(null);
   }, [clearLongPressTimer]);
 
   React.useEffect(() => {
@@ -116,35 +121,27 @@ export function CategoryBar({
     return node?.closest<HTMLElement>("[data-category-chip-id]")?.dataset.categoryChipId ?? null;
   }, []);
 
-  const reorderCategoriesByIds = React.useCallback(
-    (sourceId: string, targetId: string) => {
-      if (!editableProfileId || sourceId === targetId) return;
-      const profileCategories = categories.filter(
-        (category) => category.profileId === editableProfileId
-      );
-      const reordered = moveInArray(profileCategories, sourceId, targetId);
-      const didChange = reordered.some(
-        (category, index) => category.id !== profileCategories[index]?.id
-      );
+  const commitPreviewOrder = React.useCallback(
+    (finalOrder: CategoryItem[] | null) => {
+      if (!isEditMode || !finalOrder || !editableProfileId) return;
+      const sourceIds = categories
+        .filter((category) => category.profileId === editableProfileId)
+        .map((category) => category.id);
+      const nextIds = finalOrder.map((category) => category.id);
+      const didChange =
+        sourceIds.length === nextIds.length &&
+        sourceIds.some((id, index) => id !== nextIds[index]);
       if (!didChange) return;
-      const fullOrderIds = applyProfileOrderToAll(categories, editableProfileId, reordered);
+      const fullOrderIds = applyProfileOrderToAll(categories, editableProfileId, finalOrder);
       setCategoriesOrder(fullOrderIds);
     },
-    [categories, editableProfileId, setCategoriesOrder]
+    [categories, editableProfileId, isEditMode, setCategoriesOrder]
   );
 
   const openEditCategory = (categoryId: string, anchorPoint?: AnchorPoint) => {
     setEditingCategoryId(categoryId);
     setEditAnchorPoint(anchorPoint);
     setIsEditModalOpen(true);
-  };
-
-  const handleToggleEditMode = (enabled: boolean) => {
-    if (!enabled) {
-      clearDragState();
-    }
-    if (enabled && !canEditCategories) return;
-    onGlobalEditModeChange?.(enabled);
   };
 
   return (
@@ -162,11 +159,20 @@ export function CategoryBar({
             if (!isEditMode) return;
             setDragSourceId(category.id);
             setDragOverId(category.id);
+            setPreviewOrder(displayedCategories);
+            previewOrderRef.current = displayedCategories;
             event.dataTransfer.effectAllowed = "move";
           }}
           onDragEnter={() => {
             if (!isEditMode || !dragSourceId || dragSourceId === category.id) return;
             setDragOverId(category.id);
+            const nextOrder = moveInArray(
+              previewOrderRef.current ?? displayedCategories,
+              dragSourceId,
+              category.id
+            );
+            setPreviewOrder(nextOrder);
+            previewOrderRef.current = nextOrder;
           }}
           onDragOver={(event) => {
             if (!isEditMode) return;
@@ -175,9 +181,7 @@ export function CategoryBar({
           onDrop={(event) => {
             if (!isEditMode) return;
             event.preventDefault();
-            if (dragSourceId) {
-              reorderCategoriesByIds(dragSourceId, category.id);
-            }
+            commitPreviewOrder(previewOrderRef.current ?? previewOrder ?? displayedCategories);
             clearDragState();
           }}
           onDragEnd={() => {
@@ -192,17 +196,25 @@ export function CategoryBar({
               isTouchDraggingRef.current = true;
               setDragSourceId(category.id);
               setDragOverId(category.id);
+              setPreviewOrder(displayedCategories);
+              previewOrderRef.current = displayedCategories;
             }, MOBILE_LONG_PRESS_MS);
           }}
           onPointerMove={(event) => {
             if (!isEditMode || event.pointerType !== "touch") return;
             if (activePointerIdRef.current !== event.pointerId) return;
-            if (!isTouchDraggingRef.current) return;
+            if (!isTouchDraggingRef.current || !dragSourceId) return;
             event.preventDefault();
             const targetId = resolveCategoryIdFromPoint(event.clientX, event.clientY);
-            if (targetId) {
-              setDragOverId(targetId);
-            }
+            if (!targetId || targetId === dragOverId) return;
+            setDragOverId(targetId);
+            const nextOrder = moveInArray(
+              previewOrderRef.current ?? displayedCategories,
+              dragSourceId,
+              targetId
+            );
+            setPreviewOrder(nextOrder);
+            previewOrderRef.current = nextOrder;
           }}
           onPointerUp={(event) => {
             if (!isEditMode || event.pointerType !== "touch") return;
@@ -213,8 +225,8 @@ export function CategoryBar({
             } catch {
               // no-op
             }
-            if (isTouchDraggingRef.current && dragSourceId && dragOverId) {
-              reorderCategoriesByIds(dragSourceId, dragOverId);
+            if (isTouchDraggingRef.current) {
+              commitPreviewOrder(previewOrderRef.current ?? previewOrder ?? displayedCategories);
             }
             clearDragState();
           }}
@@ -238,7 +250,7 @@ export function CategoryBar({
             event.preventDefault();
             toggleCategoryVisibility(category.id);
           }}
-          className={`flex items-center gap-1 rounded-full px-3 py-1 text-xs text-white transition-opacity ${
+          className={`flex items-center gap-1 rounded-full px-3 py-1 text-xs text-white transition-all duration-150 ${
             category.visible ? "opacity-100" : "opacity-40"
           } ${isEditMode ? "cursor-grab" : "cursor-pointer"} ${
             isEditMode && dragOverId === category.id ? "ring-2 ring-white/50" : ""
@@ -277,56 +289,35 @@ export function CategoryBar({
       ))}
 
       {isEditMode ? (
-        <>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={(event) => {
-              const rect = event.currentTarget.getBoundingClientRect();
-              setCreateAnchorPoint({ x: rect.right, y: rect.bottom });
-              setIsCreateModalOpen(true);
-            }}
-            disabled={!editableProfileId}
-          >
-            <Plus size={14} />
-          </Button>
-          <Button variant="default" size="sm" onClick={() => handleToggleEditMode(false)}>
-            <Check size={14} className="mr-1" />
-            Done
-          </Button>
-        </>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={(event) => {
+            const rect = event.currentTarget.getBoundingClientRect();
+            setCreateAnchorPoint({ x: rect.right, y: rect.bottom });
+            setIsCreateModalOpen(true);
+          }}
+          disabled={!editableProfileId}
+          className={ADD_BUTTON_CLASS}
+        >
+          <Plus size={14} />
+        </Button>
       ) : (
-        <>
-          <Button
-            variant="ghost"
-            size="sm"
-            title={allVisible ? "Ocultar categorias visiveis" : "Mostrar categorias visiveis"}
-            onClick={() => {
-              displayedCategories.forEach((category) => {
-                if (category.visible !== !allVisible) {
-                  updateCategory(category.id, { visible: !allVisible });
-                }
-              });
-            }}
-            disabled={displayedCategories.length === 0}
-          >
-            {allVisible ? <Eye size={14} /> : <EyeOff size={14} />}
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => handleToggleEditMode(true)}
-            disabled={!canEditCategories}
-            title={
-              !canEditCategories
-                ? "Selecione apenas um perfil para editar categorias"
-                : undefined
-            }
-            aria-label="Editar categorias"
-          >
-            <Pencil size={14} />
-          </Button>
-        </>
+        <Button
+          variant="ghost"
+          size="sm"
+          title={allVisible ? "Ocultar categorias visiveis" : "Mostrar categorias visiveis"}
+          onClick={() => {
+            displayedCategories.forEach((category) => {
+              if (category.visible !== !allVisible) {
+                updateCategory(category.id, { visible: !allVisible });
+              }
+            });
+          }}
+          disabled={displayedCategories.length === 0}
+        >
+          {allVisible ? <Eye size={14} /> : <EyeOff size={14} />}
+        </Button>
       )}
 
       <CategoryManager
