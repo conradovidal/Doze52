@@ -73,12 +73,23 @@ export class SyncError extends Error {
   kind: SyncErrorKind;
   userMessage: string;
   retryable: boolean;
+  code?: string;
+  status?: number;
+  rawMessage?: string | null;
 
-  constructor(kind: SyncErrorKind, userMessage: string, retryable = false) {
+  constructor(
+    kind: SyncErrorKind,
+    userMessage: string,
+    retryable = false,
+    meta?: { code?: string; status?: number; rawMessage?: string | null }
+  ) {
     super(userMessage);
     this.kind = kind;
     this.userMessage = userMessage;
     this.retryable = retryable;
+    this.code = meta?.code;
+    this.status = meta?.status;
+    this.rawMessage = meta?.rawMessage;
     this.name = "SyncError";
   }
 }
@@ -299,9 +310,13 @@ const isMissingRelationError = (message: string, code?: string, status?: number)
   const normalized = message.toLowerCase();
   return (
     code === "42P01" ||
+    code === "42703" ||
+    code === "PGRST204" ||
     code === "PGRST205" ||
     status === 404 ||
     normalized.includes("does not exist") ||
+    normalized.includes("column") ||
+    normalized.includes("undefined column") ||
     normalized.includes("relation") ||
     normalized.includes("schema cache")
   );
@@ -346,39 +361,45 @@ const classifySyncError = (error: unknown): SyncError => {
   const message = getErrorMessage(error);
   const status = getErrorStatus(error);
   const code = getErrorCode(error);
+  const rawMessage = safeSupabaseMessage(message);
+  const meta = { code, status, rawMessage };
 
   if (message.toLowerCase().includes("supabase nao configurado")) {
     return new SyncError(
       "environment",
       userMessageForKind("environment"),
-      false
+      false,
+      meta
     );
   }
   if (isNotAuthenticatedError(message, code, status)) {
     return new SyncError(
       "not_authenticated",
       userMessageForKind("not_authenticated"),
-      false
+      false,
+      meta
     );
   }
   if (isMissingRelationError(message, code, status)) {
     return new SyncError(
       "missing_relation",
       userMessageForKind("missing_relation"),
-      false
+      false,
+      meta
     );
   }
   if (isPermissionError(message, code, status)) {
     return new SyncError(
       "permission",
       userMessageForKind("permission"),
-      false
+      false,
+      meta
     );
   }
   if (isTransientError(message)) {
-    return new SyncError("network", userMessageForKind("network"), true);
+    return new SyncError("network", userMessageForKind("network"), true, meta);
   }
-  return new SyncError("unknown", userMessageForKind("unknown", message), false);
+  return new SyncError("unknown", userMessageForKind("unknown", message), false, meta);
 };
 
 async function withRetry<T>(fn: () => Promise<T>, retries = 1): Promise<T> {
@@ -556,6 +577,8 @@ export const loadRemoteData = async (): Promise<CalendarSnapshot> => {
       kind: syncError.kind,
       message: syncError.message,
       retryable: syncError.retryable,
+      code: syncError.code,
+      status: syncError.status,
     });
     logProdError("Falha ao carregar dados remotos.");
     throw syncError;
@@ -743,6 +766,8 @@ const saveSnapshotInternal = async (snapshot: CalendarSnapshot): Promise<void> =
       kind: syncError.kind,
       message: syncError.message,
       retryable: syncError.retryable,
+      code: syncError.code,
+      status: syncError.status,
       userId,
     });
     logProdError("Falha ao salvar dados do usuario.");

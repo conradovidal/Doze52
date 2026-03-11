@@ -45,6 +45,87 @@ const SYNC_HINT_BY_KIND: Record<SyncError["kind"], string> = {
 type SyncUiError = {
   message: string;
   kind: SyncError["kind"];
+  code?: string;
+  status?: number;
+  rawMessage?: string | null;
+};
+
+type PendingSyncPayload = {
+  savedAt: string;
+  snapshot: CalendarSnapshot;
+};
+
+const PENDING_SYNC_STORAGE_PREFIX = "pending-sync:";
+const isDetailedSyncDiagnosticsEnabled =
+  process.env.NODE_ENV !== "production" ||
+  process.env.NEXT_PUBLIC_APP_ENV === "local" ||
+  process.env.NEXT_PUBLIC_APP_ENV === "dev";
+
+const cloneSnapshot = (snapshot: CalendarSnapshot): CalendarSnapshot => ({
+  profiles: snapshot.profiles.map((profile) => ({ ...profile })),
+  categories: snapshot.categories.map((category) => ({ ...category })),
+  events: snapshot.events.map((event) => ({ ...event })),
+});
+
+const getPendingSyncStorageKey = (userId: string) =>
+  `${PENDING_SYNC_STORAGE_PREFIX}${userId}`;
+
+const isCalendarSnapshotLike = (value: unknown): value is CalendarSnapshot => {
+  if (typeof value !== "object" || value === null) return false;
+  const record = value as Record<string, unknown>;
+  return (
+    Array.isArray(record.profiles) &&
+    Array.isArray(record.categories) &&
+    Array.isArray(record.events)
+  );
+};
+
+const readPendingSyncSnapshot = (userId: string): CalendarSnapshot | null => {
+  if (typeof window === "undefined") return null;
+  const key = getPendingSyncStorageKey(userId);
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as unknown;
+    const payload = parsed as Partial<PendingSyncPayload>;
+    const snapshot = payload?.snapshot ?? parsed;
+    if (!isCalendarSnapshotLike(snapshot)) {
+      window.localStorage.removeItem(key);
+      return null;
+    }
+    return ensureSnapshotCoverage(snapshot);
+  } catch {
+    window.localStorage.removeItem(key);
+    return null;
+  }
+};
+
+const writePendingSyncSnapshot = (userId: string, snapshot: CalendarSnapshot) => {
+  if (typeof window === "undefined") return;
+  const payload: PendingSyncPayload = {
+    savedAt: new Date().toISOString(),
+    snapshot: cloneSnapshot(snapshot),
+  };
+  window.localStorage.setItem(
+    getPendingSyncStorageKey(userId),
+    JSON.stringify(payload)
+  );
+};
+
+const clearPendingSyncSnapshot = (userId: string) => {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(getPendingSyncStorageKey(userId));
+};
+
+const formatSyncDebugDetail = (error: SyncUiError) => {
+  const parts: string[] = [];
+  if (error.code) parts.push(`code:${error.code}`);
+  if (typeof error.status === "number") parts.push(`status:${error.status}`);
+  const meta = parts.length > 0 ? `[${parts.join(" | ")}]` : "";
+  const raw = error.rawMessage?.trim() ?? "";
+  const detail = [meta, raw].filter(Boolean).join(" ");
+  if (!detail) return null;
+  return detail.length > 180 ? `${detail.slice(0, 177)}...` : detail;
 };
 
 const ensureSnapshotCoverage = (
@@ -398,6 +479,7 @@ export default function HomePage() {
     const run = async () => {
       setIsSyncing(true);
       setSyncError(null);
+      let snapshotToPersistOnFailure: CalendarSnapshot | null = null;
       try {
         const localSnapshot = filterAnonymousDraft(
           ensureSnapshotCoverage({
@@ -406,6 +488,7 @@ export default function HomePage() {
             events: eventsRef.current,
           })
         );
+        const pendingSnapshot = readPendingSyncSnapshot(userId);
         const localDraftIsRelevant = hasRelevantLocalDraft(localSnapshot);
         const remoteSnapshot = await loadRemoteData();
         if (cancelled) return;
@@ -416,19 +499,25 @@ export default function HomePage() {
         const alreadyImported = isLocalImported(userId);
         const remoteHash = toSnapshotHash(remoteSnapshot);
         let nextSnapshot: CalendarSnapshot = remoteSnapshot;
+        let shouldForceSave = false;
 
-        if (localDraftIsRelevant) {
+        if (pendingSnapshot) {
+          nextSnapshot = pendingSnapshot;
+          shouldForceSave = true;
+        } else if (localDraftIsRelevant) {
           nextSnapshot = mergeSnapshots(remoteSnapshot, localSnapshot);
         } else if (remoteIsEmpty && !alreadyImported) {
           nextSnapshot = ensureSnapshotCoverage(remoteSnapshot);
         }
 
+        snapshotToPersistOnFailure = nextSnapshot;
         const nextHash = toSnapshotHash(nextSnapshot);
         replaceAllData(nextSnapshot);
-        if (nextHash !== remoteHash) {
+        if (shouldForceSave || nextHash !== remoteHash) {
           await saveSnapshot(nextSnapshot);
           if (cancelled) return;
         }
+        clearPendingSyncSnapshot(userId);
         markLocalImported(userId);
         lastSyncedHashRef.current = nextHash;
         setRemoteReady(true);
@@ -442,9 +531,21 @@ export default function HomePage() {
         logDevError("app.page.bootstrap-remote", {
           kind: syncError.kind,
           message: syncError.userMessage,
+          code: syncError.code,
+          status: syncError.status,
         });
         logProdError("Falha ao carregar dados remotos.");
-        setSyncError({ message: syncError.userMessage, kind: syncError.kind });
+        if (snapshotToPersistOnFailure) {
+          writePendingSyncSnapshot(userId, snapshotToPersistOnFailure);
+          replaceAllData(snapshotToPersistOnFailure);
+        }
+        setSyncError({
+          message: syncError.userMessage,
+          kind: syncError.kind,
+          code: syncError.code,
+          status: syncError.status,
+          rawMessage: syncError.rawMessage,
+        });
         setRemoteReady(false);
         setSyncBlocked(true);
       } finally {
@@ -484,6 +585,7 @@ export default function HomePage() {
       setSyncError(null);
       try {
         await saveSnapshot(nextSnapshot);
+        clearPendingSyncSnapshot(session.user.id);
         lastSyncedHashRef.current = nextHash;
       } catch (error) {
         const syncError =
@@ -493,9 +595,18 @@ export default function HomePage() {
         logDevError("app.page.save-snapshot", {
           kind: syncError.kind,
           message: syncError.userMessage,
+          code: syncError.code,
+          status: syncError.status,
         });
         logProdError("Falha ao salvar dados.");
-        setSyncError({ message: syncError.userMessage, kind: syncError.kind });
+        writePendingSyncSnapshot(session.user.id, nextSnapshot);
+        setSyncError({
+          message: syncError.userMessage,
+          kind: syncError.kind,
+          code: syncError.code,
+          status: syncError.status,
+          rawMessage: syncError.rawMessage,
+        });
         setSyncBlocked(true);
         setRemoteReady(false);
       } finally {
@@ -578,6 +689,11 @@ export default function HomePage() {
     return () => window.removeEventListener("mouseup", onWindowMouseUp);
   }, [creatingRange, handleFinishCreateRange, windowContext]);
 
+  const syncDebugDetail =
+    syncError && isDetailedSyncDiagnosticsEnabled
+      ? formatSyncDebugDetail(syncError)
+      : null;
+
   if (windowContext === "popup") {
     return (
       <main className="flex min-h-screen items-center justify-center px-4">
@@ -633,6 +749,9 @@ export default function HomePage() {
             <p className="text-[11px] text-red-500/90">
               {SYNC_HINT_BY_KIND[syncError.kind] ?? SYNC_HINT_BY_KIND.unknown}
             </p>
+            {syncDebugDetail ? (
+              <p className="text-[10px] text-red-500/80">{syncDebugDetail}</p>
+            ) : null}
           </div>
           <Button
             type="button"
