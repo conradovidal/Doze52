@@ -24,6 +24,7 @@ select gen_random_uuid(), source.user_id, 'Pessoal', '#64748B', 0
 from (
   select distinct user_id
   from public.categories
+  where user_id is not null
 ) as source
 where not exists (
   select 1
@@ -31,16 +32,24 @@ where not exists (
   where profile.user_id = source.user_id
 );
 
+with chosen_profile as (
+  select
+    category.id as category_id,
+    (
+      select profile.id
+      from public.calendar_profiles profile
+      where profile.user_id = category.user_id
+      order by profile.position asc, profile.created_at asc, profile.id asc
+      limit 1
+    ) as profile_id
+  from public.categories category
+  where category.profile_id is null
+)
 update public.categories as category
-set profile_id = chosen_profile.id
-from lateral (
-  select profile.id
-  from public.calendar_profiles profile
-  where profile.user_id = category.user_id
-  order by profile.position asc, profile.created_at asc, profile.id asc
-  limit 1
-) as chosen_profile
-where category.profile_id is null;
+set profile_id = chosen_profile.profile_id
+from chosen_profile
+where category.id = chosen_profile.category_id
+  and chosen_profile.profile_id is not null;
 
 alter table public.categories
   alter column profile_id set not null;
