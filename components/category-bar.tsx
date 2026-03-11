@@ -10,6 +10,9 @@ import type { AnchorPoint, CategoryItem } from "@/lib/types";
 
 const MOBILE_LONG_PRESS_MS = 300;
 const MOTION_CLASS = "duration-[160ms] ease-[cubic-bezier(0.22,1,0.36,1)]";
+const FORWARD_SWAP_THRESHOLD = 0.6;
+const BACKWARD_SWAP_THRESHOLD = 0.4;
+const SWAP_COOLDOWN_MS = 70;
 const ADD_BUTTON_CLASS =
   "h-8 w-8 rounded-full border-neutral-300 bg-white p-0 text-neutral-700 shadow-sm hover:border-neutral-400 hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:border-neutral-600 dark:hover:bg-neutral-800";
 
@@ -21,6 +24,19 @@ const moveInArray = (arr: CategoryItem[], sourceId: string, targetId: string) =>
   const [moved] = next.splice(sourceIndex, 1);
   next.splice(targetIndex, 0, moved);
   return next;
+};
+
+const toPairKey = (a: string, b: string) => (a < b ? `${a}::${b}` : `${b}::${a}`);
+
+const getPointerProgress = (targetNode: HTMLElement, x: number, y: number) => {
+  const rect = targetNode.getBoundingClientRect();
+  const useHorizontalAxis = rect.width >= rect.height;
+  if (useHorizontalAxis) {
+    if (rect.width <= 0) return 0.5;
+    return Math.max(0, Math.min(1, (x - rect.left) / rect.width));
+  }
+  if (rect.height <= 0) return 0.5;
+  return Math.max(0, Math.min(1, (y - rect.top) / rect.height));
 };
 
 const applyProfileOrderToAll = (
@@ -67,6 +83,7 @@ export function CategoryBar({ compact = false, isGlobalEditMode = false }: Categ
   const activePointerIdRef = React.useRef<number | null>(null);
   const isTouchDraggingRef = React.useRef(false);
   const previewOrderRef = React.useRef<CategoryItem[] | null>(null);
+  const swapLockRef = React.useRef<{ pairKey: string; lastSwapAt: number } | null>(null);
 
   React.useEffect(() => {
     previewOrderRef.current = previewOrder;
@@ -108,6 +125,7 @@ export function CategoryBar({ compact = false, isGlobalEditMode = false }: Categ
     activePointerIdRef.current = null;
     isTouchDraggingRef.current = false;
     previewOrderRef.current = null;
+    swapLockRef.current = null;
     setDragSourceId(null);
     setDragOverId(null);
     setPreviewOrder(null);
@@ -121,11 +139,48 @@ export function CategoryBar({ compact = false, isGlobalEditMode = false }: Categ
 
   React.useEffect(() => clearLongPressTimer, [clearLongPressTimer]);
 
-  const resolveCategoryIdFromPoint = React.useCallback((x: number, y: number) => {
+  const resolveCategoryTargetFromPoint = React.useCallback((x: number, y: number) => {
     if (typeof document === "undefined") return null;
     const node = document.elementFromPoint(x, y) as HTMLElement | null;
-    return node?.closest<HTMLElement>("[data-category-chip-id]")?.dataset.categoryChipId ?? null;
+    const chip = node?.closest<HTMLElement>("[data-category-chip-id]");
+    if (!chip) return null;
+    const id = chip.dataset.categoryChipId;
+    if (!id) return null;
+    return { id, node: chip };
   }, []);
+
+  const maybeSwapCategories = React.useCallback(
+    (payload: { targetId: string; targetNode: HTMLElement; clientX: number; clientY: number }) => {
+      if (!isEditMode || !dragSourceId || dragSourceId === payload.targetId) return;
+      const workingOrder = previewOrderRef.current ?? displayedCategories;
+      const sourceIndex = workingOrder.findIndex((category) => category.id === dragSourceId);
+      const targetIndex = workingOrder.findIndex((category) => category.id === payload.targetId);
+      if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) return;
+
+      const progress = getPointerProgress(payload.targetNode, payload.clientX, payload.clientY);
+      const movingForward = sourceIndex < targetIndex;
+      const passedSwapThreshold = movingForward
+        ? progress >= FORWARD_SWAP_THRESHOLD
+        : progress <= BACKWARD_SWAP_THRESHOLD;
+      if (!passedSwapThreshold) return;
+
+      const now = performance.now();
+      const pairKey = toPairKey(dragSourceId, payload.targetId);
+      const lock = swapLockRef.current;
+      const inHysteresisBand =
+        progress > BACKWARD_SWAP_THRESHOLD && progress < FORWARD_SWAP_THRESHOLD;
+      if (lock && now - lock.lastSwapAt < SWAP_COOLDOWN_MS) return;
+      if (lock?.pairKey === pairKey && inHysteresisBand) return;
+
+      const nextOrder = moveInArray(workingOrder, dragSourceId, payload.targetId);
+      if (nextOrder === workingOrder) return;
+      setDragOverId(payload.targetId);
+      setPreviewOrder(nextOrder);
+      previewOrderRef.current = nextOrder;
+      swapLockRef.current = { pairKey, lastSwapAt: now };
+    },
+    [dragSourceId, displayedCategories, isEditMode]
+  );
 
   const commitPreviewOrder = React.useCallback(
     (finalOrder: CategoryItem[] | null) => {
@@ -168,22 +223,21 @@ export function CategoryBar({ compact = false, isGlobalEditMode = false }: Categ
             setDragOverId(category.id);
             setPreviewOrder(displayedCategories);
             previewOrderRef.current = displayedCategories;
+            swapLockRef.current = null;
             event.dataTransfer.effectAllowed = "move";
           }}
           onDragEnter={() => {
-            if (!isEditMode || !dragSourceId || dragSourceId === category.id) return;
             setDragOverId(category.id);
-            const nextOrder = moveInArray(
-              previewOrderRef.current ?? displayedCategories,
-              dragSourceId,
-              category.id
-            );
-            setPreviewOrder(nextOrder);
-            previewOrderRef.current = nextOrder;
           }}
           onDragOver={(event) => {
             if (!isEditMode) return;
             event.preventDefault();
+            maybeSwapCategories({
+              targetId: category.id,
+              targetNode: event.currentTarget,
+              clientX: event.clientX,
+              clientY: event.clientY,
+            });
           }}
           onDrop={(event) => {
             if (!isEditMode) return;
@@ -212,16 +266,15 @@ export function CategoryBar({ compact = false, isGlobalEditMode = false }: Categ
             if (activePointerIdRef.current !== event.pointerId) return;
             if (!isTouchDraggingRef.current || !dragSourceId) return;
             event.preventDefault();
-            const targetId = resolveCategoryIdFromPoint(event.clientX, event.clientY);
-            if (!targetId || targetId === dragOverId) return;
-            setDragOverId(targetId);
-            const nextOrder = moveInArray(
-              previewOrderRef.current ?? displayedCategories,
-              dragSourceId,
-              targetId
-            );
-            setPreviewOrder(nextOrder);
-            previewOrderRef.current = nextOrder;
+            const target = resolveCategoryTargetFromPoint(event.clientX, event.clientY);
+            if (!target) return;
+            setDragOverId(target.id);
+            maybeSwapCategories({
+              targetId: target.id,
+              targetNode: target.node,
+              clientX: event.clientX,
+              clientY: event.clientY,
+            });
           }}
           onPointerUp={(event) => {
             if (!isEditMode || event.pointerType !== "touch") return;

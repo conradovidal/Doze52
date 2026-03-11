@@ -151,8 +151,6 @@ export function EventDialog({
         anchorPoint={anchorPoint}
         desktopPlacement="right-start"
         mobileMode="sheet"
-        desktopAnimation="anchor-origin"
-        openState={open}
         className="sm:max-w-[420px]"
       >
         <DialogHeader>

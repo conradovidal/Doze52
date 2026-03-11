@@ -12,6 +12,9 @@ import { useFlipReorder } from "@/lib/use-flip-reorder";
 
 const MOBILE_LONG_PRESS_MS = 300;
 const MOTION_CLASS = "duration-[160ms] ease-[cubic-bezier(0.22,1,0.36,1)]";
+const FORWARD_SWAP_THRESHOLD = 0.6;
+const BACKWARD_SWAP_THRESHOLD = 0.4;
+const SWAP_COOLDOWN_MS = 70;
 const ADD_BUTTON_CLASS =
   "h-8 w-8 rounded-full border-neutral-300 bg-white p-0 text-neutral-700 shadow-sm hover:border-neutral-400 hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:border-neutral-600 dark:hover:bg-neutral-800";
 
@@ -27,6 +30,19 @@ const moveInArray = <T extends { id: string }>(
   const [moved] = next.splice(sourceIndex, 1);
   next.splice(targetIndex, 0, moved);
   return next;
+};
+
+const toPairKey = (a: string, b: string) => (a < b ? `${a}::${b}` : `${b}::${a}`);
+
+const getPointerProgress = (targetNode: HTMLElement, x: number, y: number) => {
+  const rect = targetNode.getBoundingClientRect();
+  const useHorizontalAxis = rect.width >= rect.height;
+  if (useHorizontalAxis) {
+    if (rect.width <= 0) return 0.5;
+    return Math.max(0, Math.min(1, (x - rect.left) / rect.width));
+  }
+  if (rect.height <= 0) return 0.5;
+  return Math.max(0, Math.min(1, (y - rect.top) / rect.height));
 };
 
 type ProfileBarProps = {
@@ -60,6 +76,7 @@ export function ProfileBar({
   const activePointerIdRef = React.useRef<number | null>(null);
   const isTouchDraggingRef = React.useRef(false);
   const previewOrderRef = React.useRef<CalendarProfile[] | null>(null);
+  const swapLockRef = React.useRef<{ pairKey: string; lastSwapAt: number } | null>(null);
 
   React.useEffect(() => {
     previewOrderRef.current = previewOrder;
@@ -77,6 +94,7 @@ export function ProfileBar({
     activePointerIdRef.current = null;
     isTouchDraggingRef.current = false;
     previewOrderRef.current = null;
+    swapLockRef.current = null;
     setDragSourceId(null);
     setDragOverId(null);
     setPreviewOrder(null);
@@ -106,11 +124,48 @@ export function ProfileBar({
     [profiles, setProfilesOrder]
   );
 
-  const resolveProfileIdFromPoint = React.useCallback((x: number, y: number) => {
+  const resolveProfileTargetFromPoint = React.useCallback((x: number, y: number) => {
     if (typeof document === "undefined") return null;
     const node = document.elementFromPoint(x, y) as HTMLElement | null;
-    return node?.closest<HTMLElement>("[data-profile-chip-id]")?.dataset.profileChipId ?? null;
+    const chip = node?.closest<HTMLElement>("[data-profile-chip-id]");
+    if (!chip) return null;
+    const id = chip.dataset.profileChipId;
+    if (!id) return null;
+    return { id, node: chip };
   }, []);
+
+  const maybeSwapProfiles = React.useCallback(
+    (payload: { targetId: string; targetNode: HTMLElement; clientX: number; clientY: number }) => {
+      if (!dragSourceId || dragSourceId === payload.targetId) return;
+      const workingOrder = previewOrderRef.current ?? displayedProfiles;
+      const sourceIndex = workingOrder.findIndex((profile) => profile.id === dragSourceId);
+      const targetIndex = workingOrder.findIndex((profile) => profile.id === payload.targetId);
+      if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) return;
+
+      const progress = getPointerProgress(payload.targetNode, payload.clientX, payload.clientY);
+      const movingForward = sourceIndex < targetIndex;
+      const passedSwapThreshold = movingForward
+        ? progress >= FORWARD_SWAP_THRESHOLD
+        : progress <= BACKWARD_SWAP_THRESHOLD;
+      if (!passedSwapThreshold) return;
+
+      const now = performance.now();
+      const pairKey = toPairKey(dragSourceId, payload.targetId);
+      const lock = swapLockRef.current;
+      const inHysteresisBand =
+        progress > BACKWARD_SWAP_THRESHOLD && progress < FORWARD_SWAP_THRESHOLD;
+      if (lock && now - lock.lastSwapAt < SWAP_COOLDOWN_MS) return;
+      if (lock?.pairKey === pairKey && inHysteresisBand) return;
+
+      const nextOrder = moveInArray(workingOrder, dragSourceId, payload.targetId);
+      if (nextOrder === workingOrder) return;
+      setDragOverId(payload.targetId);
+      setPreviewOrder(nextOrder);
+      previewOrderRef.current = nextOrder;
+      swapLockRef.current = { pairKey, lastSwapAt: now };
+    },
+    [dragSourceId, displayedProfiles]
+  );
 
   if (profiles.length === 0) {
     return null;
@@ -153,21 +208,20 @@ export function ProfileBar({
                   setDragOverId(profile.id);
                   setPreviewOrder(displayedProfiles);
                   previewOrderRef.current = displayedProfiles;
+                  swapLockRef.current = null;
                   event.dataTransfer.effectAllowed = "move";
                 }}
                 onDragEnter={() => {
-                  if (!dragSourceId || dragSourceId === profile.id) return;
                   setDragOverId(profile.id);
-                  const nextOrder = moveInArray(
-                    previewOrderRef.current ?? displayedProfiles,
-                    dragSourceId,
-                    profile.id
-                  );
-                  setPreviewOrder(nextOrder);
-                  previewOrderRef.current = nextOrder;
                 }}
                 onDragOver={(event) => {
                   event.preventDefault();
+                  maybeSwapProfiles({
+                    targetId: profile.id,
+                    targetNode: event.currentTarget,
+                    clientX: event.clientX,
+                    clientY: event.clientY,
+                  });
                 }}
                 onDrop={(event) => {
                   event.preventDefault();
@@ -195,16 +249,18 @@ export function ProfileBar({
                   if (activePointerIdRef.current !== event.pointerId) return;
                   if (!isTouchDraggingRef.current || !dragSourceId) return;
                   event.preventDefault();
-                  const targetId = resolveProfileIdFromPoint(event.clientX, event.clientY);
-                  if (!targetId || targetId === dragOverId) return;
-                  setDragOverId(targetId);
-                  const nextOrder = moveInArray(
-                    previewOrderRef.current ?? displayedProfiles,
-                    dragSourceId,
-                    targetId
+                  const target = resolveProfileTargetFromPoint(
+                    event.clientX,
+                    event.clientY
                   );
-                  setPreviewOrder(nextOrder);
-                  previewOrderRef.current = nextOrder;
+                  if (!target) return;
+                  setDragOverId(target.id);
+                  maybeSwapProfiles({
+                    targetId: target.id,
+                    targetNode: target.node,
+                    clientX: event.clientX,
+                    clientY: event.clientY,
+                  });
                 }}
                 onPointerUp={(event) => {
                   if (event.pointerType !== "touch") return;
