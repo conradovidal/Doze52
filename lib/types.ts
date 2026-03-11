@@ -18,7 +18,7 @@ export type CategoryItem = {
   visible: boolean;
 };
 
-export type RecurrenceType = "weekly" | "monthly" | "yearly";
+export type RecurrenceType = "weekly" | "biweekly" | "monthly" | "yearly";
 
 export type CalendarEvent = {
   id: string;

@@ -21,7 +21,10 @@ const isIsoDate = (value: string) => {
 const isRecurrenceType = (
   value: CalendarEvent["recurrenceType"]
 ): value is NonNullable<CalendarEvent["recurrenceType"]> =>
-  value === "weekly" || value === "monthly" || value === "yearly";
+  value === "weekly" ||
+  value === "biweekly" ||
+  value === "monthly" ||
+  value === "yearly";
 
 export const validateCategoryInput = (category: CategoryItem) => {
   if (!category.id?.trim()) {

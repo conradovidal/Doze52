@@ -267,7 +267,12 @@ const isIsoDate = (value: unknown): value is string =>
 const normalizeRecurrenceType = (
   value: unknown
 ): CalendarEvent["recurrenceType"] | undefined => {
-  if (value === "weekly" || value === "monthly" || value === "yearly") {
+  if (
+    value === "weekly" ||
+    value === "biweekly" ||
+    value === "monthly" ||
+    value === "yearly"
+  ) {
     return value;
   }
   return undefined;

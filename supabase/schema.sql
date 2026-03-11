@@ -42,7 +42,7 @@ create table if not exists public.events (
   day_order int4 not null default 0,
   constraint events_end_after_start check (end_date >= start_date),
   constraint events_recurrence_type_check check (
-    recurrence_type is null or recurrence_type in ('weekly', 'monthly', 'yearly')
+    recurrence_type is null or recurrence_type in ('weekly', 'biweekly', 'monthly', 'yearly')
   ),
   constraint events_recurrence_until_after_start_check check (
     recurrence_until is null or recurrence_until >= start_date

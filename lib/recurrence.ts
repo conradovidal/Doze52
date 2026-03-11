@@ -15,6 +15,7 @@ const MAX_OCCURRENCES_PER_EVENT = 4096;
 
 const advanceOccurrenceStart = (start: Date, recurrenceType: RecurrenceType) => {
   if (recurrenceType === "weekly") return addWeeks(start, 1);
+  if (recurrenceType === "biweekly") return addWeeks(start, 2);
   if (recurrenceType === "monthly") return addMonths(start, 1);
   return addYears(start, 1);
 };
@@ -46,6 +47,7 @@ export const expandEventsForYear = (
     const recurrenceUntil = event.recurrenceUntil ? parseISO(event.recurrenceUntil) : null;
     const hasRecurrence =
       recurrenceType === "weekly" ||
+      recurrenceType === "biweekly" ||
       recurrenceType === "monthly" ||
       recurrenceType === "yearly";
     const recurrenceUntilValid =

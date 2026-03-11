@@ -167,6 +167,17 @@ export function ProfileBar({
     [dragSourceId, displayedProfiles]
   );
 
+  const startDragPreview = React.useCallback(
+    (profileId: string) => {
+      setDragSourceId(profileId);
+      setDragOverId(profileId);
+      setPreviewOrder(displayedProfiles);
+      previewOrderRef.current = displayedProfiles;
+      swapLockRef.current = null;
+    },
+    [displayedProfiles]
+  );
+
   if (profiles.length === 0) {
     return null;
   }
@@ -202,15 +213,8 @@ export function ProfileBar({
                 key={profile.id}
                 ref={(node) => registerProfileNode(profile.id, node)}
                 data-profile-chip-id={profile.id}
-                draggable
-                onDragStart={(event) => {
-                  setDragSourceId(profile.id);
-                  setDragOverId(profile.id);
-                  setPreviewOrder(displayedProfiles);
-                  previewOrderRef.current = displayedProfiles;
-                  swapLockRef.current = null;
-                  event.dataTransfer.effectAllowed = "move";
-                }}
+                role="button"
+                tabIndex={0}
                 onDragEnter={() => {
                   setDragOverId(profile.id);
                 }}
@@ -228,71 +232,108 @@ export function ProfileBar({
                   commitProfilesOrder(previewOrderRef.current ?? previewOrder ?? displayedProfiles);
                   clearDragState();
                 }}
-                onDragEnd={() => {
-                  clearDragState();
+                onClick={() => {
+                  if (dragSourceId) return;
+                  toggleSelectedProfile(profile.id);
                 }}
-                onPointerDown={(event) => {
-                  if (event.pointerType !== "touch") return;
-                  activePointerIdRef.current = event.pointerId;
-                  event.currentTarget.setPointerCapture(event.pointerId);
-                  clearLongPressTimer();
-                  longPressTimerRef.current = window.setTimeout(() => {
-                    isTouchDraggingRef.current = true;
-                    setDragSourceId(profile.id);
-                    setDragOverId(profile.id);
-                    setPreviewOrder(displayedProfiles);
-                    previewOrderRef.current = displayedProfiles;
-                  }, MOBILE_LONG_PRESS_MS);
-                }}
-                onPointerMove={(event) => {
-                  if (event.pointerType !== "touch") return;
-                  if (activePointerIdRef.current !== event.pointerId) return;
-                  if (!isTouchDraggingRef.current || !dragSourceId) return;
+                onKeyDown={(event) => {
+                  if (event.key !== "Enter" && event.key !== " ") return;
                   event.preventDefault();
-                  const target = resolveProfileTargetFromPoint(
-                    event.clientX,
-                    event.clientY
-                  );
-                  if (!target) return;
-                  setDragOverId(target.id);
-                  maybeSwapProfiles({
-                    targetId: target.id,
-                    targetNode: target.node,
-                    clientX: event.clientX,
-                    clientY: event.clientY,
-                  });
-                }}
-                onPointerUp={(event) => {
-                  if (event.pointerType !== "touch") return;
-                  if (activePointerIdRef.current !== event.pointerId) return;
-                  clearLongPressTimer();
-                  try {
-                    event.currentTarget.releasePointerCapture(event.pointerId);
-                  } catch {
-                    // no-op
-                  }
-                  if (isTouchDraggingRef.current) {
-                    commitProfilesOrder(
-                      previewOrderRef.current ?? previewOrder ?? displayedProfiles
-                    );
-                  }
-                  clearDragState();
-                }}
-                onPointerCancel={(event) => {
-                  if (event.pointerType !== "touch") return;
-                  if (activePointerIdRef.current !== event.pointerId) return;
-                  clearDragState();
+                  if (dragSourceId) return;
+                  toggleSelectedProfile(profile.id);
                 }}
                 onContextMenu={(event) => {
-                  event.preventDefault();
+                  if (dragSourceId) {
+                    event.preventDefault();
+                  }
                 }}
-                className={`${chipClass} ${dragRing} cursor-grab`}
+                className={`${chipClass} ${dragRing} cursor-pointer`}
               >
-                <GripVertical size={12} className="shrink-0" />
+                <button
+                  type="button"
+                  draggable
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                  }}
+                  onDragStart={(event) => {
+                    event.stopPropagation();
+                    startDragPreview(profile.id);
+                    event.dataTransfer.effectAllowed = "move";
+                  }}
+                  onDragEnd={(event) => {
+                    event.stopPropagation();
+                    clearDragState();
+                  }}
+                  onPointerDown={(event) => {
+                    event.stopPropagation();
+                    if (event.pointerType !== "touch") return;
+                    activePointerIdRef.current = event.pointerId;
+                    event.currentTarget.setPointerCapture(event.pointerId);
+                    clearLongPressTimer();
+                    longPressTimerRef.current = window.setTimeout(() => {
+                      isTouchDraggingRef.current = true;
+                      startDragPreview(profile.id);
+                    }, MOBILE_LONG_PRESS_MS);
+                  }}
+                  onPointerMove={(event) => {
+                    event.stopPropagation();
+                    if (event.pointerType !== "touch") return;
+                    if (activePointerIdRef.current !== event.pointerId) return;
+                    if (!isTouchDraggingRef.current || !dragSourceId) return;
+                    event.preventDefault();
+                    const target = resolveProfileTargetFromPoint(
+                      event.clientX,
+                      event.clientY
+                    );
+                    if (!target) return;
+                    setDragOverId(target.id);
+                    maybeSwapProfiles({
+                      targetId: target.id,
+                      targetNode: target.node,
+                      clientX: event.clientX,
+                      clientY: event.clientY,
+                    });
+                  }}
+                  onPointerUp={(event) => {
+                    event.stopPropagation();
+                    if (event.pointerType !== "touch") return;
+                    if (activePointerIdRef.current !== event.pointerId) return;
+                    clearLongPressTimer();
+                    try {
+                      event.currentTarget.releasePointerCapture(event.pointerId);
+                    } catch {
+                      // no-op
+                    }
+                    if (isTouchDraggingRef.current) {
+                      commitProfilesOrder(
+                        previewOrderRef.current ?? previewOrder ?? displayedProfiles
+                      );
+                    }
+                    clearDragState();
+                  }}
+                  onPointerCancel={(event) => {
+                    event.stopPropagation();
+                    if (event.pointerType !== "touch") return;
+                    if (activePointerIdRef.current !== event.pointerId) return;
+                    clearDragState();
+                  }}
+                  onContextMenu={(event) => {
+                    event.preventDefault();
+                  }}
+                  className="inline-flex cursor-grab items-center rounded p-0.5 active:cursor-grabbing hover:bg-black/10 dark:hover:bg-white/10"
+                  aria-label={`Reordenar perfil ${profile.name}`}
+                  title={`Reordenar perfil ${profile.name}`}
+                >
+                  <GripVertical size={12} className="shrink-0" />
+                </button>
                 <span>{profile.name}</span>
                 <button
                   type="button"
-                  onClick={() => openEditManager(profile.id)}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    openEditManager(profile.id);
+                  }}
                   onPointerDown={(event) => {
                     event.stopPropagation();
                   }}

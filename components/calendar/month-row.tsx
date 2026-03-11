@@ -100,7 +100,7 @@ export function MonthRow({
     sourceEventId: string;
     startDate: string;
     endDate: string;
-    recurrenceType?: "weekly" | "monthly" | "yearly";
+    recurrenceType?: "weekly" | "biweekly" | "monthly" | "yearly";
     grabOffsetDays: number;
     isMultiDay: boolean;
   }) => void;

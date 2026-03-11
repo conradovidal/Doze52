@@ -30,7 +30,7 @@ type DragSource = {
   sourceEventId: string;
   startDate: string;
   endDate: string;
-  recurrenceType?: "weekly" | "monthly" | "yearly";
+  recurrenceType?: "weekly" | "biweekly" | "monthly" | "yearly";
   isMultiDay: boolean;
   grabOffsetDays: number;
   durationDaysInclusive: number;
@@ -146,7 +146,7 @@ export function YearGrid({
       sourceEventId: string;
       startDate: string;
       endDate: string;
-      recurrenceType?: "weekly" | "monthly" | "yearly";
+      recurrenceType?: "weekly" | "biweekly" | "monthly" | "yearly";
       grabOffsetDays: number;
       isMultiDay: boolean;
     }) => {

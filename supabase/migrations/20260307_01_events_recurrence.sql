@@ -10,7 +10,7 @@ alter table public.events
 alter table public.events
   add constraint events_recurrence_type_check
   check (
-    recurrence_type is null or recurrence_type in ('weekly', 'monthly', 'yearly')
+    recurrence_type is null or recurrence_type in ('weekly', 'biweekly', 'monthly', 'yearly')
   );
 
 alter table public.events

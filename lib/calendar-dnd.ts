@@ -5,7 +5,7 @@ export type CalendarEventDndPayload = {
   sourceEventId: string;
   startDate: string;
   endDate: string;
-  recurrenceType?: "weekly" | "monthly" | "yearly";
+  recurrenceType?: "weekly" | "biweekly" | "monthly" | "yearly";
   isMultiDay: boolean;
   grabOffsetDays: number;
 };
@@ -31,6 +31,7 @@ const isValidPayload = (value: unknown): value is CalendarEventDndPayload => {
     candidate.endDate.length > 0 &&
     (candidate.recurrenceType === undefined ||
       candidate.recurrenceType === "weekly" ||
+      candidate.recurrenceType === "biweekly" ||
       candidate.recurrenceType === "monthly" ||
       candidate.recurrenceType === "yearly") &&
     typeof candidate.isMultiDay === "boolean" &&
