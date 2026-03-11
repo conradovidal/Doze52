@@ -21,6 +21,7 @@ type FooterLink = {
   href: string;
   ariaLabel: string;
   external: boolean;
+  showLabel?: boolean;
   icon: React.ComponentType<{ className?: string }>;
 };
 
@@ -35,6 +36,7 @@ export function SiteFooter() {
       href: "https://instagram.com/doze.52",
       ariaLabel: "Instagram do doze52",
       external: true,
+      showLabel: true,
       icon: Instagram,
     },
     {
@@ -42,6 +44,7 @@ export function SiteFooter() {
       href: "https://x.com/doze_52",
       ariaLabel: "Perfil do doze52 no X",
       external: true,
+      showLabel: false,
       icon: BrandXIcon,
     },
     {
@@ -49,13 +52,14 @@ export function SiteFooter() {
       href: "https://github.com/conradovidal/Doze52",
       ariaLabel: "Repositorio do doze52 no GitHub",
       external: true,
+      showLabel: true,
       icon: Github,
     },
   ];
 
   return (
     <footer className="border-t border-border/70">
-      <div className="mx-auto flex w-full max-w-none flex-col gap-2 px-4 py-3 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+      <div className="mx-auto flex w-full max-w-none flex-col gap-1.5 px-4 py-2 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
         <p>© {new Date().getFullYear()} doze52</p>
         <nav
           aria-label="Redes do doze52"
@@ -71,7 +75,11 @@ export function SiteFooter() {
                 rel={link.external ? "noopener noreferrer" : undefined}
               >
                 <link.icon className="h-3.5 w-3.5" />
-                <span>{link.label}</span>
+                {link.showLabel ? (
+                  <span>{link.label}</span>
+                ) : (
+                  <span className="sr-only">{link.label}</span>
+                )}
               </a>
               {index < socialLinks.length - 1 ? (
                 <span className="hidden text-muted-foreground/60 sm:inline">|</span>

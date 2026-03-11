@@ -31,6 +31,21 @@ import { expandEventsForYear } from "@/lib/recurrence";
 import type { AnchorPoint } from "@/lib/types";
 
 const toSnapshotHash = (snapshot: CalendarSnapshot) => JSON.stringify(snapshot);
+const SYNC_HINT_BY_KIND: Record<SyncError["kind"], string> = {
+  missing_relation:
+    "Schema pendente no Supabase (rode as migrations de perfis/icones).",
+  permission: "RLS/policies sem permissao para seu usuario.",
+  not_authenticated: "Sessao expirada. Faca login novamente.",
+  network: "Falha de rede. Tente novamente em instantes.",
+  environment:
+    "Ambiente Supabase nao configurado corretamente (URL/anon key).",
+  unknown: "Falha inesperada. Tente novamente.",
+};
+
+type SyncUiError = {
+  message: string;
+  kind: SyncError["kind"];
+};
 
 const ensureSnapshotCoverage = (
   snapshot: CalendarSnapshot
@@ -163,7 +178,7 @@ export default function HomePage() {
     hoverIso: string;
     isDragging: boolean;
   } | null>(null);
-  const [syncError, setSyncError] = React.useState<string | null>(null);
+  const [syncError, setSyncError] = React.useState<SyncUiError | null>(null);
   const [isSyncing, setIsSyncing] = React.useState(false);
   const [remoteReady, setRemoteReady] = React.useState(false);
   const [syncBlocked, setSyncBlocked] = React.useState(false);
@@ -429,7 +444,7 @@ export default function HomePage() {
           message: syncError.userMessage,
         });
         logProdError("Falha ao carregar dados remotos.");
-        setSyncError(syncError.userMessage);
+        setSyncError({ message: syncError.userMessage, kind: syncError.kind });
         setRemoteReady(false);
         setSyncBlocked(true);
       } finally {
@@ -480,7 +495,7 @@ export default function HomePage() {
           message: syncError.userMessage,
         });
         logProdError("Falha ao salvar dados.");
-        setSyncError(syncError.userMessage);
+        setSyncError({ message: syncError.userMessage, kind: syncError.kind });
         setSyncBlocked(true);
         setRemoteReady(false);
       } finally {
@@ -572,7 +587,7 @@ export default function HomePage() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-none overflow-x-hidden px-4 pt-2 pb-4 md:pb-6">
+    <main className="mx-auto w-full max-w-none overflow-x-hidden px-4 pt-2 pb-1 md:pb-2">
       <div className="sticky top-0 z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85 md:static md:bg-transparent md:backdrop-blur-none">
         <AppHeader
           year={year}
@@ -613,7 +628,12 @@ export default function HomePage() {
       </div>
       {syncError ? (
         <div className="mt-2 flex flex-col items-center gap-2">
-          <p className="text-center text-xs text-red-600">{syncError}</p>
+          <div className="space-y-0.5 text-center">
+            <p className="text-xs text-red-600">{syncError.message}</p>
+            <p className="text-[11px] text-red-500/90">
+              {SYNC_HINT_BY_KIND[syncError.kind] ?? SYNC_HINT_BY_KIND.unknown}
+            </p>
+          </div>
           <Button
             type="button"
             size="sm"

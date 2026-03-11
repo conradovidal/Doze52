@@ -24,12 +24,12 @@ export default function RootLayout({
 }) {
   return (
     <html lang="pt-BR" suppressHydrationWarning>
-      <body className="flex min-h-screen flex-col bg-background text-foreground">
+      <body className="bg-background text-foreground">
         <ThemeInitScript />
         <ThemeProvider>
           <AuthProvider>
-            <div className="flex min-h-screen flex-1 flex-col">
-              <div className="flex-1">{children}</div>
+            <div className="flex flex-col">
+              <div>{children}</div>
               <SiteFooter />
             </div>
           </AuthProvider>
