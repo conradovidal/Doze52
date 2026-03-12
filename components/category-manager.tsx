@@ -199,13 +199,13 @@ export function CategoryManager({
         anchorPoint={anchorPoint}
         desktopPlacement="right-start"
         mobileMode="sheet"
-        className="sm:max-w-[500px] p-4 sm:p-5"
+        className="sm:max-w-[460px] p-4 sm:p-5"
       >
         <DialogHeader>
           <DialogTitle>{isEdit ? "Editar categoria" : "Nova categoria"}</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="space-y-3">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <div className="space-y-1">
               <label className="text-xs font-medium text-muted-foreground">Perfil</label>
               <Select value={profileDraftId} onValueChange={setProfileDraftId}>
@@ -234,14 +234,15 @@ export function CategoryManager({
 
             <div className="space-y-1">
               <label className="text-xs font-medium text-muted-foreground">Preview</label>
-              <div className="flex h-8 items-center rounded-full border border-neutral-200 bg-neutral-50 px-3 dark:border-neutral-700 dark:bg-neutral-900">
-                <div
-                  className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium text-white"
-                  style={{ backgroundColor: color }}
-                >
-                  <span className="h-2 w-2 rounded-full bg-white/80" />
-                  {name.trim() || "Categoria"}
-                </div>
+              <div
+                className="inline-flex h-8 w-full items-center gap-1.5 rounded-full border px-3 text-xs font-medium text-white shadow-none"
+                style={{
+                  backgroundColor: color,
+                  borderColor: "rgba(255,255,255,0.28)",
+                }}
+              >
+                <span className="h-2 w-2 rounded-full bg-white/80" />
+                <span className="truncate">{name.trim() || "Categoria"}</span>
               </div>
             </div>
           </div>

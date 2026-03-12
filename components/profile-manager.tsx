@@ -233,14 +233,14 @@ export function ProfileManager({
         onOpenChange(nextOpen);
       }}
     >
-      <DialogContent className="sm:max-w-[520px] p-4 sm:p-5">
+      <DialogContent className="sm:max-w-[460px] p-4 sm:p-5">
         <DialogHeader>
           <DialogTitle>{isEditMode ? "Editar perfil" : "Novo perfil"}</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
-          <div className="flex items-center gap-3">
-            <div className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-neutral-200 bg-neutral-100 text-neutral-700 shadow-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200">
+        <div className="space-y-3">
+          <div className="flex items-center gap-2.5">
+            <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-neutral-200 bg-neutral-100 text-neutral-700 shadow-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200">
               <ProfileIcon icon={icon} size={18} />
             </div>
             <div className="min-w-0 flex-1">
@@ -252,7 +252,7 @@ export function ProfileManager({
                 value={name}
                 onChange={(event) => setName(event.target.value)}
                 placeholder="Titulo do perfil"
-                className="h-11"
+                className="h-10"
               />
             </div>
           </div>
@@ -267,13 +267,13 @@ export function ProfileManager({
                   onClick={() => setIcon(option.id as ProfileIconId)}
                   aria-label={option.label}
                   title={option.label}
-                  className={`inline-flex h-11 items-center justify-center rounded-2xl border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-300 ${
+                  className={`inline-flex h-10 items-center justify-center rounded-xl border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-300 ${
                     selected
                       ? "border-neutral-900 bg-neutral-900 text-neutral-50 shadow-sm dark:border-neutral-100 dark:bg-neutral-100 dark:text-neutral-900"
                       : "border-neutral-200 bg-neutral-50 text-neutral-600 hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300 dark:hover:bg-neutral-800"
                   }`}
                 >
-                  <ProfileIcon icon={option.id} size={16} />
+                  <ProfileIcon icon={option.id} size={18} />
                 </button>
               );
             })}
