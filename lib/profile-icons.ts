@@ -10,6 +10,10 @@ export const PROFILE_ICON_IDS = [
   "stethoscope",
   "baby",
   "dumbbell",
+  "paw-print",
+  "utensils-crossed",
+  "wallet",
+  "calendar-days",
   "folder",
 ] as const;
 
@@ -29,6 +33,10 @@ export const PROFILE_ICON_OPTIONS: Array<{ id: ProfileIconId; label: string }> =
   { id: "stethoscope", label: "Saude" },
   { id: "baby", label: "Criancas" },
   { id: "dumbbell", label: "Fitness" },
+  { id: "paw-print", label: "Pet" },
+  { id: "utensils-crossed", label: "Comida" },
+  { id: "wallet", label: "Dinheiro" },
+  { id: "calendar-days", label: "Agenda" },
   { id: "folder", label: "Geral" },
 ];
 
@@ -58,6 +66,26 @@ export const inferProfileIconFromName = (name: string | undefined | null): Profi
     return "book-open";
   }
   if (normalized.includes("viagem")) return "plane";
+  if (normalized.includes("pet") || normalized.includes("animal")) {
+    return "paw-print";
+  }
+  if (
+    normalized.includes("comida") ||
+    normalized.includes("aliment") ||
+    normalized.includes("refeicao")
+  ) {
+    return "utensils-crossed";
+  }
+  if (
+    normalized.includes("dinheiro") ||
+    normalized.includes("financ") ||
+    normalized.includes("conta")
+  ) {
+    return "wallet";
+  }
+  if (normalized.includes("agenda") || normalized.includes("calend")) {
+    return "calendar-days";
+  }
   return DEFAULT_PROFILE_ICON;
 };
 

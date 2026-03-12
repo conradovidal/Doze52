@@ -5,15 +5,19 @@ import {
   Baby,
   BookOpen,
   Briefcase,
+  CalendarDays,
   Dumbbell,
   Folder,
   GraduationCap,
   Heart,
   Home,
+  PawPrint,
   Plane,
   Stethoscope,
+  UtensilsCrossed,
   User,
   Users,
+  Wallet,
 } from "lucide-react";
 import type { ProfileIconId } from "@/lib/profile-icons";
 
@@ -29,6 +33,10 @@ const ICON_BY_ID: Record<ProfileIconId, LucideIcon> = {
   stethoscope: Stethoscope,
   baby: Baby,
   dumbbell: Dumbbell,
+  "paw-print": PawPrint,
+  "utensils-crossed": UtensilsCrossed,
+  wallet: Wallet,
+  "calendar-days": CalendarDays,
   folder: Folder,
 };
 

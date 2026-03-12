@@ -233,47 +233,50 @@ export function ProfileManager({
         onOpenChange(nextOpen);
       }}
     >
-      <DialogContent className="sm:max-w-[520px]">
+      <DialogContent className="sm:max-w-[520px] p-4 sm:p-5">
         <DialogHeader>
           <DialogTitle>{isEditMode ? "Editar perfil" : "Novo perfil"}</DialogTitle>
         </DialogHeader>
 
-        <div className="grid gap-3 rounded-xl border border-neutral-200 p-3">
-          <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
-            {isEditMode ? "Perfil" : "Criar perfil"}
+        <div className="space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-neutral-200 bg-neutral-100 text-neutral-700 shadow-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200">
+              <ProfileIcon icon={icon} size={18} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <label htmlFor="profile-name" className="sr-only">
+                Nome do perfil
+              </label>
+              <Input
+                id="profile-name"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                placeholder="Titulo do perfil"
+                className="h-11"
+              />
+            </div>
           </div>
 
-          <div className="space-y-1">
-            <label htmlFor="profile-name" className="text-sm text-neutral-600">
-              Nome do perfil
-            </label>
-            <Input
-              id="profile-name"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              placeholder="Ex.: Profissional"
-            />
-          </div>
-
-          <div className="space-y-1">
-            <label htmlFor="profile-icon" className="text-sm text-neutral-600">
-              Icone
-            </label>
-            <Select value={icon} onValueChange={(value) => setIcon(value as ProfileIconId)}>
-              <SelectTrigger id="profile-icon">
-                <SelectValue placeholder="Selecione um icone" />
-              </SelectTrigger>
-              <SelectContent>
-                {PROFILE_ICON_OPTIONS.map((option) => (
-                  <SelectItem key={option.id} value={option.id}>
-                    <span className="inline-flex items-center gap-2">
-                      <ProfileIcon icon={option.id} size={14} />
-                      {option.label}
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-4 gap-2">
+            {PROFILE_ICON_OPTIONS.map((option) => {
+              const selected = option.id === icon;
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  onClick={() => setIcon(option.id as ProfileIconId)}
+                  aria-label={option.label}
+                  title={option.label}
+                  className={`inline-flex h-11 items-center justify-center rounded-2xl border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-300 ${
+                    selected
+                      ? "border-neutral-900 bg-neutral-900 text-neutral-50 shadow-sm dark:border-neutral-100 dark:bg-neutral-100 dark:text-neutral-900"
+                      : "border-neutral-200 bg-neutral-50 text-neutral-600 hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                  }`}
+                >
+                  <ProfileIcon icon={option.id} size={16} />
+                </button>
+              );
+            })}
           </div>
         </div>
 

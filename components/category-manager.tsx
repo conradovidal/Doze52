@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Palette } from "lucide-react";
+import { ProfileIcon } from "@/components/profile-icon";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -16,7 +17,6 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CATEGORY_PRESET_COLORS } from "@/lib/category-palette";
@@ -24,6 +24,8 @@ import { useStore } from "@/lib/store";
 import type { AnchorPoint } from "@/lib/types";
 
 const DEFAULT_CATEGORY_COLOR = CATEGORY_PRESET_COLORS[0];
+const CHIP_TRIGGER_CLASS =
+  "h-8 w-full rounded-full border px-3 text-xs shadow-none transition-colors";
 
 const normalizeHashPrefix = (value: string) => {
   const trimmed = value.trim();
@@ -88,8 +90,10 @@ export function CategoryManager({
   const [saveError, setSaveError] = React.useState<string | null>(null);
   const effectiveCreateProfileId = profileId ?? profiles[0]?.id ?? "";
   const effectiveProfileId = category?.profileId ?? effectiveCreateProfileId;
-  const effectiveProfileName =
-    profiles.find((profile) => profile.id === effectiveProfileId)?.name ?? "";
+  const currentProfile = React.useMemo(
+    () => profiles.find((profile) => profile.id === profileDraftId || profile.id === effectiveProfileId) ?? null,
+    [effectiveProfileId, profileDraftId, profiles]
+  );
 
   React.useEffect(() => {
     if (!open) return;
@@ -195,54 +199,68 @@ export function CategoryManager({
         anchorPoint={anchorPoint}
         desktopPlacement="right-start"
         mobileMode="sheet"
-        className="sm:max-w-[480px]"
+        className="sm:max-w-[500px] p-4 sm:p-5"
       >
         <DialogHeader>
           <DialogTitle>{isEdit ? "Editar categoria" : "Nova categoria"}</DialogTitle>
         </DialogHeader>
-        <div className="space-y-5">
-          <div className="space-y-2">
-            <div className="text-sm text-neutral-600">Perfil</div>
-            {isEdit ? (
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">Perfil</label>
               <Select value={profileDraftId} onValueChange={setProfileDraftId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione um perfil" />
+                <SelectTrigger
+                  size="sm"
+                  className={`${CHIP_TRIGGER_CLASS} border-neutral-300 bg-neutral-100 text-neutral-700 hover:bg-neutral-200 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700`}
+                  disabled={profiles.length === 0}
+                >
+                  <span className="inline-flex min-w-0 items-center gap-1.5 pr-2">
+                    {currentProfile ? <ProfileIcon icon={currentProfile.icon} size={12} /> : null}
+                    <span className="truncate">{currentProfile?.name ?? "Perfil"}</span>
+                  </span>
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent position="popper" side="bottom" align="start">
                   {profiles.map((profile) => (
                     <SelectItem key={profile.id} value={profile.id}>
-                      {profile.name}
+                      <span className="inline-flex items-center gap-2">
+                        <ProfileIcon icon={profile.icon} size={12} />
+                        {profile.name}
+                      </span>
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-            ) : (
-              <div className="rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm">
-                {effectiveProfileName || "Perfil nao selecionado"}
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">Preview</label>
+              <div className="flex h-8 items-center rounded-full border border-neutral-200 bg-neutral-50 px-3 dark:border-neutral-700 dark:bg-neutral-900">
+                <div
+                  className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium text-white"
+                  style={{ backgroundColor: color }}
+                >
+                  <span className="h-2 w-2 rounded-full bg-white/80" />
+                  {name.trim() || "Categoria"}
+                </div>
               </div>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <div className="text-sm text-neutral-600">Nome da categoria</div>
-            <Input value={name} onChange={(e) => setName(e.target.value)} />
-          </div>
-
-          <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-4">
-            <div className="mb-2 text-xs font-medium uppercase tracking-wide text-neutral-500">
-              Preview
-            </div>
-            <div
-              className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium text-white"
-              style={{ backgroundColor: color }}
-            >
-              <span className="h-2 w-2 rounded-full bg-white/80" />
-              {name.trim() || "Categoria"}
             </div>
           </div>
 
+          <div className="space-y-1">
+            <label htmlFor="category-name" className="text-xs font-medium text-muted-foreground">
+              Categoria
+            </label>
+            <Input
+              id="category-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Nome da categoria"
+              className="h-10"
+            />
+          </div>
+
           <div className="space-y-2">
-            <div className="text-sm text-neutral-600">Cor da categoria</div>
+            <div className="text-xs font-medium text-muted-foreground">Cor</div>
             <div className="flex flex-wrap items-center gap-3">
               {CATEGORY_PRESET_COLORS.map((preset) => {
                 const selected = preset.toLowerCase() === normalizedColor;
