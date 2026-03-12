@@ -723,7 +723,7 @@ export default function HomePage() {
       ) : null}
 
       <div className="overflow-x-auto md:overflow-visible">
-        <div className="w-[200%] md:w-full">
+        <div data-calendar-focus-root className="w-[200%] md:w-full">
           <YearGrid
             year={year}
             todayIso={todayIso}

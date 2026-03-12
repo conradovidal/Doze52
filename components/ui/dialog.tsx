@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button"
 
 const DIALOG_MOTION_CLASS =
   "duration-[160ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
+const CALENDAR_FOCUS_ROOT_SELECTOR = "[data-calendar-focus-root]"
+
 function Dialog({
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Root>) {
@@ -66,6 +68,10 @@ function DialogContent({
   mobileMode?: "sheet" | "center"
 }) {
   const [isMobileViewport, setIsMobileViewport] = React.useState(false)
+  const [calendarCenter, setCalendarCenter] = React.useState<{
+    x: number
+    y: number
+  } | null>(null)
   void _anchorPoint
   void _desktopPlacement
 
@@ -79,6 +85,44 @@ function DialogContent({
   }, [])
 
   const shouldUseMobileSheet = isMobileViewport && mobileMode === "sheet"
+  const updateCalendarCenter = React.useCallback(() => {
+    if (typeof window === "undefined") return
+    const target = document.querySelector<HTMLElement>(CALENDAR_FOCUS_ROOT_SELECTOR)
+    if (!target) {
+      setCalendarCenter(null)
+      return
+    }
+    const rect = target.getBoundingClientRect()
+    if (rect.width <= 0 || rect.height <= 0) {
+      setCalendarCenter(null)
+      return
+    }
+    setCalendarCenter({
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2,
+    })
+  }, [])
+
+  React.useEffect(() => {
+    if (shouldUseMobileSheet) return
+    updateCalendarCenter()
+    const onViewportChange = () => updateCalendarCenter()
+    window.addEventListener("resize", onViewportChange)
+    window.addEventListener("scroll", onViewportChange, true)
+    return () => {
+      window.removeEventListener("resize", onViewportChange)
+      window.removeEventListener("scroll", onViewportChange, true)
+    }
+  }, [shouldUseMobileSheet, updateCalendarCenter])
+
+  const desktopStyle =
+    !shouldUseMobileSheet && calendarCenter
+      ? {
+          ...(style ?? {}),
+          left: `${calendarCenter.x}px`,
+          top: `${calendarCenter.y}px`,
+        }
+      : style
 
   return (
     <DialogPortal data-slot="dialog-portal">
@@ -93,7 +137,7 @@ function DialogContent({
               : "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 top-[50%] left-[50%] w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] rounded-lg p-6 sm:max-w-lg",
           className
         )}
-        style={style}
+        style={desktopStyle}
         {...props}
       >
         {children}

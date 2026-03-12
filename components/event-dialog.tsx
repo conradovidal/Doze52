@@ -1,8 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { format, parseISO } from "date-fns";
-import { CalendarDays } from "lucide-react";
 import { ProfileIcon } from "@/components/profile-icon";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,85 +16,16 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from "@/components/ui/select";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useStore } from "@/lib/store";
 import type { AnchorPoint, CalendarEvent, RecurrenceType } from "@/lib/types";
 import { logDevError, logProdError } from "@/lib/safe-log";
 import { ValidationError, validateEventInput } from "@/lib/validation";
 
-const CHIP_MOTION_CLASS = "duration-[160ms] ease-[cubic-bezier(0.22,1,0.36,1)]";
+const CHIP_TRIGGER_CLASS =
+  "h-8 w-full rounded-full border px-3 text-xs shadow-none transition-colors";
 
 type RecurrenceDraft = "none" | RecurrenceType;
-
-const formatDateLabel = (value: string) => {
-  if (!value) return "Selecionar data";
-  try {
-    const parsed = parseISO(value);
-    if (Number.isNaN(parsed.getTime())) return "Selecionar data";
-    return format(parsed, "dd/MM/yyyy");
-  } catch {
-    return "Selecionar data";
-  }
-};
-
-function DatePopoverField({
-  label,
-  value,
-  onChange,
-  min,
-  disabled,
-}: {
-  label: string;
-  value: string;
-  onChange: (next: string) => void;
-  min?: string;
-  disabled?: boolean;
-}) {
-  const [open, setOpen] = React.useState(false);
-
-  return (
-    <div className="space-y-1.5">
-      <label className="text-xs font-medium text-muted-foreground">{label}</label>
-      <Popover
-        open={open}
-        onOpenChange={(nextOpen) => {
-          if (disabled) return;
-          setOpen(nextOpen);
-        }}
-      >
-        <PopoverTrigger asChild>
-          <Button
-            type="button"
-            variant="outline"
-            disabled={disabled}
-            className="h-10 w-full justify-between px-3 text-left font-normal"
-          >
-            <span className={value ? "text-foreground" : "text-muted-foreground"}>
-              {formatDateLabel(value)}
-            </span>
-            <CalendarDays size={14} className="text-muted-foreground" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent align="start" className="w-[220px] p-3">
-          <div className="space-y-2">
-            <p className="text-xs font-medium text-muted-foreground">{label}</p>
-            <Input
-              type="date"
-              value={value}
-              min={min}
-              onChange={(event) => {
-                onChange(event.target.value);
-                setOpen(false);
-              }}
-            />
-          </div>
-        </PopoverContent>
-      </Popover>
-    </div>
-  );
-}
 
 export function EventDialog({
   open,
@@ -145,6 +74,11 @@ export function EventDialog({
     [categories]
   );
 
+  const currentProfile = React.useMemo(
+    () => profiles.find((profile) => profile.id === profileId) ?? null,
+    [profiles, profileId]
+  );
+
   const initialProfileFromEvent = initialEvent
     ? categoryById.get(initialEvent.categoryId)?.profileId ?? ""
     : "";
@@ -156,6 +90,11 @@ export function EventDialog({
     if (!profileId) return [];
     return categories.filter((category) => category.profileId === profileId);
   }, [categories, profileId]);
+
+  const currentCategory = React.useMemo(
+    () => categories.find((category) => category.id === categoryId) ?? null,
+    [categories, categoryId]
+  );
 
   const handleProfileSelect = React.useCallback(
     (nextProfileId: string) => {
@@ -239,140 +178,190 @@ export function EventDialog({
         anchorPoint={anchorPoint}
         desktopPlacement="right-start"
         mobileMode="sheet"
-        className="sm:max-w-[560px]"
+        className="sm:max-w-[460px] p-4 sm:p-5"
       >
         <DialogHeader>
           <DialogTitle>{initialEvent ? "Editar evento" : "Novo evento"}</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <p className="text-xs font-medium text-muted-foreground">Perfil</p>
-              <div className="flex flex-wrap gap-2">
-                {profileOptions.map((profile) => {
-                  const isSelected = profile.id === profileId;
-                  return (
-                    <button
-                      key={profile.id}
-                      type="button"
-                      onClick={() => handleProfileSelect(profile.id)}
-                      className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs transition-colors ${CHIP_MOTION_CLASS} ${
-                        isSelected
-                          ? "border-neutral-500 bg-neutral-300 text-neutral-900 hover:bg-neutral-400 dark:border-neutral-500 dark:bg-neutral-600 dark:text-neutral-100 dark:hover:bg-neutral-500"
-                          : "border-neutral-300 bg-neutral-100 text-neutral-700 hover:bg-neutral-200 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
-                      }`}
-                    >
-                      <ProfileIcon icon={profile.icon} size={12} className="shrink-0" />
-                      <span>{profile.name}</span>
-                    </button>
-                  );
-                })}
-              </div>
+        <div className="space-y-3">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">Perfil</label>
+              <Select value={profileId} onValueChange={handleProfileSelect}>
+                <SelectTrigger
+                  size="sm"
+                  className={`${CHIP_TRIGGER_CLASS} border-neutral-300 bg-neutral-100 text-neutral-700 hover:bg-neutral-200 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700`}
+                >
+                  <span className="inline-flex min-w-0 items-center gap-1.5 pr-2">
+                    {currentProfile ? <ProfileIcon icon={currentProfile.icon} size={12} /> : null}
+                    <span className="truncate">{currentProfile?.name ?? "Perfil"}</span>
+                  </span>
+                </SelectTrigger>
+                <SelectContent align="start">
+                  {profileOptions.map((profile) => (
+                    <SelectItem key={profile.id} value={profile.id}>
+                      <span className="inline-flex items-center gap-2">
+                        <ProfileIcon icon={profile.icon} size={12} />
+                        {profile.name}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
-            <div className="space-y-1.5">
-              <p className="text-xs font-medium text-muted-foreground">Categoria</p>
-              <div className="flex flex-wrap gap-2">
-                {categoriesForProfile.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">Crie uma categoria para este perfil.</p>
-                ) : (
-                  categoriesForProfile.map((category) => {
-                    const isSelected = category.id === categoryId;
-                    return (
-                      <button
-                        key={category.id}
-                        type="button"
-                        onClick={() => setCategoryId(category.id)}
-                        className={`inline-flex items-center gap-1 rounded-full border border-white/30 px-3 py-1 text-xs text-white transition ${CHIP_MOTION_CLASS} ${
-                          isSelected
-                            ? "ring-2 ring-offset-1 ring-black/20 dark:ring-white/25"
-                            : "opacity-65 hover:opacity-90"
-                        }`}
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">Categoria</label>
+              <Select value={categoryId} onValueChange={setCategoryId}>
+                <SelectTrigger
+                  size="sm"
+                  className={`${CHIP_TRIGGER_CLASS} [&_svg]:text-white/90`}
+                  style={
+                    currentCategory
+                      ? {
+                          backgroundColor: currentCategory.color,
+                          borderColor: "rgba(255,255,255,0.28)",
+                          color: "#fff",
+                        }
+                      : undefined
+                  }
+                  disabled={categoriesForProfile.length === 0}
+                >
+                  <span className="inline-flex min-w-0 items-center gap-1.5 pr-2">
+                    <span className="h-2 w-2 rounded-full bg-white/80" />
+                    <span className="truncate">
+                      {currentCategory?.name ?? "Sem categoria"}
+                    </span>
+                  </span>
+                </SelectTrigger>
+                <SelectContent align="start">
+                  {categoriesForProfile.map((category) => (
+                    <SelectItem key={category.id} value={category.id}>
+                      <span
+                        className="inline-flex items-center gap-2 rounded-full px-2 py-0.5 text-white"
                         style={{ backgroundColor: category.color }}
                       >
                         <span className="h-2 w-2 rounded-full bg-white/80" />
-                        <span className="font-medium">{category.name}</span>
-                      </button>
-                    );
-                  })
-                )}
-              </div>
+                        {category.name}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
-          <div className="space-y-1.5">
+          <div className="space-y-1">
             <label htmlFor="event-title" className="text-xs font-medium text-muted-foreground">
               Titulo do evento
             </label>
             <Input
               id="event-title"
+              className="h-9"
               placeholder="Ex.: Reuniao de planejamento"
               value={title}
               onChange={(event) => setTitle(event.target.value)}
             />
           </div>
 
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <DatePopoverField
-              label="Data inicio"
-              value={startDate}
-              onChange={(nextDate) => {
-                setStartDate(nextDate);
-                setEndDate((currentEndDate) => {
-                  if (!currentEndDate) return nextDate;
-                  return currentEndDate < nextDate ? nextDate : currentEndDate;
-                });
-              }}
-            />
-            <DatePopoverField
-              label="Data final"
-              value={endDate}
-              min={startDate || undefined}
-              onChange={setEndDate}
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Recorrencia</label>
-            <Select
-              value={recurrenceType}
-              onValueChange={(value) => setRecurrenceType(value as RecurrenceDraft)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Sem recorrencia</SelectItem>
-                <SelectItem value="weekly">Semanal</SelectItem>
-                <SelectItem value="biweekly">A cada 2 semanas</SelectItem>
-                <SelectItem value="monthly">Mensal</SelectItem>
-                <SelectItem value="yearly">Anual</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {isRecurring ? (
-            <div className="space-y-1.5 rounded-md border border-border/70 bg-muted/20 p-3">
-              <DatePopoverField
-                label="Repetir ate"
-                value={recurrenceUntil}
-                min={startDate || undefined}
-                onChange={setRecurrenceUntil}
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <label htmlFor="event-start-date" className="text-xs font-medium text-muted-foreground">
+                Data inicio
+              </label>
+              <Input
+                id="event-start-date"
+                className="h-9"
+                type="date"
+                value={startDate}
+                onChange={(event) => {
+                  const nextStartDate = event.target.value;
+                  setStartDate(nextStartDate);
+                  setEndDate((currentEndDate) => {
+                    if (!currentEndDate) return nextStartDate;
+                    return currentEndDate < nextStartDate ? nextStartDate : currentEndDate;
+                  });
+                }}
               />
-              <p className="text-xs text-muted-foreground">
+            </div>
+            <div className="space-y-1">
+              <label htmlFor="event-end-date" className="text-xs font-medium text-muted-foreground">
+                Data final
+              </label>
+              <Input
+                id="event-end-date"
+                className="h-9"
+                type="date"
+                min={startDate || undefined}
+                value={endDate}
+                onChange={(event) => setEndDate(event.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <div className={`grid gap-2 ${isRecurring ? "grid-cols-2" : "grid-cols-1"}`}>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Recorrencia</label>
+                <Select
+                  value={recurrenceType}
+                  onValueChange={(value) => setRecurrenceType(value as RecurrenceDraft)}
+                >
+                  <SelectTrigger className="h-9">
+                    <span>
+                      {recurrenceType === "none"
+                        ? "Sem recorrencia"
+                        : recurrenceType === "weekly"
+                          ? "Semanal"
+                          : recurrenceType === "biweekly"
+                            ? "A cada 2 semanas"
+                            : recurrenceType === "monthly"
+                              ? "Mensal"
+                              : "Anual"}
+                    </span>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sem recorrencia</SelectItem>
+                    <SelectItem value="weekly">Semanal</SelectItem>
+                    <SelectItem value="biweekly">A cada 2 semanas</SelectItem>
+                    <SelectItem value="monthly">Mensal</SelectItem>
+                    <SelectItem value="yearly">Anual</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {isRecurring ? (
+                <div className="space-y-1">
+                  <label htmlFor="event-recurrence-until" className="text-xs font-medium text-muted-foreground">
+                    Repetir ate
+                  </label>
+                  <Input
+                    id="event-recurrence-until"
+                    className="h-9"
+                    type="date"
+                    min={startDate || undefined}
+                    value={recurrenceUntil}
+                    onChange={(event) => setRecurrenceUntil(event.target.value)}
+                  />
+                </div>
+              ) : null}
+            </div>
+            {isRecurring ? (
+              <p className="text-[11px] text-muted-foreground">
                 Ultima data em que o evento pode se repetir.
               </p>
-            </div>
-          ) : null}
+            ) : null}
+          </div>
 
-          <div className="space-y-1.5">
+          <div className="space-y-1">
             <label htmlFor="event-notes" className="text-xs font-medium text-muted-foreground">
               Descricao
             </label>
             <textarea
               id="event-notes"
-              className="min-h-24 w-full rounded-md border border-border/80 bg-background px-3 py-2 text-sm outline-none transition focus:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
+              rows={2}
+              className="min-h-[3.5rem] w-full resize-y rounded-md border border-border/80 bg-background px-3 py-2 text-sm outline-none transition focus:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
               placeholder="Adicione detalhes"
               value={notes}
               onChange={(event) => setNotes(event.target.value)}
