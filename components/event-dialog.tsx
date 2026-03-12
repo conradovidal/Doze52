@@ -198,7 +198,7 @@ export function EventDialog({
                     <span className="truncate">{currentProfile?.name ?? "Perfil"}</span>
                   </span>
                 </SelectTrigger>
-                <SelectContent align="start">
+                <SelectContent position="popper" side="bottom" align="start">
                   {profileOptions.map((profile) => (
                     <SelectItem key={profile.id} value={profile.id}>
                       <span className="inline-flex items-center gap-2">
@@ -235,7 +235,7 @@ export function EventDialog({
                     </span>
                   </span>
                 </SelectTrigger>
-                <SelectContent align="start">
+                <SelectContent position="popper" side="bottom" align="start">
                   {categoriesForProfile.map((category) => (
                     <SelectItem key={category.id} value={category.id}>
                       <span
@@ -321,7 +321,7 @@ export function EventDialog({
                               : "Anual"}
                     </span>
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent position="popper" side="bottom" align="start">
                     <SelectItem value="none">Sem recorrencia</SelectItem>
                     <SelectItem value="weekly">Semanal</SelectItem>
                     <SelectItem value="biweekly">A cada 2 semanas</SelectItem>
@@ -347,11 +347,6 @@ export function EventDialog({
                 </div>
               ) : null}
             </div>
-            {isRecurring ? (
-              <p className="text-[11px] text-muted-foreground">
-                Ultima data em que o evento pode se repetir.
-              </p>
-            ) : null}
           </div>
 
           <div className="space-y-1">
