@@ -367,7 +367,7 @@ export function EventDialog({
         <DialogFooter className="gap-2 sm:justify-between">
           {onDelete ? (
             <Button
-              variant="destructive"
+              variant="dangerSoft"
               disabled={isSaving}
               onClick={async () => {
                 if (!onDelete) return;
@@ -398,6 +398,7 @@ export function EventDialog({
           )}
 
           <Button
+            variant="premium"
             disabled={!canSave || isSaving}
             onClick={async () => {
               try {

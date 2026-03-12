@@ -340,7 +340,7 @@ export function CategoryManager({
         </div>
         <DialogFooter className="sm:justify-between">
           {isEdit ? (
-            <Button variant="destructive" onClick={handleDelete} disabled={!canDelete || isSaving}>
+            <Button variant="dangerSoft" onClick={handleDelete} disabled={!canDelete || isSaving}>
               Deletar
             </Button>
           ) : (
@@ -350,7 +350,7 @@ export function CategoryManager({
             <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={isSaving}>
               Cancelar
             </Button>
-            <Button onClick={handleSave} disabled={!canSave || isSaving}>
+            <Button variant="premium" onClick={handleSave} disabled={!canSave || isSaving}>
               {isSaving ? "Salvando..." : isEdit ? "Salvar" : "Criar"}
             </Button>
           </div>

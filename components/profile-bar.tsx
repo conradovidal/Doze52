@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import { Check, GripVertical, Pencil, Plus } from "lucide-react";
-import { CategoryManager } from "@/components/category-manager";
 import { ProfileIcon } from "@/components/profile-icon";
 import { Button } from "@/components/ui/button";
 import { useStore } from "@/lib/store";
@@ -65,9 +64,6 @@ export function ProfileBar({
   const [managerIntent, setManagerIntent] = React.useState<ProfileManagerIntent | null>(
     null
   );
-  const [pendingCategoryProfileId, setPendingCategoryProfileId] = React.useState<
-    string | null
-  >(null);
   const [dragSourceId, setDragSourceId] = React.useState<string | null>(null);
   const [dragOverId, setDragOverId] = React.useState<string | null>(null);
   const [previewOrder, setPreviewOrder] = React.useState<CalendarProfile[] | null>(null);
@@ -379,7 +375,7 @@ export function ProfileBar({
         ) : null}
 
         <Button
-          variant={isGlobalEditMode ? "default" : "ghost"}
+          variant={isGlobalEditMode ? "toolActive" : "ghost"}
           size="sm"
           onClick={() => onGlobalEditModeChange?.(!isGlobalEditMode)}
           aria-label={isGlobalEditMode ? "Finalizar edição" : "Ativar edição"}
@@ -396,7 +392,7 @@ export function ProfileBar({
         </Button>
       </div>
 
-      <ProfileManager
+        <ProfileManager
         open={managerOpen}
         onOpenChange={(open) => {
           setManagerOpen(open);
@@ -405,19 +401,6 @@ export function ProfileBar({
           }
         }}
         intent={managerIntent ?? undefined}
-        onProfileCreated={(profileId) => {
-          setPendingCategoryProfileId(profileId);
-        }}
-      />
-      <CategoryManager
-        mode="create"
-        open={Boolean(pendingCategoryProfileId)}
-        onOpenChange={(open) => {
-          if (!open) {
-            setPendingCategoryProfileId(null);
-          }
-        }}
-        profileId={pendingCategoryProfileId ?? undefined}
       />
     </>
   );

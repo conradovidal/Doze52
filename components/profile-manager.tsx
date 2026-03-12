@@ -34,14 +34,12 @@ type ProfileManagerProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   intent?: ProfileManagerIntent;
-  onProfileCreated?: (profileId: string) => void;
 };
 
 export function ProfileManager({
   open,
   onOpenChange,
   intent,
-  onProfileCreated,
 }: ProfileManagerProps) {
   const profiles = useStore((s) => s.profiles);
   const createProfile = useStore((s) => s.createProfile);
@@ -173,7 +171,6 @@ export function ProfileManager({
       const createdId = createProfile({ name: name.trim(), icon });
       if (createdId) {
         onOpenChange(false);
-        onProfileCreated?.(createdId);
       }
     } catch (error) {
       setSaveError(
@@ -282,7 +279,7 @@ export function ProfileManager({
 
         <DialogFooter className="sm:justify-between">
           {canDelete ? (
-            <Button variant="destructive" onClick={openDeleteConfirm} disabled={isSaving}>
+            <Button variant="dangerSoft" onClick={openDeleteConfirm} disabled={isSaving}>
               <Trash2 size={14} className="mr-1" />
               Excluir
             </Button>
@@ -293,7 +290,7 @@ export function ProfileManager({
             <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={isSaving}>
               {isEditMode ? "Fechar" : "Cancelar"}
             </Button>
-            <Button onClick={handleSave} disabled={!canSave || isSaving}>
+            <Button variant="premium" onClick={handleSave} disabled={!canSave || isSaving}>
               {isSaving ? "Salvando..." : isEditMode ? "Salvar" : "Criar"}
             </Button>
           </div>
@@ -335,7 +332,7 @@ export function ProfileManager({
             Cancelar
           </Button>
           <Button
-            variant="destructive"
+            variant="dangerSoft"
             onClick={handleDelete}
             disabled={!deleteTargetProfileId || isSaving}
           >
