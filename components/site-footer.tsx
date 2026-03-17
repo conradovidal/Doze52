@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArrowUpRight, Github, Instagram, Sparkles } from "lucide-react";
+import { ArrowUpRight, Github, Instagram, Route } from "lucide-react";
 
 function BrandXIcon({ className }: { className?: string }) {
   return (
@@ -29,6 +29,10 @@ type FooterLink = {
 
 export function SiteFooter() {
   const pathname = usePathname();
+  if (pathname === "/melhorias") {
+    return null;
+  }
+
   const supportEmail = "doze52cal@gmail.com";
   const gmailComposeUrl = `https://mail.google.com/mail/?view=cm&fs=1&tf=1&to=${encodeURIComponent(supportEmail)}`;
   const mailtoUrl = `mailto:${supportEmail}`;
@@ -77,7 +81,7 @@ export function SiteFooter() {
                 : "border-border/80 bg-background text-foreground hover:bg-muted"
             }`}
           >
-            <Sparkles className="h-3.5 w-3.5" />
+            <Route className="h-3.5 w-3.5" />
             <span>Melhorias &amp; Prioridades</span>
             <span className="rounded-full bg-emerald-500/12 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-200">
               Novo
