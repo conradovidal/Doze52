@@ -57,7 +57,6 @@ const SECTION_ICON = {
   launched: Rocket,
   in_progress: Clock3,
   backlog: ListTodo,
-  top_voted: ChartNoAxesColumn,
 } as const;
 
 type SectionKey = keyof typeof PRODUCT_FEEDBACK_SECTION_META;
@@ -112,6 +111,24 @@ const fetchJson = async <T,>(
 
   return payload as T;
 };
+
+const PUBLIC_MONTH_YEAR_FORMATTER = new Intl.DateTimeFormat("pt-BR", {
+  month: "long",
+  year: "numeric",
+  timeZone: "UTC",
+});
+
+const formatPublicMonthYear = (value: string | null | undefined) => {
+  if (!value) return null;
+  const parsed = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return PUBLIC_MONTH_YEAR_FORMATTER.format(parsed);
+};
+
+const getPublicItemMomentLabel = (item: ProductFeedbackItem) =>
+  formatPublicMonthYear(item.launchedAt) ??
+  formatPublicMonthYear(item.startedAt) ??
+  item.timelineLabel;
 
 function FrozenCalendarBackdrop() {
   const profiles = useStore((s) => s.profiles);
@@ -331,6 +348,7 @@ function ProductFeedbackCard({
   onVote: (itemId: string) => void;
   requireAuth: () => void;
 }) {
+  const itemMomentLabel = getPublicItemMomentLabel(item);
   return (
     <button
       type="button"
@@ -364,7 +382,7 @@ function ProductFeedbackCard({
         <div className="flex items-center gap-4 text-xs text-muted-foreground">
           <span>{item.voteCount} votos</span>
           <span>{item.reinforcementCount} reforcos</span>
-          {item.timelineLabel ? <span>{item.timelineLabel}</span> : null}
+          {itemMomentLabel ? <span>{itemMomentLabel}</span> : null}
         </div>
         <ItemVoteButton
           item={item}
@@ -411,6 +429,7 @@ function ProductFeedbackDetailsDialog({
   requireAuth: () => void;
 }) {
   if (!item) return null;
+  const itemMomentLabel = getPublicItemMomentLabel(item);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -455,7 +474,7 @@ function ProductFeedbackDetailsDialog({
               Momento
             </div>
             <div className="mt-1 text-sm font-medium text-foreground">
-              {item.timelineLabel ?? "No fluxo atual"}
+              {itemMomentLabel ?? "No fluxo atual"}
             </div>
           </div>
         </div>
@@ -686,7 +705,6 @@ function SuggestionDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        mobileMode="sheet"
         className="max-h-[90vh] overflow-y-auto rounded-[1.75rem] border-border/70 bg-background/94 sm:max-w-2xl"
       >
         <DialogHeader className="pr-8">
@@ -873,7 +891,6 @@ export function ProductUpdatesHub({
   const { snapshot, setSnapshot, loading, error, refresh } =
     useProductFeedbackSnapshot(initialSnapshot);
   const [activeSection, setActiveSection] = React.useState<SectionKey>(() => {
-    if (initialSnapshot.topVoted.length > 0) return "top_voted";
     if (initialSnapshot.backlog.length > 0) return "backlog";
     if (initialSnapshot.inProgress.length > 0) return "in_progress";
     return "launched";
@@ -903,9 +920,7 @@ export function ProductUpdatesHub({
       ? snapshot.launched
       : activeSection === "in_progress"
         ? snapshot.inProgress
-        : activeSection === "backlog"
-          ? snapshot.backlog
-          : snapshot.topVoted;
+        : snapshot.backlog;
   const selectedItem =
     snapshot.items.find((item) => item.id === selectedItemId) ?? null;
   const activeVoteItems = snapshot.items.filter((item) =>
@@ -992,7 +1007,7 @@ export function ProductUpdatesHub({
     },
     {
       title: "Acompanhe o status",
-      body: "Historico, backlog, em andamento e mais votadas convivem na mesma leitura.",
+      body: "Historico, oportunidades de melhoria e entregas em andamento convivem na mesma leitura.",
       icon: Sparkles,
     },
   ];
@@ -1018,97 +1033,51 @@ export function ProductUpdatesHub({
           </div>
 
           <div className="flex flex-col gap-6 px-5 pb-5 sm:px-8 sm:pb-8">
-            <div className="grid gap-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,0.9fr)]">
-              <div className="space-y-5">
-                <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-muted/70 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-muted-foreground">
-                  Evolucao do produto
-                </div>
-                <div className="space-y-3">
-                  <h1 className="max-w-3xl text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-                    Melhorias &amp; Prioridades
-                  </h1>
-                  <p className="max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
-                    O ponto publico onde o doze52 mostra o que ja evoluiu, o que esta em avaliacao e o que a comunidade mais quer ver a seguir.
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-3">
-                  <Button
-                    type="button"
-                    variant="premium"
-                    className="rounded-full"
-                    onClick={(event) => {
-                      if (!session) {
-                        requireAuthFromEvent(event);
-                        return;
-                      }
-                      setSuggestionOpen(true);
-                    }}
-                  >
-                    <MessageSquarePlus className="h-4 w-4" />
-                    Sugerir uma melhoria
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="rounded-full"
-                    onClick={() => setActiveSection("top_voted")}
-                  >
-                    <ChartNoAxesColumn className="h-4 w-4" />
-                    Ver mais votadas
-                  </Button>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-3">
-                  {steps.map((step) => (
-                    <div
-                      key={step.title}
-                      className="rounded-[1.5rem] border border-border/70 bg-background/56 p-4 backdrop-blur"
-                    >
-                      <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                        <step.icon className="h-3.5 w-3.5" />
-                        {step.title}
-                      </div>
-                      <p className="mt-3 text-sm leading-6 text-muted-foreground">
-                        {step.body}
-                      </p>
-                    </div>
-                  ))}
-                </div>
+            <div className="space-y-5">
+              <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-muted/70 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-muted-foreground">
+                Evolucao do produto
               </div>
-
-              <div className="grid gap-3 self-start">
-                <div className="rounded-[1.5rem] border border-border/70 bg-background/56 p-4 backdrop-blur">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                    Historico publicado
+              <div className="space-y-3">
+                <h1 className="max-w-3xl text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+                  Melhorias &amp; Prioridades
+                </h1>
+                <p className="max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
+                  O ponto publico onde o doze52 mostra o que ja evoluiu, o que esta em avaliacao e onde a comunidade pode ajudar a puxar o produto para frente.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <Button
+                  type="button"
+                  variant="premium"
+                  size="lg"
+                  className="h-12 rounded-full border border-neutral-900/10 px-5 text-sm shadow-[0_20px_55px_-24px_rgba(15,23,42,0.55)] dark:border-neutral-100/10"
+                  onClick={(event) => {
+                    if (!session) {
+                      requireAuthFromEvent(event);
+                      return;
+                    }
+                    setSuggestionOpen(true);
+                  }}
+                >
+                  <MessageSquarePlus className="h-4 w-4" />
+                  Sugerir uma melhoria
+                </Button>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-3">
+                {steps.map((step) => (
+                  <div
+                    key={step.title}
+                    className="rounded-[1.5rem] border border-border/70 bg-background/56 p-4 backdrop-blur"
+                  >
+                    <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                      <step.icon className="h-3.5 w-3.5" />
+                      {step.title}
+                    </div>
+                    <p className="mt-3 text-sm leading-6 text-muted-foreground">
+                      {step.body}
+                    </p>
                   </div>
-                  <div className="mt-2 text-2xl font-semibold text-foreground">
-                    {snapshot.counts.launched}
-                  </div>
-                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                    Marcos ja lancados, organizados como timeline clara do produto.
-                  </p>
-                </div>
-                <div className="rounded-[1.5rem] border border-border/70 bg-background/56 p-4 backdrop-blur">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                    Fila publica
-                  </div>
-                  <div className="mt-2 text-2xl font-semibold text-foreground">
-                    {snapshot.counts.backlog + snapshot.counts.inProgress}
-                  </div>
-                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                    Itens em avaliacao ou ja em execucao, visiveis para toda a comunidade.
-                  </p>
-                </div>
-                <div className="rounded-[1.5rem] border border-border/70 bg-background/56 p-4 backdrop-blur">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                    Sinal atual
-                  </div>
-                  <div className="mt-2 text-2xl font-semibold text-foreground">
-                    {snapshot.counts.activeVotes}
-                  </div>
-                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                    Votos ativos distribuídos nas prioridades que a comunidade quer puxar para cima.
-                  </p>
-                </div>
+                ))}
               </div>
             </div>
 
@@ -1118,7 +1087,6 @@ export function ProductUpdatesHub({
                   ["launched", snapshot.counts.launched],
                   ["in_progress", snapshot.counts.inProgress],
                   ["backlog", snapshot.counts.backlog],
-                  ["top_voted", snapshot.topVoted.length],
                 ] as Array<[SectionKey, number]>
               ).map(([sectionKey, count]) => {
                 const meta = PRODUCT_FEEDBACK_SECTION_META[sectionKey];
@@ -1208,7 +1176,7 @@ export function ProductUpdatesHub({
                           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                             <div className="space-y-2">
                               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                                {item.timelineLabel}
+                                {getPublicItemMomentLabel(item)}
                               </p>
                               <h3 className="text-lg font-semibold text-foreground">
                                 {item.title}
@@ -1239,11 +1207,10 @@ export function ProductUpdatesHub({
                 )
               ) : sectionItems.length > 0 ? (
                 <div className="mt-6 grid gap-4">
-                  {sectionItems.map((item, index) => (
+                  {sectionItems.map((item) => (
                     <ProductFeedbackCard
                       key={item.id}
                       item={item}
-                      rank={activeSection === "top_voted" ? index + 1 : undefined}
                       voteBusy={voteBusyItemId === item.id}
                       onOpen={setSelectedItemId}
                       onVote={(itemId) => void handleVote(itemId)}

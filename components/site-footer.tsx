@@ -82,9 +82,9 @@ export function SiteFooter() {
             }`}
           >
             <Route className="h-3.5 w-3.5" />
-            <span>Melhorias &amp; Prioridades</span>
+            <span>Roadmap</span>
             <span className="rounded-full bg-emerald-500/12 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-200">
-              Novo
+              Participe!
             </span>
             <ArrowUpRight className="h-3.5 w-3.5" />
           </Link>

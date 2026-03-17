@@ -12,7 +12,7 @@ export const hasSupabaseAdminEnv = Boolean(
   supabaseUrl && supabaseServiceRoleKey
 );
 
-let adminClient: SupabaseClient<any> | null = null;
+let adminClient: SupabaseClient | null = null;
 
 export const getSupabaseServerClient = async () => {
   if (!hasSupabaseServerEnv) {
@@ -37,7 +37,7 @@ export const getSupabaseServerClient = async () => {
         }
       },
     },
-  }) as SupabaseClient<any>;
+  }) as SupabaseClient;
 };
 
 export const getSupabaseAdminClient = () => {

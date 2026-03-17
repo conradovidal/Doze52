@@ -766,10 +766,6 @@ export default function HomePage() {
           </Button>
         </div>
       ) : null}
-      {isSyncing && session ? (
-        <p className="mt-1 text-center text-xs text-muted-foreground">salvando...</p>
-      ) : null}
-
       <EventDialog
         open={dialogOpen}
         onOpenChange={(open) => {
@@ -804,6 +800,17 @@ export default function HomePage() {
         }}
         anchorPoint={authDialogAnchorPoint}
       />
+      <div className="mt-2 flex h-5 items-center justify-center" aria-live="polite">
+        {isSyncing && session ? (
+          <span role="status" className="text-xs text-muted-foreground">
+            salvando...
+          </span>
+        ) : (
+          <span aria-hidden="true" className="invisible text-xs">
+            salvando...
+          </span>
+        )}
+      </div>
     </main>
   );
 }

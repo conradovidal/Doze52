@@ -127,25 +127,14 @@ export const PRODUCT_FEEDBACK_SECTION_META = {
   },
   backlog: {
     key: "backlog",
-    label: "Backlog",
+    label: "Oportunidades de melhoria",
     eyebrow: "Em avaliacao",
-    title: "O que estamos organizando para as proximas fases",
+    title: "O que estamos tratando como oportunidades de melhoria",
     description:
-      "Ideias publicas, refinadas e consolidadas, para a comunidade acompanhar o que esta sob consideracao.",
-    emptyStateTitle: "Backlog publico abrindo",
+      "Ideias publicas, refinadas e consolidadas, para a comunidade acompanhar o que vale aprofundar nas proximas fases.",
+    emptyStateTitle: "Sem oportunidades publicas ainda",
     emptyStateBody:
-      "A fila publica esta sendo formada. Se voce sentir falta de algo importante, envie a primeira melhoria.",
-  },
-  top_voted: {
-    key: "top_voted",
-    label: "Mais votadas",
-    eyebrow: "Sinal da comunidade",
-    title: "O que a comunidade esta empurrando para cima",
-    description:
-      "Cada pessoa pode apoiar ate 3 prioridades ao mesmo tempo. O ranking ajuda a mostrar o sinal mais forte do momento.",
-    emptyStateTitle: "Sem votos ainda",
-    emptyStateBody:
-      "Quando a comunidade comecar a votar, este bloco vai destacar as prioridades com mais apoio.",
+      "A camada publica esta abrindo. Se voce sentir falta de algo importante, envie a primeira melhoria.",
   },
 } as const;
 
@@ -158,7 +147,7 @@ export const PRODUCT_FEEDBACK_AREA_LABEL: Record<ProductFeedbackArea, string> = 
 };
 
 export const PRODUCT_FEEDBACK_STATUS_LABEL: Record<ProductFeedbackStatus, string> = {
-  backlog: "Backlog",
+  backlog: "Oportunidade",
   in_progress: "Em andamento",
   launched: "Lancada",
   archived: "Arquivada",
