@@ -4,41 +4,113 @@ import * as React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
+  ArrowUpRight,
   ChartNoAxesColumn,
+  Check,
   Clock3,
   ListTodo,
+  LoaderCircle,
+  MessageSquarePlus,
   Rocket,
+  Sparkles,
   X,
 } from "lucide-react";
+import { AuthDialog } from "@/components/auth/auth-dialog";
 import { ProfileIcon } from "@/components/profile-icon";
 import { YearGrid } from "@/components/calendar/year-grid";
+import { Button } from "@/components/ui/button";
 import {
-  PRODUCT_ROADMAP_SECTIONS,
-  PRODUCT_UPDATE_MILESTONES,
-  type ProductRoadmapSection,
-  type ProductUpdateCategory,
-} from "@/lib/product-updates";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useAuth } from "@/lib/auth";
 import { getTodayIsoInTimeZone } from "@/lib/date";
+import {
+  PRODUCT_FEEDBACK_AREAS,
+  PRODUCT_FEEDBACK_AREA_LABEL,
+  PRODUCT_FEEDBACK_AREA_STYLE,
+  PRODUCT_FEEDBACK_SECTION_META,
+  PRODUCT_FEEDBACK_STATUS_LABEL,
+  canVoteOnProductFeedbackItem,
+  type ProductFeedbackArea,
+  type ProductFeedbackItem,
+  type ProductFeedbackMatchCandidate,
+  type ProductFeedbackSnapshot,
+} from "@/lib/product-feedback";
 import { expandEventsForYear } from "@/lib/recurrence";
 import { useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
 const SECTION_ICON = {
   launched: Rocket,
-  "in-progress": Clock3,
+  in_progress: Clock3,
   backlog: ListTodo,
-  "top-voted": ChartNoAxesColumn,
+  top_voted: ChartNoAxesColumn,
 } as const;
 
-const CATEGORY_STYLES: Record<ProductUpdateCategory, string> = {
-  Calendario:
-    "border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-200",
-  Perfis:
-    "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200",
-  Interface:
-    "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200",
-  Sincronizacao:
-    "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-200",
+type SectionKey = keyof typeof PRODUCT_FEEDBACK_SECTION_META;
+
+type VoteLimitPayload = {
+  itemId: string;
+  title: string;
+  createdAt: string;
+};
+
+class ProductFeedbackClientError extends Error {
+  code?: string;
+  payload?: Record<string, unknown>;
+
+  constructor(
+    message: string,
+    options?: { code?: string; payload?: Record<string, unknown> }
+  ) {
+    super(message);
+    this.name = "ProductFeedbackClientError";
+    this.code = options?.code;
+    this.payload = options?.payload;
+  }
+}
+
+const fetchJson = async <T,>(
+  input: RequestInfo | URL,
+  init?: RequestInit
+): Promise<T> => {
+  const response = await fetch(input, {
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      ...(init?.headers ?? {}),
+    },
+  });
+  const payload = (await response.json().catch(() => ({}))) as {
+    message?: string;
+    error?: string;
+    payload?: Record<string, unknown>;
+  };
+
+  if (!response.ok) {
+    throw new ProductFeedbackClientError(
+      payload.message ?? "Falha ao carregar o hub de melhorias.",
+      {
+        code: payload.error,
+        payload: payload.payload,
+      }
+    );
+  }
+
+  return payload as T;
 };
 
 function FrozenCalendarBackdrop() {
@@ -156,21 +228,784 @@ function FrozenCalendarBackdrop() {
   );
 }
 
-export function ProductUpdatesHub() {
-  const [activeSection, setActiveSection] =
-    React.useState<ProductRoadmapSection["key"]>("launched");
+function useProductFeedbackSnapshot(initialSnapshot: ProductFeedbackSnapshot) {
+  const { session } = useAuth();
+  const [snapshot, setSnapshot] = React.useState(initialSnapshot);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
 
-  const currentSection =
-    PRODUCT_ROADMAP_SECTIONS.find((section) => section.key === activeSection) ??
-    PRODUCT_ROADMAP_SECTIONS[0];
-  const CurrentIcon = SECTION_ICON[currentSection.key];
+  const refresh = React.useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const next = await fetchJson<ProductFeedbackSnapshot>(
+        "/api/melhorias/snapshot",
+        {
+          cache: "no-store",
+        }
+      );
+      setSnapshot(next);
+      return next;
+    } catch (error) {
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Falha ao carregar o hub de melhorias."
+      );
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    void refresh();
+  }, [refresh, session?.user.id]);
+
+  return { snapshot, setSnapshot, loading, error, refresh };
+}
+
+function FeedbackAreaBadge({ area }: { area: ProductFeedbackArea }) {
+  return (
+    <span
+      className={cn(
+        "rounded-full border px-2.5 py-1 text-[11px] font-semibold",
+        PRODUCT_FEEDBACK_AREA_STYLE[area]
+      )}
+    >
+      {PRODUCT_FEEDBACK_AREA_LABEL[area]}
+    </span>
+  );
+}
+
+function ItemVoteButton({
+  item,
+  busy,
+  onVote,
+  requireAuth,
+}: {
+  item: ProductFeedbackItem;
+  busy: boolean;
+  onVote: (itemId: string) => void;
+  requireAuth: () => void;
+}) {
+  const { session } = useAuth();
+  if (!canVoteOnProductFeedbackItem(item.status)) {
+    return null;
+  }
+
+  return (
+    <Button
+      type="button"
+      size="sm"
+      variant={item.viewerHasVoted ? "premium" : "outline"}
+      className="rounded-full"
+      disabled={busy}
+      onClick={(event) => {
+        event.stopPropagation();
+        if (!session) {
+          requireAuth();
+          return;
+        }
+        onVote(item.id);
+      }}
+    >
+      {busy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}
+      {item.viewerHasVoted ? "Apoiando" : "Apoiar"}
+    </Button>
+  );
+}
+
+function ProductFeedbackCard({
+  item,
+  rank,
+  voteBusy,
+  onOpen,
+  onVote,
+  requireAuth,
+}: {
+  item: ProductFeedbackItem;
+  rank?: number;
+  voteBusy: boolean;
+  onOpen: (itemId: string) => void;
+  onVote: (itemId: string) => void;
+  requireAuth: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen(item.id)}
+      className="group flex w-full flex-col gap-4 rounded-[1.5rem] border border-border/70 bg-background/56 p-4 text-left backdrop-blur transition-all hover:border-border hover:bg-background/76 sm:p-5"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {typeof rank === "number" ? (
+              <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-full border border-neutral-300/80 bg-background/90 px-2 text-[11px] font-semibold text-muted-foreground dark:border-neutral-600/60">
+                #{rank}
+              </span>
+            ) : null}
+            <FeedbackAreaBadge area={item.area} />
+            <span className="rounded-full border border-border/70 bg-background/80 px-2.5 py-1 text-[11px] font-semibold text-muted-foreground">
+              {PRODUCT_FEEDBACK_STATUS_LABEL[item.status]}
+            </span>
+          </div>
+          <div className="space-y-1">
+            <h3 className="text-lg font-semibold text-foreground transition-colors group-hover:text-neutral-900 dark:group-hover:text-neutral-50">
+              {item.title}
+            </h3>
+            <p className="text-sm leading-6 text-muted-foreground">{item.summary}</p>
+          </div>
+        </div>
+        <ArrowUpRight className="mt-1 h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/60 pt-4">
+        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+          <span>{item.voteCount} votos</span>
+          <span>{item.reinforcementCount} reforcos</span>
+          {item.timelineLabel ? <span>{item.timelineLabel}</span> : null}
+        </div>
+        <ItemVoteButton
+          item={item}
+          busy={voteBusy}
+          onVote={onVote}
+          requireAuth={requireAuth}
+        />
+      </div>
+    </button>
+  );
+}
+
+function SectionEmptyState({
+  sectionKey,
+}: {
+  sectionKey: SectionKey;
+}) {
+  const meta = PRODUCT_FEEDBACK_SECTION_META[sectionKey];
+  return (
+    <div className="mt-6 rounded-[1.5rem] border border-dashed border-border bg-background/42 p-6 backdrop-blur sm:p-8">
+      <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/78 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+        {meta.emptyStateTitle}
+      </div>
+      <p className="mt-4 max-w-2xl text-sm leading-6 text-muted-foreground">
+        {meta.emptyStateBody}
+      </p>
+    </div>
+  );
+}
+
+function ProductFeedbackDetailsDialog({
+  item,
+  open,
+  onOpenChange,
+  onVote,
+  voteBusy,
+  requireAuth,
+}: {
+  item: ProductFeedbackItem | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onVote: (itemId: string) => void;
+  voteBusy: boolean;
+  requireAuth: () => void;
+}) {
+  if (!item) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        mobileMode="sheet"
+        className="max-h-[85vh] overflow-y-auto rounded-[1.75rem] border-border/70 bg-background/92 p-5 sm:max-w-2xl sm:p-6"
+      >
+        <DialogHeader className="pr-8">
+          <div className="flex flex-wrap items-center gap-2">
+            <FeedbackAreaBadge area={item.area} />
+            <span className="rounded-full border border-border/70 bg-background/80 px-2.5 py-1 text-[11px] font-semibold text-muted-foreground">
+              {PRODUCT_FEEDBACK_STATUS_LABEL[item.status]}
+            </span>
+          </div>
+          <DialogTitle className="pt-2 text-2xl leading-tight">
+            {item.title}
+          </DialogTitle>
+          <DialogDescription className="text-sm leading-6 text-muted-foreground">
+            {item.summary}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div className="rounded-2xl border border-border/70 bg-background/70 p-3">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              Votos
+            </div>
+            <div className="mt-1 text-sm font-medium text-foreground">
+              {item.voteCount}
+            </div>
+          </div>
+          <div className="rounded-2xl border border-border/70 bg-background/70 p-3">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              Reforcos
+            </div>
+            <div className="mt-1 text-sm font-medium text-foreground">
+              {item.reinforcementCount}
+            </div>
+          </div>
+          <div className="rounded-2xl border border-border/70 bg-background/70 p-3">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              Momento
+            </div>
+            <div className="mt-1 text-sm font-medium text-foreground">
+              {item.timelineLabel ?? "No fluxo atual"}
+            </div>
+          </div>
+        </div>
+
+        {item.publicNote ? (
+          <section className="rounded-[1.5rem] border border-border/70 bg-background/64 p-4">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              Nota do time
+            </div>
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">
+              {item.publicNote}
+            </p>
+          </section>
+        ) : null}
+
+        {item.highlights.length > 0 ? (
+          <section className="rounded-[1.5rem] border border-border/70 bg-background/64 p-4">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              Highlights
+            </div>
+            <ul className="mt-3 space-y-2 text-sm leading-6 text-muted-foreground">
+              {item.highlights.map((highlight) => (
+                <li key={highlight} className="flex gap-2">
+                  <span className="mt-[0.45rem] h-1.5 w-1.5 rounded-full bg-neutral-400 dark:bg-neutral-500" />
+                  <span>{highlight}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+
+        <DialogFooter className="items-center justify-between gap-3 sm:justify-between">
+          <div className="text-xs text-muted-foreground">
+            {canVoteOnProductFeedbackItem(item.status)
+              ? "Cada pessoa pode apoiar ate 3 prioridades ao mesmo tempo."
+              : "Este item ja saiu da fila ativa de votos."}
+          </div>
+          <ItemVoteButton
+            item={item}
+            busy={voteBusy}
+            onVote={onVote}
+            requireAuth={requireAuth}
+          />
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function VoteSwapDialog({
+  open,
+  onOpenChange,
+  activeVotes,
+  selectedReplaceItemId,
+  onSelectReplaceItemId,
+  onConfirm,
+  busy,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  activeVotes: VoteLimitPayload[];
+  selectedReplaceItemId: string | null;
+  onSelectReplaceItemId: (itemId: string) => void;
+  onConfirm: () => void;
+  busy: boolean;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent mobileMode="sheet" className="rounded-[1.75rem] sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Escolha qual prioridade sai</DialogTitle>
+          <DialogDescription>
+            Voce ja esta apoiando 3 itens. Para apoiar um quarto, substitua um dos votos atuais.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-2">
+          {activeVotes.map((vote) => {
+            const isSelected = vote.itemId === selectedReplaceItemId;
+            return (
+              <button
+                key={vote.itemId}
+                type="button"
+                onClick={() => onSelectReplaceItemId(vote.itemId)}
+                className={cn(
+                  "flex w-full items-center justify-between rounded-2xl border px-4 py-3 text-left transition-colors",
+                  isSelected
+                    ? "border-neutral-900 bg-neutral-900 text-neutral-50 dark:border-neutral-100 dark:bg-neutral-100 dark:text-neutral-900"
+                    : "border-border/70 bg-background/70 hover:bg-background"
+                )}
+              >
+                <span className="text-sm font-medium">{vote.title}</span>
+                {isSelected ? <Check className="h-4 w-4" /> : null}
+              </button>
+            );
+          })}
+        </div>
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="premium"
+            disabled={!selectedReplaceItemId || busy}
+            onClick={onConfirm}
+          >
+            {busy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}
+            Substituir voto
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function SuggestionDialog({
+  open,
+  onOpenChange,
+  activeVoteItems,
+  voteLimit,
+  onSubmitted,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  activeVoteItems: ProductFeedbackItem[];
+  voteLimit: number;
+  onSubmitted: (snapshot: ProductFeedbackSnapshot) => void;
+}) {
+  const [rawText, setRawText] = React.useState("");
+  const [proposedArea, setProposedArea] = React.useState<ProductFeedbackArea | "">("");
+  const [matches, setMatches] = React.useState<ProductFeedbackMatchCandidate[]>([]);
+  const [selectedMatchId, setSelectedMatchId] = React.useState<string | null>(null);
+  const [castVote, setCastVote] = React.useState(true);
+  const [replaceVoteItemId, setReplaceVoteItemId] = React.useState<string | null>(null);
+  const [honeypot, setHoneypot] = React.useState("");
+  const [busy, setBusy] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (!open) {
+      setRawText("");
+      setProposedArea("");
+      setMatches([]);
+      setSelectedMatchId(null);
+      setCastVote(true);
+      setReplaceVoteItemId(null);
+      setHoneypot("");
+      setBusy(false);
+      setError(null);
+      setSuccessMessage(null);
+      return;
+    }
+    const normalized = rawText.trim();
+    if (normalized.length < 6) {
+      setMatches([]);
+      return;
+    }
+
+    const timeout = window.setTimeout(async () => {
+      try {
+        const payload = await fetchJson<{ matches: ProductFeedbackMatchCandidate[] }>(
+          "/api/melhorias/match",
+          {
+            method: "POST",
+            body: JSON.stringify({ text: normalized }),
+          }
+        );
+        setMatches(payload.matches);
+      } catch {
+        setMatches([]);
+      }
+    }, 260);
+
+    return () => window.clearTimeout(timeout);
+  }, [open, rawText]);
+
+  const selectedMatch = React.useMemo(
+    () => matches.find((match) => match.id === selectedMatchId) ?? null,
+    [matches, selectedMatchId]
+  );
+
+  const hasVoteCapacity = activeVoteItems.length < voteLimit;
+  const alreadyVotingForSelected = selectedMatch
+    ? activeVoteItems.some((item) => item.id === selectedMatch.id)
+    : false;
+  const mustChooseReplacement =
+    Boolean(selectedMatch) && castVote && !hasVoteCapacity && !alreadyVotingForSelected;
+
+  const handleSubmit = async () => {
+    setBusy(true);
+    setError(null);
+    setSuccessMessage(null);
+    try {
+      const response = await fetchJson<{
+        snapshot: ProductFeedbackSnapshot;
+      }>("/api/melhorias/submissions", {
+        method: "POST",
+        body: JSON.stringify({
+          rawText,
+          proposedArea: proposedArea || null,
+          matchedItemId: selectedMatchId,
+          castVote: selectedMatchId ? castVote : false,
+          replaceVoteItemId: mustChooseReplacement ? replaceVoteItemId : null,
+          honeypot,
+        }),
+      });
+      onSubmitted(response.snapshot);
+      setSuccessMessage(
+        selectedMatchId
+          ? "Reforco registrado. Obrigado por ajudar a lapidar a prioridade."
+          : "Sugestao recebida. Ela entra primeiro em revisao antes de aparecer publicamente."
+      );
+      setRawText("");
+      setProposedArea("");
+      setMatches([]);
+      setSelectedMatchId(null);
+      setReplaceVoteItemId(null);
+      setCastVote(true);
+    } catch (error) {
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Nao foi possivel enviar sua melhoria agora."
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        mobileMode="sheet"
+        className="max-h-[90vh] overflow-y-auto rounded-[1.75rem] border-border/70 bg-background/94 sm:max-w-2xl"
+      >
+        <DialogHeader className="pr-8">
+          <DialogTitle className="text-2xl">Sugerir uma melhoria</DialogTitle>
+          <DialogDescription className="text-sm leading-6">
+            Conte o resultado que faria diferenca no seu uso do doze52. Antes de abrir um item novo, vamos procurar algo parecido para consolidar melhor o sinal.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <label className="block space-y-2">
+            <span className="text-sm font-medium text-foreground">
+              O que voce gostaria de ver?
+            </span>
+            <textarea
+              value={rawText}
+              onChange={(event) => setRawText(event.target.value)}
+              rows={6}
+              className="min-h-36 w-full rounded-2xl border border-input bg-transparent px-4 py-3 text-sm leading-6 outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+              placeholder="Ex.: queria conseguir acompanhar recorrencias com mais contexto visual sem poluir o ano inteiro..."
+            />
+          </label>
+
+          <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_12rem]">
+            <label className="block space-y-2">
+              <span className="text-sm font-medium text-foreground">
+                Area sugerida
+              </span>
+              <Select
+                value={proposedArea || "__empty__"}
+                onValueChange={(value) =>
+                  setProposedArea(value === "__empty__" ? "" : (value as ProductFeedbackArea))
+                }
+              >
+                <SelectTrigger className="w-full rounded-xl">
+                  <SelectValue placeholder="Deixe em aberto" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__empty__">Deixe em aberto</SelectItem>
+                  {PRODUCT_FEEDBACK_AREAS.map((area) => (
+                    <SelectItem key={area} value={area}>
+                      {PRODUCT_FEEDBACK_AREA_LABEL[area]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </label>
+
+            <label className="hidden">
+              <span>Se voce esta vendo isto, deixe vazio</span>
+              <Input
+                value={honeypot}
+                onChange={(event) => setHoneypot(event.target.value)}
+                autoComplete="off"
+                tabIndex={-1}
+              />
+            </label>
+          </div>
+
+          {matches.length > 0 ? (
+            <section className="rounded-[1.5rem] border border-border/70 bg-background/64 p-4">
+              <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                <Sparkles className="h-3.5 w-3.5" />
+                Itens parecidos
+              </div>
+              <div className="mt-3 space-y-2">
+                {matches.map((match) => {
+                  const isSelected = match.id === selectedMatchId;
+                  return (
+                    <button
+                      key={match.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedMatchId(isSelected ? null : match.id);
+                        setReplaceVoteItemId(null);
+                      }}
+                      className={cn(
+                        "flex w-full items-start justify-between gap-3 rounded-2xl border px-4 py-3 text-left transition-colors",
+                        isSelected
+                          ? "border-neutral-900 bg-neutral-900 text-neutral-50 dark:border-neutral-100 dark:bg-neutral-100 dark:text-neutral-900"
+                          : "border-border/70 bg-background/72 hover:bg-background"
+                      )}
+                    >
+                      <div className="space-y-1">
+                        <div className="text-sm font-medium">{match.title}</div>
+                        <div className="text-xs leading-5 opacity-80">{match.summary}</div>
+                      </div>
+                      <div className="shrink-0 text-xs opacity-80">
+                        {match.voteCount} votos
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          ) : null}
+
+          {selectedMatch ? (
+            <section className="rounded-[1.5rem] border border-emerald-200/80 bg-emerald-50/80 p-4 text-sm text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100">
+              <div className="font-medium">Voce vai reforcar um item existente.</div>
+              <p className="mt-1 leading-6">
+                Seu texto entra como contexto adicional para a equipe, sem abrir uma duplicata publica.
+              </p>
+              <label className="mt-4 flex items-start gap-2">
+                <input
+                  type="checkbox"
+                  checked={castVote}
+                  onChange={(event) => setCastVote(event.target.checked)}
+                  className="mt-1 h-4 w-4 rounded border border-input"
+                />
+                <span className="leading-6">
+                  Tambem quero usar um dos meus votos ativos neste item.
+                </span>
+              </label>
+              {selectedMatch && castVote && alreadyVotingForSelected ? (
+                <p className="mt-3 text-xs leading-5">
+                  Voce ja esta apoiando esta melhoria. O voto nao vai consumir um slot novo.
+                </p>
+              ) : null}
+              {mustChooseReplacement ? (
+                <label className="mt-4 block space-y-2">
+                  <span className="text-xs font-semibold uppercase tracking-[0.18em]">
+                    Qual voto deve sair?
+                  </span>
+                  <Select
+                    value={replaceVoteItemId ?? "__empty__"}
+                    onValueChange={(value) =>
+                      setReplaceVoteItemId(value === "__empty__" ? null : value)
+                    }
+                  >
+                    <SelectTrigger className="w-full rounded-xl bg-background/90">
+                      <SelectValue placeholder="Escolha uma prioridade para substituir" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__empty__">
+                        Escolha uma prioridade
+                      </SelectItem>
+                      {activeVoteItems.map((item) => (
+                        <SelectItem key={item.id} value={item.id}>
+                          {item.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </label>
+              ) : null}
+            </section>
+          ) : null}
+
+          {error ? <p className="text-sm text-red-600">{error}</p> : null}
+          {successMessage ? (
+            <p className="text-sm text-emerald-700 dark:text-emerald-300">
+              {successMessage}
+            </p>
+          ) : null}
+        </div>
+
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="premium"
+            disabled={
+              busy ||
+              rawText.trim().length < 16 ||
+              (mustChooseReplacement && !replaceVoteItemId)
+            }
+            onClick={handleSubmit}
+          >
+            {busy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}
+            {selectedMatch ? "Registrar reforco" : "Enviar melhoria"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export function ProductUpdatesHub({
+  initialSnapshot,
+}: {
+  initialSnapshot: ProductFeedbackSnapshot;
+}) {
+  const { session, loading: authLoading } = useAuth();
+  const { snapshot, setSnapshot, loading, error, refresh } =
+    useProductFeedbackSnapshot(initialSnapshot);
+  const [activeSection, setActiveSection] = React.useState<SectionKey>(() => {
+    if (initialSnapshot.topVoted.length > 0) return "top_voted";
+    if (initialSnapshot.backlog.length > 0) return "backlog";
+    if (initialSnapshot.inProgress.length > 0) return "in_progress";
+    return "launched";
+  });
+  const [selectedItemId, setSelectedItemId] = React.useState<string | null>(null);
+  const [suggestionOpen, setSuggestionOpen] = React.useState(false);
+  const [authDialogOpen, setAuthDialogOpen] = React.useState(false);
+  const [authDialogAnchorPoint, setAuthDialogAnchorPoint] = React.useState<
+    { x: number; y: number } | undefined
+  >(undefined);
+  const [message, setMessage] = React.useState<string | null>(null);
+  const [voteBusyItemId, setVoteBusyItemId] = React.useState<string | null>(null);
+  const [voteSwapState, setVoteSwapState] = React.useState<{
+    targetItemId: string | null;
+    activeVotes: VoteLimitPayload[];
+    selectedReplaceItemId: string | null;
+  }>({
+    targetItemId: null,
+    activeVotes: [],
+    selectedReplaceItemId: null,
+  });
+
+  const currentSection = PRODUCT_FEEDBACK_SECTION_META[activeSection];
+  const CurrentIcon = SECTION_ICON[activeSection];
+  const sectionItems =
+    activeSection === "launched"
+      ? snapshot.launched
+      : activeSection === "in_progress"
+        ? snapshot.inProgress
+        : activeSection === "backlog"
+          ? snapshot.backlog
+          : snapshot.topVoted;
+  const selectedItem =
+    snapshot.items.find((item) => item.id === selectedItemId) ?? null;
+  const activeVoteItems = snapshot.items.filter((item) =>
+    snapshot.viewerActiveVoteItemIds.includes(item.id)
+  );
+
+  const openAuthDialog = React.useCallback(
+    (anchorPoint?: { x: number; y: number }) => {
+      setAuthDialogAnchorPoint(anchorPoint);
+      setAuthDialogOpen(true);
+    },
+    []
+  );
+
+  const requireAuthFromEvent = (event?: React.MouseEvent<HTMLElement>) => {
+    if (!event) {
+      openAuthDialog(undefined);
+      return;
+    }
+    const rect = event.currentTarget.getBoundingClientRect();
+    openAuthDialog({ x: rect.right, y: rect.bottom });
+  };
+
+  const handleVote = async (itemId: string, replaceItemId?: string | null) => {
+    setVoteBusyItemId(itemId);
+    setMessage(null);
+    try {
+      const payload = await fetchJson<{
+        state: "added" | "removed" | "already_active";
+        snapshot: ProductFeedbackSnapshot;
+      }>("/api/melhorias/votes", {
+        method: "POST",
+        body: JSON.stringify({
+          itemId,
+          replaceItemId: replaceItemId ?? null,
+        }),
+      });
+      setSnapshot(payload.snapshot);
+      setVoteSwapState({
+        targetItemId: null,
+        activeVotes: [],
+        selectedReplaceItemId: null,
+      });
+      setMessage(
+        payload.state === "removed"
+          ? "Voto removido."
+          : payload.state === "already_active"
+            ? "Voce ja estava apoiando esta prioridade."
+            : "Voto registrado."
+      );
+    } catch (error) {
+      if (
+        error instanceof ProductFeedbackClientError &&
+        error.code === "vote_limit_reached"
+      ) {
+        const activeVotes = Array.isArray(error.payload?.activeVotes)
+          ? (error.payload?.activeVotes as VoteLimitPayload[])
+          : [];
+        setVoteSwapState({
+          targetItemId: itemId,
+          activeVotes,
+          selectedReplaceItemId: activeVotes[0]?.itemId ?? null,
+        });
+        return;
+      }
+      setMessage(
+        error instanceof Error ? error.message : "Nao foi possivel registrar o voto."
+      );
+    } finally {
+      setVoteBusyItemId(null);
+    }
+  };
+
+  const steps = [
+    {
+      title: "Sugira",
+      body: "Conte o resultado que faria diferenca e deixe o time lapidar o backlog com contexto real.",
+      icon: MessageSquarePlus,
+    },
+    {
+      title: "Vote em ate 3 prioridades",
+      body: "Cada pessoa sustenta so o que realmente importa, o que torna o ranking mais honesto.",
+      icon: ChartNoAxesColumn,
+    },
+    {
+      title: "Acompanhe o status",
+      body: "Historico, backlog, em andamento e mais votadas convivem na mesma leitura.",
+      icon: Sparkles,
+    },
+  ];
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-transparent">
       <FrozenCalendarBackdrop />
       <div className="absolute inset-0 bg-background/22 backdrop-blur-[8px] dark:bg-background/28" />
 
-      <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
+      <div
+        data-calendar-focus-root
+        className="relative z-10 mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8"
+      >
         <section className="overflow-hidden rounded-[2rem] border border-border/70 bg-background/76 shadow-[0_30px_120px_-60px_rgba(15,23,42,0.65)] backdrop-blur-2xl">
           <div className="flex items-start justify-end px-4 pt-4 sm:px-6 sm:pt-5">
             <Link
@@ -183,60 +1018,117 @@ export function ProductUpdatesHub() {
           </div>
 
           <div className="flex flex-col gap-6 px-5 pb-5 sm:px-8 sm:pb-8">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div className="max-w-3xl space-y-3">
+            <div className="grid gap-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,0.9fr)]">
+              <div className="space-y-5">
                 <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-muted/70 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-muted-foreground">
                   Evolucao do produto
                 </div>
-                <div className="space-y-2">
-                  <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+                <div className="space-y-3">
+                  <h1 className="max-w-3xl text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
                     Melhorias &amp; Prioridades
                   </h1>
                   <p className="max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
-                    Acompanhe o que ja melhoramos no doze52 e o que queremos priorizar
-                    em seguida. Tudo em uma leitura rapida, pensada para quem usa o
-                    produto no dia a dia.
+                    O ponto publico onde o doze52 mostra o que ja evoluiu, o que esta em avaliacao e o que a comunidade mais quer ver a seguir.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  <Button
+                    type="button"
+                    variant="premium"
+                    className="rounded-full"
+                    onClick={(event) => {
+                      if (!session) {
+                        requireAuthFromEvent(event);
+                        return;
+                      }
+                      setSuggestionOpen(true);
+                    }}
+                  >
+                    <MessageSquarePlus className="h-4 w-4" />
+                    Sugerir uma melhoria
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="rounded-full"
+                    onClick={() => setActiveSection("top_voted")}
+                  >
+                    <ChartNoAxesColumn className="h-4 w-4" />
+                    Ver mais votadas
+                  </Button>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  {steps.map((step) => (
+                    <div
+                      key={step.title}
+                      className="rounded-[1.5rem] border border-border/70 bg-background/56 p-4 backdrop-blur"
+                    >
+                      <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                        <step.icon className="h-3.5 w-3.5" />
+                        {step.title}
+                      </div>
+                      <p className="mt-3 text-sm leading-6 text-muted-foreground">
+                        {step.body}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid gap-3 self-start">
+                <div className="rounded-[1.5rem] border border-border/70 bg-background/56 p-4 backdrop-blur">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                    Historico publicado
+                  </div>
+                  <div className="mt-2 text-2xl font-semibold text-foreground">
+                    {snapshot.counts.launched}
+                  </div>
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                    Marcos ja lancados, organizados como timeline clara do produto.
+                  </p>
+                </div>
+                <div className="rounded-[1.5rem] border border-border/70 bg-background/56 p-4 backdrop-blur">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                    Fila publica
+                  </div>
+                  <div className="mt-2 text-2xl font-semibold text-foreground">
+                    {snapshot.counts.backlog + snapshot.counts.inProgress}
+                  </div>
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                    Itens em avaliacao ou ja em execucao, visiveis para toda a comunidade.
+                  </p>
+                </div>
+                <div className="rounded-[1.5rem] border border-border/70 bg-background/56 p-4 backdrop-blur">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                    Sinal atual
+                  </div>
+                  <div className="mt-2 text-2xl font-semibold text-foreground">
+                    {snapshot.counts.activeVotes}
+                  </div>
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                    Votos ativos distribuídos nas prioridades que a comunidade quer puxar para cima.
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="rounded-2xl border border-border/70 bg-background/56 px-4 py-3 backdrop-blur">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  Marco inicial
-                </div>
-                <div className="mt-1 text-sm font-medium text-foreground">
-                  11 de fevereiro de 2026
-                </div>
-              </div>
-              <div className="rounded-2xl border border-border/70 bg-background/56 px-4 py-3 backdrop-blur">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  Milestones publicadas
-                </div>
-                <div className="mt-1 text-sm font-medium text-foreground">
-                  {PRODUCT_UPDATE_MILESTONES.length} marcos principais
-                </div>
-              </div>
-              <div className="rounded-2xl border border-border/70 bg-background/56 px-4 py-3 backdrop-blur">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  Proxima fase
-                </div>
-                <div className="mt-1 text-sm font-medium text-foreground">
-                  Roadmap com backlog e votos
-                </div>
-              </div>
-            </div>
-
             <div className="flex flex-wrap gap-2">
-              {PRODUCT_ROADMAP_SECTIONS.map((section) => {
-                const isActive = section.key === activeSection;
-                const Icon = SECTION_ICON[section.key];
+              {(
+                [
+                  ["launched", snapshot.counts.launched],
+                  ["in_progress", snapshot.counts.inProgress],
+                  ["backlog", snapshot.counts.backlog],
+                  ["top_voted", snapshot.topVoted.length],
+                ] as Array<[SectionKey, number]>
+              ).map(([sectionKey, count]) => {
+                const meta = PRODUCT_FEEDBACK_SECTION_META[sectionKey];
+                const Icon = SECTION_ICON[sectionKey];
+                const isActive = sectionKey === activeSection;
                 return (
                   <button
-                    key={section.key}
+                    key={sectionKey}
                     type="button"
-                    onClick={() => setActiveSection(section.key)}
+                    onClick={() => setActiveSection(sectionKey)}
                     className={cn(
                       "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition-colors",
                       isActive
@@ -245,7 +1137,17 @@ export function ProductUpdatesHub() {
                     )}
                   >
                     <Icon className="h-4 w-4" />
-                    {section.label}
+                    {meta.label}
+                    <span
+                      className={cn(
+                        "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                        isActive
+                          ? "bg-neutral-50/15 text-neutral-50 dark:bg-neutral-900/10 dark:text-neutral-900"
+                          : "bg-muted text-muted-foreground"
+                      )}
+                    >
+                      {count}
+                    </span>
                   </button>
                 );
               })}
@@ -265,63 +1167,164 @@ export function ProductUpdatesHub() {
                 </p>
               </div>
 
-              {activeSection === "launched" ? (
-                <div className="relative mt-6 space-y-5 pl-5 sm:pl-8">
-                  <div className="absolute bottom-3 left-[7px] top-1 w-px bg-border sm:left-[11px]" />
-                  {PRODUCT_UPDATE_MILESTONES.map((milestone) => (
-                    <article key={milestone.dateLabel} className="relative">
-                      <div className="absolute -left-5 top-2.5 h-3.5 w-3.5 rounded-full border-2 border-background bg-neutral-900 dark:bg-neutral-100 sm:-left-8" />
-                      <div className="rounded-[1.5rem] border border-border/70 bg-background/46 p-4 backdrop-blur sm:p-5">
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                          <div className="space-y-2">
-                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                              {milestone.dateLabel}
-                            </p>
-                            <h3 className="text-lg font-semibold text-foreground">
-                              {milestone.title}
-                            </h3>
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            {milestone.categories.map((category) => (
-                              <span
-                                key={category}
-                                className={cn(
-                                  "rounded-full border px-2.5 py-1 text-[11px] font-semibold",
-                                  CATEGORY_STYLES[category]
-                                )}
-                              >
-                                {category}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
+              {loading ? (
+                <div className="mt-6 flex items-center gap-2 text-sm text-muted-foreground">
+                  <LoaderCircle className="h-4 w-4 animate-spin" />
+                  Atualizando prioridades...
+                </div>
+              ) : null}
 
-                        <ul className="mt-4 space-y-2 text-sm leading-6 text-muted-foreground">
-                          {milestone.bullets.map((bullet) => (
-                            <li key={bullet} className="flex gap-2">
-                              <span className="mt-[0.42rem] h-1.5 w-1.5 shrink-0 rounded-full bg-neutral-400 dark:bg-neutral-500" />
-                              <span>{bullet}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    </article>
+              {error ? (
+                <div className="mt-6 rounded-[1.5rem] border border-amber-200/80 bg-amber-50/80 p-4 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+                  {error}
+                  <button
+                    type="button"
+                    onClick={() => void refresh()}
+                    className="ml-2 underline underline-offset-4"
+                  >
+                    Tentar novamente
+                  </button>
+                </div>
+              ) : null}
+
+              {message ? (
+                <div className="mt-6 rounded-[1.5rem] border border-emerald-200/80 bg-emerald-50/80 p-4 text-sm text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100">
+                  {message}
+                </div>
+              ) : null}
+
+              {activeSection === "launched" ? (
+                sectionItems.length > 0 ? (
+                  <div className="relative mt-6 space-y-5 pl-5 sm:pl-8">
+                    <div className="absolute bottom-3 left-[7px] top-1 w-px bg-border sm:left-[11px]" />
+                    {sectionItems.map((item) => (
+                      <article key={item.id} className="relative">
+                        <div className="absolute -left-5 top-2.5 h-3.5 w-3.5 rounded-full border-2 border-background bg-neutral-900 dark:bg-neutral-100 sm:-left-8" />
+                        <button
+                          type="button"
+                          onClick={() => setSelectedItemId(item.id)}
+                          className="w-full rounded-[1.5rem] border border-border/70 bg-background/46 p-4 text-left backdrop-blur transition-colors hover:bg-background/70 sm:p-5"
+                        >
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                            <div className="space-y-2">
+                              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                                {item.timelineLabel}
+                              </p>
+                              <h3 className="text-lg font-semibold text-foreground">
+                                {item.title}
+                              </h3>
+                              <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
+                                {item.summary}
+                              </p>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              <FeedbackAreaBadge area={item.area} />
+                            </div>
+                          </div>
+
+                          <ul className="mt-4 space-y-2 text-sm leading-6 text-muted-foreground">
+                            {item.highlights.map((highlight) => (
+                              <li key={highlight} className="flex gap-2">
+                                <span className="mt-[0.42rem] h-1.5 w-1.5 shrink-0 rounded-full bg-neutral-400 dark:bg-neutral-500" />
+                                <span>{highlight}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </button>
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <SectionEmptyState sectionKey="launched" />
+                )
+              ) : sectionItems.length > 0 ? (
+                <div className="mt-6 grid gap-4">
+                  {sectionItems.map((item, index) => (
+                    <ProductFeedbackCard
+                      key={item.id}
+                      item={item}
+                      rank={activeSection === "top_voted" ? index + 1 : undefined}
+                      voteBusy={voteBusyItemId === item.id}
+                      onOpen={setSelectedItemId}
+                      onVote={(itemId) => void handleVote(itemId)}
+                      requireAuth={() => openAuthDialog(undefined)}
+                    />
                   ))}
                 </div>
               ) : (
-                <div className="mt-6 rounded-[1.5rem] border border-dashed border-border bg-background/42 p-6 backdrop-blur sm:p-8">
-                  <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/78 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                    {currentSection.emptyStateTitle}
-                  </div>
-                  <p className="mt-4 max-w-2xl text-sm leading-6 text-muted-foreground">
-                    {currentSection.emptyStateBody}
-                  </p>
-                </div>
+                <SectionEmptyState sectionKey={activeSection} />
               )}
             </section>
           </div>
         </section>
+
+        {!authLoading && !session ? (
+          <div className="rounded-[1.5rem] border border-border/70 bg-background/72 px-5 py-4 text-sm text-muted-foreground backdrop-blur">
+            Leitura publica aberta. Para votar, reforcar uma ideia ou enviar uma melhoria nova, entre com sua conta.
+          </div>
+        ) : null}
       </div>
+
+      <ProductFeedbackDetailsDialog
+        item={selectedItem}
+        open={Boolean(selectedItem)}
+        onOpenChange={(open) => {
+          if (!open) setSelectedItemId(null);
+        }}
+        onVote={(itemId) => void handleVote(itemId)}
+        voteBusy={voteBusyItemId === selectedItem?.id}
+        requireAuth={() => openAuthDialog(undefined)}
+      />
+
+      <SuggestionDialog
+        open={suggestionOpen}
+        onOpenChange={setSuggestionOpen}
+        activeVoteItems={activeVoteItems}
+        voteLimit={snapshot.viewerVoteLimit}
+        onSubmitted={(nextSnapshot) => {
+          setSnapshot(nextSnapshot);
+        }}
+      />
+
+      <VoteSwapDialog
+        open={Boolean(voteSwapState.targetItemId)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setVoteSwapState({
+              targetItemId: null,
+              activeVotes: [],
+              selectedReplaceItemId: null,
+            });
+          }
+        }}
+        activeVotes={voteSwapState.activeVotes}
+        selectedReplaceItemId={voteSwapState.selectedReplaceItemId}
+        onSelectReplaceItemId={(itemId) =>
+          setVoteSwapState((current) => ({
+            ...current,
+            selectedReplaceItemId: itemId,
+          }))
+        }
+        busy={Boolean(voteBusyItemId)}
+        onConfirm={() => {
+          if (!voteSwapState.targetItemId || !voteSwapState.selectedReplaceItemId) return;
+          void handleVote(
+            voteSwapState.targetItemId,
+            voteSwapState.selectedReplaceItemId
+          );
+        }}
+      />
+
+      <AuthDialog
+        open={authDialogOpen}
+        onOpenChange={(open) => {
+          setAuthDialogOpen(open);
+          if (!open) {
+            setAuthDialogAnchorPoint(undefined);
+          }
+        }}
+        anchorPoint={authDialogAnchorPoint}
+      />
     </main>
   );
 }

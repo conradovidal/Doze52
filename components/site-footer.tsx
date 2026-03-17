@@ -29,7 +29,7 @@ type FooterLink = {
 
 export function SiteFooter() {
   const pathname = usePathname();
-  if (pathname === "/melhorias") {
+  if (pathname?.startsWith("/melhorias")) {
     return null;
   }
 

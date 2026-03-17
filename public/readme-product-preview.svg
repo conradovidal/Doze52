@@ -1,0 +1,129 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720" role="img" aria-labelledby="title desc">
+  <title id="title">doze52 product preview</title>
+  <desc id="desc">An illustrated year-planning interface with profiles, calendar blocks, and product notes.</desc>
+  <rect width="1200" height="720" fill="#F6F1D6" />
+  <rect x="48" y="44" width="1104" height="632" rx="28" fill="#FCFBF4" stroke="#D8CFB0" stroke-width="4" />
+  <rect x="48" y="44" width="1104" height="76" rx="28" fill="#5B5C5E" />
+  <rect x="48" y="92" width="1104" height="28" fill="#5B5C5E" />
+
+  <circle cx="94" cy="82" r="8" fill="#EDCF59" />
+  <circle cx="122" cy="82" r="8" fill="#F5E6A0" />
+  <circle cx="150" cy="82" r="8" fill="#FFFFFF" fill-opacity="0.7" />
+
+  <rect x="184" y="63" width="170" height="36" rx="18" fill="#EDCF59" />
+  <text x="269" y="86" text-anchor="middle" fill="#5B5C5E" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">doze52</text>
+
+  <rect x="872" y="61" width="112" height="38" rx="19" fill="#6F7072" />
+  <text x="928" y="85" text-anchor="middle" fill="#FDFBF4" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700">2026</text>
+
+  <rect x="996" y="61" width="112" height="38" rx="19" fill="#EDCF59" />
+  <text x="1052" y="85" text-anchor="middle" fill="#5B5C5E" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700">Sync on</text>
+
+  <rect x="84" y="156" width="244" height="472" rx="24" fill="#F7F4E7" stroke="#E5DDBD" stroke-width="3" />
+  <text x="116" y="196" fill="#5B5C5E" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">Profiles</text>
+
+  <rect x="112" y="220" width="188" height="50" rx="18" fill="#5B5C5E" />
+  <circle cx="138" cy="245" r="8" fill="#EDCF59" />
+  <text x="160" y="251" fill="#FCFBF4" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="700">Work</text>
+
+  <rect x="112" y="286" width="188" height="50" rx="18" fill="#EDCF59" />
+  <circle cx="138" cy="311" r="8" fill="#5B5C5E" />
+  <text x="160" y="317" fill="#5B5C5E" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="700">Personal</text>
+
+  <rect x="112" y="352" width="188" height="50" rx="18" fill="#DDE7D9" />
+  <circle cx="138" cy="377" r="8" fill="#5B5C5E" />
+  <text x="160" y="383" fill="#5B5C5E" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="700">Family</text>
+
+  <text x="116" y="450" fill="#5B5C5E" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">Why it feels different</text>
+  <text x="116" y="482" fill="#6E6F71" font-family="Arial, Helvetica, sans-serif" font-size="15">Year-at-a-glance planning</text>
+  <text x="116" y="510" fill="#6E6F71" font-family="Arial, Helvetica, sans-serif" font-size="15">Profiles instead of clutter</text>
+  <text x="116" y="538" fill="#6E6F71" font-family="Arial, Helvetica, sans-serif" font-size="15">Recurring events + drag and drop</text>
+  <text x="116" y="566" fill="#6E6F71" font-family="Arial, Helvetica, sans-serif" font-size="15">Local safety + cloud sync</text>
+
+  <rect x="364" y="156" width="748" height="472" rx="24" fill="#FFFFFF" stroke="#E5DDBD" stroke-width="3" />
+  <text x="396" y="196" fill="#5B5C5E" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">Year planning view</text>
+
+  <g fill="#7B7C7E" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="700">
+    <text x="402" y="232">JAN</text>
+    <text x="583" y="232">FEB</text>
+    <text x="764" y="232">MAR</text>
+    <text x="945" y="232">APR</text>
+    <text x="402" y="388">MAY</text>
+    <text x="583" y="388">JUN</text>
+    <text x="764" y="388">JUL</text>
+    <text x="945" y="388">AUG</text>
+    <text x="402" y="544">SEP</text>
+    <text x="583" y="544">OCT</text>
+    <text x="764" y="544">NOV</text>
+    <text x="945" y="544">DEC</text>
+  </g>
+
+  <g>
+    <rect x="396" y="246" width="156" height="122" rx="18" fill="#F8F8F3" stroke="#E6DEC0" stroke-width="2" />
+    <rect x="577" y="246" width="156" height="122" rx="18" fill="#F8F8F3" stroke="#E6DEC0" stroke-width="2" />
+    <rect x="758" y="246" width="156" height="122" rx="18" fill="#F8F8F3" stroke="#E6DEC0" stroke-width="2" />
+    <rect x="939" y="246" width="156" height="122" rx="18" fill="#F8F8F3" stroke="#E6DEC0" stroke-width="2" />
+
+    <rect x="396" y="402" width="156" height="122" rx="18" fill="#F8F8F3" stroke="#E6DEC0" stroke-width="2" />
+    <rect x="577" y="402" width="156" height="122" rx="18" fill="#F8F8F3" stroke="#E6DEC0" stroke-width="2" />
+    <rect x="758" y="402" width="156" height="122" rx="18" fill="#F8F8F3" stroke="#E6DEC0" stroke-width="2" />
+    <rect x="939" y="402" width="156" height="122" rx="18" fill="#F8F8F3" stroke="#E6DEC0" stroke-width="2" />
+
+    <rect x="396" y="558" width="156" height="50" rx="18" fill="#F8F8F3" stroke="#E6DEC0" stroke-width="2" />
+    <rect x="577" y="558" width="156" height="50" rx="18" fill="#F8F8F3" stroke="#E6DEC0" stroke-width="2" />
+    <rect x="758" y="558" width="156" height="50" rx="18" fill="#F8F8F3" stroke="#E6DEC0" stroke-width="2" />
+    <rect x="939" y="558" width="156" height="50" rx="18" fill="#F8F8F3" stroke="#E6DEC0" stroke-width="2" />
+  </g>
+
+  <g fill="#EAE4C8">
+    <rect x="410" y="270" width="128" height="10" rx="5" />
+    <rect x="410" y="290" width="128" height="10" rx="5" />
+    <rect x="410" y="310" width="128" height="10" rx="5" />
+
+    <rect x="591" y="270" width="128" height="10" rx="5" />
+    <rect x="591" y="290" width="128" height="10" rx="5" />
+    <rect x="591" y="310" width="128" height="10" rx="5" />
+
+    <rect x="772" y="270" width="128" height="10" rx="5" />
+    <rect x="772" y="290" width="128" height="10" rx="5" />
+    <rect x="772" y="310" width="128" height="10" rx="5" />
+
+    <rect x="953" y="270" width="128" height="10" rx="5" />
+    <rect x="953" y="290" width="128" height="10" rx="5" />
+    <rect x="953" y="310" width="128" height="10" rx="5" />
+
+    <rect x="410" y="426" width="128" height="10" rx="5" />
+    <rect x="410" y="446" width="128" height="10" rx="5" />
+    <rect x="410" y="466" width="128" height="10" rx="5" />
+
+    <rect x="591" y="426" width="128" height="10" rx="5" />
+    <rect x="591" y="446" width="128" height="10" rx="5" />
+    <rect x="591" y="466" width="128" height="10" rx="5" />
+
+    <rect x="772" y="426" width="128" height="10" rx="5" />
+    <rect x="772" y="446" width="128" height="10" rx="5" />
+    <rect x="772" y="466" width="128" height="10" rx="5" />
+
+    <rect x="953" y="426" width="128" height="10" rx="5" />
+    <rect x="953" y="446" width="128" height="10" rx="5" />
+    <rect x="953" y="466" width="128" height="10" rx="5" />
+  </g>
+
+  <g>
+    <rect x="410" y="284" width="95" height="14" rx="7" fill="#EDCF59" />
+    <rect x="437" y="318" width="78" height="14" rx="7" fill="#BFD5C0" />
+    <rect x="605" y="298" width="96" height="14" rx="7" fill="#5B5C5E" />
+    <rect x="788" y="284" width="84" height="14" rx="7" fill="#E4B4A1" />
+    <rect x="962" y="318" width="92" height="14" rx="7" fill="#EDCF59" />
+
+    <rect x="414" y="438" width="102" height="14" rx="7" fill="#5B5C5E" />
+    <rect x="594" y="452" width="84" height="14" rx="7" fill="#EDCF59" />
+    <rect x="779" y="438" width="106" height="14" rx="7" fill="#BFD5C0" />
+    <rect x="968" y="452" width="80" height="14" rx="7" fill="#E4B4A1" />
+  </g>
+
+  <rect x="834" y="170" width="250" height="88" rx="18" fill="#5B5C5E" />
+  <text x="860" y="203" fill="#EDCF59" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700">Product notes</text>
+  <text x="860" y="228" fill="#F8F7F0" font-family="Arial, Helvetica, sans-serif" font-size="14">Focus, routines, priorities, and</text>
+  <text x="860" y="248" fill="#F8F7F0" font-family="Arial, Helvetica, sans-serif" font-size="14">long-range planning in one view.</text>
+</svg>
