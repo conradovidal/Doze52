@@ -1,7 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { Github, Instagram } from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { ArrowUpRight, Github, Instagram, Sparkles } from "lucide-react";
 
 function BrandXIcon({ className }: { className?: string }) {
   return (
@@ -26,6 +28,7 @@ type FooterLink = {
 };
 
 export function SiteFooter() {
+  const pathname = usePathname();
   const supportEmail = "doze52cal@gmail.com";
   const gmailComposeUrl = `https://mail.google.com/mail/?view=cm&fs=1&tf=1&to=${encodeURIComponent(supportEmail)}`;
   const mailtoUrl = `mailto:${supportEmail}`;
@@ -65,6 +68,23 @@ export function SiteFooter() {
           aria-label="Redes do doze52"
           className="flex flex-wrap items-center gap-x-2 gap-y-1"
         >
+          <Link
+            href="/melhorias"
+            aria-current={pathname === "/melhorias" ? "page" : undefined}
+            className={`mr-1 inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium shadow-sm transition-colors ${
+              pathname === "/melhorias"
+                ? "border-neutral-900 bg-neutral-900 text-neutral-50 dark:border-neutral-100 dark:bg-neutral-100 dark:text-neutral-900"
+                : "border-border/80 bg-background text-foreground hover:bg-muted"
+            }`}
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+            <span>Melhorias &amp; Prioridades</span>
+            <span className="rounded-full bg-emerald-500/12 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-200">
+              Novo
+            </span>
+            <ArrowUpRight className="h-3.5 w-3.5" />
+          </Link>
+
           {socialLinks.map((link, index) => (
             <span key={link.label} className="inline-flex items-center gap-2">
               <a
