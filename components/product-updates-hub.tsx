@@ -118,17 +118,57 @@ const PUBLIC_MONTH_YEAR_FORMATTER = new Intl.DateTimeFormat("pt-BR", {
   timeZone: "UTC",
 });
 
+const toPublicMonthYearLabel = (value: string) =>
+  value.replace(/\s+de\s+/i, " ").replace(/^./, (character) => character.toUpperCase());
+
 const formatPublicMonthYear = (value: string | null | undefined) => {
   if (!value) return null;
   const parsed = new Date(`${value}T00:00:00Z`);
   if (Number.isNaN(parsed.getTime())) return null;
-  return PUBLIC_MONTH_YEAR_FORMATTER.format(parsed);
+  return toPublicMonthYearLabel(PUBLIC_MONTH_YEAR_FORMATTER.format(parsed));
 };
 
 const getPublicItemMomentLabel = (item: ProductFeedbackItem) =>
   formatPublicMonthYear(item.launchedAt) ??
   formatPublicMonthYear(item.startedAt) ??
   item.timelineLabel;
+
+type LaunchedMonthGroup = {
+  key: string;
+  label: string;
+  items: ProductFeedbackItem[];
+};
+
+const groupLaunchedItemsByMonth = (items: ProductFeedbackItem[]) => {
+  const groups = new Map<string, LaunchedMonthGroup>();
+  const fallbackItems: ProductFeedbackItem[] = [];
+
+  for (const item of items) {
+    if (!item.launchedAt) {
+      fallbackItems.push(item);
+      continue;
+    }
+
+    const key = item.launchedAt.slice(0, 7);
+    const existingGroup = groups.get(key);
+
+    if (existingGroup) {
+      existingGroup.items.push(item);
+      continue;
+    }
+
+    groups.set(key, {
+      key,
+      label: formatPublicMonthYear(item.launchedAt) ?? item.launchedAt,
+      items: [item],
+    });
+  }
+
+  return {
+    groups: Array.from(groups.values()),
+    fallbackItems,
+  };
+};
 
 function FrozenCalendarBackdrop() {
   const profiles = useStore((s) => s.profiles);
@@ -381,7 +421,7 @@ function ProductFeedbackCard({
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/60 pt-4">
         <div className="flex items-center gap-4 text-xs text-muted-foreground">
           <span>{item.voteCount} votos</span>
-          <span>{item.reinforcementCount} reforcos</span>
+          <span>{item.reinforcementCount} reforços</span>
           {itemMomentLabel ? <span>{itemMomentLabel}</span> : null}
         </div>
         <ItemVoteButton
@@ -391,6 +431,50 @@ function ProductFeedbackCard({
           requireAuth={requireAuth}
         />
       </div>
+    </button>
+  );
+}
+
+function LaunchedFeedbackCard({
+  item,
+  onOpen,
+  fallbackMomentLabel,
+}: {
+  item: ProductFeedbackItem;
+  onOpen: (itemId: string) => void;
+  fallbackMomentLabel?: string | null;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen(item.id)}
+      className="w-full rounded-[1.5rem] border border-border/70 bg-background/46 p-4 text-left backdrop-blur transition-colors hover:bg-background/70 sm:p-5"
+    >
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="space-y-2">
+          {fallbackMomentLabel ? (
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              {fallbackMomentLabel}
+            </p>
+          ) : null}
+          <h3 className="text-lg font-semibold text-foreground">{item.title}</h3>
+          <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
+            {item.summary}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <FeedbackAreaBadge area={item.area} />
+        </div>
+      </div>
+
+      <ul className="mt-4 space-y-2 text-sm leading-6 text-muted-foreground">
+        {item.highlights.map((highlight) => (
+          <li key={highlight} className="flex gap-2">
+            <span className="mt-[0.42rem] h-1.5 w-1.5 shrink-0 rounded-full bg-neutral-400 dark:bg-neutral-500" />
+            <span>{highlight}</span>
+          </li>
+        ))}
+      </ul>
     </button>
   );
 }
@@ -430,6 +514,8 @@ function ProductFeedbackDetailsDialog({
 }) {
   if (!item) return null;
   const itemMomentLabel = getPublicItemMomentLabel(item);
+  const itemMomentTitle =
+    item.status === "launched" ? "Foi para produção" : "Momento";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -463,7 +549,7 @@ function ProductFeedbackDetailsDialog({
           </div>
           <div className="rounded-2xl border border-border/70 bg-background/70 p-3">
             <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-              Reforcos
+              Reforços
             </div>
             <div className="mt-1 text-sm font-medium text-foreground">
               {item.reinforcementCount}
@@ -471,7 +557,7 @@ function ProductFeedbackDetailsDialog({
           </div>
           <div className="rounded-2xl border border-border/70 bg-background/70 p-3">
             <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-              Momento
+              {itemMomentTitle}
             </div>
             <div className="mt-1 text-sm font-medium text-foreground">
               {itemMomentLabel ?? "No fluxo atual"}
@@ -493,7 +579,7 @@ function ProductFeedbackDetailsDialog({
         {item.highlights.length > 0 ? (
           <section className="rounded-[1.5rem] border border-border/70 bg-background/64 p-4">
             <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-              Highlights
+              Destaques
             </div>
             <ul className="mt-3 space-y-2 text-sm leading-6 text-muted-foreground">
               {item.highlights.map((highlight) => (
@@ -509,8 +595,8 @@ function ProductFeedbackDetailsDialog({
         <DialogFooter className="items-center justify-between gap-3 sm:justify-between">
           <div className="text-xs text-muted-foreground">
             {canVoteOnProductFeedbackItem(item.status)
-              ? "Cada pessoa pode apoiar ate 3 prioridades ao mesmo tempo."
-              : "Este item ja saiu da fila ativa de votos."}
+              ? "Cada pessoa pode apoiar até 3 prioridades ao mesmo tempo."
+              : "Este item já saiu da fila ativa de votos."}
           </div>
           <ItemVoteButton
             item={item}
@@ -547,7 +633,7 @@ function VoteSwapDialog({
         <DialogHeader>
           <DialogTitle>Escolha qual prioridade sai</DialogTitle>
           <DialogDescription>
-            Voce ja esta apoiando 3 itens. Para apoiar um quarto, substitua um dos votos atuais.
+            Você já está apoiando 3 itens. Para apoiar um quarto, substitua um dos votos atuais.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-2">
@@ -682,8 +768,8 @@ function SuggestionDialog({
       onSubmitted(response.snapshot);
       setSuccessMessage(
         selectedMatchId
-          ? "Reforco registrado. Obrigado por ajudar a lapidar a prioridade."
-          : "Sugestao recebida. Ela entra primeiro em revisao antes de aparecer publicamente."
+          ? "Reforço registrado. Obrigado por ajudar a lapidar a prioridade."
+          : "Sugestão recebida. Ela entra primeiro em revisão antes de aparecer publicamente."
       );
       setRawText("");
       setProposedArea("");
@@ -695,7 +781,7 @@ function SuggestionDialog({
       setError(
         error instanceof Error
           ? error.message
-          : "Nao foi possivel enviar sua melhoria agora."
+          : "Não foi possível enviar sua melhoria agora."
       );
     } finally {
       setBusy(false);
@@ -710,28 +796,28 @@ function SuggestionDialog({
         <DialogHeader className="pr-8">
           <DialogTitle className="text-2xl">Sugerir uma melhoria</DialogTitle>
           <DialogDescription className="text-sm leading-6">
-            Conte o resultado que faria diferenca no seu uso do doze52. Antes de abrir um item novo, vamos procurar algo parecido para consolidar melhor o sinal.
+            Conte o resultado que faria diferença no seu uso do doze52. Antes de abrir um item novo, vamos procurar algo parecido para consolidar melhor o sinal.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           <label className="block space-y-2">
             <span className="text-sm font-medium text-foreground">
-              O que voce gostaria de ver?
+              O que você gostaria de ver?
             </span>
             <textarea
               value={rawText}
               onChange={(event) => setRawText(event.target.value)}
               rows={6}
               className="min-h-36 w-full rounded-2xl border border-input bg-transparent px-4 py-3 text-sm leading-6 outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-              placeholder="Ex.: queria conseguir acompanhar recorrencias com mais contexto visual sem poluir o ano inteiro..."
+              placeholder="Ex.: queria conseguir acompanhar recorrências com mais contexto visual sem poluir o ano inteiro..."
             />
           </label>
 
           <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_12rem]">
             <label className="block space-y-2">
               <span className="text-sm font-medium text-foreground">
-                Area sugerida
+                Área sugerida
               </span>
               <Select
                 value={proposedArea || "__empty__"}
@@ -754,7 +840,7 @@ function SuggestionDialog({
             </label>
 
             <label className="hidden">
-              <span>Se voce esta vendo isto, deixe vazio</span>
+              <span>Se você está vendo isto, deixe vazio</span>
               <Input
                 value={honeypot}
                 onChange={(event) => setHoneypot(event.target.value)}
@@ -804,9 +890,9 @@ function SuggestionDialog({
 
           {selectedMatch ? (
             <section className="rounded-[1.5rem] border border-emerald-200/80 bg-emerald-50/80 p-4 text-sm text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100">
-              <div className="font-medium">Voce vai reforcar um item existente.</div>
+              <div className="font-medium">Você vai reforçar um item existente.</div>
               <p className="mt-1 leading-6">
-                Seu texto entra como contexto adicional para a equipe, sem abrir uma duplicata publica.
+                Seu texto entra como contexto adicional para a equipe, sem abrir uma duplicata pública.
               </p>
               <label className="mt-4 flex items-start gap-2">
                 <input
@@ -816,12 +902,12 @@ function SuggestionDialog({
                   className="mt-1 h-4 w-4 rounded border border-input"
                 />
                 <span className="leading-6">
-                  Tambem quero usar um dos meus votos ativos neste item.
+                  Também quero usar um dos meus votos ativos neste item.
                 </span>
               </label>
               {selectedMatch && castVote && alreadyVotingForSelected ? (
                 <p className="mt-3 text-xs leading-5">
-                  Voce ja esta apoiando esta melhoria. O voto nao vai consumir um slot novo.
+                  Você já está apoiando esta melhoria. O voto não vai consumir um slot novo.
                 </p>
               ) : null}
               {mustChooseReplacement ? (
@@ -874,7 +960,7 @@ function SuggestionDialog({
             onClick={handleSubmit}
           >
             {busy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}
-            {selectedMatch ? "Registrar reforco" : "Enviar melhoria"}
+            {selectedMatch ? "Registrar reforço" : "Enviar melhoria"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -887,6 +973,8 @@ export function ProductUpdatesHub({
 }: {
   initialSnapshot: ProductFeedbackSnapshot;
 }) {
+  const backlogActionsRef = React.useRef<HTMLDivElement | null>(null);
+  const backlogListRef = React.useRef<HTMLDivElement | null>(null);
   const { session, loading: authLoading } = useAuth();
   const { snapshot, setSnapshot, loading, error, refresh } =
     useProductFeedbackSnapshot(initialSnapshot);
@@ -926,6 +1014,17 @@ export function ProductUpdatesHub({
   const activeVoteItems = snapshot.items.filter((item) =>
     snapshot.viewerActiveVoteItemIds.includes(item.id)
   );
+  const launchedMonthGroups = React.useMemo(
+    () => groupLaunchedItemsByMonth(snapshot.launched),
+    [snapshot.launched]
+  );
+  const remainingVotes = Math.max(
+    snapshot.viewerVoteLimit - snapshot.viewerActiveVoteItemIds.length,
+    0
+  );
+  const remainingVotesLabel = `${remainingVotes} ${
+    remainingVotes === 1 ? "voto" : "votos"
+  }`;
 
   const openAuthDialog = React.useCallback(
     (anchorPoint?: { x: number; y: number }) => {
@@ -942,6 +1041,38 @@ export function ProductUpdatesHub({
     }
     const rect = event.currentTarget.getBoundingClientRect();
     openAuthDialog({ x: rect.right, y: rect.bottom });
+  };
+
+  const handleSuggestionCta = (event?: React.MouseEvent<HTMLElement>) => {
+    if (!session) {
+      requireAuthFromEvent(event);
+      return;
+    }
+
+    setSuggestionOpen(true);
+  };
+
+  const focusOpportunities = React.useCallback(() => {
+    const target = backlogListRef.current ?? backlogActionsRef.current;
+    if (!target) return;
+
+    target.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+
+    window.setTimeout(() => {
+      target.focus({ preventScroll: true });
+    }, 180);
+  }, []);
+
+  const handleVotesCta = (event?: React.MouseEvent<HTMLElement>) => {
+    if (!session) {
+      requireAuthFromEvent(event);
+      return;
+    }
+
+    focusOpportunities();
   };
 
   const handleVote = async (itemId: string, replaceItemId?: string | null) => {
@@ -968,7 +1099,7 @@ export function ProductUpdatesHub({
         payload.state === "removed"
           ? "Voto removido."
           : payload.state === "already_active"
-            ? "Voce ja estava apoiando esta prioridade."
+            ? "Você já estava apoiando esta prioridade."
             : "Voto registrado."
       );
     } catch (error) {
@@ -987,7 +1118,7 @@ export function ProductUpdatesHub({
         return;
       }
       setMessage(
-        error instanceof Error ? error.message : "Nao foi possivel registrar o voto."
+        error instanceof Error ? error.message : "Não foi possível registrar o voto."
       );
     } finally {
       setVoteBusyItemId(null);
@@ -997,17 +1128,17 @@ export function ProductUpdatesHub({
   const steps = [
     {
       title: "Sugira",
-      body: "Conte o resultado que faria diferenca e deixe o time lapidar o backlog com contexto real.",
+      body: "Conte o resultado que faria diferença e deixe o time lapidar o backlog com contexto real.",
       icon: MessageSquarePlus,
     },
     {
-      title: "Vote em ate 3 prioridades",
-      body: "Cada pessoa sustenta so o que realmente importa, o que torna o ranking mais honesto.",
+      title: "Vote em até 3 prioridades",
+      body: "Cada pessoa sustenta só o que realmente importa, o que torna o ranking mais honesto.",
       icon: ChartNoAxesColumn,
     },
     {
       title: "Acompanhe o status",
-      body: "Historico, oportunidades de melhoria e entregas em andamento convivem na mesma leitura.",
+      body: "Histórico, oportunidades de melhoria e implementação do roadmap convivem na mesma leitura.",
       icon: Sparkles,
     },
   ];
@@ -1025,7 +1156,7 @@ export function ProductUpdatesHub({
           <div className="flex items-start justify-end px-4 pt-4 sm:px-6 sm:pt-5">
             <Link
               href="/"
-              aria-label="Fechar e voltar ao calendario"
+              aria-label="Fechar e voltar ao calendário"
               className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border/80 bg-background/78 text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground"
             >
               <X className="h-4 w-4" />
@@ -1035,14 +1166,14 @@ export function ProductUpdatesHub({
           <div className="flex flex-col gap-6 px-5 pb-5 sm:px-8 sm:pb-8">
             <div className="space-y-5">
               <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-muted/70 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-muted-foreground">
-                Evolucao do produto
+                Evolução do produto
               </div>
               <div className="space-y-3">
                 <h1 className="max-w-3xl text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
                   Melhorias &amp; Prioridades
                 </h1>
                 <p className="max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
-                  O ponto publico onde o doze52 mostra o que ja evoluiu, o que esta em avaliacao e onde a comunidade pode ajudar a puxar o produto para frente.
+                  O ponto público onde o doze52 mostra o que já evoluiu, o que está em avaliação e onde a comunidade pode ajudar a puxar o produto para frente.
                 </p>
               </div>
               <div className="flex flex-wrap gap-3">
@@ -1051,13 +1182,7 @@ export function ProductUpdatesHub({
                   variant="premium"
                   size="lg"
                   className="h-12 rounded-full border border-neutral-900/10 px-5 text-sm shadow-[0_20px_55px_-24px_rgba(15,23,42,0.55)] dark:border-neutral-100/10"
-                  onClick={(event) => {
-                    if (!session) {
-                      requireAuthFromEvent(event);
-                      return;
-                    }
-                    setSuggestionOpen(true);
-                  }}
+                  onClick={handleSuggestionCta}
                 >
                   <MessageSquarePlus className="h-4 w-4" />
                   Sugerir uma melhoria
@@ -1133,6 +1258,34 @@ export function ProductUpdatesHub({
                 <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
                   {currentSection.description}
                 </p>
+                {activeSection === "backlog" ? (
+                  <div
+                    ref={backlogActionsRef}
+                    tabIndex={-1}
+                    className="mt-3 flex flex-col gap-3 outline-none sm:flex-row sm:flex-wrap"
+                  >
+                    <Button
+                      type="button"
+                      variant="premium"
+                      size="lg"
+                      className="h-12 rounded-full px-5 text-sm shadow-[0_20px_55px_-24px_rgba(15,23,42,0.55)]"
+                      onClick={handleVotesCta}
+                    >
+                      <ChartNoAxesColumn className="h-4 w-4" />
+                      {remainingVotesLabel}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="lg"
+                      className="h-12 rounded-full border-border/80 bg-background/82 px-5 text-sm shadow-sm hover:bg-background"
+                      onClick={handleSuggestionCta}
+                    >
+                      <MessageSquarePlus className="h-4 w-4" />
+                      Sugerir melhoria
+                    </Button>
+                  </div>
+                ) : null}
               </div>
 
               {loading ? (
@@ -1163,42 +1316,36 @@ export function ProductUpdatesHub({
 
               {activeSection === "launched" ? (
                 sectionItems.length > 0 ? (
-                  <div className="relative mt-6 space-y-5 pl-5 sm:pl-8">
+                  <div className="relative mt-6 space-y-8 pl-5 sm:pl-8">
                     <div className="absolute bottom-3 left-[7px] top-1 w-px bg-border sm:left-[11px]" />
-                    {sectionItems.map((item) => (
+                    {launchedMonthGroups.groups.map((group) => (
+                      <section key={group.key} className="relative space-y-3">
+                        <div className="absolute -left-5 top-2.5 h-3.5 w-3.5 rounded-full border-2 border-background bg-neutral-900 dark:bg-neutral-100 sm:-left-8" />
+                        <div className="pl-0.5">
+                          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                            {group.label}
+                          </p>
+                        </div>
+                        <div className="space-y-3">
+                          {group.items.map((item) => (
+                            <article key={item.id}>
+                              <LaunchedFeedbackCard
+                                item={item}
+                                onOpen={setSelectedItemId}
+                              />
+                            </article>
+                          ))}
+                        </div>
+                      </section>
+                    ))}
+                    {launchedMonthGroups.fallbackItems.map((item) => (
                       <article key={item.id} className="relative">
                         <div className="absolute -left-5 top-2.5 h-3.5 w-3.5 rounded-full border-2 border-background bg-neutral-900 dark:bg-neutral-100 sm:-left-8" />
-                        <button
-                          type="button"
-                          onClick={() => setSelectedItemId(item.id)}
-                          className="w-full rounded-[1.5rem] border border-border/70 bg-background/46 p-4 text-left backdrop-blur transition-colors hover:bg-background/70 sm:p-5"
-                        >
-                          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                            <div className="space-y-2">
-                              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                                {getPublicItemMomentLabel(item)}
-                              </p>
-                              <h3 className="text-lg font-semibold text-foreground">
-                                {item.title}
-                              </h3>
-                              <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
-                                {item.summary}
-                              </p>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                              <FeedbackAreaBadge area={item.area} />
-                            </div>
-                          </div>
-
-                          <ul className="mt-4 space-y-2 text-sm leading-6 text-muted-foreground">
-                            {item.highlights.map((highlight) => (
-                              <li key={highlight} className="flex gap-2">
-                                <span className="mt-[0.42rem] h-1.5 w-1.5 shrink-0 rounded-full bg-neutral-400 dark:bg-neutral-500" />
-                                <span>{highlight}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </button>
+                        <LaunchedFeedbackCard
+                          item={item}
+                          onOpen={setSelectedItemId}
+                          fallbackMomentLabel={item.timelineLabel}
+                        />
                       </article>
                     ))}
                   </div>
@@ -1206,7 +1353,11 @@ export function ProductUpdatesHub({
                   <SectionEmptyState sectionKey="launched" />
                 )
               ) : sectionItems.length > 0 ? (
-                <div className="mt-6 grid gap-4">
+                <div
+                  ref={activeSection === "backlog" ? backlogListRef : undefined}
+                  tabIndex={activeSection === "backlog" ? -1 : undefined}
+                  className="mt-6 grid gap-4 outline-none"
+                >
                   {sectionItems.map((item) => (
                     <ProductFeedbackCard
                       key={item.id}
@@ -1227,7 +1378,7 @@ export function ProductUpdatesHub({
 
         {!authLoading && !session ? (
           <div className="rounded-[1.5rem] border border-border/70 bg-background/72 px-5 py-4 text-sm text-muted-foreground backdrop-blur">
-            Leitura publica aberta. Para votar, reforcar uma ideia ou enviar uma melhoria nova, entre com sua conta.
+            Leitura pública aberta. Para votar, reforçar uma ideia ou enviar uma melhoria nova, entre com sua conta.
           </div>
         ) : null}
       </div>

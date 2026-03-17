@@ -105,51 +105,51 @@ export type ProductFeedbackAdminDashboard = {
 export const PRODUCT_FEEDBACK_SECTION_META = {
   launched: {
     key: "launched",
-    label: "Lancadas",
-    eyebrow: "Ja no produto",
-    title: "O que ja melhoramos no doze52",
+    label: "Lançadas",
+    eyebrow: "Já no produto",
+    title: "O que já melhoramos no doze52",
     description:
-      "Marcos importantes da evolucao do produto, sempre com foco no que mudou para quem usa o calendario no dia a dia.",
+      "Marcos importantes da evolução do produto, sempre com foco no que mudou para quem usa o calendário no dia a dia.",
     emptyStateTitle: "Ainda sem marcos publicados",
     emptyStateBody:
-      "Quando novas entregas forem para o ar, elas vao aparecer aqui com contexto do que mudou.",
+      "Quando novas entregas forem para o ar, elas vão aparecer aqui com contexto do que mudou.",
   },
   in_progress: {
     key: "in_progress",
     label: "Em andamento",
-    eyebrow: "Em construcao",
-    title: "O que estamos construindo agora",
+    eyebrow: "Em implementação",
+    title: "Implementação do roadmap e da comunidade",
     description:
-      "Transparencia sobre melhorias que ja sairam do backlog e entraram em execucao.",
-    emptyStateTitle: "Nada em execucao agora",
+      "O que estamos colocando no ar agora para transformar Melhorias & Prioridades em uma camada viva de escuta, organização e transparência.",
+    emptyStateTitle: "Nada em implementação agora",
     emptyStateBody:
-      "Quando abrirmos uma frente nova, voce vai ver aqui o que esta sendo construido, sem promessas vagas.",
+      "Quando uma frente nova entrar em execução, ela aparece aqui com clareza sobre o que está sendo construído.",
   },
   backlog: {
     key: "backlog",
     label: "Oportunidades de melhoria",
-    eyebrow: "Em avaliacao",
+    eyebrow: "Em avaliação",
     title: "O que estamos tratando como oportunidades de melhoria",
     description:
-      "Ideias publicas, refinadas e consolidadas, para a comunidade acompanhar o que vale aprofundar nas proximas fases.",
-    emptyStateTitle: "Sem oportunidades publicas ainda",
+      "Ideias públicas, refinadas e consolidadas, para a comunidade acompanhar o que vale aprofundar nas próximas fases.",
+    emptyStateTitle: "Sem oportunidades públicas ainda",
     emptyStateBody:
-      "A camada publica esta abrindo. Se voce sentir falta de algo importante, envie a primeira melhoria.",
+      "A camada pública está abrindo. Se você sentir falta de algo importante, envie a primeira melhoria.",
   },
 } as const;
 
 export const PRODUCT_FEEDBACK_AREA_LABEL: Record<ProductFeedbackArea, string> = {
-  Calendario: "Calendario",
+  Calendario: "Calendário",
   Perfis: "Perfis",
   Interface: "Interface",
-  Sincronizacao: "Sincronizacao",
+  Sincronizacao: "Sincronização",
   Geral: "Geral",
 };
 
 export const PRODUCT_FEEDBACK_STATUS_LABEL: Record<ProductFeedbackStatus, string> = {
   backlog: "Oportunidade",
   in_progress: "Em andamento",
-  launched: "Lancada",
+  launched: "Lançada",
   archived: "Arquivada",
 };
 

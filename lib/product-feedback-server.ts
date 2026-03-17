@@ -268,7 +268,7 @@ const validateFeedbackText = (rawText: string) => {
     throw new ProductFeedbackError(
       400,
       "validation_error",
-      "A sugestao ficou longa demais. Tente resumir em ate 700 caracteres."
+      "A sugestão ficou longa demais. Tente resumir em até 700 caracteres."
     );
   }
   if (normalizeProductFeedbackText(trimmed).split(" ").length < 4) {
@@ -286,13 +286,13 @@ const requireAuthenticatedFeedbackUser = async () => {
     throw new ProductFeedbackError(
       503,
       "feedback_unavailable",
-      "O hub de melhorias ainda nao esta configurado neste ambiente."
+      "O hub de melhorias ainda não está configurado neste ambiente."
     );
   }
   const supabase = await getSupabaseServerClient();
   const { data, error } = await supabase.auth.getUser();
   if (error || !data.user) {
-    throw new ProductFeedbackError(401, "not_authenticated", "Faca login para continuar.");
+    throw new ProductFeedbackError(401, "not_authenticated", "Faça login para continuar.");
   }
   return { supabase, user: data.user };
 };
@@ -353,14 +353,14 @@ export const mutateProductFeedbackVote = async (params: {
   const { supabase, user } = await requireAuthenticatedFeedbackUser();
   const targetItem = await getPublicItemById(supabase, params.itemId);
   if (!targetItem) {
-    throw new ProductFeedbackError(404, "item_not_found", "Item nao encontrado.");
+    throw new ProductFeedbackError(404, "item_not_found", "Item não encontrado.");
   }
   const status = targetItem.status as ProductFeedbackStatus;
   if (!canVoteOnProductFeedbackItem(status)) {
     throw new ProductFeedbackError(
       400,
       "vote_not_allowed",
-      "So e possivel votar em itens de backlog ou em andamento."
+      "Só é possível votar em itens de backlog ou em andamento."
     );
   }
 
@@ -400,7 +400,7 @@ export const mutateProductFeedbackVote = async (params: {
       throw new ProductFeedbackError(
         409,
         "vote_limit_reached",
-        "Voce ja esta apoiando 3 prioridades. Escolha uma para substituir.",
+        "Você já está apoiando 3 prioridades. Escolha uma para substituir.",
         {
           activeVotes: await getVoteLimitPayload(supabase, activeVotes),
           limit: PRODUCT_FEEDBACK_VOTE_LIMIT,
@@ -412,7 +412,7 @@ export const mutateProductFeedbackVote = async (params: {
       throw new ProductFeedbackError(
         400,
         "replace_vote_missing",
-        "A prioridade escolhida para sair nao esta entre seus votos ativos."
+        "A prioridade escolhida para sair não está entre seus votos ativos."
       );
     }
     const { error: replaceError } = await supabase
@@ -502,7 +502,7 @@ const enforceSubmissionLimits = async (
     throw new ProductFeedbackError(
       429,
       "submission_limit",
-      "Voce atingiu o limite diario de novas sugestoes por enquanto."
+      "Você atingiu o limite diário de novas sugestões por enquanto."
     );
   }
 
@@ -511,7 +511,7 @@ const enforceSubmissionLimits = async (
     throw new ProductFeedbackError(
       409,
       "duplicate_submission",
-      "Parece que voce ja enviou algo muito parecido recentemente."
+      "Parece que você já enviou algo muito parecido recentemente."
     );
   }
 };
@@ -571,7 +571,7 @@ export const createProductFeedbackSubmission = async (params: {
     throw new ProductFeedbackError(
       400,
       "spam_blocked",
-      "Nao foi possivel processar o envio."
+      "Não foi possível processar o envio."
     );
   }
 
@@ -592,12 +592,12 @@ export const createProductFeedbackSubmission = async (params: {
       throw new ProductFeedbackError(
         404,
         "item_not_found",
-        "Nao encontramos a melhoria escolhida para reforco."
+        "Não encontramos a melhoria escolhida para reforço."
       );
     }
     status = "merged_existing";
     reviewedAt = new Date().toISOString();
-    moderationNote = "Reforco registrado pelo proprio usuario no item existente.";
+    moderationNote = "Reforço registrado pelo próprio usuário no item existente.";
   }
 
   const payload = {
@@ -642,13 +642,13 @@ export const createProductFeedbackSubmission = async (params: {
 export const requireProductFeedbackAdmin = async (): Promise<User> => {
   const user = await getAuthenticatedServerUser();
   if (!user) {
-    throw new ProductFeedbackError(401, "not_authenticated", "Faca login para continuar.");
+    throw new ProductFeedbackError(401, "not_authenticated", "Faça login para continuar.");
   }
   if (!hasSupabaseAdminEnv) {
     throw new ProductFeedbackError(
       503,
       "admin_unavailable",
-      "A area administrativa nao esta configurada neste ambiente."
+      "A área administrativa não está configurada neste ambiente."
     );
   }
   const admin = getSupabaseAdminClient();
@@ -662,7 +662,7 @@ export const requireProductFeedbackAdmin = async (): Promise<User> => {
     throw new ProductFeedbackError(
       403,
       "forbidden",
-      "Voce nao tem acesso a esta area."
+      "Você não tem acesso a esta área."
     );
   }
   return user;
@@ -779,7 +779,7 @@ export const moderateProductFeedbackSubmission = async (params: {
     .maybeSingle();
   if (submissionError) throw submissionError;
   if (!submission) {
-    throw new ProductFeedbackError(404, "submission_not_found", "Sugestao nao encontrada.");
+    throw new ProductFeedbackError(404, "submission_not_found", "Sugestão não encontrada.");
   }
 
   const reviewedAt = new Date().toISOString();
@@ -803,7 +803,7 @@ export const moderateProductFeedbackSubmission = async (params: {
       throw new ProductFeedbackError(
         400,
         "target_item_required",
-        "Escolha o item canônico para consolidar esta sugestao."
+        "Escolha o item canônico para consolidar esta sugestão."
       );
     }
     const { error } = await admin
@@ -828,7 +828,7 @@ export const moderateProductFeedbackSubmission = async (params: {
     throw new ProductFeedbackError(
       400,
       "promotion_payload_invalid",
-      "Titulo, resumo e area sao obrigatorios para promover um item novo."
+      "Título, resumo e área são obrigatórios para promover um item novo."
     );
   }
 
@@ -975,7 +975,7 @@ export const upsertProductFeedbackItem = async (params: {
     throw new ProductFeedbackError(
       400,
       "item_payload_invalid",
-      "Titulo, resumo e area sao obrigatorios."
+      "Título, resumo e área são obrigatórios."
     );
   }
 

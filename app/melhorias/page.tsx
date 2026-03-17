@@ -5,7 +5,7 @@ import { loadServerViewerFeedbackSnapshot } from "@/lib/product-feedback-server"
 export const metadata: Metadata = {
   title: "Melhorias & Prioridades | doze52",
   description:
-    "Acompanhe o historico do produto, participe da priorizacao da comunidade e veja o que vem depois no doze52.",
+    "Acompanhe o histórico do produto, participe da priorização da comunidade e veja o que vem depois no doze52.",
 };
 
 export const dynamic = "force-dynamic";
