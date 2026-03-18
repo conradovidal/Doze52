@@ -801,13 +801,10 @@ export const useStore = create<StoreState>()(
           viewMode: mode,
         })),
       focusQuarter: (quarter) =>
-        set((state) => ({
+        set(() => ({
           viewMode: "quarter",
           focusedQuarter: quarter,
-          focusedMonth:
-            state.focusedMonth !== null && getQuarterFromMonth(state.focusedMonth) === quarter
-              ? state.focusedMonth
-              : null,
+          focusedMonth: null,
         })),
       focusMonth: (month) =>
         set(() => ({

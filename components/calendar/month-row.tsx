@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { ChevronRight } from "lucide-react";
 import {
   addDays,
   differenceInCalendarDays,
@@ -122,8 +121,9 @@ export function MonthRow({
   onDayDrop,
   onSingleDayListHover,
   clearReorderTarget,
-  onDrilldown,
-  drilldownLabel,
+  onMonthLabelClick,
+  monthLabelAriaLabel,
+  monthLabelActive = false,
 }: {
   year: number;
   todayIso: string;
@@ -157,8 +157,9 @@ export function MonthRow({
   onDayDrop: (dateIso: string, transfer?: DataTransfer | null) => void;
   onSingleDayListHover: (dayIso: string, insertIndex: number) => void;
   clearReorderTarget: () => void;
-  onDrilldown?: () => void;
-  drilldownLabel?: string;
+  onMonthLabelClick?: () => void;
+  monthLabelAriaLabel?: string;
+  monthLabelActive?: boolean;
 }) {
   const daysGridRef = React.useRef<HTMLDivElement | null>(null);
   const monthStart = startOfMonth(new Date(year, monthIndex, 1));
@@ -399,18 +400,23 @@ export function MonthRow({
         )}
         style={{ minHeight: `${minHeightPx}px` }}
       >
-        {onDrilldown ? (
+        {onMonthLabelClick ? (
           <button
             type="button"
-            onClick={onDrilldown}
-            aria-label={drilldownLabel ?? monthLabel}
-            title={drilldownLabel ?? monthLabel}
-            className="group flex h-full w-full items-center justify-center gap-1 rounded-[1rem] px-1.5 py-2 text-foreground/78 transition-colors duration-150 hover:bg-background/72 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+            onClick={onMonthLabelClick}
+            aria-label={monthLabelAriaLabel ?? monthLabel}
+            title={monthLabelAriaLabel ?? monthLabel}
+            aria-pressed={monthLabelActive}
+            className={cn(
+              "group flex h-full w-full items-center justify-center rounded-[1rem] px-1.5 py-2 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+              monthLabelActive
+                ? "bg-foreground text-background shadow-[0_12px_24px_-20px_rgba(15,23,42,0.36)]"
+                : "text-foreground/78 hover:bg-background/72 hover:text-foreground"
+            )}
           >
             <span className="text-[10px] font-semibold uppercase tracking-[0.16em] min-[420px]:text-[11px] min-[420px]:tracking-[0.18em]">
               {monthLabel}
             </span>
-            <ChevronRight className="h-3 w-3 opacity-0 transition-all duration-150 group-hover:translate-x-0.5 group-hover:opacity-60 group-focus-visible:translate-x-0.5 group-focus-visible:opacity-60" />
           </button>
         ) : (
           <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-foreground/78 min-[420px]:text-[11px] min-[420px]:tracking-[0.18em]">
