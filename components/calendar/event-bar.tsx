@@ -37,11 +37,11 @@ export function EventBar({
   const lastDragEndAtRef = React.useRef(0);
   const radius =
     isStart && isEnd
-      ? "rounded-sm"
+      ? "rounded-[8px]"
       : isStart
-        ? "rounded-l-sm"
+        ? "rounded-l-[8px]"
         : isEnd
-          ? "rounded-r-sm"
+          ? "rounded-r-[8px]"
           : "rounded-none";
 
   return (
@@ -79,23 +79,20 @@ export function EventBar({
           onDragEnd?.();
         }, 0);
       }}
-      className={`group relative block w-full cursor-pointer truncate border border-black/8 text-left text-neutral-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] transition-[transform,box-shadow,opacity] duration-150 ${EVENT_ITEM_PADDING_X_CLASS} ${EVENT_ITEM_TEXT_CLASS} ${radius} ${isPast ? "opacity-55" : ""} ${isDragging ? "opacity-40" : "hover:-translate-y-px hover:shadow-[0_6px_14px_-10px_rgba(15,23,42,0.42),inset_0_1px_0_rgba(255,255,255,0.18)]"} ${className ?? ""} overflow-visible`}
+      aria-label={event.title}
+      className={`group relative block w-full cursor-pointer truncate border border-black/10 text-left text-neutral-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_8px_16px_-14px_rgba(15,23,42,0.32)] transition-[transform,box-shadow,opacity,filter] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 ${EVENT_ITEM_PADDING_X_CLASS} ${EVENT_ITEM_TEXT_CLASS} ${radius} ${
+        isPast ? "opacity-65 saturate-[0.92]" : ""
+      } ${
+        isDragging
+          ? "opacity-40"
+          : "hover:-translate-y-px hover:brightness-[1.02] hover:shadow-[0_14px_24px_-18px_rgba(15,23,42,0.5),inset_0_1px_0_rgba(255,255,255,0.24)]"
+      } ${className ?? ""} overflow-hidden`}
       style={{ backgroundColor: event.color }}
       title={event.title}
     >
       <span
         className={`block truncate ${EVENT_ITEM_LINE_HEIGHT_CLASS}`}
         style={{ minHeight: `${EVENT_ITEM_HEIGHT_PX}px` }}
-      >
-        {event.title}
-      </span>
-      <span
-        className={`pointer-events-none absolute left-0 top-0 z-20 hidden whitespace-nowrap border border-black/8 text-white shadow-[0_10px_20px_-16px_rgba(15,23,42,0.48)] ${EVENT_ITEM_PADDING_X_CLASS} ${EVENT_ITEM_TEXT_CLASS} ${isDragging ? "" : "group-hover:inline-flex group-hover:items-center"} ${radius}`}
-        style={{
-          minHeight: `${EVENT_ITEM_HEIGHT_PX}px`,
-          lineHeight: `${EVENT_ITEM_HEIGHT_PX}px`,
-          backgroundColor: event.color,
-        }}
       >
         {event.title}
       </span>

@@ -26,7 +26,9 @@ import type { AnchorPoint } from "@/lib/types";
 
 const DEFAULT_CATEGORY_COLOR = CATEGORY_PRESET_COLORS[0];
 const CHIP_TRIGGER_CLASS =
-  "h-9 w-full rounded-xl border px-3 text-sm shadow-none transition-colors";
+  "h-10 w-full rounded-xl border px-3 text-sm shadow-sm transition-colors";
+const FIELD_LABEL_CLASS =
+  "text-[12px] font-semibold tracking-[-0.01em] text-foreground/78";
 
 const normalizeHashPrefix = (value: string) => {
   const trimmed = value.trim();
@@ -200,18 +202,18 @@ export function CategoryManager({
         anchorPoint={anchorPoint}
         desktopPlacement="right-start"
         mobileMode="sheet"
-        className="sm:max-w-[460px] p-4 sm:p-5"
+        className="sm:max-w-[500px] p-5 sm:p-6"
       >
         <DialogHeader>
           <DialogTitle>{isEdit ? "Editar categoria" : "Nova categoria"}</DialogTitle>
           <DialogDescription>
-            Defina nome, cor e perfil. O restante deve ser secundario e rapido.
+            Defina o essencial primeiro: nome, cor e perfil.
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4">
+        <div className="space-y-5">
           <div className="space-y-1.5">
-            <label htmlFor="category-name" className="text-[12px] font-medium text-foreground/70">
-              Categoria
+            <label htmlFor="category-name" className={FIELD_LABEL_CLASS}>
+              Nome
             </label>
             <Input
               id="category-name"
@@ -222,37 +224,16 @@ export function CategoryManager({
             />
           </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="space-y-1">
-              <label className="text-[12px] font-medium text-foreground/70">Perfil</label>
-              <Select value={profileDraftId} onValueChange={setProfileDraftId}>
-                <SelectTrigger
-                  size="sm"
-                  className={`${CHIP_TRIGGER_CLASS} border-border/80 bg-background text-foreground shadow-sm hover:bg-muted`}
-                  disabled={profiles.length === 0}
-                >
-                  <span className="inline-flex min-w-0 items-center gap-1.5 pr-2">
-                    {currentProfile ? <ProfileIcon icon={currentProfile.icon} size={12} /> : null}
-                    <span className="truncate">{currentProfile?.name ?? "Perfil"}</span>
-                  </span>
-                </SelectTrigger>
-                <SelectContent position="popper" side="bottom" align="start">
-                  {profiles.map((profile) => (
-                    <SelectItem key={profile.id} value={profile.id}>
-                      <span className="inline-flex items-center gap-2">
-                        <ProfileIcon icon={profile.icon} size={12} />
-                        {profile.name}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-[12px] font-medium text-foreground/70">Preview</label>
+          <div className="space-y-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="space-y-0.5">
+                <div className={FIELD_LABEL_CLASS}>Cor</div>
+                <p className="text-xs text-muted-foreground">
+                  Use a cor como pista rapida de leitura.
+                </p>
+              </div>
               <div
-                className="inline-flex h-9 w-full items-center gap-1.5 rounded-xl border px-3 text-sm font-medium text-white shadow-sm"
+                className="inline-flex h-9 items-center gap-1.5 rounded-full border border-border/80 px-3 text-xs font-medium text-white shadow-sm"
                 style={{
                   backgroundColor: color,
                   borderColor: "rgba(255,255,255,0.28)",
@@ -261,15 +242,6 @@ export function CategoryManager({
                 <span className="h-2 w-2 rounded-full bg-white/80" />
                 <span className="truncate">{name.trim() || "Categoria"}</span>
               </div>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <div className="space-y-0.5">
-              <div className="text-[12px] font-medium text-foreground/70">Cor</div>
-              <p className="text-xs text-muted-foreground">
-                Use a cor para orientar leitura, nao para competir com o restante da interface.
-              </p>
             </div>
             <div className="flex flex-wrap items-center gap-2.5">
               {CATEGORY_PRESET_COLORS.map((preset) => {
@@ -308,25 +280,25 @@ export function CategoryManager({
                 }}
               >
                 <PopoverTrigger asChild>
-                  <button
+                  <Button
                     type="button"
-                    aria-label="Selecionar cor personalizada"
-                    className={`relative inline-flex h-8 w-8 items-center justify-center rounded-full border border-neutral-300 bg-white transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-300 ${
-                      !isPresetColor || customPopoverOpen
-                        ? "ring-2 ring-neutral-400 ring-offset-2"
-                        : ""
+                    variant="outline"
+                    size="sm"
+                    className={`h-8 rounded-full px-3 text-xs ${
+                      !isPresetColor || customPopoverOpen ? "border-neutral-400 bg-muted/60" : ""
                     }`}
                   >
-                    <Palette size={14} className="text-neutral-600" />
-                  </button>
+                    <Palette size={14} />
+                    Mais cores
+                  </Button>
                 </PopoverTrigger>
                 <PopoverContent
                   align="start"
-                  className="w-60 rounded-2xl border-border/80 bg-background p-3 shadow-lg"
+                  className="w-64 p-3"
                 >
                   <div className="space-y-2">
                     <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
-                      Custom
+                      Cor personalizada
                     </div>
                     <div className="flex items-center gap-2">
                       <input
@@ -364,6 +336,32 @@ export function CategoryManager({
                 </PopoverContent>
               </Popover>
             </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className={FIELD_LABEL_CLASS}>Perfil</label>
+            <Select value={profileDraftId} onValueChange={setProfileDraftId}>
+              <SelectTrigger
+                size="sm"
+                className={`${CHIP_TRIGGER_CLASS} border-border/80 bg-background text-foreground hover:bg-muted/70`}
+                disabled={profiles.length === 0}
+              >
+                <span className="inline-flex min-w-0 items-center gap-1.5 pr-2">
+                  {currentProfile ? <ProfileIcon icon={currentProfile.icon} size={12} /> : null}
+                  <span className="truncate">{currentProfile?.name ?? "Perfil"}</span>
+                </span>
+              </SelectTrigger>
+              <SelectContent position="popper" side="bottom" align="start">
+                {profiles.map((profile) => (
+                  <SelectItem key={profile.id} value={profile.id}>
+                    <span className="inline-flex items-center gap-2">
+                      <ProfileIcon icon={profile.icon} size={12} />
+                      {profile.name}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
         <DialogFooter className="sm:justify-between">

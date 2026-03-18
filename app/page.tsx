@@ -7,6 +7,7 @@ import { EventDialog } from "@/components/event-dialog";
 import { AppHeader } from "@/components/app-header";
 import { AuthDialog } from "@/components/auth/auth-dialog";
 import { Button } from "@/components/ui/button";
+import { useFeedback } from "@/components/ui/feedback-provider";
 import {
   getOnboardingDefaultProfiles,
   getOnboardingDefaultCategories,
@@ -220,6 +221,7 @@ const mergeSnapshots = (
 };
 
 export default function HomePage() {
+  const { notify } = useFeedback();
   const initialYear = React.useMemo(() => {
     const currentYear = new Date().getFullYear();
     return currentYear >= 2025 && currentYear <= 2027 ? currentYear : 2026;
@@ -263,10 +265,6 @@ export default function HomePage() {
   const [, setIsSyncing] = React.useState(false);
   const [remoteReady, setRemoteReady] = React.useState(false);
   const [syncBlocked, setSyncBlocked] = React.useState(false);
-  const [syncNotice, setSyncNotice] = React.useState<{
-    tone: "success" | "info";
-    message: string;
-  } | null>(null);
   const [windowContext] = React.useState<"main" | "popup">(() => {
     if (typeof window === "undefined") return "main";
     return Boolean(window.opener) || window.name === "doze52_oauth"
@@ -279,8 +277,9 @@ export default function HomePage() {
   const [todayIso, setTodayIso] = React.useState<string>("");
   const lastSyncedHashRef = React.useRef<string>("");
   const saveTimerRef = React.useRef<number | null>(null);
-  const syncNoticeTimerRef = React.useRef<number | null>(null);
   const previousSessionUserIdRef = React.useRef<string | null>(null);
+  const hadSyncIssueRef = React.useRef(false);
+  const lastSyncIssueKeyRef = React.useRef<string | null>(null);
   const profilesRef = React.useRef(profiles);
   const categoriesRef = React.useRef(categories);
   const eventsRef = React.useRef(events);
@@ -291,28 +290,48 @@ export default function HomePage() {
     eventsRef.current = events;
   }, [profiles, categories, events]);
 
-  React.useEffect(() => {
-    return () => {
-      if (syncNoticeTimerRef.current !== null) {
-        window.clearTimeout(syncNoticeTimerRef.current);
-      }
-    };
-  }, []);
-
   const editingEvent = editingId ? getEventById(editingId) : null;
   const renderEvents = React.useMemo(() => expandEventsForYear(events, year), [events, year]);
   const showSyncNotice = React.useCallback(
     (tone: "success" | "info", message: string, durationMs = 1800) => {
-      setSyncNotice({ tone, message });
-      if (syncNoticeTimerRef.current !== null) {
-        window.clearTimeout(syncNoticeTimerRef.current);
-      }
-      syncNoticeTimerRef.current = window.setTimeout(() => {
-        setSyncNotice(null);
-      }, durationMs);
+      notify({
+        tone,
+        title: message,
+        durationMs,
+      });
     },
-    []
+    [notify]
   );
+
+  React.useEffect(() => {
+    if (windowContext !== "main") return;
+
+    if (syncError) {
+      const errorKey = `${syncError.kind}:${syncError.code ?? ""}:${syncError.message}`;
+      if (lastSyncIssueKeyRef.current !== errorKey) {
+        notify({
+          tone: "error",
+          title: "Sincronização pausada",
+          description: SYNC_HINT_BY_KIND[syncError.kind] ?? syncError.message,
+          durationMs: 3800,
+        });
+        lastSyncIssueKeyRef.current = errorKey;
+      }
+      hadSyncIssueRef.current = true;
+      return;
+    }
+
+    lastSyncIssueKeyRef.current = null;
+    if (hadSyncIssueRef.current && remoteReady) {
+      notify({
+        tone: "success",
+        title: "Sincronização restabelecida",
+        description: "Seus dados voltaram a ser salvos normalmente.",
+        durationMs: 2200,
+      });
+      hadSyncIssueRef.current = false;
+    }
+  }, [notify, remoteReady, syncError, windowContext]);
 
   React.useEffect(() => {
     if (windowContext !== "popup") return;
@@ -483,6 +502,8 @@ export default function HomePage() {
       setSyncError(null);
       lastSyncedHashRef.current = "";
       previousSessionUserIdRef.current = null;
+      hadSyncIssueRef.current = false;
+      lastSyncIssueKeyRef.current = null;
       return;
     }
     previousSessionUserIdRef.current = currentUserId;
@@ -671,9 +692,34 @@ export default function HomePage() {
   };
 
   const handleSubmit = async (payload: EventInput) => {
-    if (editingId) updateEvent(editingId, payload);
-    else addEvent(payload);
+    if (editingId) {
+      updateEvent(editingId, payload);
+      notify({
+        tone: "success",
+        title: "Evento atualizado",
+        description: "As alterações já foram aplicadas ao calendário.",
+      });
+      return;
+    }
+    addEvent(payload);
+    notify({
+      tone: "success",
+      title: "Evento criado",
+      description: "O novo evento já aparece no calendário.",
+    });
   };
+
+  const handleDeleteEvent = React.useCallback(() => {
+    if (!editingId) return;
+    deleteEvent(editingId);
+    notify({
+      tone: "success",
+      title: "Evento excluído",
+      description: "O calendário foi atualizado.",
+    });
+    setDialogAnchorPoint(undefined);
+    setDialogOpen(false);
+  }, [deleteEvent, editingId, notify]);
 
   const handleStartCreateRange = (startIso: string) => {
     setCreatingRange({ startIso, hoverIso: startIso, isDragging: false });
@@ -771,8 +817,8 @@ export default function HomePage() {
       </div>
       {syncError ? (
         <div className="mt-3 flex justify-center">
-          <div className="flex max-w-xl flex-col items-center gap-2 rounded-2xl border border-red-200/80 bg-red-50/80 px-4 py-3 text-center shadow-sm dark:border-red-500/25 dark:bg-red-500/10">
-            <div className="space-y-0.5">
+          <div className="flex max-w-xl flex-col gap-3 rounded-2xl border border-red-200/80 bg-red-50/88 px-4 py-3.5 text-left shadow-sm dark:border-red-500/25 dark:bg-red-500/10">
+            <div className="space-y-1">
               <p className="text-sm font-medium text-red-700 dark:text-red-200">
                 {syncError.message}
               </p>
@@ -815,13 +861,7 @@ export default function HomePage() {
         anchorPoint={dialogAnchorPoint}
         onSubmit={handleSubmit}
         onDelete={
-          editingId
-            ? () => {
-                deleteEvent(editingId);
-                setDialogAnchorPoint(undefined);
-                setDialogOpen(false);
-              }
-            : undefined
+          editingId ? handleDeleteEvent : undefined
         }
       />
       <AuthDialog
@@ -834,23 +874,6 @@ export default function HomePage() {
         }}
         anchorPoint={authDialogAnchorPoint}
       />
-      {syncNotice ? (
-        <div
-          className="pointer-events-none fixed inset-x-0 bottom-4 z-40 flex justify-center px-4"
-          aria-live="polite"
-        >
-          <div
-            role="status"
-            className={`rounded-full border px-4 py-2 text-xs font-medium shadow-lg backdrop-blur ${
-              syncNotice.tone === "success"
-                ? "border-emerald-200/90 bg-emerald-50/95 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-200"
-                : "border-border/80 bg-background/95 text-foreground"
-            }`}
-          >
-            {syncNotice.message}
-          </div>
-        </div>
-      ) : null}
     </main>
   );
 }

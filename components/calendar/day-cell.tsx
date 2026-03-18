@@ -31,11 +31,11 @@ export function DayCell({
     return (
       <div
         data-day-iso={dateIso}
-        className={`w-full bg-neutral-200 ${
+        className={`w-full transition-colors ${
           isPast
-            ? "dark:bg-[hsl(var(--cal-cell-outside-past))]"
-            : "dark:bg-[hsl(var(--cal-cell-outside))]"
-        } ${isDropActive ? "ring-1 ring-inset ring-border bg-foreground/10" : ""}`}
+            ? "bg-neutral-100/75 dark:bg-[hsl(var(--cal-cell-outside-past))]"
+            : "bg-neutral-50/70 dark:bg-[hsl(var(--cal-cell-outside))]"
+        } ${isDropActive ? "ring-1 ring-inset ring-border bg-foreground/8" : ""}`}
         style={{ minHeight: `${minHeightPx}px` }}
         onDragOver={(e) => {
           if (!onDayHover) return;
@@ -58,11 +58,11 @@ export function DayCell({
   const today = dateIso === todayIso;
   const dayToneClass = isPast
     ? isWeekend
-      ? "bg-neutral-200/85 dark:bg-[hsl(var(--cal-cell-weekend-past))]"
-      : "bg-neutral-100/90 dark:bg-[hsl(var(--cal-cell-weekday-past))]"
+      ? "bg-neutral-100/90 dark:bg-[hsl(var(--cal-cell-weekend-past))]"
+      : "bg-neutral-50/95 dark:bg-[hsl(var(--cal-cell-weekday-past))]"
     : isWeekend
-      ? "bg-neutral-100 dark:bg-[hsl(var(--cal-cell-weekend))]"
-      : "bg-neutral-50/95 dark:bg-[hsl(var(--cal-cell-weekday))]";
+      ? "bg-neutral-50/98 dark:bg-[hsl(var(--cal-cell-weekend))]"
+      : "bg-white dark:bg-[hsl(var(--cal-cell-weekday))]";
   const dayNumberToneClass = isWeekend
     ? "text-muted-foreground dark:text-neutral-300"
     : "text-muted-foreground dark:text-neutral-200";
@@ -73,14 +73,18 @@ export function DayCell({
       data-day-iso={dateIso}
       className={`group flex w-full cursor-pointer flex-col px-1 py-1 ring-1 ring-inset transition-[background-color,box-shadow] duration-150 ${dayToneClass} ${
         today
-          ? "ring-neutral-900 shadow-[inset_0_0_0_1px_rgba(23,23,23,0.08)] dark:ring-neutral-100 dark:shadow-none"
-          : "ring-transparent hover:bg-white hover:ring-neutral-400/75 hover:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.45)] dark:hover:bg-white/4 dark:hover:ring-neutral-500/70"
+          ? "ring-neutral-900 shadow-[inset_0_0_0_1px_rgba(23,23,23,0.06)] dark:ring-neutral-100 dark:shadow-none"
+          : "ring-transparent hover:bg-white hover:ring-neutral-300/90 hover:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.5),0_10px_18px_-18px_rgba(15,23,42,0.3)] dark:hover:bg-white/5 dark:hover:ring-neutral-500/65"
       } ${
         isRangeSelected
-          ? "bg-neutral-300/45 ring-neutral-500/80 dark:bg-neutral-700/45 dark:ring-neutral-500/85"
+          ? "bg-neutral-300/35 ring-neutral-400/80 dark:bg-neutral-700/45 dark:ring-neutral-500/85"
           : ""
-      } ${isRangeStart || isRangeEnd ? "ring-neutral-700 shadow-[inset_0_0_0_1px_rgba(38,38,38,0.12)] dark:ring-neutral-300 dark:shadow-none" : ""} ${
-        isDropActive ? "bg-foreground/10 ring-border" : ""
+      } ${
+        isRangeStart || isRangeEnd
+          ? "ring-neutral-700 shadow-[inset_0_0_0_1px_rgba(38,38,38,0.12)] dark:ring-neutral-300 dark:shadow-none"
+          : ""
+      } ${
+        isDropActive ? "bg-foreground/8 ring-border" : ""
       } select-none`}
       style={{ minHeight: `${minHeightPx}px` }}
       onDragOver={(e) => {
@@ -96,7 +100,7 @@ export function DayCell({
         onDayDrop(dateIso, e.dataTransfer);
       }}
     >
-      <div className={`grid h-5 w-full flex-none place-items-center px-0.5 text-[11px] ${dayNumberToneClass}`}>
+      <div className={`grid h-6 w-full flex-none place-items-center px-0.5 text-[12px] ${dayNumberToneClass}`}>
         <span
           className={`grid h-5 min-w-5 place-items-center rounded-full px-1 text-[12px] font-semibold leading-none tabular-nums transition-colors ${
             today
@@ -107,7 +111,7 @@ export function DayCell({
           {date.getDate()}
         </span>
       </div>
-      <div className="mt-0.5 flex-1" />
+      <div className="mt-1 flex-1" />
     </div>
   );
 }

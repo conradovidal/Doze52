@@ -24,8 +24,9 @@ import { logDevError, logProdError } from "@/lib/safe-log";
 import { ValidationError, validateEventInput } from "@/lib/validation";
 
 const CHIP_TRIGGER_CLASS =
-  "h-9 w-full rounded-xl border px-3 text-sm shadow-none transition-colors";
-const FIELD_LABEL_CLASS = "text-[12px] font-medium text-foreground/70";
+  "h-10 w-full rounded-xl border px-3 text-sm shadow-sm transition-colors";
+const FIELD_LABEL_CLASS =
+  "text-[12px] font-semibold tracking-[-0.01em] text-foreground/78";
 
 type RecurrenceDraft = "none" | RecurrenceType;
 
@@ -180,7 +181,7 @@ export function EventDialog({
         anchorPoint={anchorPoint}
         desktopPlacement="right-start"
         mobileMode="sheet"
-        className="sm:max-w-[460px] p-4 sm:p-5"
+        className="sm:max-w-[520px] p-5 sm:p-6"
       >
         <DialogHeader>
           <DialogTitle>{initialEvent ? "Editar evento" : "Novo evento"}</DialogTitle>
@@ -189,79 +190,18 @@ export function EventDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-5">
           <div className="space-y-1.5">
             <label htmlFor="event-title" className={FIELD_LABEL_CLASS}>
               Título do evento
             </label>
             <Input
               id="event-title"
-              className="h-10 rounded-xl"
+              className="h-10 rounded-xl text-[15px]"
               placeholder="Ex.: Reunião de planejamento"
               value={title}
               onChange={(event) => setTitle(event.target.value)}
             />
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="space-y-1">
-              <label className={FIELD_LABEL_CLASS}>Perfil</label>
-              <Select value={profileId} onValueChange={handleProfileSelect}>
-                <SelectTrigger
-                  size="sm"
-                  className={`${CHIP_TRIGGER_CLASS} border-border/80 bg-background text-foreground shadow-sm hover:bg-muted`}
-                >
-                  <span className="inline-flex min-w-0 items-center gap-1.5 pr-2">
-                    {currentProfile ? <ProfileIcon icon={currentProfile.icon} size={12} /> : null}
-                    <span className="truncate">{currentProfile?.name ?? "Perfil"}</span>
-                  </span>
-                </SelectTrigger>
-                <SelectContent position="popper" side="bottom" align="start">
-                  {profileOptions.map((profile) => (
-                    <SelectItem key={profile.id} value={profile.id}>
-                      <span className="inline-flex items-center gap-2">
-                        <ProfileIcon icon={profile.icon} size={12} />
-                        {profile.name}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1">
-              <label className={FIELD_LABEL_CLASS}>Categoria</label>
-              <Select value={categoryId} onValueChange={setCategoryId}>
-                <SelectTrigger
-                  size="sm"
-                  className={`${CHIP_TRIGGER_CLASS} border-border/80 bg-background text-foreground shadow-sm hover:bg-muted`}
-                  disabled={categoriesForProfile.length === 0}
-                >
-                  <span className="inline-flex min-w-0 items-center gap-1.5 pr-2">
-                    <span
-                      className="h-2.5 w-2.5 rounded-full"
-                      style={{ backgroundColor: currentCategory?.color ?? "#9ca3af" }}
-                    />
-                    <span className="truncate">
-                      {currentCategory?.name ?? "Sem categoria"}
-                    </span>
-                  </span>
-                </SelectTrigger>
-                <SelectContent position="popper" side="bottom" align="start">
-                  {categoriesForProfile.map((category) => (
-                    <SelectItem key={category.id} value={category.id}>
-                      <span className="inline-flex items-center gap-2">
-                        <span
-                          className="h-2.5 w-2.5 rounded-full"
-                          style={{ backgroundColor: category.color }}
-                        />
-                        {category.name}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -299,6 +239,67 @@ export function EventDialog({
             </div>
           </div>
 
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="space-y-1">
+              <label className={FIELD_LABEL_CLASS}>Perfil</label>
+              <Select value={profileId} onValueChange={handleProfileSelect}>
+                <SelectTrigger
+                  size="sm"
+                  className={`${CHIP_TRIGGER_CLASS} border-border/80 bg-background text-foreground hover:bg-muted/70`}
+                >
+                  <span className="inline-flex min-w-0 items-center gap-1.5 pr-2">
+                    {currentProfile ? <ProfileIcon icon={currentProfile.icon} size={12} /> : null}
+                    <span className="truncate">{currentProfile?.name ?? "Perfil"}</span>
+                  </span>
+                </SelectTrigger>
+                <SelectContent position="popper" side="bottom" align="start">
+                  {profileOptions.map((profile) => (
+                    <SelectItem key={profile.id} value={profile.id}>
+                      <span className="inline-flex items-center gap-2">
+                        <ProfileIcon icon={profile.icon} size={12} />
+                        {profile.name}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1">
+              <label className={FIELD_LABEL_CLASS}>Categoria</label>
+              <Select value={categoryId} onValueChange={setCategoryId}>
+                <SelectTrigger
+                  size="sm"
+                  className={`${CHIP_TRIGGER_CLASS} border-border/80 bg-background text-foreground hover:bg-muted/70`}
+                  disabled={categoriesForProfile.length === 0}
+                >
+                  <span className="inline-flex min-w-0 items-center gap-1.5 pr-2">
+                    <span
+                      className="h-2.5 w-2.5 rounded-full"
+                      style={{ backgroundColor: currentCategory?.color ?? "#9ca3af" }}
+                    />
+                    <span className="truncate">
+                      {currentCategory?.name ?? "Sem categoria"}
+                    </span>
+                  </span>
+                </SelectTrigger>
+                <SelectContent position="popper" side="bottom" align="start">
+                  {categoriesForProfile.map((category) => (
+                    <SelectItem key={category.id} value={category.id}>
+                      <span className="inline-flex items-center gap-2">
+                        <span
+                          className="h-2.5 w-2.5 rounded-full"
+                          style={{ backgroundColor: category.color }}
+                        />
+                        {category.name}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
           <div className="space-y-1">
             <label htmlFor="event-notes" className={FIELD_LABEL_CLASS}>
               Descrição
@@ -313,9 +314,9 @@ export function EventDialog({
             />
           </div>
 
-          <div className="space-y-2 rounded-2xl border border-border/70 bg-muted/30 p-3">
+          <div className="space-y-2.5 rounded-2xl border border-border/70 bg-muted/25 p-3.5">
             <div className="space-y-0.5">
-              <p className="text-[12px] font-medium text-foreground/70">Recorrência</p>
+              <p className={FIELD_LABEL_CLASS}>Recorrência</p>
               <p className="text-xs text-muted-foreground">
                 Use apenas quando esse evento se repetir ao longo do ano.
               </p>

@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { useFeedback } from "@/components/ui/feedback-provider";
 import {
   Dialog,
   DialogContent,
@@ -26,6 +27,7 @@ export function AuthDialog({
   anchorPoint?: AnchorPoint;
 }) {
   const router = useRouter();
+  const { notify } = useFeedback();
   const {
     signInWithPassword,
     signUpWithPassword,
@@ -78,10 +80,15 @@ export function AuthDialog({
       clearPopupTimers();
       setPendingGooglePopup(false);
       setError(null);
+      notify({
+        tone: "success",
+        title: "Login concluído",
+        description: "Sua conta já está pronta para sincronizar.",
+      });
       router.refresh();
       onOpenChange(false);
     },
-    [clearPopupTimers, onOpenChange, refreshSessionFromClient, router]
+    [clearPopupTimers, notify, onOpenChange, refreshSessionFromClient, router]
   );
 
   const finalizeAuthError = React.useCallback(
@@ -256,8 +263,30 @@ export function AuthDialog({
     try {
       if (mode === "login") await signInWithPassword(email, password);
       else await signUpWithPassword(email, password);
+      notify({
+        tone: "success",
+        title: mode === "login" ? "Login concluído" : "Conta criada",
+        description:
+          mode === "login"
+            ? "Sua conta já está conectada ao Doze52."
+            : "Sua conta foi criada com sucesso.",
+      });
       onOpenChange(false);
     } catch (err) {
+      if (
+        mode === "signup" &&
+        err instanceof Error &&
+        err.message === "Conta criada. Confirme seu email para continuar."
+      ) {
+        notify({
+          tone: "info",
+          title: "Conta criada",
+          description: "Confira seu email para concluir o acesso.",
+          durationMs: 3200,
+        });
+        onOpenChange(false);
+        return;
+      }
       setError(
         err instanceof Error
           ? mapAuthError(err.message)

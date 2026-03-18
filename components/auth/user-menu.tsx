@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Download, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useFeedback } from "@/components/ui/feedback-provider";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useAuth } from "@/lib/auth";
 import { exportUserData, saveSnapshot } from "@/lib/sync";
@@ -10,16 +11,15 @@ import { logDevError, logProdError } from "@/lib/safe-log";
 import { useStore } from "@/lib/store";
 
 export function UserMenu() {
+  const { notify } = useFeedback();
   const { session, signOut } = useAuth();
   const profiles = useStore((state) => state.profiles);
   const categories = useStore((state) => state.categories);
   const events = useStore((state) => state.events);
+  const [open, setOpen] = useState(false);
   const [brokenAvatar, setBrokenAvatar] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
-  const [exportError, setExportError] = useState<string | null>(null);
-  const [signOutError, setSignOutError] = useState<string | null>(null);
-  const [exportSuccess, setExportSuccess] = useState<string | null>(null);
 
   const metadata = session?.user.metadata ?? {};
   const fullName =
@@ -48,9 +48,14 @@ export function UserMenu() {
   const handleSignOut = async () => {
     try {
       setIsSigningOut(true);
-      setSignOutError(null);
       await saveSnapshot({ profiles, categories, events });
+      setOpen(false);
       await signOut();
+      notify({
+        tone: "info",
+        title: "Sessão encerrada",
+        description: "Seus dados locais foram preservados antes de sair.",
+      });
     } catch (error) {
       const message =
         error instanceof Error
@@ -58,14 +63,18 @@ export function UserMenu() {
           : "Nao foi possivel salvar antes de sair. Tente novamente.";
       logDevError("user-menu.sign-out", { message });
       logProdError("Falha ao salvar dados antes do logout.");
-      setSignOutError("Nao foi possivel salvar antes de sair. Tente novamente.");
+      notify({
+        tone: "error",
+        title: "Nao foi possivel sair agora",
+        description: "Falhou ao salvar seus dados antes do logout.",
+      });
     } finally {
       setIsSigningOut(false);
     }
   };
 
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
@@ -105,10 +114,13 @@ export function UserMenu() {
               onClick={async () => {
                 try {
                   setIsExporting(true);
-                  setExportError(null);
-                  setExportSuccess(null);
                   await exportUserData();
-                  setExportSuccess("Exportação iniciada com sucesso.");
+                  setOpen(false);
+                  notify({
+                    tone: "success",
+                    title: "Exportação iniciada",
+                    description: "Seu arquivo será preparado e baixado em seguida.",
+                  });
                 } catch (error) {
                   const message =
                     error instanceof Error
@@ -116,7 +128,11 @@ export function UserMenu() {
                       : "Falhou ao exportar. Tente novamente.";
                   logDevError("user-menu.export", { message });
                   logProdError("Falha ao exportar dados do usuario.");
-                  setExportError("Falhou ao exportar. Tente novamente.");
+                  notify({
+                    tone: "error",
+                    title: "Falha ao exportar",
+                    description: "Tente novamente em instantes.",
+                  });
                 } finally {
                   setIsExporting(false);
                 }
@@ -134,24 +150,9 @@ export function UserMenu() {
               disabled={isSigningOut}
             >
               <LogOut size={14} className="mr-2" />
-              {isSigningOut ? "Salvando..." : "Sair"}
+              {isSigningOut ? "Saindo..." : "Sair"}
             </Button>
           </div>
-          {exportSuccess ? (
-            <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200">
-              {exportSuccess}
-            </p>
-          ) : null}
-          {exportError ? (
-            <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
-              {exportError}
-            </p>
-          ) : null}
-          {signOutError ? (
-            <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
-              {signOutError}
-            </p>
-          ) : null}
         </div>
       </PopoverContent>
     </Popover>

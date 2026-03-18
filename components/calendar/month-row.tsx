@@ -340,16 +340,18 @@ export function MonthRow({
   }
 
   return (
-    <div className="flex items-stretch border-b border-border/65 last:border-b-0">
+    <div className="flex items-stretch border-b border-border/70 last:border-b-0">
       <div
-        className="flex w-11 flex-none items-start justify-start border-r border-border/60 bg-muted/45 px-2 py-3 text-muted-foreground md:w-12"
+        className="flex w-12 flex-none items-center justify-center border-r border-border/65 bg-[linear-gradient(180deg,rgba(255,255,255,0.76),rgba(244,244,245,0.92))] px-2 py-3 text-muted-foreground dark:bg-[linear-gradient(180deg,rgba(38,38,38,0.9),rgba(28,28,30,0.98))] md:w-[3.25rem]"
         style={{ minHeight: `${minHeightPx}px` }}
       >
-        <span className="text-[11px] font-semibold uppercase tracking-[0.14em]">{monthLabel}</span>
+        <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-foreground/78">
+          {monthLabel}
+        </span>
       </div>
 
       <div
-        className="relative w-full flex-1 bg-card/40"
+        className="relative w-full flex-1 bg-card/55"
         onDragOver={(e) => {
           const dragPayload = readCalendarEventDndPayload(e.dataTransfer);
           const hasTransferType = hasCalendarEventDndPayloadType(e.dataTransfer);
@@ -422,8 +424,10 @@ export function MonthRow({
             <div
               key={`${monthIndex}-${day.col}`}
               className={`border-l ${
-                day.col % 7 === 1 ? "border-border/85" : "border-border/45"
-              } ${day.col === COLUMNS ? "border-r border-border/70" : ""}`}
+                day.col % 7 === 1
+                  ? "border-border/85 shadow-[-1px_0_0_rgba(255,255,255,0.32)]"
+                  : "border-border/30"
+              } ${day.col === COLUMNS ? "border-r border-border/55" : ""}`}
             >
               <DayCell
                 date={day.date}
@@ -451,7 +455,7 @@ export function MonthRow({
           <div className="pointer-events-none absolute inset-x-0 top-0 z-[6]">
             <div className="grid" style={{ gridTemplateColumns: "repeat(37, minmax(0, 1fr))" }}>
               <div
-                className="rounded-sm bg-foreground/10 ring-1 ring-inset ring-border"
+                className="rounded-md bg-foreground/8 ring-1 ring-inset ring-border/80"
                 style={{
                   gridColumn: `${rangeColumns.startCol} / ${rangeColumns.endCol + 1}`,
                   minHeight: `${minHeightPx}px`,
@@ -535,7 +539,7 @@ export function MonthRow({
 
             {projectedMultiPreview ? (
               <div
-                className={`${EVENT_ITEM_RADIUS_CLASS} pointer-events-none z-20 bg-foreground/12 ring-1 ring-border/90`}
+                className={`${EVENT_ITEM_RADIUS_CLASS} pointer-events-none z-20 bg-foreground/8 ring-1 ring-border/80`}
                 style={{
                   gridColumn: `${projectedMultiPreview.startCol} / ${
                     projectedMultiPreview.endCol + 1
@@ -695,7 +699,7 @@ export function MonthRow({
                           style={{ top: `${previewLane * EVENT_ROW_STEP}px` }}
                         >
                           <div
-                            className={`${EVENT_ITEM_RADIUS_CLASS} bg-foreground/10 ring-1 ring-border/80`}
+                            className={`${EVENT_ITEM_RADIUS_CLASS} bg-foreground/8 ring-1 ring-border/75`}
                             style={{ minHeight: `${EVENT_ITEM_HEIGHT_PX}px` }}
                           />
                         </div>
@@ -755,7 +759,7 @@ export function MonthRow({
                       })}
                       {showMoveGhost && moveGhostLane !== null ? (
                         <div
-                          className={`absolute inset-x-0 z-20 ${EVENT_ITEM_RADIUS_CLASS} pointer-events-none bg-foreground/12 ring-1 ring-border/90`}
+                          className={`absolute inset-x-0 z-20 ${EVENT_ITEM_RADIUS_CLASS} pointer-events-none bg-foreground/8 ring-1 ring-border/80`}
                           style={{
                             top: `${moveGhostLane * EVENT_ROW_STEP}px`,
                             minHeight: `${EVENT_ITEM_HEIGHT_PX}px`,

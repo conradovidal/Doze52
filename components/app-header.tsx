@@ -45,7 +45,7 @@ export function AppHeader({
         <div className="min-w-0 justify-self-end">
           <div className="flex flex-wrap items-center justify-end gap-2">
             <Select value={String(year)} onValueChange={(v) => onYearChange(Number(v))}>
-              <SelectTrigger className="h-9 min-w-[86px] rounded-full border-border/80 bg-background px-3 text-base font-medium text-foreground shadow-sm hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/60 md:text-[1.05rem] [&_svg]:opacity-70 [&_svg]:text-muted-foreground">
+              <SelectTrigger className="h-9 min-w-[86px] rounded-full border-border/80 bg-background px-3 text-[0.98rem] font-medium text-foreground shadow-sm hover:bg-muted/80 focus-visible:ring-2 focus-visible:ring-ring/60 md:text-[1rem] [&_svg]:opacity-70 [&_svg]:text-muted-foreground">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -62,7 +62,7 @@ export function AppHeader({
               variant="outline"
               size="icon-sm"
               className={`h-9 w-9 rounded-full border-border/80 bg-background text-muted-foreground shadow-sm transition-colors ${
-                organizeOpen ? "bg-muted text-foreground" : "hover:bg-muted hover:text-foreground"
+                organizeOpen ? "bg-muted/90 text-foreground" : "hover:bg-muted/80 hover:text-foreground"
               }`}
               onClick={() => setOrganizeOpen(true)}
               aria-label="Organizar perfis e categorias"

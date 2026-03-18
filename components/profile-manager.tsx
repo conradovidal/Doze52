@@ -37,6 +37,9 @@ type ProfileManagerProps = {
   intent?: ProfileManagerIntent;
 };
 
+const FIELD_LABEL_CLASS =
+  "text-[12px] font-semibold tracking-[-0.01em] text-foreground/78";
+
 export function ProfileManager({
   open,
   onOpenChange,
@@ -234,21 +237,21 @@ export function ProfileManager({
         onOpenChange(nextOpen);
       }}
     >
-      <DialogContent className="sm:max-w-[460px] p-4 sm:p-5">
+      <DialogContent className="sm:max-w-[480px] p-5 sm:p-6">
         <DialogHeader>
           <DialogTitle>{isEditMode ? "Editar perfil" : "Novo perfil"}</DialogTitle>
           <DialogDescription>
-            Defina nome e icone. A gestao do perfil deve ser rapida e consistente com o resto do produto.
+            Defina nome e icone de forma rapida e consistente com o restante do produto.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-5">
           <div className="flex items-center gap-2.5">
-            <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-neutral-200 bg-neutral-100 text-neutral-700 shadow-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200">
+            <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border/80 bg-muted/40 text-foreground shadow-sm">
               <ProfileIcon icon={icon} size={18} />
             </div>
             <div className="min-w-0 flex-1">
-              <label htmlFor="profile-name" className="mb-1.5 block text-[12px] font-medium text-foreground/70">
+              <label htmlFor="profile-name" className={`mb-1.5 block ${FIELD_LABEL_CLASS}`}>
                 Nome do perfil
               </label>
               <Input
@@ -262,7 +265,7 @@ export function ProfileManager({
           </div>
 
           <div className="space-y-2">
-            <div className="text-[12px] font-medium text-foreground/70">Icone</div>
+            <div className={FIELD_LABEL_CLASS}>Icone</div>
             <div className="grid grid-cols-4 gap-2">
             {PROFILE_ICON_OPTIONS.map((option) => {
               const selected = option.id === icon;
@@ -275,8 +278,8 @@ export function ProfileManager({
                   title={option.label}
                   className={`inline-flex h-10 items-center justify-center rounded-xl border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-300 ${
                     selected
-                      ? "border-neutral-900 bg-neutral-900 text-neutral-50 shadow-sm dark:border-neutral-100 dark:bg-neutral-100 dark:text-neutral-900"
-                      : "border-neutral-200 bg-neutral-50 text-neutral-600 hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                      ? "border-foreground/80 bg-foreground text-background shadow-sm"
+                      : "border-border/80 bg-muted/25 text-muted-foreground hover:bg-muted/60 hover:text-foreground"
                   }`}
                 >
                   <ProfileIcon icon={option.id} size={18} />
@@ -322,11 +325,11 @@ export function ProfileManager({
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
-          <p className="text-sm text-neutral-600 dark:text-neutral-300">
+            <p className="text-sm text-muted-foreground">
             As categorias deste perfil serao reatribuidas para:
-          </p>
+            </p>
           <Select value={deleteTargetProfileId} onValueChange={setDeleteTargetProfileId}>
-            <SelectTrigger>
+            <SelectTrigger className="h-10 rounded-xl border-border/80 bg-background shadow-sm">
               <SelectValue placeholder="Selecione o perfil de destino" />
             </SelectTrigger>
             <SelectContent>
