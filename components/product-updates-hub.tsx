@@ -1148,10 +1148,7 @@ export function ProductUpdatesHub({
       <FrozenCalendarBackdrop />
       <div className="absolute inset-0 bg-background/22 backdrop-blur-[8px] dark:bg-background/28" />
 
-      <div
-        data-calendar-focus-root
-        className="relative z-10 mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8"
-      >
+      <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
         <section className="overflow-hidden rounded-[2rem] border border-border/70 bg-background/76 shadow-[0_30px_120px_-60px_rgba(15,23,42,0.65)] backdrop-blur-2xl">
           <div className="flex items-start justify-end px-4 pt-4 sm:px-6 sm:pt-5">
             <Link
