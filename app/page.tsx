@@ -241,6 +241,9 @@ export default function HomePage() {
   const moveEventByDelta = useStore((s) => s.moveEventByDelta);
   const normalizeDayOrder = useStore((s) => s.normalizeDayOrder);
   const getEventById = useStore((s) => s.getEventById);
+  const resetCalendarFocusOnYearChange = useStore(
+    (s) => s.resetCalendarFocusOnYearChange
+  );
   const { session, loading: authLoading } = useAuth();
 
   const [dialogOpen, setDialogOpen] = React.useState(false);
@@ -767,6 +770,14 @@ export default function HomePage() {
       ? formatSyncDebugDetail(syncError)
       : null;
 
+  const handleYearChange = React.useCallback(
+    (nextYear: number) => {
+      setYear(nextYear);
+      resetCalendarFocusOnYearChange();
+    },
+    [resetCalendarFocusOnYearChange]
+  );
+
   if (windowContext === "popup") {
     return (
       <main className="flex min-h-screen items-center justify-center px-4">
@@ -780,7 +791,7 @@ export default function HomePage() {
       <div className="sticky top-0 z-30 -mx-4 px-4 pb-2 bg-background/92 backdrop-blur supports-[backdrop-filter]:bg-background/82 md:static md:mx-0 md:px-0 md:pb-0 md:bg-transparent md:backdrop-blur-none">
         <AppHeader
           year={year}
-          onYearChange={setYear}
+          onYearChange={handleYearChange}
           authLoading={authLoading}
           isAuthenticated={Boolean(session)}
           onOpenAuthDialog={(anchorPoint) => {
@@ -795,11 +806,8 @@ export default function HomePage() {
         </p>
       ) : null}
 
-      <div className="overflow-x-auto md:overflow-visible">
-        <div
-          data-calendar-focus-root
-          className="w-[190%] min-[420px]:w-[175%] md:w-full"
-        >
+      <div className="overflow-x-auto pb-1 md:overflow-visible">
+        <div data-calendar-focus-root>
           <YearGrid
             year={year}
             todayIso={todayIso}

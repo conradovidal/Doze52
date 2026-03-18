@@ -24,11 +24,16 @@ export type EventInput = {
   recurrenceUntil?: string;
 };
 
+export type CalendarViewMode = "year" | "quarter" | "month";
+
 type StoreState = {
   profiles: CalendarProfile[];
   selectedProfileIds: string[];
   events: CalendarEvent[];
   categories: CategoryItem[];
+  viewMode: CalendarViewMode;
+  focusedQuarter: 0 | 1 | 2 | 3 | null;
+  focusedMonth: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | null;
   replaceAllData: (payload: {
     profiles: CalendarProfile[];
     categories: CategoryItem[];
@@ -54,6 +59,10 @@ type StoreState = {
   normalizeDayOrder: (dayIso: string, eventIdsInDay: string[]) => void;
   deleteEvent: (id: string) => void;
   getEventById: (id: string) => CalendarEvent | undefined;
+  setCalendarViewMode: (mode: CalendarViewMode) => void;
+  focusQuarter: (quarter: 0 | 1 | 2 | 3) => void;
+  focusMonth: (month: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11) => void;
+  resetCalendarFocusOnYearChange: () => void;
   createCategory: (input: { name: string; color: string; profileId: string }) => string;
   addCategory: (name: string, color: string, profileId?: string) => void;
   updateCategory: (id: string, patch: Partial<Omit<CategoryItem, "id">>) => void;
@@ -456,6 +465,10 @@ const normalizeRecurrenceUntil = (params: {
 const isSingleDayEvent = (evt: Pick<CalendarEvent, "startDate" | "endDate">) =>
   evt.startDate === evt.endDate;
 
+const getQuarterFromMonth = (
+  month: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11
+): 0 | 1 | 2 | 3 => Math.floor(month / 3) as 0 | 1 | 2 | 3;
+
 const nextSingleDayOrder = (events: CalendarEvent[], dayIso: string) => {
   const maxValue = events
     .filter((evt) => isSingleDayEvent(evt) && evt.startDate === dayIso)
@@ -485,6 +498,9 @@ export const useStore = create<StoreState>()(
       selectedProfileIds: ensureSelectedProfileIds(undefined, defaultProfiles),
       events: [],
       categories: getOnboardingDefaultCategories(),
+      viewMode: "year",
+      focusedQuarter: null,
+      focusedMonth: null,
       replaceAllData: ({ profiles, categories, events }) =>
         set((state) => {
           const hasLegacyData = categories.length > 0 || events.length > 0;
@@ -780,6 +796,31 @@ export const useStore = create<StoreState>()(
           events: state.events.filter((evt) => evt.id !== id),
         })),
       getEventById: (id) => get().events.find((evt) => evt.id === id),
+      setCalendarViewMode: (mode) =>
+        set(() => ({
+          viewMode: mode,
+        })),
+      focusQuarter: (quarter) =>
+        set((state) => ({
+          viewMode: "quarter",
+          focusedQuarter: quarter,
+          focusedMonth:
+            state.focusedMonth !== null && getQuarterFromMonth(state.focusedMonth) === quarter
+              ? state.focusedMonth
+              : null,
+        })),
+      focusMonth: (month) =>
+        set(() => ({
+          viewMode: "month",
+          focusedMonth: month,
+          focusedQuarter: getQuarterFromMonth(month),
+        })),
+      resetCalendarFocusOnYearChange: () =>
+        set(() => ({
+          viewMode: "year",
+          focusedQuarter: null,
+          focusedMonth: null,
+        })),
       createCategory: (input) => {
         const name = input.name.trim();
         if (!name) return "";
@@ -902,6 +943,12 @@ export const useStore = create<StoreState>()(
     {
       name: "yiv-store",
       version: 8,
+      partialize: (state): PersistedState => ({
+        profiles: state.profiles,
+        selectedProfileIds: state.selectedProfileIds,
+        categories: state.categories,
+        events: state.events as LegacyEvent[],
+      }),
       migrate: (state: unknown) => {
         const persisted = (state ?? {}) as PersistedState;
         const hasLegacyData =

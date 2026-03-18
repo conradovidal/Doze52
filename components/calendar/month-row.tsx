@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { ChevronRight } from "lucide-react";
 import {
   addDays,
   differenceInCalendarDays,
@@ -35,11 +36,54 @@ import {
   compareEventsByVisualPriority,
   isRenderableEventDateRange,
 } from "@/lib/event-order";
+import { cn } from "@/lib/utils";
 import { DayCell } from "./day-cell";
 import { EventBar } from "./event-bar";
 
 const COLUMNS = 37;
 const EVENT_ROW_STEP = EVENT_ITEM_HEIGHT_PX + EVENT_ITEM_GAP_PX;
+
+type MonthRowDensity = "year" | "quarter" | "month";
+
+const MONTH_LAYOUT_BY_DENSITY: Record<
+  MonthRowDensity,
+  {
+    labelWidthClass: string;
+    monthRowBaseMinHeightPx: number;
+    monthMultiDayTopOffsetPx: number;
+    monthSingleDayTopOffsetNoMultiPx: number;
+    monthEventsMinTopOffsetPx: number;
+    monthRowBottomPaddingPx: number;
+  }
+> = {
+  year: {
+    labelWidthClass:
+      "w-[2.95rem] min-[420px]:w-[3.15rem] md:w-[3.45rem] md:px-2.5",
+    monthRowBaseMinHeightPx: MONTH_ROW_BASE_MIN_HEIGHT_PX + 8,
+    monthMultiDayTopOffsetPx: MONTH_MULTI_DAY_TOP_OFFSET_PX + 2,
+    monthSingleDayTopOffsetNoMultiPx: MONTH_SINGLE_DAY_TOP_OFFSET_NO_MULTI_PX + 2,
+    monthEventsMinTopOffsetPx: MONTH_EVENTS_MIN_TOP_OFFSET_PX + 4,
+    monthRowBottomPaddingPx: MONTH_ROW_BOTTOM_PADDING_PX + 4,
+  },
+  quarter: {
+    labelWidthClass:
+      "w-[3.2rem] min-[420px]:w-[3.45rem] md:w-[3.8rem] md:px-3",
+    monthRowBaseMinHeightPx: MONTH_ROW_BASE_MIN_HEIGHT_PX + 16,
+    monthMultiDayTopOffsetPx: MONTH_MULTI_DAY_TOP_OFFSET_PX + 5,
+    monthSingleDayTopOffsetNoMultiPx: MONTH_SINGLE_DAY_TOP_OFFSET_NO_MULTI_PX + 4,
+    monthEventsMinTopOffsetPx: MONTH_EVENTS_MIN_TOP_OFFSET_PX + 8,
+    monthRowBottomPaddingPx: MONTH_ROW_BOTTOM_PADDING_PX + 8,
+  },
+  month: {
+    labelWidthClass:
+      "w-[3.45rem] min-[420px]:w-[3.7rem] md:w-[4.1rem] md:px-3.5",
+    monthRowBaseMinHeightPx: MONTH_ROW_BASE_MIN_HEIGHT_PX + 24,
+    monthMultiDayTopOffsetPx: MONTH_MULTI_DAY_TOP_OFFSET_PX + 9,
+    monthSingleDayTopOffsetNoMultiPx: MONTH_SINGLE_DAY_TOP_OFFSET_NO_MULTI_PX + 8,
+    monthEventsMinTopOffsetPx: MONTH_EVENTS_MIN_TOP_OFFSET_PX + 12,
+    monthRowBottomPaddingPx: MONTH_ROW_BOTTOM_PADDING_PX + 12,
+  },
+};
 
 type ParsedEvent = CalendarRenderEvent & {
   start: Date;
@@ -61,6 +105,7 @@ export function MonthRow({
   year,
   todayIso,
   monthIndex,
+  density = "year",
   events,
   visibleCategoryIds,
   multiDaySlotById,
@@ -77,10 +122,13 @@ export function MonthRow({
   onDayDrop,
   onSingleDayListHover,
   clearReorderTarget,
+  onDrilldown,
+  drilldownLabel,
 }: {
   year: number;
   todayIso: string;
   monthIndex: number;
+  density?: MonthRowDensity;
   events: CalendarRenderEvent[];
   visibleCategoryIds: string[];
   multiDaySlotById: Map<string, number>;
@@ -109,12 +157,15 @@ export function MonthRow({
   onDayDrop: (dateIso: string, transfer?: DataTransfer | null) => void;
   onSingleDayListHover: (dayIso: string, insertIndex: number) => void;
   clearReorderTarget: () => void;
+  onDrilldown?: () => void;
+  drilldownLabel?: string;
 }) {
   const daysGridRef = React.useRef<HTMLDivElement | null>(null);
   const monthStart = startOfMonth(new Date(year, monthIndex, 1));
   const monthEnd = endOfMonth(monthStart);
   const gridStart = startOfWeek(monthStart, { weekStartsOn: 0 });
   const gridEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
+  const layoutDensity = MONTH_LAYOUT_BY_DENSITY[density];
 
   const days: Date[] = [];
   let cur = gridStart;
@@ -247,16 +298,16 @@ export function MonthRow({
   const hasAnyMultiDayInMonth = maxMultiRows > 0;
   const eventsTopOffset = Math.max(
     hasAnyMultiDayInMonth
-      ? MONTH_MULTI_DAY_TOP_OFFSET_PX
-      : MONTH_SINGLE_DAY_TOP_OFFSET_NO_MULTI_PX,
-    MONTH_EVENTS_MIN_TOP_OFFSET_PX
+      ? layoutDensity.monthMultiDayTopOffsetPx
+      : layoutDensity.monthSingleDayTopOffsetNoMultiPx,
+    layoutDensity.monthEventsMinTopOffsetPx
   );
   const eventBandHeightPx =
     rowsForHeightTotal * EVENT_ITEM_HEIGHT_PX +
     Math.max(0, rowsForHeightTotal - 1) * EVENT_ITEM_GAP_PX;
   const contentHeight =
-    eventsTopOffset + eventBandHeightPx + MONTH_ROW_BOTTOM_PADDING_PX;
-  const minHeightPx = Math.max(MONTH_ROW_BASE_MIN_HEIGHT_PX, contentHeight);
+    eventsTopOffset + eventBandHeightPx + layoutDensity.monthRowBottomPaddingPx;
+  const minHeightPx = Math.max(layoutDensity.monthRowBaseMinHeightPx, contentHeight);
 
   const rangeBounds = React.useMemo(() => {
     if (!creatingRange) return null;
@@ -342,12 +393,30 @@ export function MonthRow({
   return (
     <div className="flex items-stretch border-b border-border/70 last:border-b-0">
       <div
-        className="flex w-[2.65rem] flex-none items-center justify-center border-r border-border/65 bg-[linear-gradient(180deg,rgba(255,255,255,0.76),rgba(244,244,245,0.92))] px-1.5 py-3 text-muted-foreground dark:bg-[linear-gradient(180deg,rgba(38,38,38,0.9),rgba(28,28,30,0.98))] min-[420px]:w-[2.9rem] md:w-[3.25rem] md:px-2"
+        className={cn(
+          "flex flex-none items-center justify-center border-r border-border/65 bg-[linear-gradient(180deg,rgba(255,255,255,0.76),rgba(244,244,245,0.92))] px-1.5 py-3 text-muted-foreground dark:bg-[linear-gradient(180deg,rgba(38,38,38,0.9),rgba(28,28,30,0.98))]",
+          layoutDensity.labelWidthClass
+        )}
         style={{ minHeight: `${minHeightPx}px` }}
       >
-        <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-foreground/78 min-[420px]:text-[11px] min-[420px]:tracking-[0.18em]">
-          {monthLabel}
-        </span>
+        {onDrilldown ? (
+          <button
+            type="button"
+            onClick={onDrilldown}
+            aria-label={drilldownLabel ?? monthLabel}
+            title={drilldownLabel ?? monthLabel}
+            className="group flex h-full w-full items-center justify-center gap-1 rounded-[1rem] px-1.5 py-2 text-foreground/78 transition-colors duration-150 hover:bg-background/72 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+          >
+            <span className="text-[10px] font-semibold uppercase tracking-[0.16em] min-[420px]:text-[11px] min-[420px]:tracking-[0.18em]">
+              {monthLabel}
+            </span>
+            <ChevronRight className="h-3 w-3 opacity-0 transition-all duration-150 group-hover:translate-x-0.5 group-hover:opacity-60 group-focus-visible:translate-x-0.5 group-focus-visible:opacity-60" />
+          </button>
+        ) : (
+          <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-foreground/78 min-[420px]:text-[11px] min-[420px]:tracking-[0.18em]">
+            {monthLabel}
+          </span>
+        )}
       </div>
 
       <div
