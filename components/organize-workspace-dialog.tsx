@@ -31,9 +31,13 @@ import type { CategoryItem } from "@/lib/types";
 const TAB_BASE_CLASS =
   "inline-flex min-h-9 items-center justify-center rounded-full px-3.5 py-2 text-sm font-medium transition-colors";
 const LIST_CARD_CLASS =
-  "rounded-2xl border border-border/80 bg-background/90 p-3 shadow-sm transition-colors";
+  "rounded-[1.5rem] border border-border/75 bg-card/92 p-4 shadow-[0_20px_45px_-34px_rgba(15,23,42,0.22)] transition-colors";
 const ROW_BASE_CLASS =
-  "flex items-center gap-3 rounded-xl border border-border/70 bg-muted/25 px-3 py-2.5 shadow-sm transition-colors";
+  "group flex items-center gap-3 rounded-[1.1rem] border border-border/70 bg-background/80 px-3 py-3 shadow-sm transition-[border-color,box-shadow,background-color]";
+const HANDLE_BUTTON_CLASS =
+  "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground sm:text-muted-foreground";
+const ACTION_GROUP_CLASS =
+  "flex items-center gap-1 rounded-full bg-muted/55 p-1";
 
 const moveInArray = <T extends { id: string }>(items: T[], sourceId: string, targetId: string) => {
   const sourceIndex = items.findIndex((item) => item.id === sourceId);
@@ -175,58 +179,67 @@ export function OrganizeWorkspaceDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="top-auto bottom-3 max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-[calc(100%-1rem)] translate-y-0 overflow-hidden rounded-[1.75rem] px-0 pb-0 pt-5 sm:top-1/2 sm:bottom-auto sm:w-full sm:max-w-[760px] sm:-translate-y-1/2 sm:px-0 sm:pb-0">
-          <DialogHeader className="px-5 sm:px-6">
-            <DialogTitle>Organizar workspace</DialogTitle>
-            <DialogDescription>
-              Gerencie perfis e categorias sem competir com os filtros principais.
-            </DialogDescription>
-          </DialogHeader>
+        <DialogContent className="top-auto bottom-2 max-h-[calc(100dvh-0.5rem)] w-[calc(100%-1rem)] max-w-[calc(100%-1rem)] translate-y-0 overflow-hidden rounded-[1.85rem] border-border/80 bg-background/98 px-0 pb-0 pt-0 shadow-[0_28px_70px_-34px_rgba(15,23,42,0.34)] sm:top-1/2 sm:bottom-auto sm:w-full sm:max-w-[780px] sm:-translate-y-1/2 sm:px-0 sm:pb-0">
+          <div className="sticky top-0 z-10 border-b border-border/60 bg-background/94 px-5 pb-4 pt-5 backdrop-blur sm:px-6">
+            <DialogHeader className="gap-1">
+              <DialogTitle>Organizar workspace</DialogTitle>
+              <DialogDescription>
+                Ajuste perfis e categorias sem poluir a leitura principal do calendario.
+              </DialogDescription>
+            </DialogHeader>
 
-          <div className="flex items-center gap-2 px-5 pt-1 sm:px-6">
-            <button
-              type="button"
-              onClick={() => setActiveTab("profiles")}
-              className={`${TAB_BASE_CLASS} ${
-                activeTab === "profiles"
-                  ? "bg-foreground text-background shadow-sm"
-                  : "bg-muted/70 text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Perfis
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab("categories")}
-              className={`${TAB_BASE_CLASS} ${
-                activeTab === "categories"
-                  ? "bg-foreground text-background shadow-sm"
-                  : "bg-muted/70 text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Categorias
-            </button>
+            <div className="mt-4 inline-flex rounded-full border border-border/80 bg-muted/45 p-1 shadow-sm">
+              <button
+                type="button"
+                onClick={() => setActiveTab("profiles")}
+                aria-pressed={activeTab === "profiles"}
+                className={`${TAB_BASE_CLASS} ${
+                  activeTab === "profiles"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Perfis
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("categories")}
+                aria-pressed={activeTab === "categories"}
+                className={`${TAB_BASE_CLASS} ${
+                  activeTab === "categories"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Categorias
+              </button>
+            </div>
           </div>
 
-          <div className="mt-4 max-h-[calc(100dvh-12rem)] overflow-y-auto px-5 pb-5 sm:max-h-[32rem] sm:px-6 sm:pb-6">
+          <div className="max-h-[calc(100dvh-11rem)] overflow-y-auto px-5 pb-5 pt-4 sm:max-h-[33rem] sm:px-6 sm:pb-6">
             {activeTab === "profiles" ? (
               <section className={LIST_CARD_CLASS}>
-                <div className="mb-3 flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-medium text-foreground">Perfis</p>
-                    <p className="text-xs text-muted-foreground">
-                      Reordene por arraste ou use as setas para ajustar a prioridade visual.
+                <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold text-foreground">Perfis</p>
+                    <p className="max-w-md text-xs leading-5 text-muted-foreground">
+                      Reordene a identidade principal do workspace e ajuste cada perfil sem mexer nos filtros.
                     </p>
                   </div>
-                  <Button variant="outline" size="sm" className="rounded-full" onClick={openCreateProfile}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-9 rounded-full px-3.5 shadow-sm"
+                    onClick={openCreateProfile}
+                  >
                     <Plus className="h-4 w-4" />
                     Novo perfil
                   </Button>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-2.5">
                   {profiles.length === 0 ? (
-                    <div className="rounded-xl border border-dashed border-border/80 px-4 py-6 text-center text-sm text-muted-foreground">
+                    <div className="rounded-[1.15rem] border border-dashed border-border/70 bg-muted/15 px-4 py-8 text-center text-sm text-muted-foreground">
                       Nenhum perfil criado ainda.
                     </div>
                   ) : (
@@ -234,10 +247,15 @@ export function OrganizeWorkspaceDialog({
                       const categoryCount = categories.filter(
                         (category) => category.profileId === profile.id
                       ).length;
+                      const isSelected = selectedProfileIds.includes(profile.id);
                       return (
                         <div
                           key={profile.id}
-                          className={`${ROW_BASE_CLASS} ${dragOverProfileId === profile.id ? "ring-2 ring-ring/35" : ""}`}
+                          className={`${ROW_BASE_CLASS} ${
+                            dragOverProfileId === profile.id
+                              ? "border-ring/45 ring-2 ring-ring/20"
+                              : "hover:border-border/90"
+                          }`}
                           onDragOver={(event) => {
                             event.preventDefault();
                             setDragOverProfileId(profile.id);
@@ -263,30 +281,43 @@ export function OrganizeWorkspaceDialog({
                               setDraggingProfileId(null);
                               setDragOverProfileId(null);
                             }}
-                            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                            className={HANDLE_BUTTON_CLASS}
                             aria-label={`Reordenar perfil ${profile.name}`}
                             title={`Reordenar perfil ${profile.name}`}
                           >
                             <GripVertical className="h-4 w-4" />
                           </button>
 
-                          <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border/80 bg-background text-foreground shadow-sm">
+                          <div className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[1rem] border border-border/80 bg-muted/25 text-foreground shadow-sm">
                             <ProfileIcon icon={profile.icon} size={18} />
                           </div>
 
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-medium text-foreground">{profile.name}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {categoryCount} {categoryCount === 1 ? "categoria" : "categorias"}
-                            </p>
+                          <div className="min-w-0 flex-1 space-y-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="truncate text-sm font-medium text-foreground">
+                                {profile.name}
+                              </p>
+                              {isSelected ? (
+                                <span className="rounded-full border border-border/80 bg-muted/45 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                                  ativo
+                                </span>
+                              ) : null}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                              <span>
+                                {categoryCount} {categoryCount === 1 ? "categoria" : "categorias"}
+                              </span>
+                              <span className="hidden h-1 w-1 rounded-full bg-border sm:inline-block" />
+                              <span className="hidden sm:inline">ordem visivel no topo</span>
+                            </div>
                           </div>
 
-                          <div className="flex items-center gap-1">
+                          <div className={ACTION_GROUP_CLASS}>
                             <Button
                               type="button"
                               variant="ghost"
-                              size="icon-xs"
-                              className="rounded-full"
+                              size="icon-sm"
+                              className="h-8 w-8 rounded-full"
                               onClick={() => moveProfileStep(profile.id, -1)}
                               disabled={index === 0}
                               aria-label={`Mover perfil ${profile.name} para cima`}
@@ -296,8 +327,8 @@ export function OrganizeWorkspaceDialog({
                             <Button
                               type="button"
                               variant="ghost"
-                              size="icon-xs"
-                              className="rounded-full"
+                              size="icon-sm"
+                              className="h-8 w-8 rounded-full"
                               onClick={() => moveProfileStep(profile.id, 1)}
                               disabled={index === profiles.length - 1}
                               aria-label={`Mover perfil ${profile.name} para baixo`}
@@ -307,8 +338,8 @@ export function OrganizeWorkspaceDialog({
                             <Button
                               type="button"
                               variant="ghost"
-                              size="icon-xs"
-                              className="rounded-full"
+                              size="icon-sm"
+                              className="h-8 w-8 rounded-full"
                               onClick={() => openEditProfile(profile.id)}
                               aria-label={`Editar perfil ${profile.name}`}
                             >
@@ -323,17 +354,19 @@ export function OrganizeWorkspaceDialog({
               </section>
             ) : (
               <section className={LIST_CARD_CLASS}>
-                <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                   <div className="flex-1 space-y-1">
-                    <p className="text-sm font-medium text-foreground">Categorias</p>
-                    <p className="text-xs text-muted-foreground">
-                      Escolha um perfil e organize a ordem visual das categorias dele.
+                    <p className="text-sm font-semibold text-foreground">Categorias</p>
+                    <p className="max-w-md text-xs leading-5 text-muted-foreground">
+                      Escolha um perfil e ajuste a ordem visual das categorias exibidas nos filtros.
                     </p>
                   </div>
                   <div className="flex flex-col gap-2 sm:min-w-[260px] sm:flex-row sm:items-center">
                     <Select value={categoryProfileId} onValueChange={setCategoryProfileId}>
                       <SelectTrigger className="h-9 rounded-full border-border/80 bg-background px-3 shadow-sm">
-                        <span className="truncate">{profiles.find((profile) => profile.id === categoryProfileId)?.name ?? "Perfil"}</span>
+                        <span className="truncate">
+                          {profiles.find((profile) => profile.id === categoryProfileId)?.name ?? "Perfil"}
+                        </span>
                       </SelectTrigger>
                       <SelectContent>
                         {profiles.map((profile) => (
@@ -349,7 +382,7 @@ export function OrganizeWorkspaceDialog({
                     <Button
                       variant="outline"
                       size="sm"
-                      className="rounded-full"
+                      className="h-9 rounded-full px-3.5 shadow-sm"
                       disabled={!categoryProfileId}
                       onClick={() => setCategoryCreateOpen(true)}
                     >
@@ -359,20 +392,24 @@ export function OrganizeWorkspaceDialog({
                   </div>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-2.5">
                   {!categoryProfileId ? (
-                    <div className="rounded-xl border border-dashed border-border/80 px-4 py-6 text-center text-sm text-muted-foreground">
+                    <div className="rounded-[1.15rem] border border-dashed border-border/70 bg-muted/15 px-4 py-8 text-center text-sm text-muted-foreground">
                       Crie um perfil antes de organizar categorias.
                     </div>
                   ) : categoriesForProfile.length === 0 ? (
-                    <div className="rounded-xl border border-dashed border-border/80 px-4 py-6 text-center text-sm text-muted-foreground">
+                    <div className="rounded-[1.15rem] border border-dashed border-border/70 bg-muted/15 px-4 py-8 text-center text-sm text-muted-foreground">
                       Nenhuma categoria neste perfil.
                     </div>
                   ) : (
                     categoriesForProfile.map((category, index) => (
                       <div
                         key={category.id}
-                        className={`${ROW_BASE_CLASS} ${dragOverCategoryId === category.id ? "ring-2 ring-ring/35" : ""}`}
+                        className={`${ROW_BASE_CLASS} ${
+                          dragOverCategoryId === category.id
+                            ? "border-ring/45 ring-2 ring-ring/20"
+                            : "hover:border-border/90"
+                        }`}
                         onDragOver={(event) => {
                           event.preventDefault();
                           setDragOverCategoryId(category.id);
@@ -398,7 +435,7 @@ export function OrganizeWorkspaceDialog({
                             setDraggingCategoryId(null);
                             setDragOverCategoryId(null);
                           }}
-                          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                          className={HANDLE_BUTTON_CLASS}
                           aria-label={`Reordenar categoria ${category.name}`}
                           title={`Reordenar categoria ${category.name}`}
                         >
@@ -406,24 +443,28 @@ export function OrganizeWorkspaceDialog({
                         </button>
 
                         <span
-                          className="h-3 w-3 shrink-0 rounded-full ring-1 ring-black/8"
+                          className="h-3.5 w-3.5 shrink-0 rounded-full ring-1 ring-black/8"
                           style={{ backgroundColor: category.color }}
                           aria-hidden="true"
                         />
 
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium text-foreground">{category.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {category.visible ? "Visivel nos filtros" : "Oculta nos filtros"}
+                        <div className="min-w-0 flex-1 space-y-1">
+                          <p className="truncate text-sm font-medium text-foreground">
+                            {category.name}
                           </p>
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                            <span>{category.visible ? "visivel nos filtros" : "oculta nos filtros"}</span>
+                            <span className="hidden h-1 w-1 rounded-full bg-border sm:inline-block" />
+                            <span className="hidden sm:inline">ordem dentro de {profiles.find((profile) => profile.id === category.profileId)?.name ?? "perfil"}</span>
+                          </div>
                         </div>
 
-                        <div className="flex items-center gap-1">
+                        <div className={ACTION_GROUP_CLASS}>
                           <Button
                             type="button"
                             variant="ghost"
-                            size="icon-xs"
-                            className="rounded-full"
+                            size="icon-sm"
+                            className="h-8 w-8 rounded-full"
                             onClick={() => moveCategoryStep(category.id, -1)}
                             disabled={index === 0}
                             aria-label={`Mover categoria ${category.name} para cima`}
@@ -433,8 +474,8 @@ export function OrganizeWorkspaceDialog({
                           <Button
                             type="button"
                             variant="ghost"
-                            size="icon-xs"
-                            className="rounded-full"
+                            size="icon-sm"
+                            className="h-8 w-8 rounded-full"
                             onClick={() => moveCategoryStep(category.id, 1)}
                             disabled={index === categoriesForProfile.length - 1}
                             aria-label={`Mover categoria ${category.name} para baixo`}
@@ -444,8 +485,8 @@ export function OrganizeWorkspaceDialog({
                           <Button
                             type="button"
                             variant="ghost"
-                            size="icon-xs"
-                            className="rounded-full"
+                            size="icon-sm"
+                            className="h-8 w-8 rounded-full"
                             onClick={() => openEditCategory(category.id)}
                             aria-label={`Editar categoria ${category.name}`}
                           >

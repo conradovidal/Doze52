@@ -342,10 +342,10 @@ export function MonthRow({
   return (
     <div className="flex items-stretch border-b border-border/70 last:border-b-0">
       <div
-        className="flex w-12 flex-none items-center justify-center border-r border-border/65 bg-[linear-gradient(180deg,rgba(255,255,255,0.76),rgba(244,244,245,0.92))] px-2 py-3 text-muted-foreground dark:bg-[linear-gradient(180deg,rgba(38,38,38,0.9),rgba(28,28,30,0.98))] md:w-[3.25rem]"
+        className="flex w-[2.65rem] flex-none items-center justify-center border-r border-border/65 bg-[linear-gradient(180deg,rgba(255,255,255,0.76),rgba(244,244,245,0.92))] px-1.5 py-3 text-muted-foreground dark:bg-[linear-gradient(180deg,rgba(38,38,38,0.9),rgba(28,28,30,0.98))] min-[420px]:w-[2.9rem] md:w-[3.25rem] md:px-2"
         style={{ minHeight: `${minHeightPx}px` }}
       >
-        <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-foreground/78">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-foreground/78 min-[420px]:text-[11px] min-[420px]:tracking-[0.18em]">
           {monthLabel}
         </span>
       </div>

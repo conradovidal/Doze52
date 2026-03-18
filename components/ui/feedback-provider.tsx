@@ -46,10 +46,10 @@ const getToastIcon = (tone: FeedbackTone) => {
 
 const getToastClasses = (tone: FeedbackTone) => {
   if (tone === "success") {
-    return "border-emerald-200/90 bg-emerald-50/96 text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/12 dark:text-emerald-100";
+    return "border-emerald-200/80 bg-emerald-50/92 text-emerald-800 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-100";
   }
   if (tone === "error") {
-    return "border-rose-200/90 bg-rose-50/96 text-rose-800 dark:border-rose-500/30 dark:bg-rose-500/12 dark:text-rose-100";
+    return "border-rose-200/80 bg-rose-50/92 text-rose-800 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-100";
   }
   if (tone === "loading") {
     return "border-border/80 bg-background/96 text-foreground";
@@ -59,6 +59,7 @@ const getToastClasses = (tone: FeedbackTone) => {
 
 export function FeedbackProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = React.useState<FeedbackToast[]>([]);
+  const [isMobile, setIsMobile] = React.useState(false);
   const timersRef = React.useRef(new Map<string, number>());
 
   const dismiss = React.useCallback((id: string) => {
@@ -106,6 +107,14 @@ export function FeedbackProvider({ children }: { children: React.ReactNode }) {
   );
 
   React.useEffect(() => {
+    const media = window.matchMedia("(max-width: 639px)");
+    const sync = () => setIsMobile(media.matches);
+    sync();
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
+  }, []);
+
+  React.useEffect(() => {
     return () => {
       for (const timer of timersRef.current.values()) {
         window.clearTimeout(timer);
@@ -114,23 +123,25 @@ export function FeedbackProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  const visibleToasts = isMobile ? toasts.slice(-1) : toasts;
+
   return (
     <FeedbackContext.Provider value={{ notify, dismiss }}>
       {children}
       <div
         aria-live="polite"
         aria-atomic="true"
-        className="pointer-events-none fixed inset-x-0 bottom-4 z-[90] flex justify-center px-4 sm:justify-end sm:px-6"
+        className="pointer-events-none fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] z-[90] flex justify-center px-3 sm:bottom-4 sm:justify-end sm:px-6"
       >
-        <div className="flex w-full max-w-sm flex-col gap-2 sm:w-[22rem]">
-          {toasts.map((toast) => {
+        <div className="flex w-full max-w-[20rem] flex-col gap-2 sm:w-[22rem] sm:max-w-none">
+          {visibleToasts.map((toast) => {
             const Icon = getToastIcon(toast.tone);
             return (
               <div
                 key={toast.id}
                 role="status"
                 className={cn(
-                  "pointer-events-auto flex items-start gap-3 rounded-2xl border px-3.5 py-3 shadow-[0_20px_45px_-30px_rgba(15,23,42,0.42)] backdrop-blur data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
+                  "pointer-events-auto flex items-start gap-2.5 rounded-[1.15rem] border px-3 py-2.5 shadow-[0_20px_45px_-30px_rgba(15,23,42,0.3)] backdrop-blur data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:gap-3 sm:rounded-2xl sm:px-3.5 sm:py-3",
                   getToastClasses(toast.tone)
                 )}
               >
@@ -143,15 +154,19 @@ export function FeedbackProvider({ children }: { children: React.ReactNode }) {
                   />
                 </div>
                 <div className="min-w-0 flex-1 space-y-0.5">
-                  <p className="text-sm font-medium leading-5">{toast.title}</p>
+                  <p className="text-[13px] font-medium leading-5 sm:text-sm">
+                    {toast.title}
+                  </p>
                   {toast.description ? (
-                    <p className="text-xs leading-5 text-current/75">{toast.description}</p>
+                    <p className="text-[11px] leading-[1.1rem] text-current/75 sm:text-xs sm:leading-5">
+                      {toast.description}
+                    </p>
                   ) : null}
                 </div>
                 <button
                   type="button"
                   onClick={() => dismiss(toast.id)}
-                  className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-current/60 transition-colors hover:bg-black/5 hover:text-current dark:hover:bg-white/8"
+                  className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-current/55 transition-colors hover:bg-black/5 hover:text-current dark:hover:bg-white/8"
                   aria-label="Fechar aviso"
                 >
                   <X className="h-3.5 w-3.5" />
