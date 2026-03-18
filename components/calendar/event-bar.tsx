@@ -79,7 +79,7 @@ export function EventBar({
           onDragEnd?.();
         }, 0);
       }}
-      className={`group relative block w-full cursor-pointer truncate text-left text-neutral-100 ${EVENT_ITEM_PADDING_X_CLASS} ${EVENT_ITEM_TEXT_CLASS} ${radius} ${isPast ? "opacity-50" : ""} ${isDragging ? "opacity-40" : ""} ${className ?? ""} overflow-visible`}
+      className={`group relative block w-full cursor-pointer truncate border border-black/8 text-left text-neutral-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] transition-[transform,box-shadow,opacity] duration-150 ${EVENT_ITEM_PADDING_X_CLASS} ${EVENT_ITEM_TEXT_CLASS} ${radius} ${isPast ? "opacity-55" : ""} ${isDragging ? "opacity-40" : "hover:-translate-y-px hover:shadow-[0_6px_14px_-10px_rgba(15,23,42,0.42),inset_0_1px_0_rgba(255,255,255,0.18)]"} ${className ?? ""} overflow-visible`}
       style={{ backgroundColor: event.color }}
       title={event.title}
     >
@@ -90,7 +90,7 @@ export function EventBar({
         {event.title}
       </span>
       <span
-        className={`pointer-events-none absolute left-0 top-0 z-20 hidden whitespace-nowrap text-white ${EVENT_ITEM_PADDING_X_CLASS} ${EVENT_ITEM_TEXT_CLASS} ${isDragging ? "" : "group-hover:inline-flex group-hover:items-center"} ${radius}`}
+        className={`pointer-events-none absolute left-0 top-0 z-20 hidden whitespace-nowrap border border-black/8 text-white shadow-[0_10px_20px_-16px_rgba(15,23,42,0.48)] ${EVENT_ITEM_PADDING_X_CLASS} ${EVENT_ITEM_TEXT_CLASS} ${isDragging ? "" : "group-hover:inline-flex group-hover:items-center"} ${radius}`}
         style={{
           minHeight: `${EVENT_ITEM_HEIGHT_PX}px`,
           lineHeight: `${EVENT_ITEM_HEIGHT_PX}px`,

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -25,7 +26,7 @@ import type { AnchorPoint } from "@/lib/types";
 
 const DEFAULT_CATEGORY_COLOR = CATEGORY_PRESET_COLORS[0];
 const CHIP_TRIGGER_CLASS =
-  "h-8 w-full rounded-full border px-3 text-xs shadow-none transition-colors";
+  "h-9 w-full rounded-xl border px-3 text-sm shadow-none transition-colors";
 
 const normalizeHashPrefix = (value: string) => {
   const trimmed = value.trim();
@@ -203,15 +204,31 @@ export function CategoryManager({
       >
         <DialogHeader>
           <DialogTitle>{isEdit ? "Editar categoria" : "Nova categoria"}</DialogTitle>
+          <DialogDescription>
+            Defina nome, cor e perfil. O restante deve ser secundario e rapido.
+          </DialogDescription>
         </DialogHeader>
-        <div className="space-y-3">
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <div className="space-y-4">
+          <div className="space-y-1.5">
+            <label htmlFor="category-name" className="text-[12px] font-medium text-foreground/70">
+              Categoria
+            </label>
+            <Input
+              id="category-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Nome da categoria"
+              className="h-10 rounded-xl"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Perfil</label>
+              <label className="text-[12px] font-medium text-foreground/70">Perfil</label>
               <Select value={profileDraftId} onValueChange={setProfileDraftId}>
                 <SelectTrigger
                   size="sm"
-                  className={`${CHIP_TRIGGER_CLASS} border-neutral-300 bg-neutral-100 text-neutral-700 hover:bg-neutral-200 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700`}
+                  className={`${CHIP_TRIGGER_CLASS} border-border/80 bg-background text-foreground shadow-sm hover:bg-muted`}
                   disabled={profiles.length === 0}
                 >
                   <span className="inline-flex min-w-0 items-center gap-1.5 pr-2">
@@ -233,9 +250,9 @@ export function CategoryManager({
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Preview</label>
+              <label className="text-[12px] font-medium text-foreground/70">Preview</label>
               <div
-                className="inline-flex h-8 w-full items-center gap-1.5 rounded-full border px-3 text-xs font-medium text-white shadow-none"
+                className="inline-flex h-9 w-full items-center gap-1.5 rounded-xl border px-3 text-sm font-medium text-white shadow-sm"
                 style={{
                   backgroundColor: color,
                   borderColor: "rgba(255,255,255,0.28)",
@@ -247,22 +264,14 @@ export function CategoryManager({
             </div>
           </div>
 
-          <div className="space-y-1">
-            <label htmlFor="category-name" className="text-xs font-medium text-muted-foreground">
-              Categoria
-            </label>
-            <Input
-              id="category-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Nome da categoria"
-              className="h-10"
-            />
-          </div>
-
           <div className="space-y-2">
-            <div className="text-xs font-medium text-muted-foreground">Cor</div>
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="space-y-0.5">
+              <div className="text-[12px] font-medium text-foreground/70">Cor</div>
+              <p className="text-xs text-muted-foreground">
+                Use a cor para orientar leitura, nao para competir com o restante da interface.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2.5">
               {CATEGORY_PRESET_COLORS.map((preset) => {
                 const selected = preset.toLowerCase() === normalizedColor;
                 return (
@@ -313,7 +322,7 @@ export function CategoryManager({
                 </PopoverTrigger>
                 <PopoverContent
                   align="start"
-                  className="w-60 rounded-2xl border-neutral-200 bg-white p-3 shadow-lg"
+                  className="w-60 rounded-2xl border-border/80 bg-background p-3 shadow-lg"
                 >
                   <div className="space-y-2">
                     <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
@@ -374,7 +383,11 @@ export function CategoryManager({
             </Button>
           </div>
         </DialogFooter>
-        {saveError ? <p className="text-sm text-red-600">{saveError}</p> : null}
+        {saveError ? (
+          <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
+            {saveError}
+          </p>
+        ) : null}
       </DialogContent>
     </Dialog>
   );

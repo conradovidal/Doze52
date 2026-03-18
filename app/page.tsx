@@ -260,9 +260,13 @@ export default function HomePage() {
     isDragging: boolean;
   } | null>(null);
   const [syncError, setSyncError] = React.useState<SyncUiError | null>(null);
-  const [isSyncing, setIsSyncing] = React.useState(false);
+  const [, setIsSyncing] = React.useState(false);
   const [remoteReady, setRemoteReady] = React.useState(false);
   const [syncBlocked, setSyncBlocked] = React.useState(false);
+  const [syncNotice, setSyncNotice] = React.useState<{
+    tone: "success" | "info";
+    message: string;
+  } | null>(null);
   const [windowContext] = React.useState<"main" | "popup">(() => {
     if (typeof window === "undefined") return "main";
     return Boolean(window.opener) || window.name === "doze52_oauth"
@@ -275,6 +279,7 @@ export default function HomePage() {
   const [todayIso, setTodayIso] = React.useState<string>("");
   const lastSyncedHashRef = React.useRef<string>("");
   const saveTimerRef = React.useRef<number | null>(null);
+  const syncNoticeTimerRef = React.useRef<number | null>(null);
   const previousSessionUserIdRef = React.useRef<string | null>(null);
   const profilesRef = React.useRef(profiles);
   const categoriesRef = React.useRef(categories);
@@ -286,8 +291,28 @@ export default function HomePage() {
     eventsRef.current = events;
   }, [profiles, categories, events]);
 
+  React.useEffect(() => {
+    return () => {
+      if (syncNoticeTimerRef.current !== null) {
+        window.clearTimeout(syncNoticeTimerRef.current);
+      }
+    };
+  }, []);
+
   const editingEvent = editingId ? getEventById(editingId) : null;
   const renderEvents = React.useMemo(() => expandEventsForYear(events, year), [events, year]);
+  const showSyncNotice = React.useCallback(
+    (tone: "success" | "info", message: string, durationMs = 1800) => {
+      setSyncNotice({ tone, message });
+      if (syncNoticeTimerRef.current !== null) {
+        window.clearTimeout(syncNoticeTimerRef.current);
+      }
+      syncNoticeTimerRef.current = window.setTimeout(() => {
+        setSyncNotice(null);
+      }, durationMs);
+    },
+    []
+  );
 
   React.useEffect(() => {
     if (windowContext !== "popup") return;
@@ -587,6 +612,7 @@ export default function HomePage() {
         await saveSnapshot(nextSnapshot);
         clearPendingSyncSnapshot(session.user.id);
         lastSyncedHashRef.current = nextHash;
+        showSyncNotice("success", "Alteracoes salvas");
       } catch (error) {
         const syncError =
           error instanceof SyncError
@@ -625,6 +651,7 @@ export default function HomePage() {
     profiles,
     remoteReady,
     session?.user.id,
+    showSyncNotice,
     syncBlocked,
     syncError,
     windowContext,
@@ -703,8 +730,8 @@ export default function HomePage() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-none overflow-x-hidden px-4 pt-2 pb-1 md:pb-2">
-      <div className="sticky top-0 z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85 md:static md:bg-transparent md:backdrop-blur-none">
+    <main className="mx-auto w-full max-w-none overflow-x-hidden px-4 pt-3 pb-2 md:pb-4">
+      <div className="sticky top-0 z-30 -mx-4 px-4 pb-2 bg-background/92 backdrop-blur supports-[backdrop-filter]:bg-background/82 md:static md:mx-0 md:px-0 md:pb-0 md:bg-transparent md:backdrop-blur-none">
         <AppHeader
           year={year}
           onYearChange={setYear}
@@ -743,27 +770,34 @@ export default function HomePage() {
         </div>
       </div>
       {syncError ? (
-        <div className="mt-2 flex flex-col items-center gap-2">
-          <div className="space-y-0.5 text-center">
-            <p className="text-xs text-red-600">{syncError.message}</p>
-            <p className="text-[11px] text-red-500/90">
-              {SYNC_HINT_BY_KIND[syncError.kind] ?? SYNC_HINT_BY_KIND.unknown}
-            </p>
-            {syncDebugDetail ? (
-              <p className="text-[10px] text-red-500/80">{syncDebugDetail}</p>
-            ) : null}
+        <div className="mt-3 flex justify-center">
+          <div className="flex max-w-xl flex-col items-center gap-2 rounded-2xl border border-red-200/80 bg-red-50/80 px-4 py-3 text-center shadow-sm dark:border-red-500/25 dark:bg-red-500/10">
+            <div className="space-y-0.5">
+              <p className="text-sm font-medium text-red-700 dark:text-red-200">
+                {syncError.message}
+              </p>
+              <p className="text-xs text-red-700/80 dark:text-red-200/80">
+                {SYNC_HINT_BY_KIND[syncError.kind] ?? SYNC_HINT_BY_KIND.unknown}
+              </p>
+              {syncDebugDetail ? (
+                <p className="text-[10px] text-red-700/65 dark:text-red-200/65">
+                  {syncDebugDetail}
+                </p>
+              ) : null}
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="rounded-full"
+              onClick={() => {
+                setSyncBlocked(false);
+                void bootstrapRemote();
+              }}
+            >
+              Recarregar
+            </Button>
           </div>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={() => {
-              setSyncBlocked(false);
-              void bootstrapRemote();
-            }}
-          >
-            Recarregar
-          </Button>
         </div>
       ) : null}
       <EventDialog
@@ -800,17 +834,23 @@ export default function HomePage() {
         }}
         anchorPoint={authDialogAnchorPoint}
       />
-      <div className="mt-2 flex h-5 items-center justify-center" aria-live="polite">
-        {isSyncing && session ? (
-          <span role="status" className="text-xs text-muted-foreground">
-            salvando...
-          </span>
-        ) : (
-          <span aria-hidden="true" className="invisible text-xs">
-            salvando...
-          </span>
-        )}
-      </div>
+      {syncNotice ? (
+        <div
+          className="pointer-events-none fixed inset-x-0 bottom-4 z-40 flex justify-center px-4"
+          aria-live="polite"
+        >
+          <div
+            role="status"
+            className={`rounded-full border px-4 py-2 text-xs font-medium shadow-lg backdrop-blur ${
+              syncNotice.tone === "success"
+                ? "border-emerald-200/90 bg-emerald-50/95 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-200"
+                : "border-border/80 bg-background/95 text-foreground"
+            }`}
+          >
+            {syncNotice.message}
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }

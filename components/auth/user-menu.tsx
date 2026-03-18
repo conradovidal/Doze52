@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { LogOut } from "lucide-react";
+import { Download, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useAuth } from "@/lib/auth";
@@ -19,6 +19,7 @@ export function UserMenu() {
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const [signOutError, setSignOutError] = useState<string | null>(null);
+  const [exportSuccess, setExportSuccess] = useState<string | null>(null);
 
   const metadata = session?.user.metadata ?? {};
   const fullName =
@@ -66,66 +67,91 @@ export function UserMenu() {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" className="h-10 w-10 overflow-hidden rounded-full p-0">
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-9 w-9 overflow-hidden rounded-full border-border/80 bg-background p-0 shadow-sm"
+        >
           {avatarUrl && !brokenAvatar ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={avatarUrl}
               alt="Perfil"
-              className="h-10 w-10 rounded-full border border-border object-cover"
+              className="h-9 w-9 rounded-full border border-border object-cover"
               onError={() => setBrokenAvatar(true)}
             />
           ) : (
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border bg-muted text-xs text-muted-foreground">
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border bg-muted text-xs text-muted-foreground">
               {fallbackInitial}
             </span>
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-56 rounded-xl">
-        <div className="space-y-3">
+      <PopoverContent align="end" className="w-60 rounded-2xl border-border/80 p-4">
+        <div className="space-y-3.5">
           <div>
-            <p className="text-xs text-muted-foreground">Conectado como</p>
-            <p className="truncate text-sm">{displayName}</p>
+            <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+              Conta
+            </p>
+            <p className="truncate text-sm font-medium">{displayName}</p>
             <p className="truncate text-xs text-muted-foreground">{email}</p>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full justify-start"
-            onClick={handleSignOut}
-            disabled={isSigningOut}
-          >
-            <LogOut size={14} className="mr-2" />
-            {isSigningOut ? "Salvando..." : "Sair"}
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full justify-start"
-            disabled={isExporting}
-            onClick={async () => {
-              try {
-                setIsExporting(true);
-                setExportError(null);
-                await exportUserData();
-              } catch (error) {
-                const message =
-                  error instanceof Error
-                    ? error.message
-                    : "Falhou ao exportar. Tente novamente.";
-                logDevError("user-menu.export", { message });
-                logProdError("Falha ao exportar dados do usuario.");
-                setExportError("Falhou ao exportar. Tente novamente.");
-              } finally {
-                setIsExporting(false);
-              }
-            }}
-          >
-            {isExporting ? "Exportando..." : "Exportar dados"}
-          </Button>
-          {exportError ? <p className="text-xs text-red-600">{exportError}</p> : null}
-          {signOutError ? <p className="text-xs text-red-600">{signOutError}</p> : null}
+          <div className="space-y-1.5">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full justify-start rounded-xl"
+              disabled={isExporting}
+              onClick={async () => {
+                try {
+                  setIsExporting(true);
+                  setExportError(null);
+                  setExportSuccess(null);
+                  await exportUserData();
+                  setExportSuccess("Exportação iniciada com sucesso.");
+                } catch (error) {
+                  const message =
+                    error instanceof Error
+                      ? error.message
+                      : "Falhou ao exportar. Tente novamente.";
+                  logDevError("user-menu.export", { message });
+                  logProdError("Falha ao exportar dados do usuario.");
+                  setExportError("Falhou ao exportar. Tente novamente.");
+                } finally {
+                  setIsExporting(false);
+                }
+              }}
+            >
+              <Download size={14} className="mr-2" />
+              {isExporting ? "Exportando..." : "Exportar dados"}
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full justify-start rounded-xl"
+              onClick={handleSignOut}
+              disabled={isSigningOut}
+            >
+              <LogOut size={14} className="mr-2" />
+              {isSigningOut ? "Salvando..." : "Sair"}
+            </Button>
+          </div>
+          {exportSuccess ? (
+            <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200">
+              {exportSuccess}
+            </p>
+          ) : null}
+          {exportError ? (
+            <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
+              {exportError}
+            </p>
+          ) : null}
+          {signOutError ? (
+            <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
+              {signOutError}
+            </p>
+          ) : null}
         </div>
       </PopoverContent>
     </Popover>

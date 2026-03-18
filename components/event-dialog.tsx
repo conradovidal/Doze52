@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -23,7 +24,8 @@ import { logDevError, logProdError } from "@/lib/safe-log";
 import { ValidationError, validateEventInput } from "@/lib/validation";
 
 const CHIP_TRIGGER_CLASS =
-  "h-8 w-full rounded-full border px-3 text-xs shadow-none transition-colors";
+  "h-9 w-full rounded-xl border px-3 text-sm shadow-none transition-colors";
+const FIELD_LABEL_CLASS = "text-[12px] font-medium text-foreground/70";
 
 type RecurrenceDraft = "none" | RecurrenceType;
 
@@ -182,16 +184,32 @@ export function EventDialog({
       >
         <DialogHeader>
           <DialogTitle>{initialEvent ? "Editar evento" : "Novo evento"}</DialogTitle>
+          <DialogDescription>
+            Defina o essencial primeiro: título, datas e categoria. Os detalhes entram depois.
+          </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3">
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <div className="space-y-4">
+          <div className="space-y-1.5">
+            <label htmlFor="event-title" className={FIELD_LABEL_CLASS}>
+              Título do evento
+            </label>
+            <Input
+              id="event-title"
+              className="h-10 rounded-xl"
+              placeholder="Ex.: Reunião de planejamento"
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Perfil</label>
+              <label className={FIELD_LABEL_CLASS}>Perfil</label>
               <Select value={profileId} onValueChange={handleProfileSelect}>
                 <SelectTrigger
                   size="sm"
-                  className={`${CHIP_TRIGGER_CLASS} border-neutral-300 bg-neutral-100 text-neutral-700 hover:bg-neutral-200 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700`}
+                  className={`${CHIP_TRIGGER_CLASS} border-border/80 bg-background text-foreground shadow-sm hover:bg-muted`}
                 >
                   <span className="inline-flex min-w-0 items-center gap-1.5 pr-2">
                     {currentProfile ? <ProfileIcon icon={currentProfile.icon} size={12} /> : null}
@@ -212,24 +230,18 @@ export function EventDialog({
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Categoria</label>
+              <label className={FIELD_LABEL_CLASS}>Categoria</label>
               <Select value={categoryId} onValueChange={setCategoryId}>
                 <SelectTrigger
                   size="sm"
-                  className={`${CHIP_TRIGGER_CLASS} [&_svg]:text-white/90`}
-                  style={
-                    currentCategory
-                      ? {
-                          backgroundColor: currentCategory.color,
-                          borderColor: "rgba(255,255,255,0.28)",
-                          color: "#fff",
-                        }
-                      : undefined
-                  }
+                  className={`${CHIP_TRIGGER_CLASS} border-border/80 bg-background text-foreground shadow-sm hover:bg-muted`}
                   disabled={categoriesForProfile.length === 0}
                 >
                   <span className="inline-flex min-w-0 items-center gap-1.5 pr-2">
-                    <span className="h-2 w-2 rounded-full bg-white/80" />
+                    <span
+                      className="h-2.5 w-2.5 rounded-full"
+                      style={{ backgroundColor: currentCategory?.color ?? "#9ca3af" }}
+                    />
                     <span className="truncate">
                       {currentCategory?.name ?? "Sem categoria"}
                     </span>
@@ -238,11 +250,11 @@ export function EventDialog({
                 <SelectContent position="popper" side="bottom" align="start">
                   {categoriesForProfile.map((category) => (
                     <SelectItem key={category.id} value={category.id}>
-                      <span
-                        className="inline-flex items-center gap-2 rounded-full px-2 py-0.5 text-white"
-                        style={{ backgroundColor: category.color }}
-                      >
-                        <span className="h-2 w-2 rounded-full bg-white/80" />
+                      <span className="inline-flex items-center gap-2">
+                        <span
+                          className="h-2.5 w-2.5 rounded-full"
+                          style={{ backgroundColor: category.color }}
+                        />
                         {category.name}
                       </span>
                     </SelectItem>
@@ -252,27 +264,14 @@ export function EventDialog({
             </div>
           </div>
 
-          <div className="space-y-1">
-            <label htmlFor="event-title" className="text-xs font-medium text-muted-foreground">
-              Titulo do evento
-            </label>
-            <Input
-              id="event-title"
-              className="h-9"
-              placeholder="Ex.: Reuniao de planejamento"
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-1">
-              <label htmlFor="event-start-date" className="text-xs font-medium text-muted-foreground">
-                Data inicio
+              <label htmlFor="event-start-date" className={FIELD_LABEL_CLASS}>
+                Data de início
               </label>
               <Input
                 id="event-start-date"
-                className="h-9"
+                className="h-10 rounded-xl"
                 type="date"
                 value={startDate}
                 onChange={(event) => {
@@ -286,12 +285,12 @@ export function EventDialog({
               />
             </div>
             <div className="space-y-1">
-              <label htmlFor="event-end-date" className="text-xs font-medium text-muted-foreground">
+              <label htmlFor="event-end-date" className={FIELD_LABEL_CLASS}>
                 Data final
               </label>
               <Input
                 id="event-end-date"
-                className="h-9"
+                className="h-10 rounded-xl"
                 type="date"
                 min={startDate || undefined}
                 value={endDate}
@@ -301,14 +300,33 @@ export function EventDialog({
           </div>
 
           <div className="space-y-1">
-            <div className={`grid gap-2 ${isRecurring ? "grid-cols-2" : "grid-cols-1"}`}>
+            <label htmlFor="event-notes" className={FIELD_LABEL_CLASS}>
+              Descrição
+            </label>
+            <textarea
+              id="event-notes"
+              rows={3}
+              className="min-h-[4.5rem] w-full resize-y rounded-xl border border-border/80 bg-background px-3 py-2 text-sm outline-none transition focus:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
+              placeholder="Adicione detalhes úteis para você se lembrar depois"
+              value={notes}
+              onChange={(event) => setNotes(event.target.value)}
+            />
+          </div>
+
+          <div className="space-y-2 rounded-2xl border border-border/70 bg-muted/30 p-3">
+            <div className="space-y-0.5">
+              <p className="text-[12px] font-medium text-foreground/70">Recorrência</p>
+              <p className="text-xs text-muted-foreground">
+                Use apenas quando esse evento se repetir ao longo do ano.
+              </p>
+            </div>
+            <div className={`grid gap-3 ${isRecurring ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"}`}>
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Recorrencia</label>
                 <Select
                   value={recurrenceType}
                   onValueChange={(value) => setRecurrenceType(value as RecurrenceDraft)}
                 >
-                  <SelectTrigger className="h-9">
+                  <SelectTrigger className="h-10 rounded-xl border-border/80 bg-background shadow-sm">
                     <span>
                       {recurrenceType === "none"
                         ? "Sem recorrencia"
@@ -333,12 +351,12 @@ export function EventDialog({
 
               {isRecurring ? (
                 <div className="space-y-1">
-                  <label htmlFor="event-recurrence-until" className="text-xs font-medium text-muted-foreground">
-                    Repetir ate
+                  <label htmlFor="event-recurrence-until" className={FIELD_LABEL_CLASS}>
+                    Repetir até
                   </label>
                   <Input
                     id="event-recurrence-until"
-                    className="h-9"
+                    className="h-10 rounded-xl"
                     type="date"
                     min={startDate || undefined}
                     value={recurrenceUntil}
@@ -347,20 +365,6 @@ export function EventDialog({
                 </div>
               ) : null}
             </div>
-          </div>
-
-          <div className="space-y-1">
-            <label htmlFor="event-notes" className="text-xs font-medium text-muted-foreground">
-              Descricao
-            </label>
-            <textarea
-              id="event-notes"
-              rows={2}
-              className="min-h-[3.5rem] w-full resize-y rounded-md border border-border/80 bg-background px-3 py-2 text-sm outline-none transition focus:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
-              placeholder="Adicione detalhes"
-              value={notes}
-              onChange={(event) => setNotes(event.target.value)}
-            />
           </div>
         </div>
 
@@ -461,7 +465,11 @@ export function EventDialog({
           </Button>
         </DialogFooter>
 
-        {submitError ? <p className="text-sm text-red-600">{submitError}</p> : null}
+        {submitError ? (
+          <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
+            {submitError}
+          </p>
+        ) : null}
       </DialogContent>
     </Dialog>
   );

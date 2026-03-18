@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -295,15 +296,20 @@ export function AuthDialog({
       >
         <DialogHeader>
           <DialogTitle>{mode === "login" ? "Entrar" : "Criar conta"}</DialogTitle>
+          <DialogDescription>
+            {mode === "login"
+              ? "Acesse sua conta para salvar, sincronizar e exportar seu ano."
+              : "Crie sua conta para manter seus calendários seguros e sincronizados."}
+          </DialogDescription>
         </DialogHeader>
-        <div className="space-y-3">
-          <div className="flex rounded-lg bg-muted p-1">
+        <div className="space-y-4">
+          <div className="flex rounded-full bg-muted/75 p-1">
             <button
               type="button"
-              className={`flex-1 rounded-md px-3 py-1.5 text-sm ${
+              className={`flex-1 rounded-full px-3 py-1.5 text-sm transition-colors ${
                 mode === "login"
                   ? "bg-background font-medium text-foreground shadow-sm"
-                  : "text-muted-foreground"
+                  : "text-muted-foreground hover:text-foreground"
               }`}
               onClick={() => setMode("login")}
             >
@@ -311,37 +317,58 @@ export function AuthDialog({
             </button>
             <button
               type="button"
-              className={`flex-1 rounded-md px-3 py-1.5 text-sm ${
+              className={`flex-1 rounded-full px-3 py-1.5 text-sm transition-colors ${
                 mode === "signup"
                   ? "bg-background font-medium text-foreground shadow-sm"
-                  : "text-muted-foreground"
+                  : "text-muted-foreground hover:text-foreground"
               }`}
               onClick={() => setMode("signup")}
             >
               Cadastro
             </button>
           </div>
-          <Input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-          <Input
-            type="password"
-            placeholder="Senha (min. 6)"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
+          <div className="space-y-1.5">
+            <label htmlFor="auth-email" className="text-[12px] font-medium text-foreground/70">
+              Email
+            </label>
+            <Input
+              id="auth-email"
+              type="email"
+              placeholder="voce@exemplo.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label htmlFor="auth-password" className="text-[12px] font-medium text-foreground/70">
+              Senha
+            </label>
+            <Input
+              id="auth-password"
+              type="password"
+              placeholder="No mínimo 6 caracteres"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </div>
           <GoogleButton onClick={handleGoogle} disabled={loading} />
-          {error ? <p className="text-sm text-red-600">{error}</p> : null}
+          {pendingGooglePopup ? (
+            <p className="rounded-xl border border-border/70 bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+              Aguardando conclusão do login com Google...
+            </p>
+          ) : null}
+          {error ? (
+            <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
+              {error}
+            </p>
+          ) : null}
         </div>
         <DialogFooter className="sm:justify-between">
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
           <Button disabled={!canSubmit || loading} onClick={handleSubmit}>
-            {mode === "login" ? "Entrar" : "Criar conta"}
+            {loading ? "Carregando..." : mode === "login" ? "Entrar" : "Criar conta"}
           </Button>
         </DialogFooter>
       </DialogContent>

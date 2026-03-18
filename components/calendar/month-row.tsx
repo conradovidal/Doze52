@@ -340,16 +340,16 @@ export function MonthRow({
   }
 
   return (
-    <div className="flex items-stretch border-b border-border last:border-b-0">
+    <div className="flex items-stretch border-b border-border/65 last:border-b-0">
       <div
-        className="flex w-9 flex-none items-center justify-center text-muted-foreground"
+        className="flex w-11 flex-none items-start justify-start border-r border-border/60 bg-muted/45 px-2 py-3 text-muted-foreground md:w-12"
         style={{ minHeight: `${minHeightPx}px` }}
       >
-        <span className="-rotate-90 text-[11px] font-medium tracking-wide">{monthLabel}</span>
+        <span className="text-[11px] font-semibold uppercase tracking-[0.14em]">{monthLabel}</span>
       </div>
 
       <div
-        className="relative flex-1 w-full"
+        className="relative w-full flex-1 bg-card/40"
         onDragOver={(e) => {
           const dragPayload = readCalendarEventDndPayload(e.dataTransfer);
           const hasTransferType = hasCalendarEventDndPayloadType(e.dataTransfer);

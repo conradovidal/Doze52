@@ -191,14 +191,14 @@ export function ProfileBar({
   return (
     <>
       <div
-        className={`${compact ? "w-full min-h-8 justify-center" : "mb-2 min-h-8 justify-center"} flex flex-wrap items-center gap-2`}
+        className={`${compact ? "w-full min-h-9 justify-start" : "mb-2 min-h-9 justify-start"} flex flex-wrap items-center gap-2`}
       >
         {displayedProfiles.map((profile) => {
           const selected = selectedSet.has(profile.id);
-          const chipClass = `inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs transition-colors ${MOTION_CLASS} ${
+          const chipClass = `inline-flex min-h-8 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium shadow-sm transition-colors ${MOTION_CLASS} ${
             selected
-              ? "border-neutral-500 bg-neutral-300 text-neutral-900 hover:bg-neutral-400 dark:border-neutral-500 dark:bg-neutral-600 dark:text-neutral-100 dark:hover:bg-neutral-500"
-              : "border-neutral-300 bg-neutral-100 text-neutral-700 hover:bg-neutral-200 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
+              ? "border-neutral-900 bg-neutral-900 text-neutral-50 hover:bg-neutral-800 dark:border-neutral-100 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-200"
+              : "border-border/80 bg-background text-foreground/75 hover:bg-muted hover:text-foreground dark:bg-background/70"
           }`;
           const dragRing =
             isGlobalEditMode && dragOverId === profile.id ? "ring-2 ring-neutral-400/80" : "";
@@ -353,6 +353,7 @@ export function ProfileBar({
               ref={(node) => registerProfileNode(profile.id, node)}
               type="button"
               onClick={() => toggleSelectedProfile(profile.id)}
+              aria-pressed={selected}
               className={chipClass}
             >
               <ProfileIcon icon={profile.icon} size={12} className="shrink-0" />
@@ -375,24 +376,28 @@ export function ProfileBar({
         ) : null}
 
         <Button
-          variant={isGlobalEditMode ? "toolActive" : "ghost"}
+          variant={isGlobalEditMode ? "toolActive" : "outline"}
           size="sm"
+          className="h-8 rounded-full px-3 shadow-sm"
           onClick={() => onGlobalEditModeChange?.(!isGlobalEditMode)}
           aria-label={isGlobalEditMode ? "Finalizar edição" : "Ativar edição"}
-          title={isGlobalEditMode ? "Finalizar edição" : "Editar perfis e categorias"}
+          title={isGlobalEditMode ? "Finalizar organização" : "Organizar perfis e categorias"}
         >
           {isGlobalEditMode ? (
             <>
               <Check size={14} />
-              Done
+              Concluir
             </>
           ) : (
-            <Pencil size={14} />
+            <>
+              <Pencil size={14} />
+              Organizar
+            </>
           )}
         </Button>
       </div>
 
-        <ProfileManager
+      <ProfileManager
         open={managerOpen}
         onOpenChange={(open) => {
           setManagerOpen(open);

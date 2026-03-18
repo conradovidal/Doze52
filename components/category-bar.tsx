@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Eye, EyeOff, GripVertical, Pencil, Plus } from "lucide-react";
+import { GripVertical, Pencil, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useStore } from "@/lib/store";
 import { useFlipReorder } from "@/lib/use-flip-reorder";
@@ -15,6 +15,27 @@ const BACKWARD_SWAP_THRESHOLD = 0.4;
 const SWAP_COOLDOWN_MS = 70;
 const ADD_BUTTON_CLASS =
   "h-8 w-8 rounded-full border-neutral-300 bg-white p-0 text-neutral-700 shadow-sm hover:border-neutral-400 hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:border-neutral-600 dark:hover:bg-neutral-800";
+
+const hexToRgba = (hex: string, alpha: number) => {
+  const normalized = hex.trim().replace("#", "");
+  const expanded =
+    normalized.length === 3
+      ? normalized
+          .split("")
+          .map((part) => `${part}${part}`)
+          .join("")
+      : normalized;
+
+  if (!/^[0-9a-fA-F]{6}$/.test(expanded)) {
+    return `rgba(99, 102, 241, ${alpha})`;
+  }
+
+  const int = Number.parseInt(expanded, 16);
+  const r = (int >> 16) & 255;
+  const g = (int >> 8) & 255;
+  const b = int & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
 
 const moveInArray = (arr: CategoryItem[], sourceId: string, targetId: string) => {
   const sourceIndex = arr.findIndex((c) => c.id === sourceId);
@@ -63,7 +84,6 @@ export function CategoryBar({ compact = false, isGlobalEditMode = false }: Categ
   const selectedProfileIds = useStore((s) => s.selectedProfileIds);
   const categories = useStore((s) => s.categories);
   const toggleCategoryVisibility = useStore((s) => s.toggleCategoryVisibility);
-  const updateCategory = useStore((s) => s.updateCategory);
   const setCategoriesOrder = useStore((s) => s.setCategoriesOrder);
 
   const [editingCategoryId, setEditingCategoryId] = React.useState<string | null>(null);
@@ -110,9 +130,6 @@ export function CategoryBar({ compact = false, isGlobalEditMode = false }: Categ
     displayedCategories.map((category) => category.id),
     { durationMs: 160 }
   );
-  const allVisible =
-    displayedCategories.length > 0 && displayedCategories.every((category) => category.visible);
-
   const clearLongPressTimer = React.useCallback(() => {
     if (longPressTimerRef.current !== null) {
       window.clearTimeout(longPressTimerRef.current);
@@ -207,7 +224,7 @@ export function CategoryBar({ compact = false, isGlobalEditMode = false }: Categ
 
   return (
     <div
-      className={`${compact ? "w-full min-h-8 justify-center" : "mb-2 min-h-8 justify-center"} flex flex-wrap items-center gap-2`}
+      className={`${compact ? "w-full min-h-9 justify-start" : "mb-2 min-h-9 justify-start"} flex flex-wrap items-center gap-2`}
     >
       {displayedCategories.map((category) => (
         <div
@@ -310,19 +327,39 @@ export function CategoryBar({ compact = false, isGlobalEditMode = false }: Categ
             event.preventDefault();
             toggleCategoryVisibility(category.id);
           }}
-          className={`flex items-center gap-1 rounded-full px-3 py-1 text-xs text-white transition-colors ${MOTION_CLASS} ${
-            category.visible ? "opacity-100" : "opacity-40"
-          } ${isEditMode ? "cursor-grab" : "cursor-pointer"} ${
+          aria-pressed={!isEditMode ? category.visible : undefined}
+          className={`flex min-h-8 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium shadow-sm transition-colors ${MOTION_CLASS} ${
+            isEditMode ? "cursor-grab text-white" : "cursor-pointer"
+          } ${
             isEditMode && dragOverId === category.id ? "ring-2 ring-white/50" : ""
-          }`}
-          style={{ backgroundColor: category.color }}
+          } ${!isEditMode && !category.visible ? "text-muted-foreground" : ""}`}
+          style={
+            isEditMode
+              ? { backgroundColor: category.color, borderColor: "rgba(255,255,255,0.2)" }
+              : {
+                  backgroundColor: category.visible
+                    ? hexToRgba(category.color, 0.12)
+                    : "hsl(var(--background))",
+                  borderColor: category.visible
+                    ? hexToRgba(category.color, 0.24)
+                    : "hsl(var(--border))",
+                }
+          }
         >
           {isEditMode ? (
             <GripVertical size={12} />
           ) : (
-            <span className="h-2 w-2 rounded-full bg-white/80" />
+            <span
+              className="h-2.5 w-2.5 rounded-full"
+              style={{
+                backgroundColor: category.color,
+                opacity: category.visible ? 1 : 0.55,
+              }}
+            />
           )}
-          <span className="font-medium">{category.name}</span>
+          <span className={isEditMode ? "font-medium" : category.visible ? "text-foreground" : "text-muted-foreground"}>
+            {category.name}
+          </span>
           {isEditMode ? (
             <button
               type="button"
@@ -362,23 +399,7 @@ export function CategoryBar({ compact = false, isGlobalEditMode = false }: Categ
         >
           <Plus size={14} />
         </Button>
-      ) : (
-        <Button
-          variant="ghost"
-          size="sm"
-          title={allVisible ? "Ocultar categorias visiveis" : "Mostrar categorias visiveis"}
-          onClick={() => {
-            displayedCategories.forEach((category) => {
-              if (category.visible !== !allVisible) {
-                updateCategory(category.id, { visible: !allVisible });
-              }
-            });
-          }}
-          disabled={displayedCategories.length === 0}
-        >
-          {allVisible ? <Eye size={14} /> : <EyeOff size={14} />}
-        </Button>
-      )}
+      ) : null}
 
       <CategoryManager
         mode="create"
