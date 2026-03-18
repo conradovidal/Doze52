@@ -324,7 +324,7 @@ export function YearGrid({
   }, [clearDragState, dragState.draggingEventId]);
 
   return (
-    <div className="w-full overflow-hidden rounded-[1.75rem] border border-border/80 bg-card/92 shadow-[0_30px_65px_-42px_rgba(15,23,42,0.34)] backdrop-blur-sm">
+    <div className="w-full overflow-hidden rounded-[1.75rem] border border-border/75 bg-card/94 shadow-[0_14px_28px_-22px_rgba(15,23,42,0.16),0_34px_72px_-54px_rgba(15,23,42,0.18)] backdrop-blur-sm">
       {Array.from({ length: 12 }).map((_, idx) => (
         <MonthRow
           key={idx}

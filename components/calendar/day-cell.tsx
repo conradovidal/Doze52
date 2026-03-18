@@ -33,9 +33,9 @@ export function DayCell({
         data-day-iso={dateIso}
         className={`w-full transition-colors ${
           isPast
-            ? "bg-neutral-100/75 dark:bg-[hsl(var(--cal-cell-outside-past))]"
-            : "bg-neutral-50/70 dark:bg-[hsl(var(--cal-cell-outside))]"
-        } ${isDropActive ? "ring-1 ring-inset ring-border bg-foreground/8" : ""}`}
+            ? "bg-neutral-100/55 dark:bg-[hsl(var(--cal-cell-outside-past))]"
+            : "bg-neutral-50/45 dark:bg-[hsl(var(--cal-cell-outside))]"
+        } ${isDropActive ? "ring-1 ring-inset ring-border/70 bg-foreground/6" : ""}`}
         style={{ minHeight: `${minHeightPx}px` }}
         onDragOver={(e) => {
           if (!onDayHover) return;
@@ -58,13 +58,13 @@ export function DayCell({
   const today = dateIso === todayIso;
   const dayToneClass = isPast
     ? isWeekend
-      ? "bg-neutral-100/90 dark:bg-[hsl(var(--cal-cell-weekend-past))]"
-      : "bg-neutral-50/95 dark:bg-[hsl(var(--cal-cell-weekday-past))]"
+      ? "bg-neutral-200/55 dark:bg-[hsl(var(--cal-cell-weekend-past))]"
+      : "bg-neutral-100/72 dark:bg-[hsl(var(--cal-cell-weekday-past))]"
     : isWeekend
-      ? "bg-neutral-50/98 dark:bg-[hsl(var(--cal-cell-weekend))]"
+      ? "bg-neutral-100/78 dark:bg-[hsl(var(--cal-cell-weekend))]"
       : "bg-white dark:bg-[hsl(var(--cal-cell-weekday))]";
   const dayNumberToneClass = isWeekend
-    ? "text-muted-foreground dark:text-neutral-300"
+    ? "text-neutral-500 dark:text-neutral-300"
     : "text-muted-foreground dark:text-neutral-200";
 
   return (
@@ -74,7 +74,7 @@ export function DayCell({
       className={`group flex w-full cursor-pointer flex-col px-1 py-1 ring-1 ring-inset transition-[background-color,box-shadow] duration-150 ${dayToneClass} ${
         today
           ? "ring-neutral-900 shadow-[inset_0_0_0_1px_rgba(23,23,23,0.06)] dark:ring-neutral-100 dark:shadow-none"
-          : "ring-transparent hover:bg-white hover:ring-neutral-300/90 hover:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.5),0_10px_18px_-18px_rgba(15,23,42,0.3)] dark:hover:bg-white/5 dark:hover:ring-neutral-500/65"
+          : "ring-transparent hover:ring-neutral-300/80 hover:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.46),0_10px_18px_-18px_rgba(15,23,42,0.26)] dark:hover:bg-white/6 dark:hover:ring-neutral-500/60"
       } ${
         isRangeSelected
           ? "bg-neutral-300/35 ring-neutral-400/80 dark:bg-neutral-700/45 dark:ring-neutral-500/85"

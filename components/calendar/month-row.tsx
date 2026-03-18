@@ -423,11 +423,11 @@ export function MonthRow({
           {dayInfos.map((day) => (
             <div
               key={`${monthIndex}-${day.col}`}
-              className={`border-l ${
-                day.col % 7 === 1
-                  ? "border-border/85 shadow-[-1px_0_0_rgba(255,255,255,0.32)]"
-                  : "border-border/30"
-              } ${day.col === COLUMNS ? "border-r border-border/55" : ""}`}
+              className={
+                day.inMonth
+                  ? `border-l border-border/20 ${day.col === COLUMNS ? "border-r border-border/30" : ""}`
+                  : ""
+              }
             >
               <DayCell
                 date={day.date}
