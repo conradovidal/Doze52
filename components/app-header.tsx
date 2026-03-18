@@ -1,7 +1,9 @@
 "use client";
 
 import * as React from "react";
+import { Settings2 } from "lucide-react";
 import { CategoryBar } from "@/components/category-bar";
+import { OrganizeWorkspaceDialog } from "@/components/organize-workspace-dialog";
 import { ProfileBar } from "@/components/profile-bar";
 import { UserMenu } from "@/components/auth/user-menu";
 import {
@@ -30,9 +32,10 @@ export function AppHeader({
   isAuthenticated,
   onOpenAuthDialog,
 }: AppHeaderProps) {
-  const [isGlobalEditMode, setIsGlobalEditMode] = React.useState(false);
+  const [organizeOpen, setOrganizeOpen] = React.useState(false);
 
   return (
+    <>
     <header className="mb-4 space-y-3 md:mb-5 md:space-y-4">
       <div className="grid min-h-10 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
         <div className="justify-self-start">
@@ -53,6 +56,20 @@ export function AppHeader({
             </Select>
 
             <ThemeToggle />
+
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-sm"
+              className={`h-9 w-9 rounded-full border-border/80 bg-background text-muted-foreground shadow-sm transition-colors ${
+                organizeOpen ? "bg-muted text-foreground" : "hover:bg-muted hover:text-foreground"
+              }`}
+              onClick={() => setOrganizeOpen(true)}
+              aria-label="Organizar perfis e categorias"
+              title="Organizar perfis e categorias"
+            >
+              <Settings2 className="h-4 w-4" />
+            </Button>
 
             <div className="flex h-9 items-center justify-end">
               {authLoading ? null : isAuthenticated ? (
@@ -76,15 +93,13 @@ export function AppHeader({
       </div>
 
       <div className="mx-auto flex w-full max-w-[56rem] flex-col gap-2.5 md:gap-3">
-        <ProfileBar
-          compact
-          isGlobalEditMode={isGlobalEditMode}
-          onGlobalEditModeChange={setIsGlobalEditMode}
-        />
-        <CategoryBar compact isGlobalEditMode={isGlobalEditMode} />
+        <ProfileBar compact />
+        <CategoryBar compact />
       </div>
 
       <div className="mx-auto h-px w-full max-w-[56rem] bg-border/60" />
     </header>
+    <OrganizeWorkspaceDialog open={organizeOpen} onOpenChange={setOrganizeOpen} />
+    </>
   );
 }

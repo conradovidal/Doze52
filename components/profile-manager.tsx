@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -236,15 +237,18 @@ export function ProfileManager({
       <DialogContent className="sm:max-w-[460px] p-4 sm:p-5">
         <DialogHeader>
           <DialogTitle>{isEditMode ? "Editar perfil" : "Novo perfil"}</DialogTitle>
+          <DialogDescription>
+            Defina nome e icone. A gestao do perfil deve ser rapida e consistente com o resto do produto.
+          </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3">
+        <div className="space-y-4">
           <div className="flex items-center gap-2.5">
             <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-neutral-200 bg-neutral-100 text-neutral-700 shadow-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200">
               <ProfileIcon icon={icon} size={18} />
             </div>
             <div className="min-w-0 flex-1">
-              <label htmlFor="profile-name" className="sr-only">
+              <label htmlFor="profile-name" className="mb-1.5 block text-[12px] font-medium text-foreground/70">
                 Nome do perfil
               </label>
               <Input
@@ -252,12 +256,14 @@ export function ProfileManager({
                 value={name}
                 onChange={(event) => setName(event.target.value)}
                 placeholder="Titulo do perfil"
-                className="h-10"
+                className="h-10 rounded-xl"
               />
             </div>
           </div>
 
-          <div className="grid grid-cols-4 gap-2">
+          <div className="space-y-2">
+            <div className="text-[12px] font-medium text-foreground/70">Icone</div>
+            <div className="grid grid-cols-4 gap-2">
             {PROFILE_ICON_OPTIONS.map((option) => {
               const selected = option.id === icon;
               return (
@@ -277,6 +283,7 @@ export function ProfileManager({
                 </button>
               );
             })}
+          </div>
           </div>
         </div>
 
@@ -299,16 +306,23 @@ export function ProfileManager({
           </div>
         </DialogFooter>
 
-        {saveError ? <p className="text-sm text-red-600">{saveError}</p> : null}
+        {saveError ? (
+          <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
+            {saveError}
+          </p>
+        ) : null}
       </DialogContent>
     </Dialog>
     <Dialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
       <DialogContent className="sm:max-w-[460px]">
         <DialogHeader>
           <DialogTitle>Excluir perfil</DialogTitle>
+          <DialogDescription>
+            As categorias deste perfil serao reatribuidas para outro perfil antes da exclusao.
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
-          <p className="text-sm text-neutral-600">
+          <p className="text-sm text-neutral-600 dark:text-neutral-300">
             As categorias deste perfil serao reatribuidas para:
           </p>
           <Select value={deleteTargetProfileId} onValueChange={setDeleteTargetProfileId}>

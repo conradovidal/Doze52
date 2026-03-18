@@ -1,48 +1,9 @@
 "use client";
 
-import * as React from "react";
-import { Check, GripVertical, Pencil, Plus } from "lucide-react";
 import { ProfileIcon } from "@/components/profile-icon";
-import { Button } from "@/components/ui/button";
 import { useStore } from "@/lib/store";
-import { ProfileManager, type ProfileManagerIntent } from "@/components/profile-manager";
-import type { CalendarProfile } from "@/lib/types";
-import { useFlipReorder } from "@/lib/use-flip-reorder";
 
-const MOBILE_LONG_PRESS_MS = 300;
 const MOTION_CLASS = "duration-[160ms] ease-[cubic-bezier(0.22,1,0.36,1)]";
-const FORWARD_SWAP_THRESHOLD = 0.6;
-const BACKWARD_SWAP_THRESHOLD = 0.4;
-const SWAP_COOLDOWN_MS = 70;
-const ADD_BUTTON_CLASS =
-  "h-8 w-8 rounded-full border-neutral-300 bg-white p-0 text-neutral-700 shadow-sm hover:border-neutral-400 hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:border-neutral-600 dark:hover:bg-neutral-800";
-
-const moveInArray = <T extends { id: string }>(
-  arr: T[],
-  sourceId: string,
-  targetId: string
-) => {
-  const sourceIndex = arr.findIndex((item) => item.id === sourceId);
-  const targetIndex = arr.findIndex((item) => item.id === targetId);
-  if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) return arr;
-  const next = [...arr];
-  const [moved] = next.splice(sourceIndex, 1);
-  next.splice(targetIndex, 0, moved);
-  return next;
-};
-
-const toPairKey = (a: string, b: string) => (a < b ? `${a}::${b}` : `${b}::${a}`);
-
-const getPointerProgress = (targetNode: HTMLElement, x: number, y: number) => {
-  const rect = targetNode.getBoundingClientRect();
-  const useHorizontalAxis = rect.width >= rect.height;
-  if (useHorizontalAxis) {
-    if (rect.width <= 0) return 0.5;
-    return Math.max(0, Math.min(1, (x - rect.left) / rect.width));
-  }
-  if (rect.height <= 0) return 0.5;
-  return Math.max(0, Math.min(1, (y - rect.top) / rect.height));
-};
 
 type ProfileBarProps = {
   compact?: boolean;
@@ -50,363 +11,40 @@ type ProfileBarProps = {
   onGlobalEditModeChange?: (enabled: boolean) => void;
 };
 
-export function ProfileBar({
-  compact = false,
-  isGlobalEditMode = false,
-  onGlobalEditModeChange,
-}: ProfileBarProps) {
+export function ProfileBar({ compact = false }: ProfileBarProps) {
   const profiles = useStore((s) => s.profiles);
   const selectedProfileIds = useStore((s) => s.selectedProfileIds);
-  const setProfilesOrder = useStore((s) => s.setProfilesOrder);
   const toggleSelectedProfile = useStore((s) => s.toggleSelectedProfile);
-
-  const [managerOpen, setManagerOpen] = React.useState(false);
-  const [managerIntent, setManagerIntent] = React.useState<ProfileManagerIntent | null>(
-    null
-  );
-  const [dragSourceId, setDragSourceId] = React.useState<string | null>(null);
-  const [dragOverId, setDragOverId] = React.useState<string | null>(null);
-  const [previewOrder, setPreviewOrder] = React.useState<CalendarProfile[] | null>(null);
-
-  const longPressTimerRef = React.useRef<number | null>(null);
-  const activePointerIdRef = React.useRef<number | null>(null);
-  const isTouchDraggingRef = React.useRef(false);
-  const previewOrderRef = React.useRef<CalendarProfile[] | null>(null);
-  const swapLockRef = React.useRef<{ pairKey: string; lastSwapAt: number } | null>(null);
-
-  React.useEffect(() => {
-    previewOrderRef.current = previewOrder;
-  }, [previewOrder]);
-
-  const clearLongPressTimer = React.useCallback(() => {
-    if (longPressTimerRef.current !== null) {
-      window.clearTimeout(longPressTimerRef.current);
-      longPressTimerRef.current = null;
-    }
-  }, []);
-
-  const clearDragState = React.useCallback(() => {
-    clearLongPressTimer();
-    activePointerIdRef.current = null;
-    isTouchDraggingRef.current = false;
-    previewOrderRef.current = null;
-    swapLockRef.current = null;
-    setDragSourceId(null);
-    setDragOverId(null);
-    setPreviewOrder(null);
-  }, [clearLongPressTimer]);
-
-  React.useEffect(() => {
-    if (!isGlobalEditMode) {
-      clearDragState();
-    }
-  }, [isGlobalEditMode, clearDragState]);
-
-  React.useEffect(() => clearLongPressTimer, [clearLongPressTimer]);
-
-  const displayedProfiles = previewOrder ?? profiles;
-  const registerProfileNode = useFlipReorder(
-    displayedProfiles.map((profile) => profile.id),
-    { durationMs: 160 }
-  );
-
-  const commitProfilesOrder = React.useCallback(
-    (finalOrder: CalendarProfile[] | null) => {
-      if (!finalOrder || finalOrder.length === 0) return;
-      const didChange = finalOrder.some((profile, index) => profile.id !== profiles[index]?.id);
-      if (!didChange) return;
-      setProfilesOrder(finalOrder.map((profile) => profile.id));
-    },
-    [profiles, setProfilesOrder]
-  );
-
-  const resolveProfileTargetFromPoint = React.useCallback((x: number, y: number) => {
-    if (typeof document === "undefined") return null;
-    const node = document.elementFromPoint(x, y) as HTMLElement | null;
-    const chip = node?.closest<HTMLElement>("[data-profile-chip-id]");
-    if (!chip) return null;
-    const id = chip.dataset.profileChipId;
-    if (!id) return null;
-    return { id, node: chip };
-  }, []);
-
-  const maybeSwapProfiles = React.useCallback(
-    (payload: { targetId: string; targetNode: HTMLElement; clientX: number; clientY: number }) => {
-      if (!dragSourceId || dragSourceId === payload.targetId) return;
-      const workingOrder = previewOrderRef.current ?? displayedProfiles;
-      const sourceIndex = workingOrder.findIndex((profile) => profile.id === dragSourceId);
-      const targetIndex = workingOrder.findIndex((profile) => profile.id === payload.targetId);
-      if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) return;
-
-      const progress = getPointerProgress(payload.targetNode, payload.clientX, payload.clientY);
-      const movingForward = sourceIndex < targetIndex;
-      const passedSwapThreshold = movingForward
-        ? progress >= FORWARD_SWAP_THRESHOLD
-        : progress <= BACKWARD_SWAP_THRESHOLD;
-      if (!passedSwapThreshold) return;
-
-      const now = performance.now();
-      const pairKey = toPairKey(dragSourceId, payload.targetId);
-      const lock = swapLockRef.current;
-      const inHysteresisBand =
-        progress > BACKWARD_SWAP_THRESHOLD && progress < FORWARD_SWAP_THRESHOLD;
-      if (lock && now - lock.lastSwapAt < SWAP_COOLDOWN_MS) return;
-      if (lock?.pairKey === pairKey && inHysteresisBand) return;
-
-      const nextOrder = moveInArray(workingOrder, dragSourceId, payload.targetId);
-      if (nextOrder === workingOrder) return;
-      setDragOverId(payload.targetId);
-      setPreviewOrder(nextOrder);
-      previewOrderRef.current = nextOrder;
-      swapLockRef.current = { pairKey, lastSwapAt: now };
-    },
-    [dragSourceId, displayedProfiles]
-  );
-
-  const startDragPreview = React.useCallback(
-    (profileId: string) => {
-      setDragSourceId(profileId);
-      setDragOverId(profileId);
-      setPreviewOrder(displayedProfiles);
-      previewOrderRef.current = displayedProfiles;
-      swapLockRef.current = null;
-    },
-    [displayedProfiles]
-  );
 
   if (profiles.length === 0) {
     return null;
   }
 
   const selectedSet = new Set(selectedProfileIds);
-  const openCreateManager = () => {
-    setManagerIntent({ mode: "create" });
-    setManagerOpen(true);
-  };
-  const openEditManager = (profileId: string) => {
-    setManagerIntent({ mode: "edit", profileId });
-    setManagerOpen(true);
-  };
 
   return (
-    <>
-      <div
-        className={`${compact ? "w-full min-h-9 justify-start" : "mb-2 min-h-9 justify-start"} flex flex-wrap items-center gap-2`}
-      >
-        {displayedProfiles.map((profile) => {
-          const selected = selectedSet.has(profile.id);
-          const chipClass = `inline-flex min-h-8 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium shadow-sm transition-colors ${MOTION_CLASS} ${
-            selected
-              ? "border-neutral-900 bg-neutral-900 text-neutral-50 hover:bg-neutral-800 dark:border-neutral-100 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-200"
-              : "border-border/80 bg-background text-foreground/75 hover:bg-muted hover:text-foreground dark:bg-background/70"
-          }`;
-          const dragRing =
-            isGlobalEditMode && dragOverId === profile.id ? "ring-2 ring-neutral-400/80" : "";
-
-          if (isGlobalEditMode) {
-            return (
-              <div
-                key={profile.id}
-                ref={(node) => registerProfileNode(profile.id, node)}
-                data-profile-chip-id={profile.id}
-                role="button"
-                tabIndex={0}
-                onDragEnter={() => {
-                  setDragOverId(profile.id);
-                }}
-                onDragOver={(event) => {
-                  event.preventDefault();
-                  maybeSwapProfiles({
-                    targetId: profile.id,
-                    targetNode: event.currentTarget,
-                    clientX: event.clientX,
-                    clientY: event.clientY,
-                  });
-                }}
-                onDrop={(event) => {
-                  event.preventDefault();
-                  commitProfilesOrder(previewOrderRef.current ?? previewOrder ?? displayedProfiles);
-                  clearDragState();
-                }}
-                onClick={() => {
-                  if (dragSourceId) return;
-                  toggleSelectedProfile(profile.id);
-                }}
-                onKeyDown={(event) => {
-                  if (event.key !== "Enter" && event.key !== " ") return;
-                  event.preventDefault();
-                  if (dragSourceId) return;
-                  toggleSelectedProfile(profile.id);
-                }}
-                onContextMenu={(event) => {
-                  if (dragSourceId) {
-                    event.preventDefault();
-                  }
-                }}
-                className={`${chipClass} ${dragRing} cursor-pointer`}
-              >
-                <button
-                  type="button"
-                  draggable
-                  onClick={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                  }}
-                  onDragStart={(event) => {
-                    event.stopPropagation();
-                    startDragPreview(profile.id);
-                    event.dataTransfer.effectAllowed = "move";
-                  }}
-                  onDragEnd={(event) => {
-                    event.stopPropagation();
-                    clearDragState();
-                  }}
-                  onPointerDown={(event) => {
-                    event.stopPropagation();
-                    if (event.pointerType !== "touch") return;
-                    activePointerIdRef.current = event.pointerId;
-                    event.currentTarget.setPointerCapture(event.pointerId);
-                    clearLongPressTimer();
-                    longPressTimerRef.current = window.setTimeout(() => {
-                      isTouchDraggingRef.current = true;
-                      startDragPreview(profile.id);
-                    }, MOBILE_LONG_PRESS_MS);
-                  }}
-                  onPointerMove={(event) => {
-                    event.stopPropagation();
-                    if (event.pointerType !== "touch") return;
-                    if (activePointerIdRef.current !== event.pointerId) return;
-                    if (!isTouchDraggingRef.current || !dragSourceId) return;
-                    event.preventDefault();
-                    const target = resolveProfileTargetFromPoint(
-                      event.clientX,
-                      event.clientY
-                    );
-                    if (!target) return;
-                    setDragOverId(target.id);
-                    maybeSwapProfiles({
-                      targetId: target.id,
-                      targetNode: target.node,
-                      clientX: event.clientX,
-                      clientY: event.clientY,
-                    });
-                  }}
-                  onPointerUp={(event) => {
-                    event.stopPropagation();
-                    if (event.pointerType !== "touch") return;
-                    if (activePointerIdRef.current !== event.pointerId) return;
-                    clearLongPressTimer();
-                    try {
-                      event.currentTarget.releasePointerCapture(event.pointerId);
-                    } catch {
-                      // no-op
-                    }
-                    if (isTouchDraggingRef.current) {
-                      commitProfilesOrder(
-                        previewOrderRef.current ?? previewOrder ?? displayedProfiles
-                      );
-                    }
-                    clearDragState();
-                  }}
-                  onPointerCancel={(event) => {
-                    event.stopPropagation();
-                    if (event.pointerType !== "touch") return;
-                    if (activePointerIdRef.current !== event.pointerId) return;
-                    clearDragState();
-                  }}
-                  onContextMenu={(event) => {
-                    event.preventDefault();
-                  }}
-                  className="inline-flex cursor-grab items-center rounded p-0.5 active:cursor-grabbing hover:bg-black/10 dark:hover:bg-white/10"
-                  aria-label={`Reordenar perfil ${profile.name}`}
-                  title={`Reordenar perfil ${profile.name}`}
-                >
-                  <GripVertical size={12} className="shrink-0" />
-                </button>
-                <span>{profile.name}</span>
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    openEditManager(profile.id);
-                  }}
-                  onPointerDown={(event) => {
-                    event.stopPropagation();
-                  }}
-                  onDragStart={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                  }}
-                  className="ml-1 inline-flex rounded p-0.5 hover:bg-black/10 dark:hover:bg-white/10"
-                  aria-label={`Editar perfil ${profile.name}`}
-                  title={`Editar perfil ${profile.name}`}
-                >
-                  <Pencil size={12} />
-                </button>
-              </div>
-            );
-          }
-
-          return (
-            <button
-              key={profile.id}
-              ref={(node) => registerProfileNode(profile.id, node)}
-              type="button"
-              onClick={() => toggleSelectedProfile(profile.id)}
-              aria-pressed={selected}
-              className={chipClass}
-            >
-              <ProfileIcon icon={profile.icon} size={12} className="shrink-0" />
-              <span>{profile.name}</span>
-            </button>
-          );
-        })}
-
-        {isGlobalEditMode ? (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={openCreateManager}
-            className={ADD_BUTTON_CLASS}
-            aria-label="Criar novo perfil"
-            title="Novo perfil"
+    <div
+      className={`${compact ? "w-full min-h-9 justify-center" : "mb-2 min-h-9 justify-center"} flex flex-wrap items-center gap-2`}
+    >
+      {profiles.map((profile) => {
+        const selected = selectedSet.has(profile.id);
+        return (
+          <button
+            key={profile.id}
+            type="button"
+            aria-pressed={selected}
+            onClick={() => toggleSelectedProfile(profile.id)}
+            className={`inline-flex min-h-8 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium shadow-sm transition-colors ${MOTION_CLASS} ${
+              selected
+                ? "border-neutral-900 bg-neutral-900 text-neutral-50 hover:bg-neutral-800 dark:border-neutral-100 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-200"
+                : "border-border/80 bg-background text-foreground/75 hover:bg-muted hover:text-foreground dark:bg-background/70"
+            }`}
           >
-            <Plus size={14} />
-          </Button>
-        ) : null}
-
-        <Button
-          variant={isGlobalEditMode ? "toolActive" : "outline"}
-          size="sm"
-          className="h-8 rounded-full px-3 shadow-sm"
-          onClick={() => onGlobalEditModeChange?.(!isGlobalEditMode)}
-          aria-label={isGlobalEditMode ? "Finalizar edição" : "Ativar edição"}
-          title={isGlobalEditMode ? "Finalizar organização" : "Organizar perfis e categorias"}
-        >
-          {isGlobalEditMode ? (
-            <>
-              <Check size={14} />
-              Concluir
-            </>
-          ) : (
-            <>
-              <Pencil size={14} />
-              Organizar
-            </>
-          )}
-        </Button>
-      </div>
-
-      <ProfileManager
-        open={managerOpen}
-        onOpenChange={(open) => {
-          setManagerOpen(open);
-          if (!open) {
-            setManagerIntent(null);
-          }
-        }}
-        intent={managerIntent ?? undefined}
-      />
-    </>
+            <ProfileIcon icon={profile.icon} size={12} className="shrink-0" />
+            <span>{profile.name}</span>
+          </button>
+        );
+      })}
+    </div>
   );
 }

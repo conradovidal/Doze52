@@ -419,7 +419,12 @@ export function MonthRow({
           style={{ gridTemplateColumns: "repeat(37, minmax(0, 1fr))" }}
         >
           {dayInfos.map((day) => (
-            <div key={`${monthIndex}-${day.col}`} className="border-l border-border">
+            <div
+              key={`${monthIndex}-${day.col}`}
+              className={`border-l ${
+                day.col % 7 === 1 ? "border-border/85" : "border-border/45"
+              } ${day.col === COLUMNS ? "border-r border-border/70" : ""}`}
+            >
               <DayCell
                 date={day.date}
                 dateIso={day.iso}
