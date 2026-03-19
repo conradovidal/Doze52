@@ -492,7 +492,7 @@ export function YearGrid({
               title={QUARTER_LABELS[group.quarterIndex]}
               className={cn(
                 LATERAL_KEY_BASE_CLASS,
-                "w-[1.95rem] shrink-0 border-r border-border/85 px-0 shadow-[inset_-1px_0_0_rgba(255,255,255,0.3)] min-[420px]:w-[2.1rem] md:w-[2.25rem] dark:shadow-[inset_-1px_0_0_rgba(255,255,255,0.05)]",
+                "h-auto self-stretch w-[1.95rem] shrink-0 border-r border-border/85 px-0 shadow-[inset_-1px_0_0_rgba(255,255,255,0.3)] min-[420px]:w-[2.1rem] md:w-[2.25rem] dark:shadow-[inset_-1px_0_0_rgba(255,255,255,0.05)]",
                 quarterRailShapeClass,
                 isQuarterSelected ? LATERAL_KEY_ACTIVE_CLASS : LATERAL_KEY_REST_CLASS
               )}

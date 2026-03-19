@@ -544,7 +544,7 @@ export function MonthRow({
             aria-pressed={monthLabelActive}
             className={cn(
               LATERAL_KEY_BASE_CLASS,
-              "px-1 py-2.5 min-[420px]:px-1.5 md:px-2",
+              "h-full px-1 py-2.5 min-[420px]:px-1.5 md:px-2",
               monthLabelActive ? LATERAL_KEY_ACTIVE_CLASS : LATERAL_KEY_REST_CLASS
             )}
             style={{ minHeight: `${minHeightPx}px` }}
