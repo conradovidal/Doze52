@@ -19,6 +19,11 @@ import {
   isSingleDayEvent,
 } from "@/lib/event-order";
 import { cn } from "@/lib/utils";
+import {
+  LATERAL_KEY_ACTIVE_CLASS,
+  LATERAL_KEY_BASE_CLASS,
+  LATERAL_KEY_REST_CLASS,
+} from "./lateral-key-styles";
 import { MonthRow } from "./month-row";
 
 type ReorderTarget = {
@@ -452,17 +457,12 @@ export function YearGrid({
 
   const density = "year";
   const canvasWidthClass = "min-w-[49rem] min-[420px]:min-w-[55rem] md:min-w-0";
-  const visibleMonthIndices = React.useMemo(
-    () => quarterGroups.flatMap((group) => group.monthIndices),
-    [quarterGroups]
-  );
 
   const annualContent = (
     <div className="overflow-hidden">
       {quarterGroups.map((group, groupIndex) => {
         const isActiveQuarter = viewMode !== "year" && group.quarterIndex === resolvedQuarter;
-        const isQuarterContext = viewMode === "month" && isActiveQuarter;
-        const isQuarterFocus = viewMode === "quarter" && isActiveQuarter;
+        const isQuarterSelected = isActiveQuarter;
         const isFirstVisibleGroup = groupIndex === 0;
         const isLastVisibleGroup = groupIndex === quarterGroups.length - 1;
         const quarterRailShapeClass =
@@ -483,7 +483,7 @@ export function YearGrid({
               onClick={() => handleQuarterRailClick(group.quarterIndex)}
               aria-label={
                 isActiveQuarter
-                  ? isQuarterFocus
+                  ? viewMode === "quarter"
                     ? `Voltar para o ano inteiro a partir de ${QUARTER_LABELS[group.quarterIndex]}`
                     : `Mostrar ${QUARTER_LABELS[group.quarterIndex]}`
                   : `Abrir ${QUARTER_LABELS[group.quarterIndex]}`
@@ -491,14 +491,10 @@ export function YearGrid({
               aria-pressed={isActiveQuarter}
               title={QUARTER_LABELS[group.quarterIndex]}
               className={cn(
-                "group relative isolate flex w-[1.95rem] shrink-0 cursor-pointer select-none items-center justify-center border-r border-border/85 px-0 text-muted-foreground transition-[transform,background-color,color,box-shadow] duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/45 active:translate-y-[1px] active:scale-[0.985] min-[420px]:w-[2.1rem] md:w-[2.25rem]",
-                "bg-[linear-gradient(180deg,rgba(255,255,255,0.78),rgba(244,244,245,0.94))] shadow-[inset_-1px_0_0_rgba(255,255,255,0.3)] dark:bg-[linear-gradient(180deg,rgba(38,38,38,0.9),rgba(28,28,30,0.98))] dark:shadow-[inset_-1px_0_0_rgba(255,255,255,0.05)]",
+                LATERAL_KEY_BASE_CLASS,
+                "w-[1.95rem] shrink-0 border-r border-border/85 px-0 shadow-[inset_-1px_0_0_rgba(255,255,255,0.3)] min-[420px]:w-[2.1rem] md:w-[2.25rem] dark:shadow-[inset_-1px_0_0_rgba(255,255,255,0.05)]",
                 quarterRailShapeClass,
-                isQuarterFocus
-                  ? "bg-neutral-300/92 text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.34),inset_0_-1px_0_rgba(82,82,91,0.14)] hover:bg-neutral-400/92 hover:text-foreground hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.32),inset_0_-1px_0_rgba(82,82,91,0.18)] active:bg-neutral-300/92 dark:bg-neutral-700/92 dark:text-neutral-100 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),inset_0_-1px_0_rgba(0,0,0,0.2)] dark:hover:bg-neutral-600/92 dark:hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),inset_0_-1px_0_rgba(0,0,0,0.24)] dark:active:bg-neutral-700/92"
-                  : isQuarterContext
-                    ? "bg-neutral-300/92 text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.34),inset_0_-1px_0_rgba(82,82,91,0.14)] hover:bg-neutral-400/92 hover:text-foreground hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.32),inset_0_-1px_0_rgba(82,82,91,0.18)] active:bg-neutral-300/92 dark:bg-neutral-700/92 dark:text-neutral-100 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),inset_0_-1px_0_rgba(0,0,0,0.2)] dark:hover:bg-neutral-600/92 dark:hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),inset_0_-1px_0_rgba(0,0,0,0.24)] dark:active:bg-neutral-700/92"
-                    : "bg-transparent hover:bg-neutral-200/78 hover:text-foreground/88 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.26)] active:bg-transparent dark:hover:bg-neutral-700/48 dark:hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
+                isQuarterSelected ? LATERAL_KEY_ACTIVE_CLASS : LATERAL_KEY_REST_CLASS
               )}
             >
               <span
@@ -511,9 +507,6 @@ export function YearGrid({
             <div className="min-w-0 flex-1">
               {group.monthIndices.map((monthIndex) => {
                 const isActiveMonth = viewMode === "month" && monthIndex === resolvedMonth;
-                const isFirstVisibleMonth = monthIndex === visibleMonthIndices[0];
-                const isLastVisibleMonth =
-                  monthIndex === visibleMonthIndices[visibleMonthIndices.length - 1];
                 return (
                   <MonthRow
                     key={monthIndex}
@@ -544,8 +537,6 @@ export function YearGrid({
                         : `Abrir ${MONTH_TITLE_LABELS[monthIndex]}`
                     }
                     monthLabelActive={isActiveMonth}
-                    isFirstVisibleMonth={isFirstVisibleMonth}
-                    isLastVisibleMonth={isLastVisibleMonth}
                   />
                 );
               })}
