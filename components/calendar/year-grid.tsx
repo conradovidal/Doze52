@@ -66,7 +66,7 @@ const QUARTER_LABELS = [
   "4o trimestre",
 ] as const;
 
-const QUARTER_SHORT_LABELS = ["1o tri", "2o tri", "3o tri", "4o tri"] as const;
+const QUARTER_SHORT_LABELS = ["Q1", "Q2", "Q3", "Q4"] as const;
 
 const MONTH_TITLE_LABELS = [
   "Janeiro",
@@ -396,10 +396,16 @@ export function YearGrid({
 
   const handleQuarterRailClick = React.useCallback(
     (quarterIndex: QuarterIndex) => {
-      if (viewMode !== "year" && quarterIndex === resolvedQuarter) {
+      if (quarterIndex === resolvedQuarter && viewMode === "quarter") {
         setCalendarViewMode("year");
         return;
       }
+
+      if (quarterIndex === resolvedQuarter && viewMode === "month") {
+        focusQuarter(quarterIndex);
+        return;
+      }
+
       focusQuarter(quarterIndex);
     },
     [focusQuarter, resolvedQuarter, setCalendarViewMode, viewMode]
@@ -444,28 +450,15 @@ export function YearGrid({
     ];
   }, [resolvedMonth, resolvedQuarter, viewMode]);
 
-  const density = viewMode;
-  const canvasWidthClass =
-    viewMode === "year"
-      ? "min-w-[49rem] min-[420px]:min-w-[55rem] md:min-w-0"
-      : viewMode === "quarter"
-        ? "min-w-[43rem] min-[420px]:min-w-[47rem] md:min-w-0"
-        : "min-w-[37rem] min-[420px]:min-w-[41rem] md:min-w-0";
-
-  const handleFocusBackdropClick = React.useCallback(
-    (event: React.MouseEvent<HTMLDivElement>) => {
-      if (viewMode === "year") return;
-      const target = event.target as HTMLElement | null;
-      if (target?.closest("[data-calendar-focus-area='true']")) return;
-      setCalendarViewMode("year");
-    },
-    [setCalendarViewMode, viewMode]
-  );
+  const density = "year";
+  const canvasWidthClass = "min-w-[49rem] min-[420px]:min-w-[55rem] md:min-w-0";
 
   const annualContent = (
-    <div data-calendar-focus-area="true" className="overflow-hidden">
+    <div className="overflow-hidden">
       {quarterGroups.map((group) => {
         const isActiveQuarter = viewMode !== "year" && group.quarterIndex === resolvedQuarter;
+        const isQuarterContext = viewMode === "month" && isActiveQuarter;
+        const isQuarterFocus = viewMode === "quarter" && isActiveQuarter;
         return (
           <div
             key={group.key}
@@ -476,22 +469,25 @@ export function YearGrid({
               onClick={() => handleQuarterRailClick(group.quarterIndex)}
               aria-label={
                 isActiveQuarter
-                  ? `Voltar para o ano inteiro a partir de ${QUARTER_LABELS[group.quarterIndex]}`
+                  ? isQuarterFocus
+                    ? `Voltar para o ano inteiro a partir de ${QUARTER_LABELS[group.quarterIndex]}`
+                    : `Mostrar ${QUARTER_LABELS[group.quarterIndex]}`
                   : `Abrir ${QUARTER_LABELS[group.quarterIndex]}`
               }
               aria-pressed={isActiveQuarter}
               title={QUARTER_LABELS[group.quarterIndex]}
               className={cn(
-                "group flex w-7 shrink-0 items-center justify-center border-r border-border/65 px-1 text-muted-foreground transition-colors duration-150 min-[420px]:w-8 md:w-9",
+                "group flex w-[1.85rem] shrink-0 items-center justify-center border-r border-border/65 px-0 text-muted-foreground transition-[background-color,color,box-shadow] duration-150 min-[420px]:w-[2rem] md:w-[2.15rem]",
                 "bg-[linear-gradient(180deg,rgba(255,255,255,0.78),rgba(244,244,245,0.94))] dark:bg-[linear-gradient(180deg,rgba(38,38,38,0.9),rgba(28,28,30,0.98))]",
-                isActiveQuarter
-                  ? "bg-neutral-900 text-neutral-50 dark:bg-neutral-100 dark:text-neutral-900"
-                  : "hover:bg-background/76 hover:text-foreground"
+                isQuarterFocus
+                  ? "bg-background/92 text-foreground shadow-[inset_0_0_0_1px_rgba(63,63,70,0.18)] dark:bg-background/72 dark:shadow-[inset_0_0_0_1px_rgba(244,244,245,0.14)]"
+                  : isQuarterContext
+                    ? "bg-background/72 text-foreground/90 shadow-[inset_0_0_0_1px_rgba(63,63,70,0.14)] dark:bg-background/58 dark:shadow-[inset_0_0_0_1px_rgba(244,244,245,0.1)]"
+                    : "hover:bg-background/72 hover:text-foreground/88"
               )}
             >
               <span
-                className="text-[9px] font-semibold uppercase tracking-[0.18em] min-[420px]:text-[10px]"
-                style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
+                className="block -rotate-90 whitespace-nowrap text-[10px] font-medium uppercase tracking-[0.08em] min-[420px]:text-[10.5px] md:text-[11px]"
               >
                 {QUARTER_SHORT_LABELS[group.quarterIndex]}
               </span>
@@ -547,18 +543,7 @@ export function YearGrid({
         canvasWidthClass
       )}
     >
-      {viewMode === "year" ? (
-        annualContent
-      ) : (
-        <div className="p-2 sm:p-3" onClick={handleFocusBackdropClick}>
-          <div
-            data-calendar-focus-area="true"
-            className="overflow-hidden rounded-[1.45rem] border border-border/70 bg-background/42 shadow-[inset_0_1px_0_rgba(255,255,255,0.32)] dark:bg-background/22"
-          >
-            {annualContent}
-          </div>
-        </div>
-      )}
+      {annualContent}
     </div>
   );
 }

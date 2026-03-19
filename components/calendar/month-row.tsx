@@ -57,7 +57,7 @@ const MONTH_LAYOUT_BY_DENSITY: Record<
 > = {
   year: {
     labelWidthClass:
-      "w-[2.95rem] min-[420px]:w-[3.15rem] md:w-[3.45rem] md:px-2.5",
+      "w-[2.8rem] min-[420px]:w-[3rem] md:w-[3.25rem] md:px-2",
     monthRowBaseMinHeightPx: MONTH_ROW_BASE_MIN_HEIGHT_PX + 8,
     monthMultiDayTopOffsetPx: MONTH_MULTI_DAY_TOP_OFFSET_PX + 2,
     monthSingleDayTopOffsetNoMultiPx: MONTH_SINGLE_DAY_TOP_OFFSET_NO_MULTI_PX + 2,
@@ -395,7 +395,7 @@ export function MonthRow({
     <div className="flex items-stretch border-b border-border/70 last:border-b-0">
       <div
         className={cn(
-          "flex flex-none items-center justify-center border-r border-border/65 bg-[linear-gradient(180deg,rgba(255,255,255,0.76),rgba(244,244,245,0.92))] px-1.5 py-3 text-muted-foreground dark:bg-[linear-gradient(180deg,rgba(38,38,38,0.9),rgba(28,28,30,0.98))]",
+          "flex flex-none items-center justify-center border-r border-border/65 bg-[linear-gradient(180deg,rgba(255,255,255,0.76),rgba(244,244,245,0.92))] px-1 py-2.5 text-muted-foreground dark:bg-[linear-gradient(180deg,rgba(38,38,38,0.9),rgba(28,28,30,0.98))]",
           layoutDensity.labelWidthClass
         )}
         style={{ minHeight: `${minHeightPx}px` }}
@@ -408,18 +408,18 @@ export function MonthRow({
             title={monthLabelAriaLabel ?? monthLabel}
             aria-pressed={monthLabelActive}
             className={cn(
-              "group flex h-full w-full items-center justify-center rounded-[1rem] px-1.5 py-2 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+              "group flex h-full w-full items-center justify-center rounded-[0.85rem] px-1 py-2 transition-[background-color,color,box-shadow] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35",
               monthLabelActive
-                ? "bg-foreground text-background shadow-[0_12px_24px_-20px_rgba(15,23,42,0.36)]"
-                : "text-foreground/78 hover:bg-background/72 hover:text-foreground"
+                ? "bg-background/92 text-foreground shadow-[inset_0_0_0_1px_rgba(63,63,70,0.18)] dark:bg-background/72 dark:shadow-[inset_0_0_0_1px_rgba(244,244,245,0.14)]"
+                : "text-foreground/72 hover:bg-background/72 hover:text-foreground/88"
             )}
           >
-            <span className="text-[10px] font-semibold uppercase tracking-[0.16em] min-[420px]:text-[11px] min-[420px]:tracking-[0.18em]">
+            <span className="text-[9.5px] font-medium uppercase tracking-[0.12em] min-[420px]:text-[10px] min-[420px]:tracking-[0.14em] md:text-[10.5px]">
               {monthLabel}
             </span>
           </button>
         ) : (
-          <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-foreground/78 min-[420px]:text-[11px] min-[420px]:tracking-[0.18em]">
+          <span className="text-[9.5px] font-medium uppercase tracking-[0.12em] text-foreground/72 min-[420px]:text-[10px] min-[420px]:tracking-[0.14em] md:text-[10.5px]">
             {monthLabel}
           </span>
         )}
