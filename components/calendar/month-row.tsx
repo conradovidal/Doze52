@@ -830,7 +830,7 @@ export function MonthRow({
                     className={`absolute inset-x-0 ${
                       draggingMultiDay
                         ? "pointer-events-none"
-                        : "pointer-events-auto"
+                        : "pointer-events-none"
                     }`}
                     style={{
                       top: `${eventsTopOffset}px`,
@@ -911,8 +911,15 @@ export function MonthRow({
                       e.stopPropagation();
                       onDayDrop(day.iso, e.dataTransfer);
                     }}
+                  >
+                    <div
+                      className={
+                        draggingSingleDay && !draggingMultiDay
+                          ? "relative pointer-events-auto"
+                          : "relative pointer-events-none"
+                      }
+                      style={{ minHeight: `${eventBandHeightPx}px` }}
                     >
-                    <div className="relative" style={{ minHeight: `${eventBandHeightPx}px` }}>
                       {previewLane !== null ? (
                         <div
                           className="absolute inset-x-0 z-0"
