@@ -6,7 +6,10 @@ import { Plus } from "lucide-react";
 import { YearGrid } from "@/components/calendar/year-grid";
 import { EventDialog } from "@/components/event-dialog";
 import { AppHeader } from "@/components/app-header";
-import type { SyncIndicatorState } from "@/components/sync-status-chip";
+import {
+  SyncStatusOverlay,
+  type SyncOverlayStatus,
+} from "@/components/sync-status-overlay";
 import { AuthDialog } from "@/components/auth/auth-dialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -71,6 +74,13 @@ type PendingSyncPayload = {
   savedAt: string;
   snapshot: CalendarSnapshot;
 };
+
+type RawSyncState =
+  | { state: "hidden" }
+  | { state: "loading" }
+  | { state: "saving" }
+  | { state: "synced" }
+  | { state: "error"; message: string; detail?: string | null; onRetry: () => void };
 
 const PENDING_SYNC_STORAGE_PREFIX = "pending-sync:";
 const isDetailedSyncDiagnosticsEnabled =
@@ -284,6 +294,11 @@ export default function HomePage() {
   const [isSyncing, setIsSyncing] = React.useState(false);
   const [isBootstrappingSync, setIsBootstrappingSync] = React.useState(false);
   const [hasQueuedSave, setHasQueuedSave] = React.useState(false);
+  const [syncOverlayStatus, setSyncOverlayStatus] = React.useState<SyncOverlayStatus | null>(
+    null
+  );
+  const [isSyncOverlayVisible, setIsSyncOverlayVisible] = React.useState(false);
+  const [isSyncOverlayErrorOpen, setIsSyncOverlayErrorOpen] = React.useState(false);
   const [remoteReady, setRemoteReady] = React.useState(false);
   const [syncBlocked, setSyncBlocked] = React.useState(false);
   const [calendarCreateOnboarding, setCalendarCreateOnboarding] = React.useState<
@@ -302,7 +317,11 @@ export default function HomePage() {
   const [todayIso, setTodayIso] = React.useState<string>("");
   const lastSyncedHashRef = React.useRef<string>("");
   const saveTimerRef = React.useRef<number | null>(null);
+  const syncOverlayTimerRef = React.useRef<number | null>(null);
   const previousSessionUserIdRef = React.useRef<string | null>(null);
+  const previousRawSyncStateRef = React.useRef<RawSyncState["state"]>("hidden");
+  const shouldHideSyncOverlayAfterCloseRef = React.useRef(false);
+  const syncOverlayErrorOpenRef = React.useRef(false);
   const profilesRef = React.useRef(profiles);
   const categoriesRef = React.useRef(categories);
   const eventsRef = React.useRef(events);
@@ -819,7 +838,7 @@ export default function HomePage() {
     setSyncError(null);
     void bootstrapRemote();
   }, [bootstrapRemote]);
-  const syncStatus = React.useMemo<SyncIndicatorState>(() => {
+  const rawSyncState = React.useMemo<RawSyncState>(() => {
     if (!session?.user.id) {
       return { state: "hidden" };
     }
@@ -852,6 +871,91 @@ export default function HomePage() {
     syncDebugDetail,
     syncError,
   ]);
+  const clearSyncOverlayTimer = React.useCallback(() => {
+    if (syncOverlayTimerRef.current !== null) {
+      window.clearTimeout(syncOverlayTimerRef.current);
+      syncOverlayTimerRef.current = null;
+    }
+  }, []);
+  const handleSyncOverlayErrorOpenChange = React.useCallback((open: boolean) => {
+    syncOverlayErrorOpenRef.current = open;
+    setIsSyncOverlayErrorOpen(open);
+    if (!open && shouldHideSyncOverlayAfterCloseRef.current) {
+      shouldHideSyncOverlayAfterCloseRef.current = false;
+      setIsSyncOverlayVisible(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    if (windowContext !== "main") return;
+
+    const previousState = previousRawSyncStateRef.current;
+    previousRawSyncStateRef.current = rawSyncState.state;
+
+    if (rawSyncState.state === "hidden") {
+      clearSyncOverlayTimer();
+      shouldHideSyncOverlayAfterCloseRef.current = false;
+      syncOverlayErrorOpenRef.current = false;
+      setIsSyncOverlayErrorOpen(false);
+      setIsSyncOverlayVisible(false);
+      setSyncOverlayStatus(null);
+      return;
+    }
+
+    if (rawSyncState.state === "loading" || rawSyncState.state === "saving") {
+      clearSyncOverlayTimer();
+      shouldHideSyncOverlayAfterCloseRef.current = false;
+      syncOverlayErrorOpenRef.current = false;
+      setIsSyncOverlayErrorOpen(false);
+      setSyncOverlayStatus(rawSyncState);
+      setIsSyncOverlayVisible(true);
+      return;
+    }
+
+    if (rawSyncState.state === "error") {
+      clearSyncOverlayTimer();
+      shouldHideSyncOverlayAfterCloseRef.current = false;
+      syncOverlayErrorOpenRef.current = false;
+      setIsSyncOverlayErrorOpen(false);
+      setSyncOverlayStatus(rawSyncState);
+      setIsSyncOverlayVisible(true);
+      syncOverlayTimerRef.current = window.setTimeout(() => {
+        if (syncOverlayErrorOpenRef.current) {
+          shouldHideSyncOverlayAfterCloseRef.current = true;
+          return;
+        }
+        setIsSyncOverlayVisible(false);
+      }, 6000);
+      return;
+    }
+
+    if (rawSyncState.state === "synced") {
+      const shouldShowSuccess =
+        previousState === "loading" ||
+        previousState === "saving" ||
+        previousState === "error";
+
+      clearSyncOverlayTimer();
+      shouldHideSyncOverlayAfterCloseRef.current = false;
+      syncOverlayErrorOpenRef.current = false;
+      setIsSyncOverlayErrorOpen(false);
+      if (!shouldShowSuccess) {
+        setIsSyncOverlayVisible(false);
+        return;
+      }
+      setSyncOverlayStatus(rawSyncState);
+      setIsSyncOverlayVisible(true);
+      syncOverlayTimerRef.current = window.setTimeout(() => {
+        setIsSyncOverlayVisible(false);
+      }, 1000);
+    }
+  }, [clearSyncOverlayTimer, rawSyncState, windowContext]);
+
+  React.useEffect(() => {
+    return () => {
+      clearSyncOverlayTimer();
+    };
+  }, [clearSyncOverlayTimer]);
   const showDesktopCreateCoachmark =
     calendarCreateOnboarding === "pending" && isMobileCalendarUi === false;
   const showMobileCreateCoachmark =
@@ -875,13 +979,18 @@ export default function HomePage() {
 
   return (
     <main className="mx-auto w-full max-w-none overflow-x-hidden px-4 pt-3 pb-2 md:pb-4">
+      <SyncStatusOverlay
+        status={syncOverlayStatus}
+        visible={isSyncOverlayVisible}
+        errorPopoverOpen={isSyncOverlayErrorOpen}
+        onErrorPopoverOpenChange={handleSyncOverlayErrorOpenChange}
+      />
       <div className="sticky top-0 z-30 -mx-4 px-4 pb-2 bg-background/92 backdrop-blur supports-[backdrop-filter]:bg-background/82 md:static md:mx-0 md:px-0 md:pb-0 md:bg-transparent md:backdrop-blur-none">
         <AppHeader
           year={year}
           onYearChange={handleYearChange}
           authLoading={authLoading}
           isAuthenticated={Boolean(session)}
-          syncStatus={syncStatus}
           onOpenAuthDialog={(anchorPoint) => {
             setAuthDialogAnchorPoint(anchorPoint);
             setAuthDialogOpen(true);
