@@ -70,6 +70,7 @@ export function DayCell({
   const dayNumberToneClass = isWeekend
     ? "text-neutral-500 dark:text-neutral-300"
     : "text-muted-foreground dark:text-neutral-200";
+  const showCenterCreateCue = showCreateCue && !today && !isRangeSelected;
 
   return (
     <div
@@ -109,12 +110,18 @@ export function DayCell({
         onActivate?.(dateIso);
       }}
     >
-      {showCreateCue ? (
-        <div className="pointer-events-none absolute top-1.5 right-1.5 grid h-4 w-4 place-items-center rounded-full bg-white/82 text-[11px] font-semibold text-muted-foreground opacity-0 shadow-[0_8px_16px_-14px_rgba(15,23,42,0.28)] ring-1 ring-border/60 transition-all duration-150 group-hover:opacity-100 dark:bg-neutral-900/78 dark:text-neutral-200 dark:ring-white/10">
-          +
+      {showCenterCreateCue ? (
+        <div className="pointer-events-none absolute inset-0 grid place-items-center opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+          <span className="text-[18px] font-medium leading-none text-foreground/28 dark:text-neutral-100/26">
+            +
+          </span>
         </div>
       ) : null}
-      <div className={`grid h-6 w-full flex-none place-items-center px-0.5 text-[12px] ${dayNumberToneClass}`}>
+      <div
+        className={`grid h-6 w-full flex-none place-items-center px-0.5 text-[12px] ${dayNumberToneClass} ${
+          showCreateCue ? "pointer-events-none" : ""
+        }`}
+      >
         <span
           className={`grid h-5 min-w-5 place-items-center rounded-full px-1 text-[12px] font-semibold leading-none tabular-nums transition-colors ${
             today
@@ -126,6 +133,9 @@ export function DayCell({
         </span>
       </div>
       <div className="mt-1 flex-1" />
+      {showCreateCue ? (
+        <div className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-transparent transition-all duration-150 group-hover:ring-neutral-300/45 dark:group-hover:ring-neutral-500/30" />
+      ) : null}
     </div>
   );
 }

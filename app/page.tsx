@@ -35,6 +35,12 @@ import {
   type CalendarSnapshot,
 } from "@/lib/sync";
 import { getTodayIsoInTimeZone } from "@/lib/date";
+import {
+  PRODUCT_ONBOARDING_RESET_EVENT,
+  readProductOnboardingState,
+  setProductOnboardingState,
+  type ProductOnboardingState,
+} from "@/lib/onboarding";
 import { logDevError, logProdError } from "@/lib/safe-log";
 import { getSupabaseBrowserClient, hasSupabaseEnv } from "@/lib/supabase";
 import { expandEventsForYear } from "@/lib/recurrence";
@@ -65,14 +71,7 @@ type PendingSyncPayload = {
   snapshot: CalendarSnapshot;
 };
 
-type CalendarCreateOnboardingState = "pending" | "dismissed" | "completed";
-type CalendarCreateOnboardingPayload = {
-  dismissedAt?: string;
-  completedAt?: string;
-};
-
 const PENDING_SYNC_STORAGE_PREFIX = "pending-sync:";
-const CALENDAR_CREATE_ONBOARDING_STORAGE_KEY = "doze52:create-onboarding:v1";
 const isDetailedSyncDiagnosticsEnabled =
   process.env.NODE_ENV !== "production" ||
   process.env.NEXT_PUBLIC_APP_ENV === "local" ||
@@ -132,37 +131,6 @@ const writePendingSyncSnapshot = (userId: string, snapshot: CalendarSnapshot) =>
 const clearPendingSyncSnapshot = (userId: string) => {
   if (typeof window === "undefined") return;
   window.localStorage.removeItem(getPendingSyncStorageKey(userId));
-};
-
-const readCalendarCreateOnboardingState = (): CalendarCreateOnboardingState => {
-  if (typeof window === "undefined") return "pending";
-  try {
-    const raw = window.localStorage.getItem(CALENDAR_CREATE_ONBOARDING_STORAGE_KEY);
-    if (!raw) return "pending";
-    const parsed = JSON.parse(raw) as CalendarCreateOnboardingPayload;
-    if (parsed.completedAt) return "completed";
-    if (parsed.dismissedAt) return "dismissed";
-    return "pending";
-  } catch {
-    return "pending";
-  }
-};
-
-const persistCalendarCreateOnboardingState = (
-  state: Exclude<CalendarCreateOnboardingState, "pending">
-) => {
-  if (typeof window === "undefined") return;
-  const nowIso = new Date().toISOString();
-  const payload: CalendarCreateOnboardingPayload =
-    state === "completed" ? { completedAt: nowIso } : { dismissedAt: nowIso };
-  try {
-    window.localStorage.setItem(
-      CALENDAR_CREATE_ONBOARDING_STORAGE_KEY,
-      JSON.stringify(payload)
-    );
-  } catch {
-    // Ignore storage failures; the onboarding will simply reappear.
-  }
 };
 
 const formatSyncDebugDetail = (error: SyncUiError) => {
@@ -316,7 +284,7 @@ export default function HomePage() {
   const [remoteReady, setRemoteReady] = React.useState(false);
   const [syncBlocked, setSyncBlocked] = React.useState(false);
   const [calendarCreateOnboarding, setCalendarCreateOnboarding] = React.useState<
-    CalendarCreateOnboardingState | null
+    ProductOnboardingState | null
   >(null);
   const [isMobileCalendarUi, setIsMobileCalendarUi] = React.useState<boolean | null>(null);
   const [windowContext] = React.useState<"main" | "popup">(() => {
@@ -539,7 +507,14 @@ export default function HomePage() {
 
   React.useEffect(() => {
     if (windowContext !== "main") return;
-    setCalendarCreateOnboarding(readCalendarCreateOnboardingState());
+    const syncCreateOnboarding = () => {
+      setCalendarCreateOnboarding(readProductOnboardingState("create-event"));
+    };
+
+    syncCreateOnboarding();
+    window.addEventListener(PRODUCT_ONBOARDING_RESET_EVENT, syncCreateOnboarding);
+    return () =>
+      window.removeEventListener(PRODUCT_ONBOARDING_RESET_EVENT, syncCreateOnboarding);
   }, [windowContext]);
 
   React.useEffect(() => {
@@ -592,7 +567,7 @@ export default function HomePage() {
     if (windowContext !== "main") return;
     if (calendarCreateOnboarding !== "pending") return;
     if (events.length === 0) return;
-    persistCalendarCreateOnboardingState("completed");
+    setProductOnboardingState("create-event", "completed");
     setCalendarCreateOnboarding("completed");
   }, [calendarCreateOnboarding, events.length, windowContext]);
 
@@ -771,12 +746,12 @@ export default function HomePage() {
   };
 
   const dismissCalendarCreateOnboarding = React.useCallback(() => {
-    persistCalendarCreateOnboardingState("dismissed");
+    setProductOnboardingState("create-event", "dismissed");
     setCalendarCreateOnboarding("dismissed");
   }, []);
 
   const completeCalendarCreateOnboarding = React.useCallback(() => {
-    persistCalendarCreateOnboardingState("completed");
+    setProductOnboardingState("create-event", "completed");
     setCalendarCreateOnboarding("completed");
   }, []);
 

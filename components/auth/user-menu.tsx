@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Download, LogOut } from "lucide-react";
+import { Download, LogOut, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useFeedback } from "@/components/ui/feedback-provider";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useAuth } from "@/lib/auth";
+import { resetAllProductOnboarding } from "@/lib/onboarding";
 import { exportUserData, saveSnapshot } from "@/lib/sync";
 import { logDevError, logProdError } from "@/lib/safe-log";
 import { useStore } from "@/lib/store";
@@ -140,6 +141,24 @@ export function UserMenu() {
             >
               <Download size={14} className="mr-2" />
               {isExporting ? "Exportando..." : "Exportar dados"}
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full justify-start rounded-xl"
+              onClick={() => {
+                resetAllProductOnboarding();
+                setOpen(false);
+                notify({
+                  tone: "success",
+                  title: "Tour reiniciado",
+                  description: "As dicas iniciais voltaram a ficar disponíveis.",
+                });
+              }}
+            >
+              <Sparkles size={14} className="mr-2" />
+              Refazer tour
             </Button>
 
             <Button
