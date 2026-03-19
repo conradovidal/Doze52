@@ -14,7 +14,6 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -29,8 +28,7 @@ import type { CategoryItem } from "@/lib/types";
 
 const TAB_BASE_CLASS =
   "inline-flex min-h-8 items-center justify-center rounded-full px-3 py-1.5 text-sm font-medium transition-[background-color,color,box-shadow]";
-const SECTION_CLASS =
-  "rounded-[1.35rem] border border-border/65 bg-card/58 p-4 transition-colors";
+const SECTION_CLASS = "space-y-3";
 const LIST_CLASS = "overflow-hidden rounded-[1.1rem] border border-border/55 bg-background/78";
 const ROW_SHELL_CLASS =
   "group flex items-stretch gap-0 border-b border-border/55 transition-[background-color,border-color] last:border-b-0";
@@ -39,6 +37,19 @@ const HANDLE_BUTTON_CLASS =
 const ROW_BUTTON_CLASS =
   "flex min-w-0 flex-1 cursor-pointer items-center gap-3 px-3 py-3 text-left transition-[background-color,box-shadow,color,transform] hover:bg-muted/35 focus-visible:bg-muted/38 focus-visible:ring-2 focus-visible:ring-ring/20 active:bg-muted/45";
 const MOBILE_REORDER_GROUP_CLASS = "flex shrink-0 items-center gap-0.5 px-2 sm:hidden";
+
+const setFullRowDragImage = (
+  event: React.DragEvent<HTMLButtonElement>,
+  row: HTMLElement | null
+) => {
+  if (!row) return;
+  const rect = row.getBoundingClientRect();
+  event.dataTransfer.setDragImage(
+    row,
+    Math.max(20, event.clientX - rect.left),
+    Math.max(16, event.clientY - rect.top)
+  );
+};
 
 const moveInArray = <T extends { id: string }>(items: T[], sourceId: string, targetId: string) => {
   const sourceIndex = items.findIndex((item) => item.id === sourceId);
@@ -182,11 +193,8 @@ export function OrganizeWorkspaceDialog({
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="top-auto bottom-2 max-h-[calc(100dvh-0.5rem)] w-[calc(100%-1rem)] max-w-[calc(100%-1rem)] translate-y-0 overflow-hidden rounded-[1.85rem] border-border/80 bg-background/98 px-0 pb-0 pt-0 shadow-[0_28px_70px_-34px_rgba(15,23,42,0.34)] sm:top-1/2 sm:bottom-auto sm:w-full sm:max-w-[780px] sm:-translate-y-1/2 sm:px-0 sm:pb-0">
           <div className="sticky top-0 z-10 border-b border-border/60 bg-background/94 px-5 pb-4 pt-5 backdrop-blur sm:px-6">
-            <DialogHeader className="gap-1">
+            <DialogHeader>
               <DialogTitle>Organizar workspace</DialogTitle>
-              <DialogDescription>
-                Ajuste perfis e categorias sem poluir a leitura principal do calendario.
-              </DialogDescription>
             </DialogHeader>
 
             <div className="mt-4 inline-flex rounded-full border border-border/70 bg-muted/35 p-1">
@@ -220,13 +228,7 @@ export function OrganizeWorkspaceDialog({
           <div className="max-h-[calc(100dvh-11rem)] overflow-y-auto px-5 pb-5 pt-4 sm:max-h-[33rem] sm:px-6 sm:pb-6">
             {activeTab === "profiles" ? (
               <section className={SECTION_CLASS}>
-                <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                  <div className="space-y-1">
-                    <p className="text-sm font-semibold text-foreground">Perfis</p>
-                    <p className="max-w-md text-xs leading-5 text-muted-foreground">
-                      Reordene a identidade principal do workspace e ajuste cada perfil sem mexer nos filtros.
-                    </p>
-                  </div>
+                <div className="flex justify-end">
                   <Button
                     variant="outline"
                     size="sm"
@@ -241,7 +243,7 @@ export function OrganizeWorkspaceDialog({
                 <div className={LIST_CLASS}>
                   {profiles.length === 0 ? (
                     <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-                      Nenhum perfil criado ainda.
+                      Nenhum perfil ainda.
                     </div>
                   ) : (
                     profiles.map((profile, index) => {
@@ -252,10 +254,13 @@ export function OrganizeWorkspaceDialog({
                       return (
                         <div
                           key={profile.id}
+                          data-reorder-row
                           className={`${ROW_SHELL_CLASS} ${
-                            dragOverProfileId === profile.id
-                              ? "bg-muted/28"
-                              : "hover:bg-muted/12"
+                            draggingProfileId === profile.id
+                              ? "bg-muted/30 opacity-75"
+                              : dragOverProfileId === profile.id
+                                ? "bg-muted/28"
+                                : "hover:bg-muted/12"
                           }`}
                           onDragOver={(event) => {
                             event.preventDefault();
@@ -277,6 +282,10 @@ export function OrganizeWorkspaceDialog({
                               setDragOverProfileId(profile.id);
                               event.dataTransfer.effectAllowed = "move";
                               event.dataTransfer.setData("text/plain", profile.id);
+                              setFullRowDragImage(
+                                event,
+                                event.currentTarget.closest("[data-reorder-row]")
+                              );
                             }}
                             onDragEnd={() => {
                               setDraggingProfileId(null);
@@ -348,61 +357,56 @@ export function OrganizeWorkspaceDialog({
               </section>
             ) : (
               <section className={SECTION_CLASS}>
-                <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                  <div className="flex-1 space-y-1">
-                    <p className="text-sm font-semibold text-foreground">Categorias</p>
-                    <p className="max-w-md text-xs leading-5 text-muted-foreground">
-                      Escolha um perfil e ajuste a ordem visual das categorias exibidas nos filtros.
-                    </p>
-                  </div>
-                  <div className="flex flex-col gap-2 sm:min-w-[260px] sm:flex-row sm:items-center">
-                    <Select value={categoryProfileId} onValueChange={setCategoryProfileId}>
-                      <SelectTrigger className="h-9 rounded-full border-border/65 bg-background/80 px-3 shadow-none">
-                        <span className="truncate">
-                          {profiles.find((profile) => profile.id === categoryProfileId)?.name ?? "Perfil"}
-                        </span>
-                      </SelectTrigger>
-                      <SelectContent>
-                        {profiles.map((profile) => (
-                          <SelectItem key={profile.id} value={profile.id}>
-                            <span className="inline-flex items-center gap-2">
-                              <ProfileIcon icon={profile.icon} size={12} />
-                              {profile.name}
-                            </span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-9 rounded-full border-border/65 bg-background/80 px-3.5 shadow-none hover:bg-muted/40"
-                      disabled={!categoryProfileId}
-                      onClick={() => setCategoryCreateOpen(true)}
-                    >
-                      <Plus className="h-4 w-4" />
-                      Nova categoria
-                    </Button>
-                  </div>
+                <div className="flex flex-col gap-2 sm:min-w-[260px] sm:flex-row sm:items-center sm:justify-end">
+                  <Select value={categoryProfileId} onValueChange={setCategoryProfileId}>
+                    <SelectTrigger className="h-9 rounded-full border-border/65 bg-background/80 px-3 shadow-none sm:min-w-[220px]">
+                      <span className="truncate">
+                        {profiles.find((profile) => profile.id === categoryProfileId)?.name ?? "Perfil"}
+                      </span>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {profiles.map((profile) => (
+                        <SelectItem key={profile.id} value={profile.id}>
+                          <span className="inline-flex items-center gap-2">
+                            <ProfileIcon icon={profile.icon} size={12} />
+                            {profile.name}
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-9 rounded-full border-border/65 bg-background/80 px-3.5 shadow-none hover:bg-muted/40"
+                    disabled={!categoryProfileId}
+                    onClick={() => setCategoryCreateOpen(true)}
+                  >
+                    <Plus className="h-4 w-4" />
+                    Nova categoria
+                  </Button>
                 </div>
 
                 <div className={LIST_CLASS}>
                   {!categoryProfileId ? (
                     <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-                      Crie um perfil antes de organizar categorias.
+                      Crie um perfil primeiro.
                     </div>
                   ) : categoriesForProfile.length === 0 ? (
                     <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-                      Nenhuma categoria neste perfil.
+                      Nenhuma categoria nesse perfil.
                     </div>
                   ) : (
                     categoriesForProfile.map((category, index) => (
                       <div
                         key={category.id}
+                        data-reorder-row
                         className={`${ROW_SHELL_CLASS} ${
-                          dragOverCategoryId === category.id
-                            ? "bg-muted/28"
-                            : "hover:bg-muted/12"
+                          draggingCategoryId === category.id
+                            ? "bg-muted/30 opacity-75"
+                            : dragOverCategoryId === category.id
+                              ? "bg-muted/28"
+                              : "hover:bg-muted/12"
                         }`}
                         onDragOver={(event) => {
                           event.preventDefault();
@@ -420,11 +424,15 @@ export function OrganizeWorkspaceDialog({
                           type="button"
                           draggable
                           onDragStart={(event) => {
-                            setDraggingCategoryId(category.id);
-                            setDragOverCategoryId(category.id);
-                            event.dataTransfer.effectAllowed = "move";
-                            event.dataTransfer.setData("text/plain", category.id);
-                          }}
+                              setDraggingCategoryId(category.id);
+                              setDragOverCategoryId(category.id);
+                              event.dataTransfer.effectAllowed = "move";
+                              event.dataTransfer.setData("text/plain", category.id);
+                              setFullRowDragImage(
+                                event,
+                                event.currentTarget.closest("[data-reorder-row]")
+                              );
+                            }}
                           onDragEnd={() => {
                             setDraggingCategoryId(null);
                             setDragOverCategoryId(null);

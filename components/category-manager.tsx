@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -27,8 +26,6 @@ import type { AnchorPoint } from "@/lib/types";
 const DEFAULT_CATEGORY_COLOR = CATEGORY_PRESET_COLORS[0];
 const CHIP_TRIGGER_CLASS =
   "h-10 w-full rounded-xl border px-3 text-sm shadow-sm transition-colors";
-const FIELD_LABEL_CLASS =
-  "text-[12px] font-semibold tracking-[-0.01em] text-foreground/78";
 
 const normalizeHashPrefix = (value: string) => {
   const trimmed = value.trim();
@@ -206,43 +203,53 @@ export function CategoryManager({
       >
         <DialogHeader>
           <DialogTitle>{isEdit ? "Editar categoria" : "Nova categoria"}</DialogTitle>
-          <DialogDescription>
-            Defina o essencial primeiro: nome, cor e perfil.
-          </DialogDescription>
         </DialogHeader>
         <div className="space-y-5">
-          <div className="space-y-1.5">
-            <label htmlFor="category-name" className={FIELD_LABEL_CLASS}>
-              Nome
-            </label>
-            <Input
-              id="category-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Nome da categoria"
-              className="h-10 rounded-xl"
-            />
+          <Input
+            id="category-name"
+            aria-label="Nome da categoria"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Nome da categoria"
+            className="h-10 rounded-xl"
+          />
+
+          <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center">
+            <Select value={profileDraftId} onValueChange={setProfileDraftId}>
+              <SelectTrigger
+                size="sm"
+                aria-label="Perfil da categoria"
+                className={`${CHIP_TRIGGER_CLASS} border-border/80 bg-background text-foreground hover:bg-muted/70 sm:flex-1`}
+                disabled={profiles.length === 0}
+              >
+                <span className="inline-flex min-w-0 items-center gap-1.5 pr-2">
+                  {currentProfile ? <ProfileIcon icon={currentProfile.icon} size={12} /> : null}
+                  <span className="truncate">{currentProfile?.name ?? "Perfil"}</span>
+                </span>
+              </SelectTrigger>
+              <SelectContent position="popper" side="bottom" align="start">
+                {profiles.map((profile) => (
+                  <SelectItem key={profile.id} value={profile.id}>
+                    <span className="inline-flex items-center gap-2">
+                      <ProfileIcon icon={profile.icon} size={12} />
+                      {profile.name}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <div className="inline-flex h-10 max-w-full items-center gap-2 rounded-xl border border-border/75 bg-muted/20 px-3 text-sm text-foreground shadow-sm sm:max-w-[220px]">
+              <span
+                className="h-2.5 w-2.5 shrink-0 rounded-full ring-1 ring-black/8"
+                style={{ backgroundColor: color }}
+                aria-hidden="true"
+              />
+              <span className="truncate">{name.trim() || "Categoria"}</span>
+            </div>
           </div>
 
           <div className="space-y-2.5">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="space-y-0.5">
-                <div className={FIELD_LABEL_CLASS}>Cor</div>
-                <p className="text-xs text-muted-foreground">
-                  Use a cor como pista rapida de leitura.
-                </p>
-              </div>
-              <div
-                className="inline-flex h-9 items-center gap-1.5 rounded-full border border-border/80 px-3 text-xs font-medium text-white shadow-sm"
-                style={{
-                  backgroundColor: color,
-                  borderColor: "rgba(255,255,255,0.28)",
-                }}
-              >
-                <span className="h-2 w-2 rounded-full bg-white/80" />
-                <span className="truncate">{name.trim() || "Categoria"}</span>
-              </div>
-            </div>
             <div className="flex flex-wrap items-center gap-2.5">
               {CATEGORY_PRESET_COLORS.map((preset) => {
                 const selected = preset.toLowerCase() === normalizedColor;
@@ -336,32 +343,6 @@ export function CategoryManager({
                 </PopoverContent>
               </Popover>
             </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <label className={FIELD_LABEL_CLASS}>Perfil</label>
-            <Select value={profileDraftId} onValueChange={setProfileDraftId}>
-              <SelectTrigger
-                size="sm"
-                className={`${CHIP_TRIGGER_CLASS} border-border/80 bg-background text-foreground hover:bg-muted/70`}
-                disabled={profiles.length === 0}
-              >
-                <span className="inline-flex min-w-0 items-center gap-1.5 pr-2">
-                  {currentProfile ? <ProfileIcon icon={currentProfile.icon} size={12} /> : null}
-                  <span className="truncate">{currentProfile?.name ?? "Perfil"}</span>
-                </span>
-              </SelectTrigger>
-              <SelectContent position="popper" side="bottom" align="start">
-                {profiles.map((profile) => (
-                  <SelectItem key={profile.id} value={profile.id}>
-                    <span className="inline-flex items-center gap-2">
-                      <ProfileIcon icon={profile.icon} size={12} />
-                      {profile.name}
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
         </div>
         <DialogFooter className="sm:justify-between">

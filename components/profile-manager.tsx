@@ -37,9 +37,6 @@ type ProfileManagerProps = {
   intent?: ProfileManagerIntent;
 };
 
-const FIELD_LABEL_CLASS =
-  "text-[12px] font-semibold tracking-[-0.01em] text-foreground/78";
-
 export function ProfileManager({
   open,
   onOpenChange,
@@ -240,33 +237,24 @@ export function ProfileManager({
       <DialogContent className="sm:max-w-[480px] p-5 sm:p-6">
         <DialogHeader>
           <DialogTitle>{isEditMode ? "Editar perfil" : "Novo perfil"}</DialogTitle>
-          <DialogDescription>
-            Defina nome e icone de forma rapida e consistente com o restante do produto.
-          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-5">
-          <div className="flex items-center gap-2.5">
-            <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border/80 bg-muted/40 text-foreground shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border/75 bg-muted/35 text-foreground shadow-sm">
               <ProfileIcon icon={icon} size={18} />
             </div>
-            <div className="min-w-0 flex-1">
-              <label htmlFor="profile-name" className={`mb-1.5 block ${FIELD_LABEL_CLASS}`}>
-                Nome do perfil
-              </label>
-              <Input
-                id="profile-name"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                placeholder="Titulo do perfil"
-                className="h-10 rounded-xl"
-              />
-            </div>
+            <Input
+              id="profile-name"
+              aria-label="Nome do perfil"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder="Nome do perfil"
+              className="h-11 flex-1 rounded-xl"
+            />
           </div>
 
-          <div className="space-y-2">
-            <div className={FIELD_LABEL_CLASS}>Icone</div>
-            <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-4 gap-2">
             {PROFILE_ICON_OPTIONS.map((option) => {
               const selected = option.id === icon;
               return (
@@ -286,7 +274,6 @@ export function ProfileManager({
                 </button>
               );
             })}
-          </div>
           </div>
         </div>
 
