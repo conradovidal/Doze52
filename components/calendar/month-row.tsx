@@ -126,6 +126,8 @@ export function MonthRow({
   onMonthLabelClick,
   monthLabelAriaLabel,
   monthLabelActive = false,
+  isMobileInteractionMode = false,
+  onDayCellActivate,
 }: {
   year: number;
   todayIso: string;
@@ -162,6 +164,8 @@ export function MonthRow({
   onMonthLabelClick?: () => void;
   monthLabelAriaLabel?: string;
   monthLabelActive?: boolean;
+  isMobileInteractionMode?: boolean;
+  onDayCellActivate?: (payload: { monthIndex: number; dateIso: string }) => void;
 }) {
   const daysGridRef = React.useRef<HTMLDivElement | null>(null);
   const interactionSurfaceRef = React.useRef<HTMLDivElement | null>(null);
@@ -590,6 +594,7 @@ export function MonthRow({
           onDayDrop(format(targetDate, "yyyy-MM-dd"), e.dataTransfer);
         }}
         onPointerDown={(e) => {
+          if (isMobileInteractionMode) return;
           if (!e.isPrimary || e.button !== 0 || isDraggingAny) return;
           const target = e.target as HTMLElement | null;
           if (target?.closest("button, a, input, textarea, select, [role='button']")) return;
@@ -653,8 +658,14 @@ export function MonthRow({
                 isRangeEnd={!!rangeBounds && day.iso === rangeBounds.endIso}
                 isInMonth={day.inMonth}
                 isDropActive={isDraggingAny && dragState.hoverDateIso === day.iso}
+                showCreateCue={!isMobileInteractionMode && day.inMonth}
                 onDayHover={onDayHover}
                 onDayDrop={onDayDrop}
+                onActivate={
+                  day.inMonth && onDayCellActivate
+                    ? (dateIso) => onDayCellActivate({ monthIndex, dateIso })
+                    : undefined
+                }
               />
             </div>
           ))}

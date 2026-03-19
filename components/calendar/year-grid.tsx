@@ -105,6 +105,7 @@ export function YearGrid({
   onFinishCreateRange,
   onMoveEventByDelta,
   onApplyDayReorder,
+  isMobileInteractionMode = false,
 }: {
   year: number;
   todayIso: string;
@@ -125,6 +126,7 @@ export function YearGrid({
     toIndex: number;
     orderedIds: string[];
   }) => void;
+  isMobileInteractionMode?: boolean;
 }) {
   const categories = useStore((s) => s.categories as CategoryItem[]);
   const selectedProfileIds = useStore((s) => s.selectedProfileIds);
@@ -434,6 +436,14 @@ export function YearGrid({
     [focusMonth, focusQuarter, resolvedMonth, resolvedQuarter, viewMode]
   );
 
+  const handleMobileDayCellActivate = React.useCallback(
+    ({ monthIndex }: { monthIndex: number; dateIso: string }) => {
+      if (!isMobileInteractionMode || viewMode === "month") return;
+      focusMonth(monthIndex as MonthIndex);
+    },
+    [focusMonth, isMobileInteractionMode, viewMode]
+  );
+
   const quarterGroups = React.useMemo<QuarterGroup[]>(() => {
     if (viewMode === "year") {
       return QUARTER_MONTH_GROUPS.map((months, quarterIndex) => ({
@@ -598,6 +608,12 @@ export function YearGrid({
                         : `Abrir ${MONTH_TITLE_LABELS[monthIndex]}`
                     }
                     monthLabelActive={isActiveMonth}
+                    isMobileInteractionMode={isMobileInteractionMode}
+                    onDayCellActivate={
+                      isMobileInteractionMode && viewMode !== "month"
+                        ? handleMobileDayCellActivate
+                        : undefined
+                    }
                   />
                 );
               })}

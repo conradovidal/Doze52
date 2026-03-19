@@ -2,11 +2,20 @@
 
 import * as React from "react";
 import { format, parseISO } from "date-fns";
+import { Plus } from "lucide-react";
 import { YearGrid } from "@/components/calendar/year-grid";
 import { EventDialog } from "@/components/event-dialog";
 import { AppHeader } from "@/components/app-header";
 import { AuthDialog } from "@/components/auth/auth-dialog";
 import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverAnchor,
+  PopoverContent,
+  PopoverDescription,
+  PopoverHeader,
+  PopoverTitle,
+} from "@/components/ui/popover";
 import { useFeedback } from "@/components/ui/feedback-provider";
 import {
   getOnboardingDefaultProfiles,
@@ -56,7 +65,14 @@ type PendingSyncPayload = {
   snapshot: CalendarSnapshot;
 };
 
+type CalendarCreateOnboardingState = "pending" | "dismissed" | "completed";
+type CalendarCreateOnboardingPayload = {
+  dismissedAt?: string;
+  completedAt?: string;
+};
+
 const PENDING_SYNC_STORAGE_PREFIX = "pending-sync:";
+const CALENDAR_CREATE_ONBOARDING_STORAGE_KEY = "doze52:create-onboarding:v1";
 const isDetailedSyncDiagnosticsEnabled =
   process.env.NODE_ENV !== "production" ||
   process.env.NEXT_PUBLIC_APP_ENV === "local" ||
@@ -116,6 +132,37 @@ const writePendingSyncSnapshot = (userId: string, snapshot: CalendarSnapshot) =>
 const clearPendingSyncSnapshot = (userId: string) => {
   if (typeof window === "undefined") return;
   window.localStorage.removeItem(getPendingSyncStorageKey(userId));
+};
+
+const readCalendarCreateOnboardingState = (): CalendarCreateOnboardingState => {
+  if (typeof window === "undefined") return "pending";
+  try {
+    const raw = window.localStorage.getItem(CALENDAR_CREATE_ONBOARDING_STORAGE_KEY);
+    if (!raw) return "pending";
+    const parsed = JSON.parse(raw) as CalendarCreateOnboardingPayload;
+    if (parsed.completedAt) return "completed";
+    if (parsed.dismissedAt) return "dismissed";
+    return "pending";
+  } catch {
+    return "pending";
+  }
+};
+
+const persistCalendarCreateOnboardingState = (
+  state: Exclude<CalendarCreateOnboardingState, "pending">
+) => {
+  if (typeof window === "undefined") return;
+  const nowIso = new Date().toISOString();
+  const payload: CalendarCreateOnboardingPayload =
+    state === "completed" ? { completedAt: nowIso } : { dismissedAt: nowIso };
+  try {
+    window.localStorage.setItem(
+      CALENDAR_CREATE_ONBOARDING_STORAGE_KEY,
+      JSON.stringify(payload)
+    );
+  } catch {
+    // Ignore storage failures; the onboarding will simply reappear.
+  }
 };
 
 const formatSyncDebugDetail = (error: SyncUiError) => {
@@ -268,6 +315,10 @@ export default function HomePage() {
   const [, setIsSyncing] = React.useState(false);
   const [remoteReady, setRemoteReady] = React.useState(false);
   const [syncBlocked, setSyncBlocked] = React.useState(false);
+  const [calendarCreateOnboarding, setCalendarCreateOnboarding] = React.useState<
+    CalendarCreateOnboardingState | null
+  >(null);
+  const [isMobileCalendarUi, setIsMobileCalendarUi] = React.useState<boolean | null>(null);
   const [windowContext] = React.useState<"main" | "popup">(() => {
     if (typeof window === "undefined") return "main";
     return Boolean(window.opener) || window.name === "doze52_oauth"
@@ -488,6 +539,23 @@ export default function HomePage() {
 
   React.useEffect(() => {
     if (windowContext !== "main") return;
+    setCalendarCreateOnboarding(readCalendarCreateOnboardingState());
+  }, [windowContext]);
+
+  React.useEffect(() => {
+    if (windowContext !== "main") return;
+    const mediaQuery = window.matchMedia("(max-width: 767px)");
+    const syncViewportMode = () => {
+      setIsMobileCalendarUi(mediaQuery.matches);
+    };
+
+    syncViewportMode();
+    mediaQuery.addEventListener("change", syncViewportMode);
+    return () => mediaQuery.removeEventListener("change", syncViewportMode);
+  }, [windowContext]);
+
+  React.useEffect(() => {
+    if (windowContext !== "main") return;
     if (authLoading) return;
     const currentUserId = session?.user.id ?? null;
     const previousUserId = previousSessionUserIdRef.current;
@@ -519,6 +587,14 @@ export default function HomePage() {
     session?.user.id,
     windowContext,
   ]);
+
+  React.useEffect(() => {
+    if (windowContext !== "main") return;
+    if (calendarCreateOnboarding !== "pending") return;
+    if (events.length === 0) return;
+    persistCalendarCreateOnboardingState("completed");
+    setCalendarCreateOnboarding("completed");
+  }, [calendarCreateOnboarding, events.length, windowContext]);
 
   const bootstrapRemote = React.useCallback(() => {
     if (windowContext !== "main") return () => {};
@@ -694,6 +770,16 @@ export default function HomePage() {
     setDialogOpen(true);
   };
 
+  const dismissCalendarCreateOnboarding = React.useCallback(() => {
+    persistCalendarCreateOnboardingState("dismissed");
+    setCalendarCreateOnboarding("dismissed");
+  }, []);
+
+  const completeCalendarCreateOnboarding = React.useCallback(() => {
+    persistCalendarCreateOnboardingState("completed");
+    setCalendarCreateOnboarding("completed");
+  }, []);
+
   const handleSubmit = async (payload: EventInput) => {
     if (editingId) {
       updateEvent(editingId, payload);
@@ -705,12 +791,25 @@ export default function HomePage() {
       return;
     }
     addEvent(payload);
+    completeCalendarCreateOnboarding();
     notify({
       tone: "success",
       title: "Evento criado",
       description: "O novo evento já aparece no calendário.",
     });
   };
+
+  const handleMobileFabCreate = React.useCallback(() => {
+    const fallbackTodayIso = todayIso || format(new Date(), "yyyy-MM-dd");
+    setEditingId(null);
+    setDialogAnchorPoint(undefined);
+    setCreatingRange(null);
+    setSeedRange({
+      startDate: fallbackTodayIso,
+      endDate: fallbackTodayIso,
+    });
+    setDialogOpen(true);
+  }, [todayIso]);
 
   const handleDeleteEvent = React.useCallback(() => {
     if (!editingId) return;
@@ -769,6 +868,10 @@ export default function HomePage() {
     syncError && isDetailedSyncDiagnosticsEnabled
       ? formatSyncDebugDetail(syncError)
       : null;
+  const showDesktopCreateCoachmark =
+    calendarCreateOnboarding === "pending" && isMobileCalendarUi === false;
+  const showMobileCreateCoachmark =
+    calendarCreateOnboarding === "pending" && isMobileCalendarUi === true;
 
   const handleYearChange = React.useCallback(
     (nextYear: number) => {
@@ -807,7 +910,7 @@ export default function HomePage() {
       ) : null}
 
       <div className="overflow-x-auto pb-1 md:overflow-visible">
-        <div data-calendar-focus-root>
+        <div data-calendar-focus-root className="relative">
           <YearGrid
             year={year}
             todayIso={todayIso}
@@ -823,9 +926,103 @@ export default function HomePage() {
               void toIndex;
               normalizeDayOrder(dayIso, orderedIds);
             }}
+            isMobileInteractionMode={isMobileCalendarUi === true}
           />
+          {showDesktopCreateCoachmark ? (
+            <Popover
+              open={showDesktopCreateCoachmark}
+              onOpenChange={(open) => {
+                if (!open) dismissCalendarCreateOnboarding();
+              }}
+            >
+              <PopoverAnchor asChild>
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute top-4 left-[5.5rem] h-px w-px"
+                />
+              </PopoverAnchor>
+              <PopoverContent
+                align="start"
+                side="bottom"
+                sideOffset={14}
+                className="w-[18.5rem] rounded-[1.4rem] p-4"
+              >
+                <PopoverHeader className="space-y-1.5">
+                  <PopoverTitle>Crie direto no calendario</PopoverTitle>
+                  <PopoverDescription className="text-sm leading-5">
+                    Clique ou arraste no calendario para criar um evento. Toque
+                    num evento existente para editar.
+                  </PopoverDescription>
+                </PopoverHeader>
+                <div className="mt-4 flex justify-end">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="rounded-full"
+                    onClick={dismissCalendarCreateOnboarding}
+                  >
+                    Entendi
+                  </Button>
+                </div>
+              </PopoverContent>
+            </Popover>
+          ) : null}
         </div>
       </div>
+      {isMobileCalendarUi ? (
+        <div
+          className="fixed right-4 z-40 md:hidden"
+          style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 1rem)" }}
+        >
+          <Popover
+            open={showMobileCreateCoachmark}
+            onOpenChange={(open) => {
+              if (!open) dismissCalendarCreateOnboarding();
+            }}
+          >
+            <PopoverAnchor asChild>
+              <Button
+                type="button"
+                size="icon-lg"
+                variant="premium"
+                className="rounded-full shadow-[0_20px_40px_-24px_rgba(15,23,42,0.55)]"
+                aria-label="Novo evento"
+                onClick={handleMobileFabCreate}
+              >
+                <Plus className="size-5" />
+              </Button>
+            </PopoverAnchor>
+            {showMobileCreateCoachmark ? (
+              <PopoverContent
+                align="end"
+                side="top"
+                sideOffset={14}
+                className="w-[17rem] rounded-[1.4rem] p-4"
+              >
+                <PopoverHeader className="space-y-1.5">
+                  <PopoverTitle>Crie pelo botão +</PopoverTitle>
+                  <PopoverDescription className="text-sm leading-5">
+                    Use o + para criar um evento. Toque no calendario para
+                    navegar entre os focos do periodo.
+                  </PopoverDescription>
+                </PopoverHeader>
+                <div className="mt-4 flex justify-end">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="rounded-full"
+                    onClick={dismissCalendarCreateOnboarding}
+                  >
+                    Entendi
+                  </Button>
+                </div>
+              </PopoverContent>
+            ) : null}
+          </Popover>
+        </div>
+      ) : null}
       {syncError ? (
         <div className="mt-3 flex justify-center">
           <div className="flex max-w-xl flex-col gap-3 rounded-2xl border border-red-200/80 bg-red-50/88 px-4 py-3.5 text-left shadow-sm dark:border-red-500/25 dark:bg-red-500/10">

@@ -10,8 +10,10 @@ export function DayCell({
   isRangeEnd,
   isInMonth,
   isDropActive = false,
+  showCreateCue = false,
   onDayHover,
   onDayDrop,
+  onActivate,
 }: {
   date: Date;
   dateIso: string;
@@ -22,8 +24,10 @@ export function DayCell({
   isRangeEnd: boolean;
   isInMonth: boolean;
   isDropActive?: boolean;
+  showCreateCue?: boolean;
   onDayHover?: (dateIso: string) => void;
   onDayDrop?: (dateIso: string, transfer?: DataTransfer | null) => void;
+  onActivate?: (dateIso: string) => void;
 }) {
   const isPast = dateIso < todayIso;
 
@@ -71,10 +75,12 @@ export function DayCell({
     <div
       data-day-cell
       data-day-iso={dateIso}
-      className={`group flex w-full cursor-pointer flex-col px-1 py-1 ring-1 ring-inset transition-[background-color,box-shadow] duration-150 ${dayToneClass} ${
+      className={`group relative flex w-full cursor-pointer flex-col px-1 py-1 ring-1 ring-inset transition-[background-color,box-shadow] duration-150 ${dayToneClass} ${
         today
           ? "ring-neutral-900 shadow-[inset_0_0_0_1px_rgba(23,23,23,0.06)] dark:ring-neutral-100 dark:shadow-none"
-          : "ring-transparent hover:ring-neutral-300/80 hover:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.46),0_10px_18px_-18px_rgba(15,23,42,0.26)] dark:hover:bg-white/6 dark:hover:ring-neutral-500/60"
+          : showCreateCue
+            ? "ring-transparent hover:ring-neutral-400/85 hover:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.5),0_12px_24px_-20px_rgba(15,23,42,0.3)] dark:hover:bg-white/7 dark:hover:ring-neutral-400/70"
+            : "ring-transparent hover:ring-neutral-300/80 hover:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.46),0_10px_18px_-18px_rgba(15,23,42,0.26)] dark:hover:bg-white/6 dark:hover:ring-neutral-500/60"
       } ${
         isRangeSelected
           ? "bg-neutral-300/35 ring-neutral-400/80 dark:bg-neutral-700/45 dark:ring-neutral-500/85"
@@ -99,7 +105,15 @@ export function DayCell({
         e.stopPropagation();
         onDayDrop(dateIso, e.dataTransfer);
       }}
+      onClick={() => {
+        onActivate?.(dateIso);
+      }}
     >
+      {showCreateCue ? (
+        <div className="pointer-events-none absolute top-1.5 right-1.5 grid h-4 w-4 place-items-center rounded-full bg-white/82 text-[11px] font-semibold text-muted-foreground opacity-0 shadow-[0_8px_16px_-14px_rgba(15,23,42,0.28)] ring-1 ring-border/60 transition-all duration-150 group-hover:opacity-100 dark:bg-neutral-900/78 dark:text-neutral-200 dark:ring-white/10">
+          +
+        </div>
+      ) : null}
       <div className={`grid h-6 w-full flex-none place-items-center px-0.5 text-[12px] ${dayNumberToneClass}`}>
         <span
           className={`grid h-5 min-w-5 place-items-center rounded-full px-1 text-[12px] font-semibold leading-none tabular-nums transition-colors ${
