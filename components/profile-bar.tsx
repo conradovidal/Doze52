@@ -24,7 +24,7 @@ export function ProfileBar({ compact = false }: ProfileBarProps) {
 
   return (
     <div
-      className={`${compact ? "w-full min-h-9 justify-center" : "mb-2 min-h-9 justify-center"} flex flex-wrap items-center gap-2`}
+      className={`${compact ? "w-full min-h-8 justify-center" : "mb-2 min-h-8 justify-center"} flex flex-wrap items-center gap-1.5 sm:gap-2`}
     >
       {profiles.map((profile) => {
         const selected = selectedSet.has(profile.id);
@@ -34,10 +34,10 @@ export function ProfileBar({ compact = false }: ProfileBarProps) {
             type="button"
             aria-pressed={selected}
             onClick={() => toggleSelectedProfile(profile.id)}
-            className={`inline-flex min-h-8 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium shadow-sm transition-colors ${MOTION_CLASS} ${
+            className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3 py-1 text-[0.78rem] font-medium shadow-none transition-all ${MOTION_CLASS} ${
               selected
-                ? "border-neutral-900 bg-neutral-900 text-neutral-50 hover:bg-neutral-800 dark:border-neutral-100 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-200"
-                : "border-border/80 bg-background text-foreground/75 hover:bg-muted hover:text-foreground dark:bg-background/70"
+                ? "border-foreground/10 bg-foreground/[0.06] text-foreground hover:bg-foreground/[0.085] dark:border-white/10 dark:bg-white/10 dark:text-white dark:hover:bg-white/14"
+                : "border-border/55 bg-background/70 text-foreground/72 hover:border-border/75 hover:bg-muted/35 hover:text-foreground dark:bg-background/45 dark:text-foreground/70 dark:hover:bg-accent/45"
             }`}
           >
             <ProfileIcon icon={profile.icon} size={12} className="shrink-0" />

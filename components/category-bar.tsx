@@ -46,7 +46,7 @@ export function CategoryBar({ compact = false }: CategoryBarProps) {
 
   return (
     <div
-      className={`${compact ? "w-full min-h-9 justify-center" : "mb-2 min-h-9 justify-center"} flex flex-wrap items-center gap-2`}
+      className={`${compact ? "w-full min-h-8 justify-center" : "mb-2 min-h-8 justify-center"} flex flex-wrap items-center gap-1.5 sm:gap-2`}
     >
       {displayedCategories.map((category) => (
         <button
@@ -54,25 +54,25 @@ export function CategoryBar({ compact = false }: CategoryBarProps) {
           type="button"
           aria-pressed={category.visible}
           onClick={() => toggleCategoryVisibility(category.id)}
-          className={`inline-flex min-h-8 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium shadow-sm transition-colors ${MOTION_CLASS} ${
+          className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3 py-1 text-[0.78rem] font-medium shadow-none transition-all ${MOTION_CLASS} ${
             category.visible
-              ? "text-foreground"
-              : "bg-background text-muted-foreground hover:text-foreground"
+              ? "text-foreground hover:brightness-[0.97]"
+              : "bg-background/70 text-muted-foreground hover:border-border/75 hover:bg-muted/35 hover:text-foreground dark:bg-background/45 dark:hover:bg-accent/45"
           }`}
           style={{
             backgroundColor: category.visible
-              ? hexToRgba(category.color, 0.12)
+              ? hexToRgba(category.color, 0.1)
               : "hsl(var(--background))",
             borderColor: category.visible
-              ? hexToRgba(category.color, 0.24)
-              : "hsl(var(--border))",
+              ? hexToRgba(category.color, 0.2)
+              : "hsl(var(--border) / 0.72)",
           }}
         >
           <span
             className="h-2.5 w-2.5 rounded-full"
             style={{
               backgroundColor: category.color,
-              opacity: category.visible ? 1 : 0.55,
+              opacity: category.visible ? 0.92 : 0.5,
             }}
           />
           <span className={category.visible ? "text-foreground" : "text-muted-foreground"}>

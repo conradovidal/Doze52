@@ -16,9 +16,9 @@ export function ThemeToggle() {
       aria-label={isLight ? "Ativar tema escuro" : "Ativar tema claro"}
       title={isLight ? "Tema claro" : "Tema escuro"}
       className={cn(
-        "inline-flex h-9 w-9 items-center justify-center rounded-full border border-border/80 bg-background text-muted-foreground shadow-sm transition-colors duration-150",
-        "hover:bg-muted hover:text-foreground",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+        "inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-border/65 bg-background/70 text-muted-foreground shadow-none transition-colors duration-150",
+        "hover:border-border/80 hover:bg-muted/45 hover:text-foreground",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
       )}
     >
       <span className="sr-only">
