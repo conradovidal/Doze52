@@ -6,6 +6,7 @@ import { Plus } from "lucide-react";
 import { YearGrid } from "@/components/calendar/year-grid";
 import { EventDialog } from "@/components/event-dialog";
 import { AppHeader } from "@/components/app-header";
+import type { SyncIndicatorState } from "@/components/sync-status-chip";
 import { AuthDialog } from "@/components/auth/auth-dialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -280,7 +281,9 @@ export default function HomePage() {
     isDragging: boolean;
   } | null>(null);
   const [syncError, setSyncError] = React.useState<SyncUiError | null>(null);
-  const [, setIsSyncing] = React.useState(false);
+  const [isSyncing, setIsSyncing] = React.useState(false);
+  const [isBootstrappingSync, setIsBootstrappingSync] = React.useState(false);
+  const [hasQueuedSave, setHasQueuedSave] = React.useState(false);
   const [remoteReady, setRemoteReady] = React.useState(false);
   const [syncBlocked, setSyncBlocked] = React.useState(false);
   const [calendarCreateOnboarding, setCalendarCreateOnboarding] = React.useState<
@@ -300,8 +303,6 @@ export default function HomePage() {
   const lastSyncedHashRef = React.useRef<string>("");
   const saveTimerRef = React.useRef<number | null>(null);
   const previousSessionUserIdRef = React.useRef<string | null>(null);
-  const hadSyncIssueRef = React.useRef(false);
-  const lastSyncIssueKeyRef = React.useRef<string | null>(null);
   const profilesRef = React.useRef(profiles);
   const categoriesRef = React.useRef(categories);
   const eventsRef = React.useRef(events);
@@ -314,46 +315,6 @@ export default function HomePage() {
 
   const editingEvent = editingId ? getEventById(editingId) : null;
   const renderEvents = React.useMemo(() => expandEventsForYear(events, year), [events, year]);
-  const showSyncNotice = React.useCallback(
-    (tone: "success" | "info", message: string, durationMs = 1800) => {
-      notify({
-        tone,
-        title: message,
-        durationMs,
-      });
-    },
-    [notify]
-  );
-
-  React.useEffect(() => {
-    if (windowContext !== "main") return;
-
-    if (syncError) {
-      const errorKey = `${syncError.kind}:${syncError.code ?? ""}:${syncError.message}`;
-      if (lastSyncIssueKeyRef.current !== errorKey) {
-        notify({
-          tone: "error",
-          title: "Sincronização pausada",
-          description: SYNC_HINT_BY_KIND[syncError.kind] ?? syncError.message,
-          durationMs: 3800,
-        });
-        lastSyncIssueKeyRef.current = errorKey;
-      }
-      hadSyncIssueRef.current = true;
-      return;
-    }
-
-    lastSyncIssueKeyRef.current = null;
-    if (hadSyncIssueRef.current && remoteReady) {
-      notify({
-        tone: "success",
-        title: "Sincronização restabelecida",
-        description: "Seus dados voltaram a ser salvos normalmente.",
-        durationMs: 2200,
-      });
-      hadSyncIssueRef.current = false;
-    }
-  }, [notify, remoteReady, syncError, windowContext]);
 
   React.useEffect(() => {
     if (windowContext !== "popup") return;
@@ -543,13 +504,18 @@ export default function HomePage() {
       if (previousUserId || hasUserBoundLocalData) {
         resetToOnboardingData();
       }
+      if (saveTimerRef.current !== null) {
+        window.clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+      }
+      setIsSyncing(false);
+      setIsBootstrappingSync(false);
+      setHasQueuedSave(false);
       setRemoteReady(false);
       setSyncBlocked(false);
       setSyncError(null);
       lastSyncedHashRef.current = "";
       previousSessionUserIdRef.current = null;
-      hadSyncIssueRef.current = false;
-      lastSyncIssueKeyRef.current = null;
       return;
     }
     previousSessionUserIdRef.current = currentUserId;
@@ -577,7 +543,7 @@ export default function HomePage() {
     if (!userId) return () => {};
     let cancelled = false;
     const run = async () => {
-      setIsSyncing(true);
+      setIsBootstrappingSync(true);
       setSyncError(null);
       let snapshotToPersistOnFailure: CalendarSnapshot | null = null;
       try {
@@ -649,7 +615,7 @@ export default function HomePage() {
         setRemoteReady(false);
         setSyncBlocked(true);
       } finally {
-        if (!cancelled) setIsSyncing(false);
+        if (!cancelled) setIsBootstrappingSync(false);
       }
     };
 
@@ -675,19 +641,24 @@ export default function HomePage() {
     if (!session?.user.id || !remoteReady || syncBlocked || syncError) return;
     const nextSnapshot = { profiles, categories, events };
     const nextHash = JSON.stringify(nextSnapshot);
-    if (nextHash === lastSyncedHashRef.current) return;
+    if (nextHash === lastSyncedHashRef.current) {
+      setHasQueuedSave(false);
+      return;
+    }
 
     if (saveTimerRef.current !== null) {
       window.clearTimeout(saveTimerRef.current);
     }
+    setHasQueuedSave(true);
     saveTimerRef.current = window.setTimeout(async () => {
+      saveTimerRef.current = null;
+      setHasQueuedSave(false);
       setIsSyncing(true);
       setSyncError(null);
       try {
         await saveSnapshot(nextSnapshot);
         clearPendingSyncSnapshot(session.user.id);
         lastSyncedHashRef.current = nextHash;
-        showSyncNotice("success", "Alteracoes salvas");
       } catch (error) {
         const syncError =
           error instanceof SyncError
@@ -718,6 +689,7 @@ export default function HomePage() {
     return () => {
       if (saveTimerRef.current !== null) {
         window.clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
       }
     };
   }, [
@@ -726,7 +698,6 @@ export default function HomePage() {
     profiles,
     remoteReady,
     session?.user.id,
-    showSyncNotice,
     syncBlocked,
     syncError,
     windowContext,
@@ -843,6 +814,44 @@ export default function HomePage() {
     syncError && isDetailedSyncDiagnosticsEnabled
       ? formatSyncDebugDetail(syncError)
       : null;
+  const handleRetrySync = React.useCallback(() => {
+    setSyncBlocked(false);
+    setSyncError(null);
+    void bootstrapRemote();
+  }, [bootstrapRemote]);
+  const syncStatus = React.useMemo<SyncIndicatorState>(() => {
+    if (!session?.user.id) {
+      return { state: "hidden" };
+    }
+    if (syncError || syncBlocked) {
+      return {
+        state: "error",
+        message:
+          syncError
+            ? SYNC_HINT_BY_KIND[syncError.kind] ?? syncError.message
+            : "Falha de sincronizacao. Tente novamente.",
+        detail: syncDebugDetail,
+        onRetry: handleRetrySync,
+      };
+    }
+    if (!remoteReady || isBootstrappingSync) {
+      return { state: "loading" };
+    }
+    if (hasQueuedSave || isSyncing) {
+      return { state: "saving" };
+    }
+    return { state: "synced" };
+  }, [
+    handleRetrySync,
+    hasQueuedSave,
+    isBootstrappingSync,
+    isSyncing,
+    remoteReady,
+    session?.user.id,
+    syncBlocked,
+    syncDebugDetail,
+    syncError,
+  ]);
   const showDesktopCreateCoachmark =
     calendarCreateOnboarding === "pending" && isMobileCalendarUi === false;
   const showMobileCreateCoachmark =
@@ -872,6 +881,7 @@ export default function HomePage() {
           onYearChange={handleYearChange}
           authLoading={authLoading}
           isAuthenticated={Boolean(session)}
+          syncStatus={syncStatus}
           onOpenAuthDialog={(anchorPoint) => {
             setAuthDialogAnchorPoint(anchorPoint);
             setAuthDialogOpen(true);
@@ -996,37 +1006,6 @@ export default function HomePage() {
               </PopoverContent>
             ) : null}
           </Popover>
-        </div>
-      ) : null}
-      {syncError ? (
-        <div className="mt-3 flex justify-center">
-          <div className="flex max-w-xl flex-col gap-3 rounded-2xl border border-red-200/80 bg-red-50/88 px-4 py-3.5 text-left shadow-sm dark:border-red-500/25 dark:bg-red-500/10">
-            <div className="space-y-1">
-              <p className="text-sm font-medium text-red-700 dark:text-red-200">
-                {syncError.message}
-              </p>
-              <p className="text-xs text-red-700/80 dark:text-red-200/80">
-                {SYNC_HINT_BY_KIND[syncError.kind] ?? SYNC_HINT_BY_KIND.unknown}
-              </p>
-              {syncDebugDetail ? (
-                <p className="text-[10px] text-red-700/65 dark:text-red-200/65">
-                  {syncDebugDetail}
-                </p>
-              ) : null}
-            </div>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="rounded-full"
-              onClick={() => {
-                setSyncBlocked(false);
-                void bootstrapRemote();
-              }}
-            >
-              Recarregar
-            </Button>
-          </div>
         </div>
       ) : null}
       <EventDialog

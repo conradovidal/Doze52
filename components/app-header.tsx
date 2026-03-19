@@ -5,6 +5,7 @@ import { PencilLine } from "lucide-react";
 import { CategoryBar } from "@/components/category-bar";
 import { OrganizeWorkspaceDialog } from "@/components/organize-workspace-dialog";
 import { ProfileBar } from "@/components/profile-bar";
+import { SyncStatusChip, type SyncIndicatorState } from "@/components/sync-status-chip";
 import { UserMenu } from "@/components/auth/user-menu";
 import {
   Select,
@@ -22,6 +23,7 @@ type AppHeaderProps = {
   onYearChange: (year: number) => void;
   authLoading: boolean;
   isAuthenticated: boolean;
+  syncStatus: SyncIndicatorState;
   onOpenAuthDialog: (anchorPoint?: AnchorPoint) => void;
 };
 
@@ -30,6 +32,7 @@ export function AppHeader({
   onYearChange,
   authLoading,
   isAuthenticated,
+  syncStatus,
   onOpenAuthDialog,
 }: AppHeaderProps) {
   const [organizeOpen, setOrganizeOpen] = React.useState(false);
@@ -74,6 +77,8 @@ export function AppHeader({
                   <SelectItem value="2027">2027</SelectItem>
                 </SelectContent>
               </Select>
+
+              <SyncStatusChip status={syncStatus} />
 
               <ThemeToggle />
 
