@@ -492,14 +492,14 @@ export function YearGrid({
               aria-pressed={isActiveQuarter}
               title={QUARTER_LABELS[group.quarterIndex]}
               className={cn(
-                "group relative isolate flex w-[1.95rem] shrink-0 cursor-pointer select-none items-center justify-center border-r border-border/55 px-0 text-muted-foreground transition-[transform,background-color,color,box-shadow,border-color] duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/45 active:translate-y-[1px] active:scale-[0.985] min-[420px]:w-[2.1rem] md:w-[2.25rem]",
-                "bg-[linear-gradient(180deg,rgba(255,255,255,0.78),rgba(244,244,245,0.94))] shadow-[inset_-1px_0_0_rgba(255,255,255,0.34)] dark:bg-[linear-gradient(180deg,rgba(38,38,38,0.9),rgba(28,28,30,0.98))] dark:shadow-[inset_-1px_0_0_rgba(255,255,255,0.06)]",
+                "group relative isolate flex w-[1.95rem] shrink-0 cursor-pointer select-none items-center justify-center border-r border-border/78 px-0 text-muted-foreground transition-[transform,background-color,color] duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/45 active:translate-y-[1px] active:scale-[0.985] min-[420px]:w-[2.1rem] md:w-[2.25rem]",
+                "bg-[linear-gradient(180deg,rgba(255,255,255,0.78),rgba(244,244,245,0.94))] shadow-[inset_-1px_0_0_rgba(255,255,255,0.3)] dark:bg-[linear-gradient(180deg,rgba(38,38,38,0.9),rgba(28,28,30,0.98))] dark:shadow-[inset_-1px_0_0_rgba(255,255,255,0.05)]",
                 quarterRailShapeClass,
                 isQuarterFocus
-                  ? "border-border/72 bg-background/32 text-foreground/88 shadow-[inset_0_0_0_1px_rgba(63,63,70,0.08)] hover:border-border/82 hover:bg-background/60 hover:text-foreground active:bg-background/32 dark:bg-background/24 dark:hover:bg-background/44 dark:shadow-[inset_0_0_0_1px_rgba(244,244,245,0.08)]"
+                  ? "bg-neutral-300/92 text-foreground hover:bg-neutral-400/92 hover:text-foreground active:bg-neutral-300/92 dark:bg-neutral-700/92 dark:text-neutral-100 dark:hover:bg-neutral-600/92 dark:active:bg-neutral-700/92"
                   : isQuarterContext
-                    ? "border-border/66 bg-background/24 text-foreground/84 shadow-[inset_0_0_0_1px_rgba(63,63,70,0.06)] hover:border-border/76 hover:bg-background/48 hover:text-foreground/90 active:bg-background/24 dark:bg-background/18 dark:hover:bg-background/36 dark:shadow-[inset_0_0_0_1px_rgba(244,244,245,0.07)]"
-                    : "border-transparent hover:border-border/60 hover:bg-background/54 hover:text-foreground/88 active:bg-transparent dark:hover:bg-background/34"
+                    ? "bg-neutral-200/65 text-foreground/84 hover:bg-neutral-300/76 hover:text-foreground/90 active:bg-neutral-200/65 dark:bg-neutral-700/44 dark:text-neutral-100/84 dark:hover:bg-neutral-600/56 dark:active:bg-neutral-700/44"
+                    : "bg-transparent hover:bg-neutral-200/78 hover:text-foreground/88 active:bg-transparent dark:hover:bg-neutral-700/48"
               )}
             >
               <span
