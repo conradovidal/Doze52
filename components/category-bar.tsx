@@ -55,20 +55,6 @@ export function CategoryBar({ compact = false }: CategoryBarProps) {
     <div
       className={`${compact ? "w-full min-h-8 justify-center" : "mb-2 min-h-8 justify-center"} flex flex-wrap items-center gap-1.5 sm:gap-2`}
     >
-      <button
-        type="button"
-        onClick={() => setCategoriesVisibility(displayedCategoryIds, !allDisplayedVisible)}
-        className={`inline-flex h-8 w-8 items-center justify-center rounded-full border text-muted-foreground/80 shadow-none transition-all ${MOTION_CLASS} ${
-          allDisplayedVisible
-            ? "border-border/50 bg-background/65 hover:border-border/75 hover:bg-muted/35 hover:text-foreground"
-            : "border-border/55 bg-muted/25 text-foreground/85 hover:border-border/75 hover:bg-muted/45 hover:text-foreground"
-        }`}
-        aria-label={visibilityActionLabel}
-        title={visibilityActionLabel}
-      >
-        {allDisplayedVisible ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-      </button>
-
       {displayedCategories.map((category) => (
         <button
           key={category.id}
@@ -101,6 +87,20 @@ export function CategoryBar({ compact = false }: CategoryBarProps) {
           </span>
         </button>
       ))}
+
+      <button
+        type="button"
+        onClick={() => setCategoriesVisibility(displayedCategoryIds, !allDisplayedVisible)}
+        className={`inline-flex h-8 items-center justify-center rounded-full border px-2.5 text-muted-foreground/80 shadow-none transition-all ${MOTION_CLASS} ${
+          allDisplayedVisible
+            ? "border-border/50 bg-background/70 hover:border-border/75 hover:bg-muted/35 hover:text-foreground"
+            : "border-border/55 bg-muted/25 text-foreground/85 hover:border-border/75 hover:bg-muted/45 hover:text-foreground"
+        }`}
+        aria-label={visibilityActionLabel}
+        title={visibilityActionLabel}
+      >
+        {allDisplayedVisible ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+      </button>
     </div>
   );
 }
