@@ -8,9 +8,7 @@ import {
   EVENT_ITEM_PADDING_X_CLASS,
   EVENT_ITEM_TEXT_CLASS,
 } from "@/lib/calendar-layout";
-import { deriveEventBarStyle } from "@/lib/event-bar-style";
 
-const MARKER_WIDTH_PX = 4;
 const HORIZONTAL_PADDING_PX = 10;
 const EXPANDED_EXTRA_GAP_PX = 12;
 
@@ -45,7 +43,6 @@ export function EventBar({
   const [isOverflowing, setIsOverflowing] = React.useState(false);
   const [isExpanded, setIsExpanded] = React.useState(false);
   const [expandedWidthPx, setExpandedWidthPx] = React.useState<number | null>(null);
-  const styles = React.useMemo(() => deriveEventBarStyle(event.color), [event.color]);
   const radius =
     isStart && isEnd
       ? "rounded-[8px]"
@@ -67,7 +64,7 @@ export function EventBar({
       setIsOverflowing(nextOverflowing);
       setExpandedWidthPx(
         nextOverflowing
-          ? Math.max(buttonWidth, textWidth + HORIZONTAL_PADDING_PX * 2 + MARKER_WIDTH_PX + EXPANDED_EXTRA_GAP_PX)
+          ? Math.max(buttonWidth, textWidth + HORIZONTAL_PADDING_PX * 2 + EXPANDED_EXTRA_GAP_PX)
           : null
       );
     };
@@ -121,36 +118,19 @@ export function EventBar({
       }}
       onMouseLeave={() => setIsExpanded(false)}
       onBlur={() => setIsExpanded(false)}
-      className={`group relative block cursor-pointer border text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.16),0_8px_16px_-14px_rgba(15,23,42,0.18)] transition-[transform,box-shadow,opacity,filter,width] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 ${EVENT_ITEM_PADDING_X_CLASS} ${EVENT_ITEM_TEXT_CLASS} ${radius} ${
+      className={`group relative block cursor-pointer border border-black/10 text-left text-neutral-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_8px_16px_-14px_rgba(15,23,42,0.32)] transition-[transform,box-shadow,opacity,filter,width] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 ${EVENT_ITEM_PADDING_X_CLASS} ${EVENT_ITEM_TEXT_CLASS} ${radius} ${
         isPast ? "opacity-65 saturate-[0.92]" : ""
       } ${
         isDragging
           ? "opacity-40"
-          : "hover:-translate-y-px hover:shadow-[0_14px_24px_-18px_rgba(15,23,42,0.24),inset_0_1px_0_rgba(255,255,255,0.22)]"
+          : "hover:-translate-y-px hover:brightness-[1.02] hover:shadow-[0_14px_24px_-18px_rgba(15,23,42,0.5),inset_0_1px_0_rgba(255,255,255,0.24)]"
       } ${isExpanded ? "z-30" : "w-full"} ${className ?? ""} overflow-hidden`}
       style={{
-        backgroundColor: styles.backgroundColor,
-        borderColor: styles.borderColor,
-        color: styles.foregroundColor,
-        paddingLeft: `${HORIZONTAL_PADDING_PX + MARKER_WIDTH_PX + 4}px`,
-        paddingRight: `${HORIZONTAL_PADDING_PX}px`,
+        backgroundColor: event.color,
         width: isExpanded && expandedWidthPx ? `${expandedWidthPx}px` : undefined,
       }}
       title={event.title}
     >
-      <span
-        aria-hidden="true"
-        className={`absolute bottom-[2px] left-[2px] top-[2px] ${
-          isStart && isEnd
-            ? "rounded-[6px]"
-            : isStart
-              ? "rounded-l-[6px]"
-              : isEnd
-                ? "rounded-r-[6px]"
-                : "rounded-none"
-        }`}
-        style={{ backgroundColor: styles.markerColor, width: `${MARKER_WIDTH_PX}px` }}
-      />
       <span
         ref={textRef}
         className={`block ${isExpanded ? "whitespace-nowrap" : "truncate"} ${EVENT_ITEM_LINE_HEIGHT_CLASS}`}
