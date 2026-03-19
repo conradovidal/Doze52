@@ -2,14 +2,28 @@
 
 import * as React from "react";
 import {
-  ArrowDown,
-  ArrowUp,
-  GripVertical,
-  Plus,
-} from "lucide-react";
-import { ProfileManager, type ProfileManagerIntent } from "@/components/profile-manager";
+  closestCenter,
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { ArrowDown, ArrowUp, GripVertical, Plus } from "lucide-react";
 import { CategoryManager } from "@/components/category-manager";
 import { ProfileIcon } from "@/components/profile-icon";
+import { ProfileManager, type ProfileManagerIntent } from "@/components/profile-manager";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -24,52 +38,53 @@ import {
   SelectTrigger,
 } from "@/components/ui/select";
 import { useStore } from "@/lib/store";
-import type { CategoryItem } from "@/lib/types";
+import type { CalendarProfile, CategoryItem } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 const TAB_BASE_CLASS =
   "inline-flex min-h-8 items-center justify-center rounded-full px-3 py-1.5 text-sm font-medium transition-[background-color,color,box-shadow]";
 const SECTION_CLASS = "space-y-3";
 const LIST_CLASS = "overflow-hidden rounded-[1.1rem] border border-border/55 bg-background/78";
-const ROW_SHELL_CLASS =
-  "group flex items-stretch gap-0 border-b border-border/55 transition-[background-color,border-color] last:border-b-0";
+const ROW_CONTAINER_BASE_CLASS =
+  "group relative flex items-stretch gap-0 border-b border-border/55 bg-background/78 transition-[background-color,box-shadow,transform,border-color] last:border-b-0";
+const ROW_BODY_BUTTON_CLASS =
+  "flex min-w-0 flex-1 cursor-pointer items-center gap-3 px-3 py-3 text-left transition-[background-color,box-shadow,color] hover:bg-muted/28 focus-visible:bg-muted/32 focus-visible:ring-2 focus-visible:ring-ring/20 active:bg-muted/40";
+const ROW_BODY_STATIC_CLASS = "flex min-w-0 flex-1 items-center gap-3 px-3 py-3 text-left";
+const HANDLE_SLOT_CLASS = "hidden shrink-0 items-center justify-center px-3 sm:inline-flex";
 const HANDLE_BUTTON_CLASS =
-  "hidden shrink-0 cursor-grab items-center justify-center px-3 text-muted-foreground/55 transition-colors hover:text-foreground focus-visible:text-foreground active:cursor-grabbing sm:inline-flex";
-const ROW_BUTTON_CLASS =
-  "flex min-w-0 flex-1 cursor-pointer items-center gap-3 px-3 py-3 text-left transition-[background-color,box-shadow,color,transform] hover:bg-muted/35 focus-visible:bg-muted/38 focus-visible:ring-2 focus-visible:ring-ring/20 active:bg-muted/45";
+  "inline-flex h-9 w-9 cursor-grab items-center justify-center rounded-full text-muted-foreground/55 transition-[background-color,color,transform] hover:bg-muted/45 hover:text-foreground focus-visible:bg-muted/45 focus-visible:text-foreground active:cursor-grabbing active:scale-[0.98]";
+const HANDLE_GHOST_CLASS =
+  "inline-flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground/50";
 const MOBILE_REORDER_GROUP_CLASS = "flex shrink-0 items-center gap-0.5 px-2 sm:hidden";
-
-const setFullRowDragImage = (
-  event: React.DragEvent<HTMLButtonElement>,
-  row: HTMLElement | null
-) => {
-  if (!row) return;
-  const rect = row.getBoundingClientRect();
-  event.dataTransfer.setDragImage(
-    row,
-    Math.max(20, event.clientX - rect.left),
-    Math.max(16, event.clientY - rect.top)
-  );
+const PLACEHOLDER_PANEL_CLASS =
+  "pointer-events-none absolute inset-x-3 inset-y-2 rounded-[0.95rem] border border-dashed border-border/65 bg-muted/18";
+const OVERLAY_ROW_CLASS =
+  "overflow-hidden rounded-[1.05rem] border border-border/70 bg-background/98 shadow-[0_18px_38px_-24px_rgba(15,23,42,0.34)]";
+const DROP_ANIMATION = {
+  duration: 180,
+  easing: "cubic-bezier(0.22, 1, 0.36, 1)",
 };
 
-const moveInArray = <T extends { id: string }>(items: T[], sourceId: string, targetId: string) => {
-  const sourceIndex = items.findIndex((item) => item.id === sourceId);
-  const targetIndex = items.findIndex((item) => item.id === targetId);
-  if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) return items;
-  const next = [...items];
-  const [moved] = next.splice(sourceIndex, 1);
-  next.splice(targetIndex, 0, moved);
-  return next;
+type OrganizeWorkspaceDialogProps = {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 };
+
+type DragState = {
+  id: string;
+  width: number | null;
+};
+
+type SortableHandleAttributes = ReturnType<typeof useSortable>["attributes"];
+type SortableHandleListeners = ReturnType<typeof useSortable>["listeners"];
+type SortableHandleRef = ReturnType<typeof useSortable>["setActivatorNodeRef"];
 
 const moveByStep = <T extends { id: string }>(items: T[], id: string, step: -1 | 1) => {
   const index = items.findIndex((item) => item.id === id);
   if (index < 0) return items;
   const targetIndex = index + step;
   if (targetIndex < 0 || targetIndex >= items.length) return items;
-  const next = [...items];
-  const [moved] = next.splice(index, 1);
-  next.splice(targetIndex, 0, moved);
-  return next;
+  return arrayMove(items, index, targetIndex);
 };
 
 const applyProfileOrderToAll = (
@@ -86,10 +101,422 @@ const applyProfileOrderToAll = (
   });
 };
 
-type OrganizeWorkspaceDialogProps = {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-};
+function useDesktopDragEnabled() {
+  const [enabled, setEnabled] = React.useState(false);
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    const media = window.matchMedia("(min-width: 640px) and (pointer: fine)");
+    const sync = () => setEnabled(media.matches);
+    sync();
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
+  }, []);
+
+  return enabled;
+}
+
+function DesktopHandle({
+  label,
+  interactive = false,
+  hidden = false,
+  faded = false,
+  attributes,
+  listeners,
+  setActivatorNodeRef,
+}: {
+  label: string;
+  interactive?: boolean;
+  hidden?: boolean;
+  faded?: boolean;
+  attributes?: SortableHandleAttributes;
+  listeners?: SortableHandleListeners;
+  setActivatorNodeRef?: SortableHandleRef;
+}) {
+  if (hidden) return null;
+
+  return (
+    <div className={cn(HANDLE_SLOT_CLASS, faded && "opacity-0")}>
+      {interactive ? (
+        <button
+          type="button"
+          ref={setActivatorNodeRef}
+          className={HANDLE_BUTTON_CLASS}
+          aria-label={label}
+          title={label}
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical className="h-4 w-4" />
+        </button>
+      ) : (
+        <span className={HANDLE_GHOST_CLASS} aria-hidden="true">
+          <GripVertical className="h-4 w-4" />
+        </span>
+      )}
+    </div>
+  );
+}
+
+function ProfileRowVisual({
+  profile,
+  categoryCount,
+  isSelected,
+  onEdit,
+  onMoveUp,
+  onMoveDown,
+  disableMoveUp,
+  disableMoveDown,
+  showStepControls,
+  interactiveHandle,
+  handleAttributes,
+  handleListeners,
+  setHandleRef,
+  isPlaceholder = false,
+  isOverlay = false,
+  style,
+  rowRef,
+}: {
+  profile: CalendarProfile;
+  categoryCount: number;
+  isSelected: boolean;
+  onEdit?: () => void;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
+  disableMoveUp?: boolean;
+  disableMoveDown?: boolean;
+  showStepControls?: boolean;
+  interactiveHandle?: boolean;
+  handleAttributes?: SortableHandleAttributes;
+  handleListeners?: SortableHandleListeners;
+  setHandleRef?: SortableHandleRef;
+  isPlaceholder?: boolean;
+  isOverlay?: boolean;
+  style?: React.CSSProperties;
+  rowRef?: (node: HTMLElement | null) => void;
+}) {
+  const BodyComp = isOverlay || isPlaceholder ? "div" : "button";
+  const bodyProps =
+    BodyComp === "button"
+      ? {
+          type: "button" as const,
+          onClick: onEdit,
+          "aria-label": `Editar perfil ${profile.name}`,
+        }
+      : {};
+
+  return (
+    <div
+      ref={rowRef}
+      style={style}
+      className={cn(
+        ROW_CONTAINER_BASE_CLASS,
+        isOverlay && OVERLAY_ROW_CLASS,
+        isPlaceholder && "bg-transparent",
+        !isOverlay && !isPlaceholder && "hover:bg-muted/12"
+      )}
+    >
+      {isPlaceholder ? <div className={PLACEHOLDER_PANEL_CLASS} /> : null}
+
+      <DesktopHandle
+        label={`Reordenar perfil ${profile.name}`}
+        interactive={Boolean(interactiveHandle)}
+        hidden={!interactiveHandle && !isOverlay && !isPlaceholder}
+        faded={isPlaceholder}
+        attributes={handleAttributes}
+        listeners={handleListeners}
+        setActivatorNodeRef={setHandleRef}
+      />
+
+      <BodyComp
+        {...bodyProps}
+        className={cn(
+          BodyComp === "button" ? ROW_BODY_BUTTON_CLASS : ROW_BODY_STATIC_CLASS,
+          isPlaceholder && "opacity-0"
+        )}
+      >
+        <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[0.95rem] bg-muted/42 ring-1 ring-border/55">
+          <ProfileIcon icon={profile.icon} size={18} />
+        </div>
+
+        <div className="min-w-0 flex-1 space-y-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="truncate text-sm font-medium text-foreground">{profile.name}</p>
+            {isSelected ? (
+              <span className="rounded-full bg-muted/55 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                ativo
+              </span>
+            ) : null}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {categoryCount} {categoryCount === 1 ? "categoria" : "categorias"}
+          </p>
+        </div>
+      </BodyComp>
+
+      {showStepControls ? (
+        <div className={cn(MOBILE_REORDER_GROUP_CLASS, isPlaceholder && "opacity-0")}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            className="h-8 w-8 rounded-full text-muted-foreground/70 hover:bg-muted/55 hover:text-foreground"
+            onClick={onMoveUp}
+            disabled={disableMoveUp}
+            aria-label={`Mover perfil ${profile.name} para cima`}
+          >
+            <ArrowUp className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            className="h-8 w-8 rounded-full text-muted-foreground/70 hover:bg-muted/55 hover:text-foreground"
+            onClick={onMoveDown}
+            disabled={disableMoveDown}
+            aria-label={`Mover perfil ${profile.name} para baixo`}
+          >
+            <ArrowDown className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function CategoryRowVisual({
+  category,
+  onEdit,
+  onMoveUp,
+  onMoveDown,
+  disableMoveUp,
+  disableMoveDown,
+  showStepControls,
+  interactiveHandle,
+  handleAttributes,
+  handleListeners,
+  setHandleRef,
+  isPlaceholder = false,
+  isOverlay = false,
+  style,
+  rowRef,
+}: {
+  category: CategoryItem;
+  onEdit?: () => void;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
+  disableMoveUp?: boolean;
+  disableMoveDown?: boolean;
+  showStepControls?: boolean;
+  interactiveHandle?: boolean;
+  handleAttributes?: SortableHandleAttributes;
+  handleListeners?: SortableHandleListeners;
+  setHandleRef?: SortableHandleRef;
+  isPlaceholder?: boolean;
+  isOverlay?: boolean;
+  style?: React.CSSProperties;
+  rowRef?: (node: HTMLElement | null) => void;
+}) {
+  const BodyComp = isOverlay || isPlaceholder ? "div" : "button";
+  const bodyProps =
+    BodyComp === "button"
+      ? {
+          type: "button" as const,
+          onClick: onEdit,
+          "aria-label": `Editar categoria ${category.name}`,
+        }
+      : {};
+
+  return (
+    <div
+      ref={rowRef}
+      style={style}
+      className={cn(
+        ROW_CONTAINER_BASE_CLASS,
+        isOverlay && OVERLAY_ROW_CLASS,
+        isPlaceholder && "bg-transparent",
+        !isOverlay && !isPlaceholder && "hover:bg-muted/12"
+      )}
+    >
+      {isPlaceholder ? <div className={PLACEHOLDER_PANEL_CLASS} /> : null}
+
+      <DesktopHandle
+        label={`Reordenar categoria ${category.name}`}
+        interactive={Boolean(interactiveHandle)}
+        hidden={!interactiveHandle && !isOverlay && !isPlaceholder}
+        faded={isPlaceholder}
+        attributes={handleAttributes}
+        listeners={handleListeners}
+        setActivatorNodeRef={setHandleRef}
+      />
+
+      <BodyComp
+        {...bodyProps}
+        className={cn(
+          BodyComp === "button" ? ROW_BODY_BUTTON_CLASS : ROW_BODY_STATIC_CLASS,
+          isPlaceholder && "opacity-0"
+        )}
+      >
+        <span
+          className="h-3.5 w-3.5 shrink-0 rounded-full ring-1 ring-black/8"
+          style={{ backgroundColor: category.color }}
+          aria-hidden="true"
+        />
+
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium text-foreground">{category.name}</p>
+        </div>
+      </BodyComp>
+
+      {showStepControls ? (
+        <div className={cn(MOBILE_REORDER_GROUP_CLASS, isPlaceholder && "opacity-0")}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            className="h-8 w-8 rounded-full text-muted-foreground/70 hover:bg-muted/55 hover:text-foreground"
+            onClick={onMoveUp}
+            disabled={disableMoveUp}
+            aria-label={`Mover categoria ${category.name} para cima`}
+          >
+            <ArrowUp className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            className="h-8 w-8 rounded-full text-muted-foreground/70 hover:bg-muted/55 hover:text-foreground"
+            onClick={onMoveDown}
+            disabled={disableMoveDown}
+            aria-label={`Mover categoria ${category.name} para baixo`}
+          >
+            <ArrowDown className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function SortableProfileRow({
+  profile,
+  categoryCount,
+  isSelected,
+  index,
+  total,
+  dragEnabled,
+  onEdit,
+  onMoveUp,
+  onMoveDown,
+}: {
+  profile: CalendarProfile;
+  categoryCount: number;
+  isSelected: boolean;
+  index: number;
+  total: number;
+  dragEnabled: boolean;
+  onEdit: () => void;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setActivatorNodeRef,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: profile.id,
+    disabled: !dragEnabled,
+  });
+
+  const style = dragEnabled
+    ? {
+        transform: CSS.Transform.toString(transform),
+        transition,
+      }
+    : undefined;
+
+  return (
+    <ProfileRowVisual
+      profile={profile}
+      categoryCount={categoryCount}
+      isSelected={isSelected}
+      onEdit={onEdit}
+      onMoveUp={onMoveUp}
+      onMoveDown={onMoveDown}
+      disableMoveUp={index === 0}
+      disableMoveDown={index === total - 1}
+      showStepControls={!dragEnabled}
+      interactiveHandle={dragEnabled}
+      handleAttributes={attributes}
+      handleListeners={listeners}
+      setHandleRef={setActivatorNodeRef}
+      isPlaceholder={dragEnabled && isDragging}
+      style={style}
+      rowRef={setNodeRef}
+    />
+  );
+}
+
+function SortableCategoryRow({
+  category,
+  index,
+  total,
+  dragEnabled,
+  onEdit,
+  onMoveUp,
+  onMoveDown,
+}: {
+  category: CategoryItem;
+  index: number;
+  total: number;
+  dragEnabled: boolean;
+  onEdit: () => void;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setActivatorNodeRef,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: category.id,
+    disabled: !dragEnabled,
+  });
+
+  const style = dragEnabled
+    ? {
+        transform: CSS.Transform.toString(transform),
+        transition,
+      }
+    : undefined;
+
+  return (
+    <CategoryRowVisual
+      category={category}
+      onEdit={onEdit}
+      onMoveUp={onMoveUp}
+      onMoveDown={onMoveDown}
+      disableMoveUp={index === 0}
+      disableMoveDown={index === total - 1}
+      showStepControls={!dragEnabled}
+      interactiveHandle={dragEnabled}
+      handleAttributes={attributes}
+      handleListeners={listeners}
+      setHandleRef={setActivatorNodeRef}
+      isPlaceholder={dragEnabled && isDragging}
+      style={style}
+      rowRef={setNodeRef}
+    />
+  );
+}
 
 export function OrganizeWorkspaceDialog({
   open,
@@ -103,10 +530,8 @@ export function OrganizeWorkspaceDialog({
 
   const [activeTab, setActiveTab] = React.useState<"profiles" | "categories">("profiles");
   const [categoryProfileId, setCategoryProfileId] = React.useState("");
-  const [draggingProfileId, setDraggingProfileId] = React.useState<string | null>(null);
-  const [dragOverProfileId, setDragOverProfileId] = React.useState<string | null>(null);
-  const [draggingCategoryId, setDraggingCategoryId] = React.useState<string | null>(null);
-  const [dragOverCategoryId, setDragOverCategoryId] = React.useState<string | null>(null);
+  const [activeProfileDrag, setActiveProfileDrag] = React.useState<DragState | null>(null);
+  const [activeCategoryDrag, setActiveCategoryDrag] = React.useState<DragState | null>(null);
   const [profileManagerOpen, setProfileManagerOpen] = React.useState(false);
   const [profileManagerIntent, setProfileManagerIntent] = React.useState<ProfileManagerIntent | null>(
     null
@@ -114,6 +539,16 @@ export function OrganizeWorkspaceDialog({
   const [categoryCreateOpen, setCategoryCreateOpen] = React.useState(false);
   const [categoryEditOpen, setCategoryEditOpen] = React.useState(false);
   const [editingCategoryId, setEditingCategoryId] = React.useState<string | null>(null);
+
+  const isDesktopDragEnabled = useDesktopDragEnabled();
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 6 },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   React.useEffect(() => {
     if (!open) return;
@@ -128,49 +563,32 @@ export function OrganizeWorkspaceDialog({
     });
   }, [open, profiles, selectedProfileIds]);
 
+  React.useEffect(() => {
+    if (!open) {
+      setActiveProfileDrag(null);
+      setActiveCategoryDrag(null);
+    }
+  }, [open]);
+
   const categoriesForProfile = React.useMemo(
     () => categories.filter((category) => category.profileId === categoryProfileId),
     [categories, categoryProfileId]
   );
 
-  const moveProfiles = React.useCallback(
-    (sourceId: string, targetId: string) => {
-      const next = moveInArray(profiles, sourceId, targetId);
-      if (next === profiles) return;
-      setProfilesOrder(next.map((profile) => profile.id));
-    },
-    [profiles, setProfilesOrder]
+  const activeProfile = React.useMemo(
+    () => profiles.find((profile) => profile.id === activeProfileDrag?.id) ?? null,
+    [profiles, activeProfileDrag]
   );
-
-  const moveProfileStep = React.useCallback(
-    (profileId: string, step: -1 | 1) => {
-      const next = moveByStep(profiles, profileId, step);
-      if (next === profiles) return;
-      setProfilesOrder(next.map((profile) => profile.id));
-    },
-    [profiles, setProfilesOrder]
+  const activeProfileCategoryCount = React.useMemo(
+    () =>
+      activeProfile
+        ? categories.filter((category) => category.profileId === activeProfile.id).length
+        : 0,
+    [activeProfile, categories]
   );
-
-  const moveCategories = React.useCallback(
-    (sourceId: string, targetId: string) => {
-      if (!categoryProfileId) return;
-      const nextProfileCategories = moveInArray(categoriesForProfile, sourceId, targetId);
-      if (nextProfileCategories === categoriesForProfile) return;
-      const fullOrder = applyProfileOrderToAll(categories, categoryProfileId, nextProfileCategories);
-      setCategoriesOrder(fullOrder.map((category) => category.id));
-    },
-    [categories, categoriesForProfile, categoryProfileId, setCategoriesOrder]
-  );
-
-  const moveCategoryStep = React.useCallback(
-    (categoryId: string, step: -1 | 1) => {
-      if (!categoryProfileId) return;
-      const nextProfileCategories = moveByStep(categoriesForProfile, categoryId, step);
-      if (nextProfileCategories === categoriesForProfile) return;
-      const fullOrder = applyProfileOrderToAll(categories, categoryProfileId, nextProfileCategories);
-      setCategoriesOrder(fullOrder.map((category) => category.id));
-    },
-    [categories, categoriesForProfile, categoryProfileId, setCategoriesOrder]
+  const activeCategory = React.useMemo(
+    () => categoriesForProfile.find((category) => category.id === activeCategoryDrag?.id) ?? null,
+    [categoriesForProfile, activeCategoryDrag]
   );
 
   const openCreateProfile = () => {
@@ -187,6 +605,82 @@ export function OrganizeWorkspaceDialog({
     setEditingCategoryId(categoryId);
     setCategoryEditOpen(true);
   };
+
+  const moveProfileStep = React.useCallback(
+    (profileId: string, step: -1 | 1) => {
+      const next = moveByStep(profiles, profileId, step);
+      if (next === profiles) return;
+      setProfilesOrder(next.map((profile) => profile.id));
+    },
+    [profiles, setProfilesOrder]
+  );
+
+  const moveCategoryStep = React.useCallback(
+    (categoryId: string, step: -1 | 1) => {
+      if (!categoryProfileId) return;
+      const nextProfileCategories = moveByStep(categoriesForProfile, categoryId, step);
+      if (nextProfileCategories === categoriesForProfile) return;
+      const fullOrder = applyProfileOrderToAll(categories, categoryProfileId, nextProfileCategories);
+      setCategoriesOrder(fullOrder.map((category) => category.id));
+    },
+    [categories, categoriesForProfile, categoryProfileId, setCategoriesOrder]
+  );
+
+  const handleProfilesDragStart = React.useCallback((event: DragStartEvent) => {
+    setActiveProfileDrag({
+      id: String(event.active.id),
+      width: event.active.rect.current.initial?.width ?? null,
+    });
+  }, []);
+
+  const handleProfilesDragEnd = React.useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event;
+      setActiveProfileDrag(null);
+      if (!over || active.id === over.id) return;
+
+      const oldIndex = profiles.findIndex((profile) => profile.id === String(active.id));
+      const newIndex = profiles.findIndex((profile) => profile.id === String(over.id));
+      if (oldIndex < 0 || newIndex < 0 || oldIndex === newIndex) return;
+
+      const next = arrayMove(profiles, oldIndex, newIndex);
+      setProfilesOrder(next.map((profile) => profile.id));
+    },
+    [profiles, setProfilesOrder]
+  );
+
+  const handleCategoriesDragStart = React.useCallback((event: DragStartEvent) => {
+    setActiveCategoryDrag({
+      id: String(event.active.id),
+      width: event.active.rect.current.initial?.width ?? null,
+    });
+  }, []);
+
+  const handleCategoriesDragEnd = React.useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event;
+      setActiveCategoryDrag(null);
+      if (!over || active.id === over.id || !categoryProfileId) return;
+
+      const oldIndex = categoriesForProfile.findIndex(
+        (category) => category.id === String(active.id)
+      );
+      const newIndex = categoriesForProfile.findIndex(
+        (category) => category.id === String(over.id)
+      );
+      if (oldIndex < 0 || newIndex < 0 || oldIndex === newIndex) return;
+
+      const nextProfileCategories = arrayMove(categoriesForProfile, oldIndex, newIndex);
+      const fullOrder = applyProfileOrderToAll(categories, categoryProfileId, nextProfileCategories);
+      setCategoriesOrder(fullOrder.map((category) => category.id));
+    },
+    [categories, categoriesForProfile, categoryProfileId, setCategoriesOrder]
+  );
+
+  const handleDragCancel = React.useCallback(() => {
+    setActiveProfileDrag(null);
+    setActiveCategoryDrag(null);
+  }, []);
 
   return (
     <>
@@ -240,120 +734,61 @@ export function OrganizeWorkspaceDialog({
                   </Button>
                 </div>
 
-                <div className={LIST_CLASS}>
-                  {profiles.length === 0 ? (
-                    <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-                      Nenhum perfil ainda.
-                    </div>
-                  ) : (
-                    profiles.map((profile, index) => {
-                      const categoryCount = categories.filter(
-                        (category) => category.profileId === profile.id
-                      ).length;
-                      const isSelected = selectedProfileIds.includes(profile.id);
-                      return (
-                        <div
-                          key={profile.id}
-                          data-reorder-row
-                          className={`${ROW_SHELL_CLASS} ${
-                            draggingProfileId === profile.id
-                              ? "bg-muted/30 opacity-75"
-                              : dragOverProfileId === profile.id
-                                ? "bg-muted/28"
-                                : "hover:bg-muted/12"
-                          }`}
-                          onDragOver={(event) => {
-                            event.preventDefault();
-                            setDragOverProfileId(profile.id);
-                          }}
-                          onDrop={(event) => {
-                            event.preventDefault();
-                            if (!draggingProfileId || draggingProfileId === profile.id) return;
-                            moveProfiles(draggingProfileId, profile.id);
-                            setDraggingProfileId(null);
-                            setDragOverProfileId(null);
-                          }}
-                        >
-                          <button
-                            type="button"
-                            draggable
-                            onDragStart={(event) => {
-                              setDraggingProfileId(profile.id);
-                              setDragOverProfileId(profile.id);
-                              event.dataTransfer.effectAllowed = "move";
-                              event.dataTransfer.setData("text/plain", profile.id);
-                              setFullRowDragImage(
-                                event,
-                                event.currentTarget.closest("[data-reorder-row]")
-                              );
-                            }}
-                            onDragEnd={() => {
-                              setDraggingProfileId(null);
-                              setDragOverProfileId(null);
-                            }}
-                            className={HANDLE_BUTTON_CLASS}
-                            aria-label={`Reordenar perfil ${profile.name}`}
-                            title={`Reordenar perfil ${profile.name}`}
-                          >
-                            <GripVertical className="h-4 w-4" />
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => openEditProfile(profile.id)}
-                            className={ROW_BUTTON_CLASS}
-                            aria-label={`Editar perfil ${profile.name}`}
-                          >
-                            <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[0.95rem] bg-muted/42 ring-1 ring-border/55">
-                              <ProfileIcon icon={profile.icon} size={18} />
-                            </div>
-
-                            <div className="min-w-0 flex-1 space-y-1">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <p className="truncate text-sm font-medium text-foreground">
-                                  {profile.name}
-                                </p>
-                                {isSelected ? (
-                                  <span className="rounded-full bg-muted/55 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                                    ativo
-                                  </span>
-                                ) : null}
-                              </div>
-                              <p className="text-xs text-muted-foreground">
-                                {categoryCount} {categoryCount === 1 ? "categoria" : "categorias"}
-                              </p>
-                            </div>
-                          </button>
-
-                          <div className={MOBILE_REORDER_GROUP_CLASS}>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon-sm"
-                              className="h-8 w-8 rounded-full text-muted-foreground/70 hover:bg-muted/55 hover:text-foreground"
-                              onClick={() => moveProfileStep(profile.id, -1)}
-                              disabled={index === 0}
-                              aria-label={`Mover perfil ${profile.name} para cima`}
-                            >
-                              <ArrowUp className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon-sm"
-                              className="h-8 w-8 rounded-full text-muted-foreground/70 hover:bg-muted/55 hover:text-foreground"
-                              onClick={() => moveProfileStep(profile.id, 1)}
-                              disabled={index === profiles.length - 1}
-                              aria-label={`Mover perfil ${profile.name} para baixo`}
-                            >
-                              <ArrowDown className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
+                <DndContext
+                  sensors={isDesktopDragEnabled ? sensors : []}
+                  collisionDetection={closestCenter}
+                  onDragStart={handleProfilesDragStart}
+                  onDragEnd={handleProfilesDragEnd}
+                  onDragCancel={handleDragCancel}
+                >
+                  <SortableContext
+                    items={profiles.map((profile) => profile.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    <div className={LIST_CLASS}>
+                      {profiles.length === 0 ? (
+                        <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+                          Nenhum perfil ainda.
                         </div>
-                      );
-                    })
-                  )}
-                </div>
+                      ) : (
+                        profiles.map((profile, index) => {
+                          const categoryCount = categories.filter(
+                            (category) => category.profileId === profile.id
+                          ).length;
+
+                          return (
+                            <SortableProfileRow
+                              key={profile.id}
+                              profile={profile}
+                              categoryCount={categoryCount}
+                              isSelected={selectedProfileIds.includes(profile.id)}
+                              index={index}
+                              total={profiles.length}
+                              dragEnabled={isDesktopDragEnabled}
+                              onEdit={() => openEditProfile(profile.id)}
+                              onMoveUp={() => moveProfileStep(profile.id, -1)}
+                              onMoveDown={() => moveProfileStep(profile.id, 1)}
+                            />
+                          );
+                        })
+                      )}
+                    </div>
+                  </SortableContext>
+
+                  <DragOverlay dropAnimation={DROP_ANIMATION}>
+                    {activeProfile ? (
+                      <ProfileRowVisual
+                        profile={activeProfile}
+                        categoryCount={activeProfileCategoryCount}
+                        isSelected={selectedProfileIds.includes(activeProfile.id)}
+                        isOverlay
+                        style={{
+                          width: activeProfileDrag?.width ?? undefined,
+                        }}
+                      />
+                    ) : null}
+                  </DragOverlay>
+                </DndContext>
               </section>
             ) : (
               <section className={SECTION_CLASS}>
@@ -361,7 +796,8 @@ export function OrganizeWorkspaceDialog({
                   <Select value={categoryProfileId} onValueChange={setCategoryProfileId}>
                     <SelectTrigger className="h-9 rounded-full border-border/65 bg-background/80 px-3 shadow-none sm:min-w-[220px]">
                       <span className="truncate">
-                        {profiles.find((profile) => profile.id === categoryProfileId)?.name ?? "Perfil"}
+                        {profiles.find((profile) => profile.id === categoryProfileId)?.name ??
+                          "Perfil"}
                       </span>
                     </SelectTrigger>
                     <SelectContent>
@@ -387,110 +823,55 @@ export function OrganizeWorkspaceDialog({
                   </Button>
                 </div>
 
-                <div className={LIST_CLASS}>
-                  {!categoryProfileId ? (
-                    <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-                      Crie um perfil primeiro.
-                    </div>
-                  ) : categoriesForProfile.length === 0 ? (
-                    <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-                      Nenhuma categoria nesse perfil.
-                    </div>
-                  ) : (
-                    categoriesForProfile.map((category, index) => (
-                      <div
-                        key={category.id}
-                        data-reorder-row
-                        className={`${ROW_SHELL_CLASS} ${
-                          draggingCategoryId === category.id
-                            ? "bg-muted/30 opacity-75"
-                            : dragOverCategoryId === category.id
-                              ? "bg-muted/28"
-                              : "hover:bg-muted/12"
-                        }`}
-                        onDragOver={(event) => {
-                          event.preventDefault();
-                          setDragOverCategoryId(category.id);
-                        }}
-                        onDrop={(event) => {
-                          event.preventDefault();
-                          if (!draggingCategoryId || draggingCategoryId === category.id) return;
-                          moveCategories(draggingCategoryId, category.id);
-                          setDraggingCategoryId(null);
-                          setDragOverCategoryId(null);
-                        }}
-                      >
-                        <button
-                          type="button"
-                          draggable
-                          onDragStart={(event) => {
-                              setDraggingCategoryId(category.id);
-                              setDragOverCategoryId(category.id);
-                              event.dataTransfer.effectAllowed = "move";
-                              event.dataTransfer.setData("text/plain", category.id);
-                              setFullRowDragImage(
-                                event,
-                                event.currentTarget.closest("[data-reorder-row]")
-                              );
-                            }}
-                          onDragEnd={() => {
-                            setDraggingCategoryId(null);
-                            setDragOverCategoryId(null);
-                          }}
-                          className={HANDLE_BUTTON_CLASS}
-                          aria-label={`Reordenar categoria ${category.name}`}
-                          title={`Reordenar categoria ${category.name}`}
-                        >
-                          <GripVertical className="h-4 w-4" />
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => openEditCategory(category.id)}
-                          className={ROW_BUTTON_CLASS}
-                          aria-label={`Editar categoria ${category.name}`}
-                        >
-                          <span
-                            className="h-3.5 w-3.5 shrink-0 rounded-full ring-1 ring-black/8"
-                            style={{ backgroundColor: category.color }}
-                            aria-hidden="true"
-                          />
-
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-medium text-foreground">
-                              {category.name}
-                            </p>
-                          </div>
-                        </button>
-
-                        <div className={MOBILE_REORDER_GROUP_CLASS}>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon-sm"
-                            className="h-8 w-8 rounded-full text-muted-foreground/70 hover:bg-muted/55 hover:text-foreground"
-                            onClick={() => moveCategoryStep(category.id, -1)}
-                            disabled={index === 0}
-                            aria-label={`Mover categoria ${category.name} para cima`}
-                          >
-                            <ArrowUp className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon-sm"
-                            className="h-8 w-8 rounded-full text-muted-foreground/70 hover:bg-muted/55 hover:text-foreground"
-                            onClick={() => moveCategoryStep(category.id, 1)}
-                            disabled={index === categoriesForProfile.length - 1}
-                            aria-label={`Mover categoria ${category.name} para baixo`}
-                          >
-                            <ArrowDown className="h-3.5 w-3.5" />
-                          </Button>
+                <DndContext
+                  sensors={isDesktopDragEnabled ? sensors : []}
+                  collisionDetection={closestCenter}
+                  onDragStart={handleCategoriesDragStart}
+                  onDragEnd={handleCategoriesDragEnd}
+                  onDragCancel={handleDragCancel}
+                >
+                  <SortableContext
+                    items={categoriesForProfile.map((category) => category.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    <div className={LIST_CLASS}>
+                      {!categoryProfileId ? (
+                        <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+                          Crie um perfil primeiro.
                         </div>
-                      </div>
-                    ))
-                  )}
-                </div>
+                      ) : categoriesForProfile.length === 0 ? (
+                        <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+                          Nenhuma categoria nesse perfil.
+                        </div>
+                      ) : (
+                        categoriesForProfile.map((category, index) => (
+                          <SortableCategoryRow
+                            key={category.id}
+                            category={category}
+                            index={index}
+                            total={categoriesForProfile.length}
+                            dragEnabled={isDesktopDragEnabled}
+                            onEdit={() => openEditCategory(category.id)}
+                            onMoveUp={() => moveCategoryStep(category.id, -1)}
+                            onMoveDown={() => moveCategoryStep(category.id, 1)}
+                          />
+                        ))
+                      )}
+                    </div>
+                  </SortableContext>
+
+                  <DragOverlay dropAnimation={DROP_ANIMATION}>
+                    {activeCategory ? (
+                      <CategoryRowVisual
+                        category={activeCategory}
+                        isOverlay
+                        style={{
+                          width: activeCategoryDrag?.width ?? undefined,
+                        }}
+                      />
+                    ) : null}
+                  </DragOverlay>
+                </DndContext>
               </section>
             )}
           </div>
