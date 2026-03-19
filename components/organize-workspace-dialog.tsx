@@ -10,6 +10,7 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DragOverEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
 import {
@@ -44,11 +45,12 @@ import { cn } from "@/lib/utils";
 const TAB_BASE_CLASS =
   "inline-flex min-h-8 items-center justify-center rounded-full px-3 py-1.5 text-sm font-medium transition-[background-color,color,box-shadow]";
 const SECTION_CLASS = "space-y-3";
-const LIST_CLASS = "overflow-hidden rounded-[1.1rem] border border-border/55 bg-background/78";
+const LIST_CLASS =
+  "overflow-hidden rounded-[1.1rem] border border-border/60 bg-muted/18 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]";
 const ROW_CONTAINER_BASE_CLASS =
-  "group relative flex items-stretch gap-0 border-b border-border/55 bg-background/78 transition-[background-color,box-shadow,transform,border-color] last:border-b-0";
+  "group relative flex items-stretch gap-0 border-b border-border/45 bg-transparent transition-[background-color,box-shadow,transform,border-color] last:border-b-0";
 const ROW_BODY_BUTTON_CLASS =
-  "flex min-w-0 flex-1 cursor-pointer items-center gap-3 px-3 py-3 text-left transition-[background-color,box-shadow,color] hover:bg-muted/28 focus-visible:bg-muted/32 focus-visible:ring-2 focus-visible:ring-ring/20 active:bg-muted/40";
+  "flex min-w-0 flex-1 cursor-pointer items-center gap-3 px-3 py-3 text-left transition-[background-color,box-shadow,color] hover:bg-muted/30 focus-visible:bg-muted/34 focus-visible:ring-2 focus-visible:ring-ring/20 active:bg-muted/42";
 const ROW_BODY_STATIC_CLASS = "flex min-w-0 flex-1 items-center gap-3 px-3 py-3 text-left";
 const HANDLE_SLOT_CLASS = "hidden shrink-0 items-center justify-center px-3 sm:inline-flex";
 const HANDLE_BUTTON_CLASS =
@@ -57,9 +59,9 @@ const HANDLE_GHOST_CLASS =
   "inline-flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground/50";
 const MOBILE_REORDER_GROUP_CLASS = "flex shrink-0 items-center gap-0.5 px-2 sm:hidden";
 const PLACEHOLDER_PANEL_CLASS =
-  "pointer-events-none absolute inset-x-3 inset-y-2 rounded-[0.95rem] border border-dashed border-border/65 bg-muted/18";
+  "pointer-events-none absolute inset-x-3 inset-y-2 rounded-[0.95rem] border border-dashed border-border/75 bg-muted/26";
 const OVERLAY_ROW_CLASS =
-  "overflow-hidden rounded-[1.05rem] border border-border/70 bg-background/98 shadow-[0_18px_38px_-24px_rgba(15,23,42,0.34)]";
+  "overflow-hidden rounded-[1.05rem] border border-border/70 bg-background/96 shadow-[0_18px_38px_-24px_rgba(15,23,42,0.34)]";
 const DROP_ANIMATION = {
   duration: 180,
   easing: "cubic-bezier(0.22, 1, 0.36, 1)",
@@ -78,6 +80,22 @@ type DragState = {
 type SortableHandleAttributes = ReturnType<typeof useSortable>["attributes"];
 type SortableHandleListeners = ReturnType<typeof useSortable>["listeners"];
 type SortableHandleRef = ReturnType<typeof useSortable>["setActivatorNodeRef"];
+
+const arraysEqual = (left: string[], right: string[]) =>
+  left.length === right.length && left.every((value, index) => value === right[index]);
+
+const orderItemsByIds = <T extends { id: string }>(items: T[], orderedIds: string[] | null) => {
+  if (!orderedIds || orderedIds.length === 0) return items;
+  const itemMap = new Map(items.map((item) => [item.id, item]));
+  const ordered = orderedIds
+    .map((id) => itemMap.get(id))
+    .filter((item): item is T => Boolean(item));
+
+  if (ordered.length === items.length) return ordered;
+
+  const seen = new Set(ordered.map((item) => item.id));
+  return [...ordered, ...items.filter((item) => !seen.has(item.id))];
+};
 
 const moveByStep = <T extends { id: string }>(items: T[], id: string, step: -1 | 1) => {
   const index = items.findIndex((item) => item.id === id);
@@ -136,7 +154,7 @@ function DesktopHandle({
   if (hidden) return null;
 
   return (
-    <div className={cn(HANDLE_SLOT_CLASS, faded && "opacity-0")}>
+    <div className={cn(HANDLE_SLOT_CLASS, faded && "opacity-40")}>
       {interactive ? (
         <button
           type="button"
@@ -212,7 +230,7 @@ function ProfileRowVisual({
       className={cn(
         ROW_CONTAINER_BASE_CLASS,
         isOverlay && OVERLAY_ROW_CLASS,
-        isPlaceholder && "bg-transparent",
+        isPlaceholder && "bg-muted/12",
         !isOverlay && !isPlaceholder && "hover:bg-muted/12"
       )}
     >
@@ -232,7 +250,7 @@ function ProfileRowVisual({
         {...bodyProps}
         className={cn(
           BodyComp === "button" ? ROW_BODY_BUTTON_CLASS : ROW_BODY_STATIC_CLASS,
-          isPlaceholder && "opacity-0"
+          isPlaceholder && "opacity-45 saturate-[0.88]"
         )}
       >
         <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[0.95rem] bg-muted/42 ring-1 ring-border/55">
@@ -255,7 +273,7 @@ function ProfileRowVisual({
       </BodyComp>
 
       {showStepControls ? (
-        <div className={cn(MOBILE_REORDER_GROUP_CLASS, isPlaceholder && "opacity-0")}>
+        <div className={cn(MOBILE_REORDER_GROUP_CLASS, isPlaceholder && "opacity-45")}>
           <Button
             type="button"
             variant="ghost"
@@ -334,7 +352,7 @@ function CategoryRowVisual({
       className={cn(
         ROW_CONTAINER_BASE_CLASS,
         isOverlay && OVERLAY_ROW_CLASS,
-        isPlaceholder && "bg-transparent",
+        isPlaceholder && "bg-muted/12",
         !isOverlay && !isPlaceholder && "hover:bg-muted/12"
       )}
     >
@@ -354,7 +372,7 @@ function CategoryRowVisual({
         {...bodyProps}
         className={cn(
           BodyComp === "button" ? ROW_BODY_BUTTON_CLASS : ROW_BODY_STATIC_CLASS,
-          isPlaceholder && "opacity-0"
+          isPlaceholder && "opacity-45 saturate-[0.88]"
         )}
       >
         <span
@@ -369,7 +387,7 @@ function CategoryRowVisual({
       </BodyComp>
 
       {showStepControls ? (
-        <div className={cn(MOBILE_REORDER_GROUP_CLASS, isPlaceholder && "opacity-0")}>
+        <div className={cn(MOBILE_REORDER_GROUP_CLASS, isPlaceholder && "opacity-45")}>
           <Button
             type="button"
             variant="ghost"
@@ -532,6 +550,8 @@ export function OrganizeWorkspaceDialog({
   const [categoryProfileId, setCategoryProfileId] = React.useState("");
   const [activeProfileDrag, setActiveProfileDrag] = React.useState<DragState | null>(null);
   const [activeCategoryDrag, setActiveCategoryDrag] = React.useState<DragState | null>(null);
+  const [draftProfileOrderIds, setDraftProfileOrderIds] = React.useState<string[] | null>(null);
+  const [draftCategoryOrderIds, setDraftCategoryOrderIds] = React.useState<string[] | null>(null);
   const [profileManagerOpen, setProfileManagerOpen] = React.useState(false);
   const [profileManagerIntent, setProfileManagerIntent] = React.useState<ProfileManagerIntent | null>(
     null
@@ -567,17 +587,40 @@ export function OrganizeWorkspaceDialog({
     if (!open) {
       setActiveProfileDrag(null);
       setActiveCategoryDrag(null);
+      setDraftProfileOrderIds(null);
+      setDraftCategoryOrderIds(null);
     }
   }, [open]);
+
+  React.useEffect(() => {
+    setActiveProfileDrag(null);
+    setActiveCategoryDrag(null);
+    setDraftProfileOrderIds(null);
+    setDraftCategoryOrderIds(null);
+  }, [activeTab]);
 
   const categoriesForProfile = React.useMemo(
     () => categories.filter((category) => category.profileId === categoryProfileId),
     [categories, categoryProfileId]
   );
 
+  React.useEffect(() => {
+    setActiveCategoryDrag(null);
+    setDraftCategoryOrderIds(null);
+  }, [categoryProfileId]);
+
+  const orderedProfiles = React.useMemo(
+    () => orderItemsByIds(profiles, draftProfileOrderIds),
+    [profiles, draftProfileOrderIds]
+  );
+  const orderedCategoriesForProfile = React.useMemo(
+    () => orderItemsByIds(categoriesForProfile, draftCategoryOrderIds),
+    [categoriesForProfile, draftCategoryOrderIds]
+  );
+
   const activeProfile = React.useMemo(
-    () => profiles.find((profile) => profile.id === activeProfileDrag?.id) ?? null,
-    [profiles, activeProfileDrag]
+    () => orderedProfiles.find((profile) => profile.id === activeProfileDrag?.id) ?? null,
+    [orderedProfiles, activeProfileDrag]
   );
   const activeProfileCategoryCount = React.useMemo(
     () =>
@@ -587,8 +630,10 @@ export function OrganizeWorkspaceDialog({
     [activeProfile, categories]
   );
   const activeCategory = React.useMemo(
-    () => categoriesForProfile.find((category) => category.id === activeCategoryDrag?.id) ?? null,
-    [categoriesForProfile, activeCategoryDrag]
+    () =>
+      orderedCategoriesForProfile.find((category) => category.id === activeCategoryDrag?.id) ??
+      null,
+    [orderedCategoriesForProfile, activeCategoryDrag]
   );
 
   const openCreateProfile = () => {
@@ -631,22 +676,47 @@ export function OrganizeWorkspaceDialog({
       id: String(event.active.id),
       width: event.active.rect.current.initial?.width ?? null,
     });
-  }, []);
+    setDraftProfileOrderIds(orderedProfiles.map((profile) => profile.id));
+  }, [orderedProfiles]);
+
+  const handleProfilesDragOver = React.useCallback(
+    (event: DragOverEvent) => {
+      const { active, over } = event;
+      if (!over || active.id === over.id) return;
+
+      setDraftProfileOrderIds((current) => {
+        const base = current ?? orderedProfiles.map((profile) => profile.id);
+        const oldIndex = base.indexOf(String(active.id));
+        const newIndex = base.indexOf(String(over.id));
+        if (oldIndex < 0 || newIndex < 0 || oldIndex === newIndex) return base;
+        return arrayMove(base, oldIndex, newIndex);
+      });
+    },
+    [orderedProfiles]
+  );
 
   const handleProfilesDragEnd = React.useCallback(
     (event: DragEndEvent) => {
       const { active, over } = event;
       setActiveProfileDrag(null);
-      if (!over || active.id === over.id) return;
+      const currentIds = profiles.map((profile) => profile.id);
+      let nextIds = draftProfileOrderIds;
 
-      const oldIndex = profiles.findIndex((profile) => profile.id === String(active.id));
-      const newIndex = profiles.findIndex((profile) => profile.id === String(over.id));
-      if (oldIndex < 0 || newIndex < 0 || oldIndex === newIndex) return;
+      if (!nextIds && over && active.id !== over.id) {
+        const oldIndex = currentIds.indexOf(String(active.id));
+        const newIndex = currentIds.indexOf(String(over.id));
+        if (oldIndex >= 0 && newIndex >= 0 && oldIndex !== newIndex) {
+          nextIds = arrayMove(currentIds, oldIndex, newIndex);
+        }
+      }
 
-      const next = arrayMove(profiles, oldIndex, newIndex);
-      setProfilesOrder(next.map((profile) => profile.id));
+      if (over && nextIds && !arraysEqual(nextIds, currentIds)) {
+        setProfilesOrder(nextIds);
+      }
+
+      setDraftProfileOrderIds(null);
     },
-    [profiles, setProfilesOrder]
+    [draftProfileOrderIds, profiles, setProfilesOrder]
   );
 
   const handleCategoriesDragStart = React.useCallback((event: DragStartEvent) => {
@@ -654,44 +724,78 @@ export function OrganizeWorkspaceDialog({
       id: String(event.active.id),
       width: event.active.rect.current.initial?.width ?? null,
     });
-  }, []);
+    setDraftCategoryOrderIds(orderedCategoriesForProfile.map((category) => category.id));
+  }, [orderedCategoriesForProfile]);
+
+  const handleCategoriesDragOver = React.useCallback(
+    (event: DragOverEvent) => {
+      const { active, over } = event;
+      if (!over || active.id === over.id) return;
+
+      setDraftCategoryOrderIds((current) => {
+        const base =
+          current ?? orderedCategoriesForProfile.map((category) => category.id);
+        const oldIndex = base.indexOf(String(active.id));
+        const newIndex = base.indexOf(String(over.id));
+        if (oldIndex < 0 || newIndex < 0 || oldIndex === newIndex) return base;
+        return arrayMove(base, oldIndex, newIndex);
+      });
+    },
+    [orderedCategoriesForProfile]
+  );
 
   const handleCategoriesDragEnd = React.useCallback(
     (event: DragEndEvent) => {
       const { active, over } = event;
       setActiveCategoryDrag(null);
-      if (!over || active.id === over.id || !categoryProfileId) return;
+      if (!categoryProfileId) {
+        setDraftCategoryOrderIds(null);
+        return;
+      }
 
-      const oldIndex = categoriesForProfile.findIndex(
-        (category) => category.id === String(active.id)
-      );
-      const newIndex = categoriesForProfile.findIndex(
-        (category) => category.id === String(over.id)
-      );
-      if (oldIndex < 0 || newIndex < 0 || oldIndex === newIndex) return;
+      const currentIds = categoriesForProfile.map((category) => category.id);
+      let nextIds = draftCategoryOrderIds;
 
-      const nextProfileCategories = arrayMove(categoriesForProfile, oldIndex, newIndex);
-      const fullOrder = applyProfileOrderToAll(categories, categoryProfileId, nextProfileCategories);
-      setCategoriesOrder(fullOrder.map((category) => category.id));
+      if (!nextIds && over && active.id !== over.id) {
+        const oldIndex = currentIds.indexOf(String(active.id));
+        const newIndex = currentIds.indexOf(String(over.id));
+        if (oldIndex >= 0 && newIndex >= 0 && oldIndex !== newIndex) {
+          nextIds = arrayMove(currentIds, oldIndex, newIndex);
+        }
+      }
+
+      if (over && nextIds && !arraysEqual(nextIds, currentIds)) {
+        const nextProfileCategories = orderItemsByIds(categoriesForProfile, nextIds);
+        const fullOrder = applyProfileOrderToAll(
+          categories,
+          categoryProfileId,
+          nextProfileCategories
+        );
+        setCategoriesOrder(fullOrder.map((category) => category.id));
+      }
+
+      setDraftCategoryOrderIds(null);
     },
-    [categories, categoriesForProfile, categoryProfileId, setCategoriesOrder]
+    [categories, categoriesForProfile, categoryProfileId, draftCategoryOrderIds, setCategoriesOrder]
   );
 
   const handleDragCancel = React.useCallback(() => {
     setActiveProfileDrag(null);
     setActiveCategoryDrag(null);
+    setDraftProfileOrderIds(null);
+    setDraftCategoryOrderIds(null);
   }, []);
 
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="top-auto bottom-2 max-h-[calc(100dvh-0.5rem)] w-[calc(100%-1rem)] max-w-[calc(100%-1rem)] translate-y-0 overflow-hidden rounded-[1.85rem] border-border/80 bg-background/98 px-0 pb-0 pt-0 shadow-[0_28px_70px_-34px_rgba(15,23,42,0.34)] sm:top-1/2 sm:bottom-auto sm:w-full sm:max-w-[780px] sm:-translate-y-1/2 sm:px-0 sm:pb-0">
-          <div className="sticky top-0 z-10 border-b border-border/60 bg-background/94 px-5 pb-4 pt-5 backdrop-blur sm:px-6">
+        <DialogContent className="top-auto bottom-2 max-h-[calc(100dvh-0.5rem)] w-[calc(100%-1rem)] max-w-[calc(100%-1rem)] translate-y-0 overflow-hidden rounded-[1.85rem] border-border/80 bg-muted/36 px-0 pb-0 pt-0 shadow-[0_28px_70px_-34px_rgba(15,23,42,0.34)] sm:top-1/2 sm:bottom-auto sm:w-full sm:max-w-[780px] sm:-translate-y-1/2 sm:px-0 sm:pb-0">
+          <div className="sticky top-0 z-10 border-b border-border/60 bg-muted/44 px-5 pb-4 pt-5 backdrop-blur sm:px-6">
             <DialogHeader>
               <DialogTitle>Organizar workspace</DialogTitle>
             </DialogHeader>
 
-            <div className="mt-4 inline-flex rounded-full border border-border/70 bg-muted/35 p-1">
+            <div className="mt-4 inline-flex rounded-full border border-border/70 bg-background/45 p-1">
               <button
                 type="button"
                 onClick={() => setActiveTab("profiles")}
@@ -738,20 +842,21 @@ export function OrganizeWorkspaceDialog({
                   sensors={isDesktopDragEnabled ? sensors : []}
                   collisionDetection={closestCenter}
                   onDragStart={handleProfilesDragStart}
+                  onDragOver={handleProfilesDragOver}
                   onDragEnd={handleProfilesDragEnd}
                   onDragCancel={handleDragCancel}
                 >
                   <SortableContext
-                    items={profiles.map((profile) => profile.id)}
+                    items={orderedProfiles.map((profile) => profile.id)}
                     strategy={verticalListSortingStrategy}
                   >
                     <div className={LIST_CLASS}>
-                      {profiles.length === 0 ? (
+                      {orderedProfiles.length === 0 ? (
                         <div className="px-4 py-8 text-center text-sm text-muted-foreground">
                           Nenhum perfil ainda.
                         </div>
                       ) : (
-                        profiles.map((profile, index) => {
+                        orderedProfiles.map((profile, index) => {
                           const categoryCount = categories.filter(
                             (category) => category.profileId === profile.id
                           ).length;
@@ -827,11 +932,12 @@ export function OrganizeWorkspaceDialog({
                   sensors={isDesktopDragEnabled ? sensors : []}
                   collisionDetection={closestCenter}
                   onDragStart={handleCategoriesDragStart}
+                  onDragOver={handleCategoriesDragOver}
                   onDragEnd={handleCategoriesDragEnd}
                   onDragCancel={handleDragCancel}
                 >
                   <SortableContext
-                    items={categoriesForProfile.map((category) => category.id)}
+                    items={orderedCategoriesForProfile.map((category) => category.id)}
                     strategy={verticalListSortingStrategy}
                   >
                     <div className={LIST_CLASS}>
@@ -839,17 +945,17 @@ export function OrganizeWorkspaceDialog({
                         <div className="px-4 py-8 text-center text-sm text-muted-foreground">
                           Crie um perfil primeiro.
                         </div>
-                      ) : categoriesForProfile.length === 0 ? (
+                      ) : orderedCategoriesForProfile.length === 0 ? (
                         <div className="px-4 py-8 text-center text-sm text-muted-foreground">
                           Nenhuma categoria nesse perfil.
                         </div>
                       ) : (
-                        categoriesForProfile.map((category, index) => (
+                        orderedCategoriesForProfile.map((category, index) => (
                           <SortableCategoryRow
                             key={category.id}
                             category={category}
                             index={index}
-                            total={categoriesForProfile.length}
+                            total={orderedCategoriesForProfile.length}
                             dragEnabled={isDesktopDragEnabled}
                             onEdit={() => openEditCategory(category.id)}
                             onMoveUp={() => moveCategoryStep(category.id, -1)}
