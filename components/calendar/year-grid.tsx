@@ -465,7 +465,6 @@ export function YearGrid({
         const isQuarterFocus = viewMode === "quarter" && isActiveQuarter;
         const isFirstVisibleGroup = groupIndex === 0;
         const isLastVisibleGroup = groupIndex === quarterGroups.length - 1;
-        const isFilteredView = viewMode !== "year";
         const quarterRailShapeClass =
           isFirstVisibleGroup && isLastVisibleGroup
             ? "rounded-l-[1.35rem]"
@@ -492,14 +491,14 @@ export function YearGrid({
               aria-pressed={isActiveQuarter}
               title={QUARTER_LABELS[group.quarterIndex]}
               className={cn(
-                "group relative isolate flex w-[1.95rem] shrink-0 cursor-pointer select-none items-center justify-center border-r border-border/78 px-0 text-muted-foreground transition-[transform,background-color,color] duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/45 active:translate-y-[1px] active:scale-[0.985] min-[420px]:w-[2.1rem] md:w-[2.25rem]",
+                "group relative isolate flex w-[1.95rem] shrink-0 cursor-pointer select-none items-center justify-center border-r border-border/85 px-0 text-muted-foreground transition-[transform,background-color,color,box-shadow] duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/45 active:translate-y-[1px] active:scale-[0.985] min-[420px]:w-[2.1rem] md:w-[2.25rem]",
                 "bg-[linear-gradient(180deg,rgba(255,255,255,0.78),rgba(244,244,245,0.94))] shadow-[inset_-1px_0_0_rgba(255,255,255,0.3)] dark:bg-[linear-gradient(180deg,rgba(38,38,38,0.9),rgba(28,28,30,0.98))] dark:shadow-[inset_-1px_0_0_rgba(255,255,255,0.05)]",
                 quarterRailShapeClass,
                 isQuarterFocus
-                  ? "bg-neutral-300/92 text-foreground hover:bg-neutral-400/92 hover:text-foreground active:bg-neutral-300/92 dark:bg-neutral-700/92 dark:text-neutral-100 dark:hover:bg-neutral-600/92 dark:active:bg-neutral-700/92"
+                  ? "bg-neutral-300/92 text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.34),inset_0_-1px_0_rgba(82,82,91,0.14)] hover:bg-neutral-400/92 hover:text-foreground hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.32),inset_0_-1px_0_rgba(82,82,91,0.18)] active:bg-neutral-300/92 dark:bg-neutral-700/92 dark:text-neutral-100 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),inset_0_-1px_0_rgba(0,0,0,0.2)] dark:hover:bg-neutral-600/92 dark:hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),inset_0_-1px_0_rgba(0,0,0,0.24)] dark:active:bg-neutral-700/92"
                   : isQuarterContext
-                    ? "bg-neutral-200/65 text-foreground/84 hover:bg-neutral-300/76 hover:text-foreground/90 active:bg-neutral-200/65 dark:bg-neutral-700/44 dark:text-neutral-100/84 dark:hover:bg-neutral-600/56 dark:active:bg-neutral-700/44"
-                    : "bg-transparent hover:bg-neutral-200/78 hover:text-foreground/88 active:bg-transparent dark:hover:bg-neutral-700/48"
+                    ? "bg-neutral-300/92 text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.34),inset_0_-1px_0_rgba(82,82,91,0.14)] hover:bg-neutral-400/92 hover:text-foreground hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.32),inset_0_-1px_0_rgba(82,82,91,0.18)] active:bg-neutral-300/92 dark:bg-neutral-700/92 dark:text-neutral-100 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),inset_0_-1px_0_rgba(0,0,0,0.2)] dark:hover:bg-neutral-600/92 dark:hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),inset_0_-1px_0_rgba(0,0,0,0.24)] dark:active:bg-neutral-700/92"
+                    : "bg-transparent hover:bg-neutral-200/78 hover:text-foreground/88 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.26)] active:bg-transparent dark:hover:bg-neutral-700/48 dark:hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
               )}
             >
               <span
@@ -547,7 +546,6 @@ export function YearGrid({
                     monthLabelActive={isActiveMonth}
                     isFirstVisibleMonth={isFirstVisibleMonth}
                     isLastVisibleMonth={isLastVisibleMonth}
-                    isFilteredView={isFilteredView}
                   />
                 );
               })}

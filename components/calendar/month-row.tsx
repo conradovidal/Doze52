@@ -126,7 +126,6 @@ export function MonthRow({
   monthLabelActive = false,
   isFirstVisibleMonth = false,
   isLastVisibleMonth = false,
-  isFilteredView = false,
 }: {
   year: number;
   todayIso: string;
@@ -165,7 +164,6 @@ export function MonthRow({
   monthLabelActive?: boolean;
   isFirstVisibleMonth?: boolean;
   isLastVisibleMonth?: boolean;
-  isFilteredView?: boolean;
 }) {
   const daysGridRef = React.useRef<HTMLDivElement | null>(null);
   const interactionSurfaceRef = React.useRef<HTMLDivElement | null>(null);
@@ -487,19 +485,13 @@ export function MonthRow({
     [onFinishCreateRange, resolveDayAnchorPoint, resolveRangeTargetIsoFromPointer]
   );
 
-  const monthLabelShapeClass = isFilteredView
+  const monthLabelShapeClass = isFirstVisibleMonth && isLastVisibleMonth
     ? "rounded-none"
-    : isFirstVisibleMonth && isLastVisibleMonth
-      ? "rounded-[0.95rem]"
-      : isFirstVisibleMonth
-        ? "rounded-t-[0.95rem] rounded-b-[0.45rem]"
-        : isLastVisibleMonth
-          ? "rounded-b-[0.95rem] rounded-t-[0.45rem]"
-          : "rounded-[0.45rem]";
-
-  const monthLabelContainerPaddingClass = isFilteredView
-    ? "px-0 py-0"
-    : "px-[3px] py-[3px]";
+    : isFirstVisibleMonth
+      ? "rounded-none"
+      : isLastVisibleMonth
+        ? "rounded-none"
+        : "rounded-none";
 
   let projectedMultiPreview:
     | { row: number; startCol: number; endCol: number }
@@ -549,7 +541,6 @@ export function MonthRow({
       <div
         className={cn(
           "flex flex-none items-center justify-center overflow-hidden border-r border-border/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.76),rgba(244,244,245,0.92))] text-muted-foreground dark:bg-[linear-gradient(180deg,rgba(38,38,38,0.9),rgba(28,28,30,0.98))]",
-          monthLabelContainerPaddingClass,
           layoutDensity.labelWidthClass
         )}
         style={{ minHeight: `${minHeightPx}px` }}
@@ -562,11 +553,11 @@ export function MonthRow({
             title={monthLabelAriaLabel ?? monthLabel}
             aria-pressed={monthLabelActive}
             className={cn(
-              "group flex h-full w-full cursor-pointer select-none items-center justify-center border-0 px-1 py-2.5 transition-[transform,background-color,color] duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/40 active:translate-y-[1px] active:scale-[0.985]",
+              "group flex h-full w-full cursor-pointer select-none items-center justify-center border-0 px-1 py-2.5 transition-[transform,background-color,color,box-shadow] duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/40 active:translate-y-[1px] active:scale-[0.985]",
               monthLabelShapeClass,
               monthLabelActive
-                ? "bg-neutral-300/92 text-foreground hover:bg-neutral-400/92 hover:text-foreground active:bg-neutral-300/92 dark:bg-neutral-700/92 dark:text-neutral-100 dark:hover:bg-neutral-600/92 dark:active:bg-neutral-700/92"
-                : "bg-transparent text-foreground/72 hover:bg-neutral-200/78 hover:text-foreground/90 active:bg-transparent dark:hover:bg-neutral-700/48"
+                ? "bg-neutral-300/92 text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.34),inset_0_-1px_0_rgba(82,82,91,0.14)] hover:bg-neutral-400/92 hover:text-foreground hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.32),inset_0_-1px_0_rgba(82,82,91,0.18)] active:bg-neutral-300/92 dark:bg-neutral-700/92 dark:text-neutral-100 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),inset_0_-1px_0_rgba(0,0,0,0.2)] dark:hover:bg-neutral-600/92 dark:hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),inset_0_-1px_0_rgba(0,0,0,0.24)] dark:active:bg-neutral-700/92"
+                : "bg-transparent text-foreground/72 hover:bg-neutral-200/78 hover:text-foreground/90 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.26)] active:bg-transparent dark:hover:bg-neutral-700/48 dark:hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
             )}
           >
             <span className="text-[9.5px] font-medium uppercase tracking-[0.12em] min-[420px]:text-[10px] min-[420px]:tracking-[0.14em] md:text-[10.5px]">
