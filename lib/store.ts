@@ -79,6 +79,7 @@ type StoreState = {
   deleteCategory: (id: string) => void;
   toggleCategoryVisibility: (id: string) => void;
   setAllCategoriesVisibility: (visible: boolean) => void;
+  setCategoriesVisibility: (ids: string[], visible: boolean) => void;
   setCategoriesOrder: (orderedIds: string[]) => void;
   reorderCategories: (sourceId: string, targetId: string) => void;
 };
@@ -920,6 +921,16 @@ export const useStore = create<StoreState>()(
             c.visible === visible ? c : { ...c, visible }
           ),
         })),
+      setCategoriesVisibility: (ids, visible) =>
+        set((state) => {
+          if (ids.length === 0) return state;
+          const targetIds = new Set(ids);
+          return {
+            categories: state.categories.map((c) =>
+              targetIds.has(c.id) && c.visible !== visible ? { ...c, visible } : c
+            ),
+          };
+        }),
       setCategoriesOrder: (orderedIds) =>
         set((state) => {
           const byId = new Map(state.categories.map((c) => [c.id, c]));

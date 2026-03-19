@@ -1,5 +1,6 @@
 "use client";
 
+import { Eye, EyeOff } from "lucide-react";
 import { useStore } from "@/lib/store";
 
 const MOTION_CLASS = "duration-[160ms] ease-[cubic-bezier(0.22,1,0.36,1)]";
@@ -34,11 +35,17 @@ export function CategoryBar({ compact = false }: CategoryBarProps) {
   const selectedProfileIds = useStore((s) => s.selectedProfileIds);
   const categories = useStore((s) => s.categories);
   const toggleCategoryVisibility = useStore((s) => s.toggleCategoryVisibility);
+  const setCategoriesVisibility = useStore((s) => s.setCategoriesVisibility);
 
   const activeProfileIds = new Set(selectedProfileIds);
   const displayedCategories = categories.filter((category) =>
     activeProfileIds.has(category.profileId)
   );
+  const displayedCategoryIds = displayedCategories.map((category) => category.id);
+  const allDisplayedVisible = displayedCategories.every((category) => category.visible);
+  const visibilityActionLabel = allDisplayedVisible
+    ? "Limpar categorias visiveis"
+    : "Mostrar todas as categorias visiveis";
 
   if (displayedCategories.length === 0) {
     return null;
@@ -48,6 +55,20 @@ export function CategoryBar({ compact = false }: CategoryBarProps) {
     <div
       className={`${compact ? "w-full min-h-8 justify-center" : "mb-2 min-h-8 justify-center"} flex flex-wrap items-center gap-1.5 sm:gap-2`}
     >
+      <button
+        type="button"
+        onClick={() => setCategoriesVisibility(displayedCategoryIds, !allDisplayedVisible)}
+        className={`inline-flex h-8 w-8 items-center justify-center rounded-full border text-muted-foreground/80 shadow-none transition-all ${MOTION_CLASS} ${
+          allDisplayedVisible
+            ? "border-border/50 bg-background/65 hover:border-border/75 hover:bg-muted/35 hover:text-foreground"
+            : "border-border/55 bg-muted/25 text-foreground/85 hover:border-border/75 hover:bg-muted/45 hover:text-foreground"
+        }`}
+        aria-label={visibilityActionLabel}
+        title={visibilityActionLabel}
+      >
+        {allDisplayedVisible ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+      </button>
+
       {displayedCategories.map((category) => (
         <button
           key={category.id}
