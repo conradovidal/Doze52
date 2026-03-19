@@ -23,7 +23,6 @@ type FooterLink = {
   href: string;
   ariaLabel: string;
   external: boolean;
-  showLabel?: boolean;
   icon: React.ComponentType<{ className?: string }>;
 };
 
@@ -43,7 +42,6 @@ export function SiteFooter() {
       href: "https://instagram.com/doze.52",
       ariaLabel: "Instagram do doze52",
       external: true,
-      showLabel: true,
       icon: Instagram,
     },
     {
@@ -51,7 +49,6 @@ export function SiteFooter() {
       href: "https://x.com/doze_52",
       ariaLabel: "Perfil do doze52 no X",
       external: true,
-      showLabel: false,
       icon: BrandXIcon,
     },
     {
@@ -59,7 +56,6 @@ export function SiteFooter() {
       href: "https://github.com/conradovidal/Doze52",
       ariaLabel: "Repositorio do doze52 no GitHub",
       external: true,
-      showLabel: true,
       icon: Github,
     },
   ];
@@ -70,7 +66,7 @@ export function SiteFooter() {
         <p>© {new Date().getFullYear()} doze52</p>
         <nav
           aria-label="Redes do doze52"
-          className="flex flex-wrap items-center gap-x-2 gap-y-1"
+          className="flex flex-wrap items-center gap-x-2 gap-y-1.5"
         >
           <Link
             href="/melhorias"
@@ -89,28 +85,19 @@ export function SiteFooter() {
             <ArrowUpRight className="h-3.5 w-3.5" />
           </Link>
 
-          {socialLinks.map((link, index) => (
-            <span key={link.label} className="inline-flex items-center gap-2">
-              <a
-                href={link.href}
-                aria-label={link.ariaLabel}
-                className="inline-flex items-center gap-1.5 transition-colors hover:text-foreground"
-                target={link.external ? "_blank" : undefined}
-                rel={link.external ? "noopener noreferrer" : undefined}
-              >
-                <link.icon className="h-3.5 w-3.5" />
-                {link.showLabel ? (
-                  <span>{link.label}</span>
-                ) : (
-                  <span className="sr-only">{link.label}</span>
-                )}
-              </a>
-              {index < socialLinks.length - 1 ? (
-                <span className="hidden text-muted-foreground/60 sm:inline">|</span>
-              ) : null}
-            </span>
+          {socialLinks.map((link) => (
+            <a
+              key={link.label}
+              href={link.href}
+              aria-label={link.ariaLabel}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-transparent text-muted-foreground transition-[transform,background-color,color,box-shadow,border-color] duration-150 ease-out hover:border-border/65 hover:bg-muted/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 active:translate-y-[1px] active:scale-[0.98]"
+              target={link.external ? "_blank" : undefined}
+              rel={link.external ? "noopener noreferrer" : undefined}
+            >
+              <link.icon className="h-3.5 w-3.5" />
+              <span className="sr-only">{link.label}</span>
+            </a>
           ))}
-          <span className="hidden text-muted-foreground/60 sm:inline">|</span>
           <a
             href={mailtoUrl}
             aria-label={`Enviar e-mail para ${supportEmail}`}

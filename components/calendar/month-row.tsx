@@ -124,6 +124,8 @@ export function MonthRow({
   onMonthLabelClick,
   monthLabelAriaLabel,
   monthLabelActive = false,
+  isFirstVisibleMonth = false,
+  isLastVisibleMonth = false,
 }: {
   year: number;
   todayIso: string;
@@ -160,8 +162,12 @@ export function MonthRow({
   onMonthLabelClick?: () => void;
   monthLabelAriaLabel?: string;
   monthLabelActive?: boolean;
+  isFirstVisibleMonth?: boolean;
+  isLastVisibleMonth?: boolean;
 }) {
   const daysGridRef = React.useRef<HTMLDivElement | null>(null);
+  const interactionSurfaceRef = React.useRef<HTMLDivElement | null>(null);
+  const activeCreatePointerIdRef = React.useRef<number | null>(null);
   const monthStart = startOfMonth(new Date(year, monthIndex, 1));
   const monthEnd = endOfMonth(monthStart);
   const gridStart = startOfWeek(monthStart, { weekStartsOn: 0 });
@@ -328,6 +334,98 @@ export function MonthRow({
     return { startCol: Math.min(...selected), endCol: Math.max(...selected) };
   })();
 
+  const resolveNearestInMonthIsoFromGrid = React.useCallback(
+    (gridElement: HTMLElement, clientX: number) => {
+      const rect = gridElement.getBoundingClientRect();
+      if (rect.width <= 0) return null;
+
+      const cells = Array.from(
+        gridElement.querySelectorAll<HTMLElement>("[data-day-iso]")
+      );
+      if (!cells.length) return null;
+
+      const clampedX = Math.max(0, Math.min(clientX - rect.left, rect.width - 1));
+      const rawIndex = Math.floor((clampedX / rect.width) * cells.length);
+      const startIndex = Math.max(0, Math.min(rawIndex, cells.length - 1));
+
+      const resolveIsoAtIndex = (index: number) => {
+        const node = cells[index];
+        if (!node?.matches("[data-day-cell][data-day-iso]")) return null;
+        return node.dataset.dayIso ?? null;
+      };
+
+      const directIso = resolveIsoAtIndex(startIndex);
+      if (directIso) return directIso;
+
+      for (let offset = 1; offset < cells.length; offset += 1) {
+        const leftIndex = startIndex - offset;
+        if (leftIndex >= 0) {
+          const leftIso = resolveIsoAtIndex(leftIndex);
+          if (leftIso) return leftIso;
+        }
+
+        const rightIndex = startIndex + offset;
+        if (rightIndex < cells.length) {
+          const rightIso = resolveIsoAtIndex(rightIndex);
+          if (rightIso) return rightIso;
+        }
+      }
+
+      return null;
+    },
+    []
+  );
+
+  const resolveRangeTargetIsoFromPointer = React.useCallback(
+    (clientX: number, clientY: number) => {
+      if (typeof document === "undefined") return null;
+
+      const elements = document.elementsFromPoint(clientX, clientY);
+      for (const element of elements) {
+        if (!(element instanceof HTMLElement)) continue;
+        const dayCell = element.closest<HTMLElement>("[data-day-cell][data-day-iso]");
+        const iso = dayCell?.dataset.dayIso ?? null;
+        if (iso) return iso;
+      }
+
+      for (const element of elements) {
+        if (!(element instanceof HTMLElement)) continue;
+        const surface = element.closest<HTMLElement>("[data-month-interaction-surface]");
+        const gridElement = surface?.querySelector<HTMLElement>("[data-days-grid]") ?? null;
+        if (!gridElement) continue;
+        const iso = resolveNearestInMonthIsoFromGrid(gridElement, clientX);
+        if (iso) return iso;
+      }
+
+      const surfaces = Array.from(
+        document.querySelectorAll<HTMLElement>("[data-month-interaction-surface]")
+      );
+      if (!surfaces.length) return null;
+
+      let nearestSurface: HTMLElement | null = null;
+      let nearestDistance = Number.POSITIVE_INFINITY;
+      for (const surface of surfaces) {
+        const rect = surface.getBoundingClientRect();
+        const verticalDistance =
+          clientY < rect.top
+            ? rect.top - clientY
+            : clientY > rect.bottom
+              ? clientY - rect.bottom
+              : 0;
+        if (verticalDistance < nearestDistance) {
+          nearestDistance = verticalDistance;
+          nearestSurface = surface;
+        }
+      }
+
+      const fallbackGrid =
+        nearestSurface?.querySelector<HTMLElement>("[data-days-grid]") ?? null;
+      if (!fallbackGrid) return null;
+      return resolveNearestInMonthIsoFromGrid(fallbackGrid, clientX);
+    },
+    [resolveNearestInMonthIsoFromGrid]
+  );
+
   const resolveTargetDateFromPointer = (clientX: number) => {
     const rect = daysGridRef.current?.getBoundingClientRect();
     if (!rect || rect.width <= 0) return null;
@@ -336,7 +434,7 @@ export function MonthRow({
     return gridDays[Math.max(0, Math.min(col, COLUMNS - 1))] ?? null;
   };
 
-  const resolveDayAnchorPoint = (iso: string): AnchorPoint | undefined => {
+  const resolveDayAnchorPoint = React.useCallback((iso: string): AnchorPoint | undefined => {
     const node = daysGridRef.current?.querySelector<HTMLElement>(
       `[data-day-cell][data-day-iso="${iso}"]`
     );
@@ -346,7 +444,55 @@ export function MonthRow({
       x: rect.left + rect.width / 2,
       y: rect.top + rect.height / 2,
     };
-  };
+  }, []);
+
+  const releaseCreatePointerCapture = React.useCallback(
+    (surface: HTMLDivElement | null, pointerId: number) => {
+      if (!surface?.hasPointerCapture(pointerId)) return;
+      try {
+        surface.releasePointerCapture(pointerId);
+      } catch {
+        // Pointer capture may already be gone if the browser cancelled the gesture.
+      }
+    },
+    []
+  );
+
+  const updateRangeHoverFromPointer = React.useCallback(
+    (clientX: number, clientY: number) => {
+      const targetIso = resolveRangeTargetIsoFromPointer(clientX, clientY);
+      if (!targetIso) return;
+      onHoverCreateRange(targetIso);
+    },
+    [onHoverCreateRange, resolveRangeTargetIsoFromPointer]
+  );
+
+  const finishRangeFromPointer = React.useCallback(
+    (clientX: number, clientY: number) => {
+      const targetIso = resolveRangeTargetIsoFromPointer(clientX, clientY);
+      if (!targetIso) {
+        onFinishCreateRange();
+        return;
+      }
+      onFinishCreateRange(
+        targetIso,
+        resolveDayAnchorPoint(targetIso) ?? {
+          x: clientX,
+          y: clientY,
+        }
+      );
+    },
+    [onFinishCreateRange, resolveDayAnchorPoint, resolveRangeTargetIsoFromPointer]
+  );
+
+  const monthLabelShapeClass =
+    isFirstVisibleMonth && isLastVisibleMonth
+      ? "rounded-[0.95rem]"
+      : isFirstVisibleMonth
+        ? "rounded-t-[0.95rem] rounded-b-[0.45rem]"
+        : isLastVisibleMonth
+          ? "rounded-b-[0.95rem] rounded-t-[0.45rem]"
+          : "rounded-[0.45rem]";
 
   let projectedMultiPreview:
     | { row: number; startCol: number; endCol: number }
@@ -395,7 +541,7 @@ export function MonthRow({
     <div className="flex items-stretch border-b border-border/70 last:border-b-0">
       <div
         className={cn(
-          "flex flex-none items-center justify-center border-r border-border/65 bg-[linear-gradient(180deg,rgba(255,255,255,0.76),rgba(244,244,245,0.92))] px-1 py-2.5 text-muted-foreground dark:bg-[linear-gradient(180deg,rgba(38,38,38,0.9),rgba(28,28,30,0.98))]",
+          "flex flex-none items-center justify-center border-r border-border/60 bg-[linear-gradient(180deg,rgba(255,255,255,0.76),rgba(244,244,245,0.92))] px-[3px] py-[3px] text-muted-foreground dark:bg-[linear-gradient(180deg,rgba(38,38,38,0.9),rgba(28,28,30,0.98))]",
           layoutDensity.labelWidthClass
         )}
         style={{ minHeight: `${minHeightPx}px` }}
@@ -408,10 +554,11 @@ export function MonthRow({
             title={monthLabelAriaLabel ?? monthLabel}
             aria-pressed={monthLabelActive}
             className={cn(
-              "group flex h-full w-full items-center justify-center rounded-[0.85rem] px-1 py-2 transition-[background-color,color,box-shadow] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35",
+              "group flex h-full w-full cursor-pointer select-none items-center justify-center border border-transparent px-1 py-2.5 transition-[transform,background-color,color,box-shadow,border-color] duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/40 active:translate-y-[1px] active:scale-[0.985]",
+              monthLabelShapeClass,
               monthLabelActive
-                ? "bg-background/92 text-foreground shadow-[inset_0_0_0_1px_rgba(63,63,70,0.18)] dark:bg-background/72 dark:shadow-[inset_0_0_0_1px_rgba(244,244,245,0.14)]"
-                : "text-foreground/72 hover:bg-background/72 hover:text-foreground/88"
+                ? "border-border/70 bg-background/92 text-foreground shadow-[inset_0_0_0_1px_rgba(63,63,70,0.14),0_8px_18px_-20px_rgba(15,23,42,0.26)] dark:bg-background/74 dark:shadow-[inset_0_0_0_1px_rgba(244,244,245,0.12)]"
+                : "text-foreground/72 hover:border-border/65 hover:bg-background/72 hover:text-foreground/90 hover:shadow-[inset_0_0_0_1px_rgba(63,63,70,0.1)] dark:hover:shadow-[inset_0_0_0_1px_rgba(244,244,245,0.08)]"
             )}
           >
             <span className="text-[9.5px] font-medium uppercase tracking-[0.12em] min-[420px]:text-[10px] min-[420px]:tracking-[0.14em] md:text-[10.5px]">
@@ -426,6 +573,8 @@ export function MonthRow({
       </div>
 
       <div
+        ref={interactionSurfaceRef}
+        data-month-interaction-surface
         className="relative w-full flex-1 bg-card/55"
         onDragOver={(e) => {
           const dragPayload = readCalendarEventDndPayload(e.dataTransfer);
@@ -452,46 +601,43 @@ export function MonthRow({
           if (!targetDate) return;
           onDayDrop(format(targetDate, "yyyy-MM-dd"), e.dataTransfer);
         }}
-        onMouseEnter={(e) => {
-          if (!creatingRange || isDraggingAny) return;
-          const targetDate = resolveTargetDateFromPointer(e.clientX);
-          if (!targetDate || !isSameMonth(targetDate, monthStart)) return;
-          onHoverCreateRange(format(targetDate, "yyyy-MM-dd"));
-        }}
-        onMouseDown={(e) => {
-          if (e.button !== 0 || isDraggingAny) return;
+        onPointerDown={(e) => {
+          if (!e.isPrimary || e.button !== 0 || isDraggingAny) return;
           const target = e.target as HTMLElement | null;
-          if (target?.closest("button[draggable='true']")) return;
-          const targetDate = resolveTargetDateFromPointer(e.clientX);
-          if (!targetDate || !isSameMonth(targetDate, monthStart)) return;
+          if (target?.closest("button, a, input, textarea, select, [role='button']")) return;
+          const targetIso = resolveRangeTargetIsoFromPointer(e.clientX, e.clientY);
+          if (!targetIso) return;
           e.preventDefault();
-          onStartCreateRange(format(targetDate, "yyyy-MM-dd"));
+          activeCreatePointerIdRef.current = e.pointerId;
+          e.currentTarget.setPointerCapture(e.pointerId);
+          onStartCreateRange(targetIso);
         }}
-        onMouseMove={(e) => {
-          if (!creatingRange || isDraggingAny) return;
-          const targetDate = resolveTargetDateFromPointer(e.clientX);
-          if (!targetDate || !isSameMonth(targetDate, monthStart)) return;
-          onHoverCreateRange(format(targetDate, "yyyy-MM-dd"));
+        onPointerMove={(e) => {
+          if (activeCreatePointerIdRef.current !== e.pointerId || isDraggingAny) return;
+          e.preventDefault();
+          updateRangeHoverFromPointer(e.clientX, e.clientY);
         }}
-        onMouseUp={(e) => {
-          if (e.button !== 0 || !creatingRange || isDraggingAny) return;
-          const targetDate = resolveTargetDateFromPointer(e.clientX);
-          if (!targetDate || !isSameMonth(targetDate, monthStart)) {
-            onFinishCreateRange();
-            return;
-          }
-          const targetIso = format(targetDate, "yyyy-MM-dd");
-          onFinishCreateRange(
-            targetIso,
-            resolveDayAnchorPoint(targetIso) ?? {
-              x: e.clientX,
-              y: e.clientY,
-            }
-          );
+        onPointerUp={(e) => {
+          if (activeCreatePointerIdRef.current !== e.pointerId || isDraggingAny) return;
+          e.preventDefault();
+          activeCreatePointerIdRef.current = null;
+          releaseCreatePointerCapture(e.currentTarget, e.pointerId);
+          finishRangeFromPointer(e.clientX, e.clientY);
+        }}
+        onPointerCancel={(e) => {
+          if (activeCreatePointerIdRef.current !== e.pointerId) return;
+          activeCreatePointerIdRef.current = null;
+          releaseCreatePointerCapture(e.currentTarget, e.pointerId);
+          onFinishCreateRange();
+        }}
+        onLostPointerCapture={(e) => {
+          if (activeCreatePointerIdRef.current !== e.pointerId) return;
+          activeCreatePointerIdRef.current = null;
         }}
       >
         <div
           ref={daysGridRef}
+          data-days-grid
           className="grid w-full"
           style={{ gridTemplateColumns: "repeat(37, minmax(0, 1fr))" }}
         >
