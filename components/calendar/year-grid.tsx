@@ -465,6 +465,7 @@ export function YearGrid({
         const isQuarterFocus = viewMode === "quarter" && isActiveQuarter;
         const isFirstVisibleGroup = groupIndex === 0;
         const isLastVisibleGroup = groupIndex === quarterGroups.length - 1;
+        const isFilteredView = viewMode !== "year";
         const quarterRailShapeClass =
           isFirstVisibleGroup && isLastVisibleGroup
             ? "rounded-l-[1.35rem]"
@@ -495,10 +496,10 @@ export function YearGrid({
                 "bg-[linear-gradient(180deg,rgba(255,255,255,0.78),rgba(244,244,245,0.94))] shadow-[inset_-1px_0_0_rgba(255,255,255,0.34)] dark:bg-[linear-gradient(180deg,rgba(38,38,38,0.9),rgba(28,28,30,0.98))] dark:shadow-[inset_-1px_0_0_rgba(255,255,255,0.06)]",
                 quarterRailShapeClass,
                 isQuarterFocus
-                  ? "border-border/70 bg-background/94 text-foreground shadow-[inset_0_0_0_1px_rgba(63,63,70,0.14),0_10px_18px_-20px_rgba(15,23,42,0.22)] dark:bg-background/74 dark:shadow-[inset_0_0_0_1px_rgba(244,244,245,0.12)]"
+                  ? "border-border/72 bg-background/32 text-foreground/88 shadow-[inset_0_0_0_1px_rgba(63,63,70,0.08)] hover:border-border/82 hover:bg-background/60 hover:text-foreground active:bg-background/32 dark:bg-background/24 dark:hover:bg-background/44 dark:shadow-[inset_0_0_0_1px_rgba(244,244,245,0.08)]"
                   : isQuarterContext
-                    ? "border-border/60 bg-background/74 text-foreground/88 shadow-[inset_0_0_0_1px_rgba(63,63,70,0.11)] dark:bg-background/58 dark:shadow-[inset_0_0_0_1px_rgba(244,244,245,0.1)]"
-                    : "hover:border-border/60 hover:bg-background/72 hover:text-foreground/88 hover:shadow-[inset_0_0_0_1px_rgba(63,63,70,0.08)] dark:hover:shadow-[inset_0_0_0_1px_rgba(244,244,245,0.06)]"
+                    ? "border-border/66 bg-background/24 text-foreground/84 shadow-[inset_0_0_0_1px_rgba(63,63,70,0.06)] hover:border-border/76 hover:bg-background/48 hover:text-foreground/90 active:bg-background/24 dark:bg-background/18 dark:hover:bg-background/36 dark:shadow-[inset_0_0_0_1px_rgba(244,244,245,0.07)]"
+                    : "border-transparent hover:border-border/60 hover:bg-background/54 hover:text-foreground/88 active:bg-transparent dark:hover:bg-background/34"
               )}
             >
               <span
@@ -546,6 +547,7 @@ export function YearGrid({
                     monthLabelActive={isActiveMonth}
                     isFirstVisibleMonth={isFirstVisibleMonth}
                     isLastVisibleMonth={isLastVisibleMonth}
+                    isFilteredView={isFilteredView}
                   />
                 );
               })}
