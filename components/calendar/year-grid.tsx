@@ -57,6 +57,9 @@ type QuarterGroup = {
   monthIndices: MonthIndex[];
 };
 
+const CALENDAR_ZOOM_MIN_PERCENT = 100;
+const CALENDAR_ZOOM_MAX_PERCENT = 180;
+
 const QUARTER_MONTH_GROUPS = [
   [0, 1, 2],
   [3, 4, 5],
@@ -128,9 +131,11 @@ export function YearGrid({
   const viewMode = useStore((s) => s.viewMode);
   const focusedQuarter = useStore((s) => s.focusedQuarter);
   const focusedMonth = useStore((s) => s.focusedMonth);
+  const calendarZoomPercent = useStore((s) => s.calendarZoomPercent);
   const setCalendarViewMode = useStore((s) => s.setCalendarViewMode);
   const focusQuarter = useStore((s) => s.focusQuarter);
   const focusMonth = useStore((s) => s.focusMonth);
+  const setCalendarZoomPercent = useStore((s) => s.setCalendarZoomPercent);
   const visibleCategoryIds = React.useMemo(
     () => {
       const selectedProfiles = new Set(selectedProfileIds);
@@ -176,6 +181,8 @@ export function YearGrid({
     source: null,
   });
   const didDropRef = React.useRef(false);
+  const zoomViewportRef = React.useRef<HTMLDivElement | null>(null);
+  const pendingViewportRatioRef = React.useRef<number | null>(null);
 
   const visibleEvents = React.useMemo(
     () =>
@@ -457,6 +464,60 @@ export function YearGrid({
 
   const density = "year";
   const canvasWidthClass = "min-w-[49rem] min-[420px]:min-w-[55rem] md:min-w-0";
+  const hasFocusZoom = viewMode !== "year";
+  const effectiveZoomPercent = hasFocusZoom
+    ? calendarZoomPercent
+    : CALENDAR_ZOOM_MIN_PERCENT;
+
+  const handleZoomChange = React.useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      const nextPercent = Number(event.target.value);
+      const viewport = zoomViewportRef.current;
+      if (viewport) {
+        const maxScrollLeft = Math.max(0, viewport.scrollWidth - viewport.clientWidth);
+        pendingViewportRatioRef.current =
+          maxScrollLeft > 0 ? viewport.scrollLeft / maxScrollLeft : 0;
+      }
+      setCalendarZoomPercent(nextPercent);
+    },
+    [setCalendarZoomPercent]
+  );
+
+  React.useLayoutEffect(() => {
+    const viewport = zoomViewportRef.current;
+    const pendingRatio = pendingViewportRatioRef.current;
+    if (!viewport || pendingRatio === null) return;
+
+    const rafId = window.requestAnimationFrame(() => {
+      const maxScrollLeft = Math.max(0, viewport.scrollWidth - viewport.clientWidth);
+      viewport.scrollLeft = maxScrollLeft > 0 ? maxScrollLeft * pendingRatio : 0;
+      pendingViewportRatioRef.current = null;
+    });
+
+    return () => window.cancelAnimationFrame(rafId);
+  }, [effectiveZoomPercent]);
+
+  const handleViewportWheel = React.useCallback(
+    (event: React.WheelEvent<HTMLDivElement>) => {
+      if (!hasFocusZoom || event.ctrlKey) return;
+      if (hasDragContext || creatingRange?.isDragging) return;
+
+      const viewport = zoomViewportRef.current;
+      if (!viewport) return;
+
+      const hasOverflow =
+        viewport.scrollWidth - viewport.clientWidth > 1;
+      if (!hasOverflow) return;
+
+      const horizontalDelta =
+        Math.abs(event.deltaX) > 0 ? event.deltaX : event.deltaY;
+      if (horizontalDelta === 0) return;
+
+      event.preventDefault();
+      viewport.scrollLeft += horizontalDelta;
+    },
+    [creatingRange?.isDragging, hasDragContext, hasFocusZoom]
+  );
 
   const annualContent = (
     <div className="overflow-hidden">
@@ -554,7 +615,48 @@ export function YearGrid({
         canvasWidthClass
       )}
     >
-      {annualContent}
+      <div
+        ref={zoomViewportRef}
+        className={cn(
+          "overflow-y-hidden",
+          hasFocusZoom ? "overflow-x-auto overscroll-x-contain" : "overflow-x-hidden"
+        )}
+        onWheel={handleViewportWheel}
+      >
+        <div
+          style={
+            hasFocusZoom
+              ? {
+                  width: `${effectiveZoomPercent}%`,
+                  minWidth: `${effectiveZoomPercent}%`,
+                }
+              : undefined
+          }
+        >
+          {annualContent}
+        </div>
+      </div>
+
+      {hasFocusZoom ? (
+        <div className="flex justify-end border-t border-border/65 bg-[linear-gradient(180deg,rgba(255,255,255,0.52),rgba(249,249,250,0.88))] px-3 py-2.5 dark:bg-[linear-gradient(180deg,rgba(31,31,35,0.72),rgba(22,22,25,0.96))] md:px-4 md:py-3">
+          <label className="flex w-[10.75rem] items-center justify-end gap-2.5 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground min-[420px]:w-[11.5rem] md:w-[12.25rem]">
+            <span className="shrink-0">Zoom</span>
+            <input
+              type="range"
+              min={CALENDAR_ZOOM_MIN_PERCENT}
+              max={CALENDAR_ZOOM_MAX_PERCENT}
+              step={1}
+              value={effectiveZoomPercent}
+              onChange={handleZoomChange}
+              aria-label="Zoom horizontal do calendario"
+              className="h-1.5 w-full cursor-ew-resize accent-foreground"
+            />
+            <span className="w-[2.75rem] shrink-0 text-right tabular-nums text-foreground/82">
+              {effectiveZoomPercent}%
+            </span>
+          </label>
+        </div>
+      ) : null}
     </div>
   );
 }

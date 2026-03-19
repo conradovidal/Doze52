@@ -25,6 +25,14 @@ export type EventInput = {
 };
 
 export type CalendarViewMode = "year" | "quarter" | "month";
+const CALENDAR_ZOOM_MIN_PERCENT = 100;
+const CALENDAR_ZOOM_MAX_PERCENT = 180;
+
+const clampCalendarZoomPercent = (value: number) =>
+  Math.max(
+    CALENDAR_ZOOM_MIN_PERCENT,
+    Math.min(CALENDAR_ZOOM_MAX_PERCENT, Math.round(value))
+  );
 
 type StoreState = {
   profiles: CalendarProfile[];
@@ -34,6 +42,7 @@ type StoreState = {
   viewMode: CalendarViewMode;
   focusedQuarter: 0 | 1 | 2 | 3 | null;
   focusedMonth: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | null;
+  calendarZoomPercent: number;
   replaceAllData: (payload: {
     profiles: CalendarProfile[];
     categories: CategoryItem[];
@@ -62,6 +71,7 @@ type StoreState = {
   setCalendarViewMode: (mode: CalendarViewMode) => void;
   focusQuarter: (quarter: 0 | 1 | 2 | 3) => void;
   focusMonth: (month: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11) => void;
+  setCalendarZoomPercent: (percent: number) => void;
   resetCalendarFocusOnYearChange: () => void;
   createCategory: (input: { name: string; color: string; profileId: string }) => string;
   addCategory: (name: string, color: string, profileId?: string) => void;
@@ -501,6 +511,7 @@ export const useStore = create<StoreState>()(
       viewMode: "year",
       focusedQuarter: null,
       focusedMonth: null,
+      calendarZoomPercent: CALENDAR_ZOOM_MIN_PERCENT,
       replaceAllData: ({ profiles, categories, events }) =>
         set((state) => {
           const hasLegacyData = categories.length > 0 || events.length > 0;
@@ -811,6 +822,10 @@ export const useStore = create<StoreState>()(
           viewMode: "month",
           focusedMonth: month,
           focusedQuarter: getQuarterFromMonth(month),
+        })),
+      setCalendarZoomPercent: (percent) =>
+        set(() => ({
+          calendarZoomPercent: clampCalendarZoomPercent(percent),
         })),
       resetCalendarFocusOnYearChange: () =>
         set(() => ({
