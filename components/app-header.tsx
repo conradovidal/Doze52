@@ -45,7 +45,7 @@ export function AppHeader({
       <header className="mb-4 space-y-3 md:mb-5 md:space-y-3.5">
         <div className="grid min-h-10 grid-cols-[minmax(0,1fr)_auto] items-start gap-3 md:items-center md:gap-4">
           <div className="justify-self-start">
-            <img src="/logo-doze52.svg" alt="doze 52" className="h-8 w-auto md:h-9" />
+            <img src="/logo-doze52.png" alt="doze 52" className="h-8 w-auto md:h-9" />
           </div>
 
           <div className="min-w-0 justify-self-end">

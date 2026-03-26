@@ -222,10 +222,10 @@ function FrozenCalendarBackdrop() {
               <div className="grid min-h-10 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:gap-x-3 md:gap-y-0">
                 <div className="justify-self-start">
                   <Image
-                    src="/logo-doze52.svg"
+                    src="/logo-doze52.png"
                     alt=""
-                    width={164}
-                    height={36}
+                    width={1549}
+                    height={438}
                     className="h-8 w-auto md:h-9"
                   />
                 </div>
