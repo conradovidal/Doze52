@@ -11,10 +11,10 @@ export const metadata: Metadata = {
   description: "Planejamento visual anual com revisao mensal e habitos.",
   icons: {
     icon: [
-      { url: "/icon.svg?v=20260224b", type: "image/svg+xml" },
-      { url: "/favicon.ico?v=20260224b", sizes: "any" },
+      { url: "/icon.svg?v=20260326a", type: "image/svg+xml" },
+      { url: "/favicon.ico?v=20260326a", sizes: "any" },
     ],
-    shortcut: ["/favicon.ico?v=20260224b"],
+    shortcut: ["/favicon.ico?v=20260326a"],
   },
 };
 
