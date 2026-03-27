@@ -204,17 +204,10 @@ export function CategoryManager({
             </div>
           </div>
 
-          <div className="space-y-2.5">
+          <div className="space-y-2">
             {CATEGORY_COLOR_SETS.map((set) => (
-              <div
-                key={set.id}
-                className="grid grid-cols-[4.5rem_minmax(0,1fr)] items-center gap-3"
-              >
-                <div className="text-xs font-medium text-muted-foreground">
-                  {set.label}
-                </div>
-
-                <div className="grid grid-cols-6 gap-2">
+              <div key={set.id} className="flex justify-center">
+                <div className="grid grid-cols-7 gap-2">
                   {set.colors.map((preset) => {
                     const selected = preset.toLowerCase() === normalizedColor;
                     return (

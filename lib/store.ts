@@ -6,10 +6,10 @@ import { persist } from "zustand/middleware";
 import {
   CATEGORY_COLOR_BASE_AMBER,
   CATEGORY_COLOR_BASE_BLUE,
+  CATEGORY_COLOR_BASE_CYAN,
   CATEGORY_COLOR_BASE_GREEN,
-  CATEGORY_COLOR_BASE_OLIVE,
+  CATEGORY_COLOR_BASE_LIME,
   CATEGORY_COLOR_BASE_VIOLET,
-  CATEGORY_COLOR_EARTH_TEAL,
   DEFAULT_CATEGORY_COLOR,
   ONBOARDING_CATEGORY_COLOR_BY_ID,
   PREVIOUS_ONBOARDING_COLOR_BY_ID,
@@ -235,7 +235,7 @@ const getFeatureDefaultCategories = (): CategoryItem[] => [
     id: ONBOARDING_CATEGORY_IDS.workTrips,
     profileId: ONBOARDING_PROFILE_IDS.professional,
     name: "Viagens Trabalho",
-    color: CATEGORY_COLOR_EARTH_TEAL,
+    color: CATEGORY_COLOR_BASE_CYAN,
     visible: true,
   },
   {
@@ -277,7 +277,7 @@ const getFeatureDefaultCategories = (): CategoryItem[] => [
     id: ONBOARDING_CATEGORY_IDS.familyMoments,
     profileId: ONBOARDING_PROFILE_IDS.family,
     name: "Momentos",
-    color: CATEGORY_COLOR_BASE_OLIVE,
+    color: CATEGORY_COLOR_BASE_LIME,
     visible: true,
   },
 ];
