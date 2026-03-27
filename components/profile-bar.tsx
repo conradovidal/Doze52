@@ -60,6 +60,10 @@ type DragState = {
   width: number | null;
 };
 
+type SortableHandleAttributes = ReturnType<typeof useSortable>["attributes"];
+type SortableHandleListeners = ReturnType<typeof useSortable>["listeners"];
+type SortableHandleRef = ReturnType<typeof useSortable>["setActivatorNodeRef"];
+
 function EditProfileChip({
   profile,
   isActive,
@@ -79,16 +83,15 @@ function EditProfileChip({
   onSelect?: () => void;
   onEdit?: () => void;
   interactiveHandle?: boolean;
-  handleAttributes?: ReturnType<typeof useSortable>["attributes"];
-  handleListeners?: ReturnType<typeof useSortable>["listeners"];
-  setHandleRef?: ReturnType<typeof useSortable>["setActivatorNodeRef"];
+  handleAttributes?: SortableHandleAttributes;
+  handleListeners?: SortableHandleListeners;
+  setHandleRef?: SortableHandleRef;
   isPlaceholder?: boolean;
   isOverlay?: boolean;
   style?: React.CSSProperties;
   chipRef?: (node: HTMLElement | null) => void;
 }) {
-  const BodyComp = isOverlay || isPlaceholder ? "div" : "button";
-  const EditComp = isOverlay || isPlaceholder ? "div" : "button";
+  const contentHiddenClass = isPlaceholder ? "invisible" : "";
 
   return (
     <div
@@ -100,61 +103,71 @@ function EditProfileChip({
           ? "border-foreground/16 bg-foreground/[0.06] text-foreground"
           : "border-border/60 bg-background text-foreground/78 hover:border-border/78 hover:bg-muted/30 hover:text-foreground",
         isOverlay && CHIP_OVERLAY_CLASS,
-        isPlaceholder && "bg-muted/10"
+        isPlaceholder && "bg-background"
       )}
     >
       {isPlaceholder ? <div className={CHIP_PLACEHOLDER_CLASS} /> : null}
 
-      <div className={cn("shrink-0", isPlaceholder && "invisible")}>
-        {interactiveHandle ? (
+      {interactiveHandle ? (
+        <button
+          type="button"
+          ref={setHandleRef}
+          aria-label={`Reordenar perfil ${profile.name}`}
+          title={`Reordenar perfil ${profile.name}`}
+          className={cn(CHIP_HANDLE_CLASS, contentHiddenClass)}
+          {...handleAttributes}
+          {...handleListeners}
+        >
+          <GripVertical className="h-3.5 w-3.5" />
+        </button>
+      ) : (
+        <span className={cn(CHIP_HANDLE_CLASS, "cursor-default", contentHiddenClass)} aria-hidden="true">
+          <GripVertical className="h-3.5 w-3.5" />
+        </span>
+      )}
+
+      {isOverlay || isPlaceholder ? (
+        <div
+          className={cn(
+            "flex min-w-0 items-center gap-1.5 pl-1 pr-2 text-[0.78rem] font-medium",
+            contentHiddenClass
+          )}
+        >
+          <span className="truncate">{profile.name}</span>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={onSelect}
+          aria-label={`Selecionar perfil ${profile.name} para editar`}
+          className="flex min-w-0 items-center gap-1.5 pl-1 pr-2 text-[0.78rem] font-medium"
+        >
+          <span className="truncate">{profile.name}</span>
+        </button>
+      )}
+
+      {isOverlay || isPlaceholder ? (
+        <div className={cn("pr-1", contentHiddenClass)}>
+          <span className={CHIP_EDIT_ACTION_CLASS}>
+            <PencilLine className="h-3.5 w-3.5" />
+          </span>
+        </div>
+      ) : (
+        <div className="pr-1">
           <button
             type="button"
-            ref={setHandleRef}
-            aria-label={`Reordenar perfil ${profile.name}`}
-            title={`Reordenar perfil ${profile.name}`}
-            className={CHIP_HANDLE_CLASS}
-            {...handleAttributes}
-            {...handleListeners}
+            onClick={(event) => {
+              event.stopPropagation();
+              onEdit?.();
+            }}
+            aria-label={`Editar perfil ${profile.name}`}
+            title={`Editar perfil ${profile.name}`}
+            className={CHIP_EDIT_ACTION_CLASS}
           >
-            <GripVertical className="h-3.5 w-3.5" />
+            <PencilLine className="h-3.5 w-3.5" />
           </button>
-        ) : (
-          <span className={cn(CHIP_HANDLE_CLASS, "cursor-default")} aria-hidden="true">
-            <GripVertical className="h-3.5 w-3.5" />
-          </span>
-        )}
-      </div>
-
-      <BodyComp
-        type={BodyComp === "button" ? "button" : undefined}
-        onClick={BodyComp === "button" ? onSelect : undefined}
-        aria-label={BodyComp === "button" ? `Selecionar perfil ${profile.name} para editar` : undefined}
-        className={cn(
-          "flex min-w-0 items-center gap-1.5 pl-1 pr-2 text-[0.78rem] font-medium",
-          isPlaceholder && "invisible"
-        )}
-      >
-        <span className="truncate">{profile.name}</span>
-      </BodyComp>
-
-      <EditComp
-        type={EditComp === "button" ? "button" : undefined}
-        onClick={
-          EditComp === "button"
-            ? (event: React.MouseEvent) => {
-                event.stopPropagation();
-                onEdit?.();
-              }
-            : undefined
-        }
-        aria-label={EditComp === "button" ? `Editar perfil ${profile.name}` : undefined}
-        title={EditComp === "button" ? `Editar perfil ${profile.name}` : undefined}
-        className={cn("pr-1", isPlaceholder && "invisible")}
-      >
-        <span className={CHIP_EDIT_ACTION_CLASS}>
-          <PencilLine className="h-3.5 w-3.5" />
-        </span>
-      </EditComp>
+        </div>
+      )}
     </div>
   );
 }
@@ -185,12 +198,13 @@ function SortableEditProfileChip({
     disabled: !dragEnabled,
   });
 
-  const style = dragEnabled && !isDragging
-    ? {
-        transform: CSS.Transform.toString(transform),
-        transition,
-      }
-    : undefined;
+  const style =
+    dragEnabled && !isDragging
+      ? {
+          transform: CSS.Transform.toString(transform),
+          transition,
+        }
+      : undefined;
 
   return (
     <EditProfileChip
@@ -226,8 +240,7 @@ export function ProfileBar({
   const [draftOrderIds, setDraftOrderIds] = React.useState<string[] | null>(null);
   const draftOrderIdsRef = React.useRef<string[] | null>(null);
   const lastOverIdRef = React.useRef<string | null>(null);
-  const overlayPortalTarget =
-    typeof document !== "undefined" ? document.body : null;
+  const overlayPortalTarget = typeof document !== "undefined" ? document.body : null;
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -246,8 +259,9 @@ export function ProfileBar({
     () => orderedProfiles.find((profile) => profile.id === activeDrag?.id) ?? null,
     [orderedProfiles, activeDrag]
   );
-  const selectedSet = new Set(selectedProfileIds);
+  const selectedSet = React.useMemo(() => new Set(selectedProfileIds), [selectedProfileIds]);
   const dragEnabled = isInlineEditMode && profiles.length > 1;
+  const barClass = `${compact ? "w-full min-h-8 justify-center" : "mb-2 min-h-8 justify-center"} flex flex-wrap items-center gap-1.5 sm:gap-2`;
 
   const resetDragState = React.useCallback(() => {
     setActiveDrag(null);
@@ -326,9 +340,7 @@ export function ProfileBar({
 
   if (!isInlineEditMode) {
     return (
-      <div
-        className={`${compact ? "w-full min-h-8 justify-center" : "mb-2 min-h-8 justify-center"} flex flex-wrap items-center gap-1.5 sm:gap-2`}
-      >
+      <div className={barClass}>
         {profiles.map((profile) => {
           const selected = selectedSet.has(profile.id);
           return (
@@ -366,9 +378,7 @@ export function ProfileBar({
         items={orderedProfiles.map((profile) => profile.id)}
         strategy={rectSortingStrategy}
       >
-        <div
-          className={`${compact ? "w-full min-h-8 justify-center" : "mb-2 min-h-8 justify-center"} flex flex-wrap items-center gap-1.5 sm:gap-2`}
-        >
+        <div className={barClass}>
           {orderedProfiles.map((profile) => (
             <SortableEditProfileChip
               key={profile.id}
@@ -393,10 +403,7 @@ export function ProfileBar({
 
       {overlayPortalTarget
         ? createPortal(
-            <DragOverlay
-              modifiers={[preserveActivatorOffsetModifier]}
-              zIndex={80}
-            >
+            <DragOverlay modifiers={[preserveActivatorOffsetModifier]} zIndex={80}>
               {activeProfile ? (
                 <EditProfileChip
                   profile={activeProfile}
