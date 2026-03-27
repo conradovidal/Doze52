@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { Palette } from "lucide-react";
 import { ProfileIcon } from "@/components/profile-icon";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,37 +17,16 @@ import {
   SelectItem,
   SelectTrigger,
 } from "@/components/ui/select";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CATEGORY_PRESET_COLORS } from "@/lib/category-palette";
+import {
+  CATEGORY_COLOR_SETS,
+  DEFAULT_CATEGORY_COLOR,
+  getNearestCategoryColor,
+} from "@/lib/category-palette";
 import { useStore } from "@/lib/store";
 import type { AnchorPoint } from "@/lib/types";
 
-const DEFAULT_CATEGORY_COLOR = CATEGORY_PRESET_COLORS[0];
 const CHIP_TRIGGER_CLASS =
   "h-10 w-full rounded-xl border px-3 text-sm shadow-sm transition-colors";
-
-const normalizeHashPrefix = (value: string) => {
-  const trimmed = value.trim();
-  if (!trimmed) return "";
-  return trimmed.startsWith("#") ? trimmed : `#${trimmed}`;
-};
-
-const isValidHexColor = (value: string) =>
-  /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(value);
-
-const normalizeHex = (value: string) => {
-  const withHash = normalizeHashPrefix(value);
-  if (!isValidHexColor(withHash)) return null;
-  const hex = withHash.slice(1);
-  if (hex.length === 3) {
-    return `#${hex
-      .split("")
-      .map((c) => `${c}${c}`)
-      .join("")
-      .toUpperCase()}`;
-  }
-  return `#${hex.toUpperCase()}`;
-};
 
 type CategoryManagerProps = {
   mode: "edit" | "create";
@@ -82,9 +60,6 @@ export function CategoryManager({
 
   const [name, setName] = React.useState("");
   const [color, setColor] = React.useState(DEFAULT_CATEGORY_COLOR);
-  const [customHexDraft, setCustomHexDraft] = React.useState(DEFAULT_CATEGORY_COLOR);
-  const [customHexError, setCustomHexError] = React.useState(false);
-  const [customPopoverOpen, setCustomPopoverOpen] = React.useState(false);
   const [profileDraftId, setProfileDraftId] = React.useState("");
   const [isSaving, setIsSaving] = React.useState(false);
   const [saveError, setSaveError] = React.useState<string | null>(null);
@@ -99,11 +74,8 @@ export function CategoryManager({
     if (!open) return;
     if (mode === "edit") {
       setName(category?.name ?? "");
-      const initial = normalizeHex(category?.color ?? "") ?? DEFAULT_CATEGORY_COLOR;
+      const initial = getNearestCategoryColor(category?.color ?? DEFAULT_CATEGORY_COLOR);
       setColor(initial);
-      setCustomHexDraft(initial);
-      setCustomHexError(false);
-      setCustomPopoverOpen(false);
       setProfileDraftId(category?.profileId ?? effectiveCreateProfileId);
       setIsSaving(false);
       setSaveError(null);
@@ -111,9 +83,6 @@ export function CategoryManager({
     }
     setName("");
     setColor(DEFAULT_CATEGORY_COLOR);
-    setCustomHexDraft(DEFAULT_CATEGORY_COLOR);
-    setCustomHexError(false);
-    setCustomPopoverOpen(false);
     setProfileDraftId(effectiveCreateProfileId);
     setIsSaving(false);
     setSaveError(null);
@@ -123,9 +92,6 @@ export function CategoryManager({
   const canSave = name.trim().length > 0 && Boolean(profileDraftId);
   const canDelete = categories.length > 1;
   const normalizedColor = color.toLowerCase();
-  const isPresetColor = CATEGORY_PRESET_COLORS.some(
-    (c) => c.toLowerCase() === normalizedColor
-  );
 
   const handleSave = async () => {
     if (!canSave) return;
@@ -180,17 +146,6 @@ export function CategoryManager({
     } finally {
       setIsSaving(false);
     }
-  };
-
-  const applyHexDraft = (raw: string) => {
-    setCustomHexDraft(raw);
-    const normalized = normalizeHex(raw);
-    if (normalized) {
-      setColor(normalized);
-      setCustomHexError(false);
-      return;
-    }
-    setCustomHexError(raw.trim().length > 0);
   };
 
   return (
@@ -250,99 +205,38 @@ export function CategoryManager({
           </div>
 
           <div className="space-y-2.5">
-            <div className="flex flex-wrap items-center gap-2.5">
-              {CATEGORY_PRESET_COLORS.map((preset) => {
-                const selected = preset.toLowerCase() === normalizedColor;
-                return (
-                  <button
-                    key={preset}
-                    type="button"
-                    onClick={() => {
-                      const normalizedPreset = normalizeHex(preset) ?? preset;
-                      setColor(normalizedPreset);
-                      setCustomHexDraft(normalizedPreset);
-                      setCustomHexError(false);
-                    }}
-                    aria-label={`Selecionar cor ${preset.toUpperCase()}`}
-                    className={`h-8 w-8 rounded-full border border-black/5 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-300 ${
-                      selected
-                        ? "ring-2 ring-neutral-400 ring-offset-2"
-                        : "hover:opacity-90"
-                    }`}
-                    style={{ backgroundColor: preset }}
-                  >
-                    <span className="sr-only">{preset.toUpperCase()}</span>
-                  </button>
-                );
-              })}
-
-              <Popover
-                open={customPopoverOpen}
-                onOpenChange={(nextOpen) => {
-                  setCustomPopoverOpen(nextOpen);
-                  if (nextOpen) {
-                    setCustomHexDraft(color);
-                    setCustomHexError(false);
-                  }
-                }}
+            {CATEGORY_COLOR_SETS.map((set) => (
+              <div
+                key={set.id}
+                className="grid grid-cols-[4.5rem_minmax(0,1fr)] items-center gap-3"
               >
-                <PopoverTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className={`h-8 rounded-full px-3 text-xs ${
-                      !isPresetColor || customPopoverOpen ? "border-neutral-400 bg-muted/60" : ""
-                    }`}
-                  >
-                    <Palette size={14} />
-                    Mais cores
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent
-                  align="start"
-                  className="w-64 p-3"
-                >
-                  <div className="space-y-2">
-                    <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
-                      Cor personalizada
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="color"
-                        value={color}
-                        onChange={(e) => {
-                          const normalized = normalizeHex(e.target.value) ?? color;
-                          setColor(normalized);
-                          setCustomHexDraft(normalized);
-                          setCustomHexError(false);
-                        }}
-                        className="h-9 w-9 shrink-0 cursor-pointer rounded-md border border-neutral-200 p-0"
-                        aria-label="Color picker"
-                      />
-                      <Input
-                        value={customHexDraft}
-                        onChange={(e) => applyHexDraft(e.target.value)}
-                        onBlur={() => {
-                          const normalized = normalizeHex(customHexDraft);
-                          if (!normalized) {
-                            setCustomHexDraft(color);
-                            setCustomHexError(false);
-                            return;
-                          }
-                          setColor(normalized);
-                          setCustomHexDraft(normalized);
-                          setCustomHexError(false);
-                        }}
-                        placeholder="#RRGGBB"
-                        aria-label="Código HEX"
-                        className={customHexError ? "border-red-300 focus-visible:ring-red-200" : ""}
-                      />
-                    </div>
-                  </div>
-                </PopoverContent>
-              </Popover>
-            </div>
+                <div className="text-xs font-medium text-muted-foreground">
+                  {set.label}
+                </div>
+
+                <div className="grid grid-cols-6 gap-2">
+                  {set.colors.map((preset) => {
+                    const selected = preset.toLowerCase() === normalizedColor;
+                    return (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => setColor(preset)}
+                        aria-label={`Selecionar cor ${preset.toUpperCase()}`}
+                        className={`h-8 w-8 rounded-full border border-black/5 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-300 ${
+                          selected
+                            ? "ring-2 ring-neutral-400 ring-offset-2"
+                            : "hover:opacity-90"
+                        }`}
+                        style={{ backgroundColor: preset }}
+                      >
+                        <span className="sr-only">{preset.toUpperCase()}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
         <DialogFooter className="sm:justify-between">

@@ -4,7 +4,13 @@ import { create } from "zustand";
 import { addDays, format, parseISO } from "date-fns";
 import { persist } from "zustand/middleware";
 import {
-  CATEGORY_PRESET_COLORS,
+  CATEGORY_COLOR_BASE_AMBER,
+  CATEGORY_COLOR_BASE_BLUE,
+  CATEGORY_COLOR_BASE_GREEN,
+  CATEGORY_COLOR_BASE_OLIVE,
+  CATEGORY_COLOR_BASE_VIOLET,
+  CATEGORY_COLOR_EARTH_TEAL,
+  DEFAULT_CATEGORY_COLOR,
   ONBOARDING_CATEGORY_COLOR_BY_ID,
   PREVIOUS_ONBOARDING_COLOR_BY_ID,
 } from "./category-palette";
@@ -130,7 +136,7 @@ export const ONBOARDING_DEFAULT_CATEGORY_ID = ONBOARDING_CATEGORY_IDS.events;
 
 const defaultCategoryColor =
   ONBOARDING_CATEGORY_COLOR_BY_ID[ONBOARDING_DEFAULT_CATEGORY_ID] ??
-  CATEGORY_PRESET_COLORS[0];
+  DEFAULT_CATEGORY_COLOR;
 
 const getLegacyDefaultProfiles = (): CalendarProfile[] => [
   {
@@ -215,21 +221,21 @@ const getFeatureDefaultCategories = (): CategoryItem[] => [
     id: ONBOARDING_CATEGORY_IDS.workMeetings,
     profileId: ONBOARDING_PROFILE_IDS.professional,
     name: "Reunioes",
-    color: CATEGORY_PRESET_COLORS[0],
+    color: CATEGORY_COLOR_BASE_BLUE,
     visible: true,
   },
   {
     id: ONBOARDING_CATEGORY_IDS.workDeliveries,
     profileId: ONBOARDING_PROFILE_IDS.professional,
     name: "Entregas",
-    color: CATEGORY_PRESET_COLORS[4],
+    color: CATEGORY_COLOR_BASE_VIOLET,
     visible: true,
   },
   {
     id: ONBOARDING_CATEGORY_IDS.workTrips,
     profileId: ONBOARDING_PROFILE_IDS.professional,
     name: "Viagens Trabalho",
-    color: CATEGORY_PRESET_COLORS[5],
+    color: CATEGORY_COLOR_EARTH_TEAL,
     visible: true,
   },
   {
@@ -257,21 +263,21 @@ const getFeatureDefaultCategories = (): CategoryItem[] => [
     id: ONBOARDING_CATEGORY_IDS.familySchool,
     profileId: ONBOARDING_PROFILE_IDS.family,
     name: "Escola",
-    color: CATEGORY_PRESET_COLORS[1],
+    color: CATEGORY_COLOR_BASE_GREEN,
     visible: true,
   },
   {
     id: ONBOARDING_CATEGORY_IDS.familyHealth,
     profileId: ONBOARDING_PROFILE_IDS.family,
     name: "Saude Familia",
-    color: CATEGORY_PRESET_COLORS[2],
+    color: CATEGORY_COLOR_BASE_AMBER,
     visible: true,
   },
   {
     id: ONBOARDING_CATEGORY_IDS.familyMoments,
     profileId: ONBOARDING_PROFILE_IDS.family,
     name: "Momentos",
-    color: CATEGORY_PRESET_COLORS[6],
+    color: CATEGORY_COLOR_BASE_OLIVE,
     visible: true,
   },
 ];
