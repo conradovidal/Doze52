@@ -36,12 +36,15 @@ import { cn } from "@/lib/utils";
 const MOTION_CLASS = "duration-[160ms] ease-[cubic-bezier(0.22,1,0.36,1)]";
 const CHIP_SHELL_CLASS =
   "group relative inline-flex h-8 items-center overflow-hidden rounded-full border transition-[background-color,border-color,box-shadow,transform] shadow-none";
+const CHIP_LEADING_SLOT_CLASS =
+  "inline-flex h-8 w-8 shrink-0 items-center justify-center";
 const CHIP_HANDLE_CLASS =
   "inline-flex h-8 w-8 shrink-0 touch-none cursor-grab items-center justify-center rounded-full text-muted-foreground/72 transition-colors hover:bg-muted/42 hover:text-foreground active:cursor-grabbing";
 const CHIP_PLACEHOLDER_CLASS =
   "pointer-events-none absolute inset-[3px] rounded-full border border-dashed border-border/70 bg-muted/26";
 const CHIP_OVERLAY_CLASS =
   "border-border/75 bg-background shadow-[0_18px_30px_-18px_rgba(15,23,42,0.28)]";
+const CREATE_ACTION_CLASS = `inline-flex h-8 w-8 items-center justify-center rounded-full border border-foreground/12 bg-foreground/[0.06] text-foreground/82 shadow-none transition-all ${MOTION_CLASS} hover:border-foreground/18 hover:bg-foreground/[0.1] hover:text-foreground`;
 
 const hexToRgba = (hex: string, alpha: number) => {
   const normalized = hex.trim().replace("#", "");
@@ -145,9 +148,21 @@ function EditCategoryChip({
         >
           <GripVertical className="h-3.5 w-3.5" />
         </button>
-      ) : (
-        <span className={cn(CHIP_HANDLE_CLASS, "cursor-default", contentHiddenClass)} aria-hidden="true">
+      ) : isOverlay || isPlaceholder ? (
+        <span
+          className={cn(CHIP_HANDLE_CLASS, "cursor-default", contentHiddenClass)}
+          aria-hidden="true"
+        >
           <GripVertical className="h-3.5 w-3.5" />
+        </span>
+      ) : (
+        <span className={cn(CHIP_LEADING_SLOT_CLASS, contentHiddenClass)} aria-hidden="true">
+          <span
+            className="h-2.5 w-2.5 rounded-full"
+            style={{
+              backgroundColor: category.color,
+            }}
+          />
         </span>
       )}
 
@@ -384,7 +399,7 @@ export function CategoryBar({
             type="button"
             aria-pressed={category.visible}
             onClick={() => toggleCategoryVisibility(category.id)}
-            className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3 py-1 text-[0.78rem] font-medium shadow-none transition-all ${MOTION_CLASS} ${
+            className={`inline-flex h-8 items-center overflow-hidden rounded-full border text-[0.78rem] font-medium shadow-none transition-all ${MOTION_CLASS} ${
               category.visible
                 ? "text-foreground hover:brightness-[0.97]"
                 : "bg-background/70 text-muted-foreground hover:border-border/75 hover:bg-muted/35 hover:text-foreground dark:bg-background/45 dark:hover:bg-accent/45"
@@ -398,14 +413,20 @@ export function CategoryBar({
                 : "hsl(var(--border) / 0.72)",
             }}
           >
+            <span className={CHIP_LEADING_SLOT_CLASS} aria-hidden="true">
+              <span
+                className="h-2.5 w-2.5 rounded-full"
+                style={{
+                  backgroundColor: category.color,
+                  opacity: category.visible ? 0.92 : 0.5,
+                }}
+              />
+            </span>
             <span
-              className="h-2.5 w-2.5 rounded-full"
-              style={{
-                backgroundColor: category.color,
-                opacity: category.visible ? 0.92 : 0.5,
-              }}
-            />
-            <span className={category.visible ? "text-foreground" : "text-muted-foreground"}>
+              className={`min-w-0 truncate pl-1 pr-3 ${
+                category.visible ? "text-foreground" : "text-muted-foreground"
+              }`}
+            >
               {category.name}
             </span>
           </button>
@@ -456,14 +477,15 @@ export function CategoryBar({
             type="button"
             onClick={onCreateCategory}
             disabled={!editingProfileId}
-            className={`inline-flex h-8 items-center gap-1.5 rounded-full border border-dashed px-3 text-[0.78rem] font-medium shadow-none transition-all ${MOTION_CLASS} ${
+            className={`${CREATE_ACTION_CLASS} ${
               editingProfileId
-                ? "border-border/70 bg-background text-muted-foreground hover:border-border/85 hover:bg-muted/28 hover:text-foreground"
-                : "cursor-not-allowed border-border/55 bg-background/80 text-muted-foreground/55"
+                ? ""
+                : "cursor-not-allowed border-border/55 bg-background/80 text-muted-foreground/55 hover:border-border/55 hover:bg-background/80 hover:text-muted-foreground/55"
             }`}
+            aria-label="Criar nova categoria"
+            title="Criar nova categoria"
           >
             <Plus className="h-3.5 w-3.5" />
-            <span>Nova categoria</span>
           </button>
         </div>
       </SortableContext>

@@ -37,6 +37,8 @@ import { cn } from "@/lib/utils";
 const MOTION_CLASS = "duration-[160ms] ease-[cubic-bezier(0.22,1,0.36,1)]";
 const CHIP_SHELL_CLASS =
   "group relative inline-flex h-8 items-center overflow-hidden rounded-full border transition-[background-color,border-color,box-shadow,transform] shadow-none";
+const CHIP_LEADING_SLOT_CLASS =
+  "inline-flex h-8 w-8 shrink-0 items-center justify-center";
 const CHIP_HANDLE_CLASS =
   "inline-flex h-8 w-8 shrink-0 touch-none cursor-grab items-center justify-center rounded-full text-muted-foreground/72 transition-colors hover:bg-muted/42 hover:text-foreground active:cursor-grabbing";
 const CHIP_EDIT_ACTION_CLASS =
@@ -45,6 +47,7 @@ const CHIP_PLACEHOLDER_CLASS =
   "pointer-events-none absolute inset-[3px] rounded-full border border-dashed border-border/70 bg-muted/26";
 const CHIP_OVERLAY_CLASS =
   "border-border/75 bg-background shadow-[0_18px_30px_-18px_rgba(15,23,42,0.28)]";
+const CREATE_ACTION_CLASS = `inline-flex h-8 w-8 items-center justify-center rounded-full border border-foreground/12 bg-foreground/[0.06] text-foreground/82 shadow-none transition-all ${MOTION_CLASS} hover:border-foreground/18 hover:bg-foreground/[0.1] hover:text-foreground`;
 
 type ProfileBarProps = {
   compact?: boolean;
@@ -120,9 +123,16 @@ function EditProfileChip({
         >
           <GripVertical className="h-3.5 w-3.5" />
         </button>
-      ) : (
-        <span className={cn(CHIP_HANDLE_CLASS, "cursor-default", contentHiddenClass)} aria-hidden="true">
+      ) : isOverlay || isPlaceholder ? (
+        <span
+          className={cn(CHIP_HANDLE_CLASS, "cursor-default", contentHiddenClass)}
+          aria-hidden="true"
+        >
           <GripVertical className="h-3.5 w-3.5" />
+        </span>
+      ) : (
+        <span className={cn(CHIP_LEADING_SLOT_CLASS, contentHiddenClass)} aria-hidden="true">
+          <ProfileIcon icon={profile.icon} size={12} className="shrink-0" />
         </span>
       )}
 
@@ -152,7 +162,7 @@ function EditProfileChip({
             <PencilLine className="h-3.5 w-3.5" />
           </span>
         </div>
-      ) : (
+      ) : onEdit ? (
         <div className="pr-1">
           <button
             type="button"
@@ -166,6 +176,12 @@ function EditProfileChip({
           >
             <PencilLine className="h-3.5 w-3.5" />
           </button>
+        </div>
+      ) : (
+        <div className="pr-1">
+          <span className={cn(CHIP_EDIT_ACTION_CLASS, "opacity-0")} aria-hidden="true">
+            <PencilLine className="h-3.5 w-3.5" />
+          </span>
         </div>
       )}
     </div>
@@ -349,14 +365,21 @@ export function ProfileBar({
               type="button"
               aria-pressed={selected}
               onClick={() => toggleSelectedProfile(profile.id)}
-              className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3 py-1 text-[0.78rem] font-medium shadow-none transition-all ${MOTION_CLASS} ${
+              className={`inline-flex h-8 items-center overflow-hidden rounded-full border text-[0.78rem] font-medium shadow-none transition-all ${MOTION_CLASS} ${
                 selected
                   ? "border-foreground/10 bg-foreground/[0.06] text-foreground hover:bg-foreground/[0.085] dark:border-white/10 dark:bg-white/10 dark:text-white dark:hover:bg-white/14"
                   : "border-border/55 bg-background/70 text-foreground/72 hover:border-border/75 hover:bg-muted/35 hover:text-foreground dark:bg-background/45 dark:text-foreground/70 dark:hover:bg-accent/45"
               }`}
             >
-              <ProfileIcon icon={profile.icon} size={12} className="shrink-0" />
-              <span>{profile.name}</span>
+              <span className={CHIP_LEADING_SLOT_CLASS} aria-hidden="true">
+                <ProfileIcon icon={profile.icon} size={12} className="shrink-0" />
+              </span>
+              <span className="min-w-0 truncate pl-1 pr-2">{profile.name}</span>
+              <span className="pr-1">
+                <span className={cn(CHIP_EDIT_ACTION_CLASS, "opacity-0")} aria-hidden="true">
+                  <PencilLine className="h-3.5 w-3.5" />
+                </span>
+              </span>
             </button>
           );
         })}
@@ -393,10 +416,11 @@ export function ProfileBar({
           <button
             type="button"
             onClick={onCreateProfile}
-            className={`inline-flex h-8 items-center gap-1.5 rounded-full border border-dashed border-border/70 bg-background px-3 text-[0.78rem] font-medium text-muted-foreground shadow-none transition-all ${MOTION_CLASS} hover:border-border/85 hover:bg-muted/28 hover:text-foreground`}
+            className={CREATE_ACTION_CLASS}
+            aria-label="Criar novo perfil"
+            title="Criar novo perfil"
           >
             <Plus className="h-3.5 w-3.5" />
-            <span>Novo perfil</span>
           </button>
         </div>
       </SortableContext>

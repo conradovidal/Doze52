@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { PencilLine } from "lucide-react";
+import { Check, PencilLine } from "lucide-react";
 import { CategoryBar } from "@/components/category-bar";
 import { CategoryManager } from "@/components/category-manager";
 import { ProfileBar } from "@/components/profile-bar";
@@ -63,6 +63,8 @@ export function AppHeader({
 
   const utilityIconClass =
     "h-9 w-9 rounded-2xl border-border/65 bg-background/70 text-muted-foreground shadow-none transition-colors hover:border-border/80 hover:bg-muted/45 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50";
+  const utilityActiveEditClass =
+    "h-9 rounded-full border border-foreground/15 bg-foreground px-3.5 text-sm font-medium text-background shadow-none transition-colors hover:bg-foreground/92 focus-visible:ring-2 focus-visible:ring-ring/50 dark:border-white/15 dark:bg-white dark:text-black dark:hover:bg-white/92";
   const utilityButtonClass =
     "h-9 rounded-2xl border-border/65 bg-background/70 px-3.5 text-sm font-medium text-foreground shadow-none transition-colors hover:border-border/80 hover:bg-muted/45 hover:text-foreground";
   const yearSelectClass =
@@ -148,27 +150,32 @@ export function AppHeader({
 
           <div className="min-w-0 justify-self-end">
             <div className="flex flex-wrap items-center justify-end gap-1.5 sm:gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="icon-sm"
-                className={`${utilityIconClass} ${
-                  isInlineEditMode ? "border-border/80 bg-muted/65 text-foreground" : ""
-                }`}
-                onClick={toggleInlineEditMode}
-                aria-label={
-                  isInlineEditMode
-                    ? "Finalizar edicao de perfis e categorias"
-                    : "Editar perfis e categorias"
-                }
-                title={
-                  isInlineEditMode
-                    ? "Finalizar edicao de perfis e categorias"
-                    : "Editar perfis e categorias"
-                }
-              >
-                <PencilLine className="h-4 w-4" />
-              </Button>
+              {isInlineEditMode ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className={utilityActiveEditClass}
+                  onClick={toggleInlineEditMode}
+                  aria-label="Finalizar edicao de perfis e categorias"
+                  title="Finalizar edicao de perfis e categorias"
+                >
+                  <Check className="h-4 w-4" />
+                  <span>Finalizar</span>
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon-sm"
+                  className={utilityIconClass}
+                  onClick={toggleInlineEditMode}
+                  aria-label="Editar perfis e categorias"
+                  title="Editar perfis e categorias"
+                >
+                  <PencilLine className="h-4 w-4" />
+                </Button>
+              )}
 
               <Select value={String(year)} onValueChange={(v) => onYearChange(Number(v))}>
                 <SelectTrigger className={yearSelectClass}>
@@ -205,12 +212,6 @@ export function AppHeader({
         </div>
 
         <div className="mx-auto flex w-full max-w-[58rem] flex-col items-center gap-1.5 border-t border-border/45 pt-2.5 md:gap-2 md:pt-3">
-          {isInlineEditMode ? (
-            <p className="text-center text-[0.74rem] font-medium text-muted-foreground">
-              Modo de edicao ativo. Toque no lapis para finalizar.
-            </p>
-          ) : null}
-
           <ProfileBar
             compact
             isInlineEditMode={isInlineEditMode}
