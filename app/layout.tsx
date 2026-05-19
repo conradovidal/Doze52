@@ -1,10 +1,21 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth";
+import { ThemeProvider } from "@/lib/theme";
+import { FeedbackProvider } from "@/components/ui/feedback-provider";
+import { ThemeInitScript } from "@/components/theme-init-script";
+import { SiteFooter } from "@/components/site-footer";
 
 export const metadata: Metadata = {
-  title: "Year-in-View",
+  title: "doze 52 | Sistema de estruturação de foco",
   description: "Planejamento visual anual com revisao mensal e habitos.",
+  icons: {
+    icon: [
+      { url: "/icon.svg?v=20260326a", type: "image/svg+xml" },
+      { url: "/favicon.ico?v=20260326a", sizes: "any" },
+    ],
+    shortcut: ["/favicon.ico?v=20260326a"],
+  },
 };
 
 export default function RootLayout({
@@ -13,9 +24,19 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="pt-BR">
-      <body className="min-h-screen bg-neutral-50 text-neutral-900">
-        <AuthProvider>{children}</AuthProvider>
+    <html lang="pt-BR" suppressHydrationWarning>
+      <body className="min-h-screen bg-background text-foreground">
+        <ThemeInitScript />
+        <ThemeProvider>
+          <FeedbackProvider>
+            <AuthProvider>
+              <div className="flex min-h-screen flex-col">
+                <div className="flex-1">{children}</div>
+                <SiteFooter />
+              </div>
+            </AuthProvider>
+          </FeedbackProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

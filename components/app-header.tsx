@@ -1,6 +1,14 @@
 "use client";
 
+import * as React from "react";
+import { Check, PencilLine } from "lucide-react";
 import { CategoryBar } from "@/components/category-bar";
+import { CategoryManager } from "@/components/category-manager";
+import { ProfileBar } from "@/components/profile-bar";
+import {
+  ProfileManager,
+  type ProfileManagerIntent,
+} from "@/components/profile-manager";
 import { UserMenu } from "@/components/auth/user-menu";
 import {
   Select,
@@ -10,14 +18,22 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { useStore } from "@/lib/store";
+import type { AnchorPoint } from "@/lib/types";
 
 type AppHeaderProps = {
   year: number;
   onYearChange: (year: number) => void;
   authLoading: boolean;
   isAuthenticated: boolean;
-  onOpenAuthDialog: () => void;
+  onOpenAuthDialog: (anchorPoint?: AnchorPoint) => void;
 };
+
+const getPreferredEditingProfileId = (
+  selectedProfileIds: string[],
+  profileIds: string[]
+) => selectedProfileIds.find((id) => profileIds.includes(id)) ?? profileIds[0] ?? null;
 
 export function AppHeader({
   year,
@@ -26,19 +42,143 @@ export function AppHeader({
   isAuthenticated,
   onOpenAuthDialog,
 }: AppHeaderProps) {
+  const profiles = useStore((s) => s.profiles);
+  const selectedProfileIds = useStore((s) => s.selectedProfileIds);
+  const setSelectedProfiles = useStore((s) => s.setSelectedProfiles);
+
+  const [isInlineEditMode, setIsInlineEditMode] = React.useState(false);
+  const [editingProfileId, setEditingProfileId] = React.useState<string | null>(null);
+  const [profileManagerOpen, setProfileManagerOpen] = React.useState(false);
+  const [profileManagerIntent, setProfileManagerIntent] =
+    React.useState<ProfileManagerIntent | null>(null);
+  const [categoryCreateOpen, setCategoryCreateOpen] = React.useState(false);
+  const [categoryEditOpen, setCategoryEditOpen] = React.useState(false);
+  const [editingCategoryId, setEditingCategoryId] = React.useState<string | null>(null);
+
+  const pendingProfileCreateRestoreRef = React.useRef<{
+    knownProfileIds: string[];
+    selectedProfileIds: string[];
+  } | null>(null);
+  const previousProfileManagerOpenRef = React.useRef(false);
+
+  const utilityIconClass =
+    "h-9 w-9 rounded-2xl border-border/65 bg-background/70 text-muted-foreground shadow-none transition-colors hover:border-border/80 hover:bg-muted/45 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50";
+  const utilityActiveEditClass =
+    "h-9 rounded-full border border-foreground/15 bg-foreground px-3.5 text-sm font-medium text-background shadow-none transition-colors hover:bg-foreground/92 focus-visible:ring-2 focus-visible:ring-ring/50 dark:border-white/15 dark:bg-white dark:text-black dark:hover:bg-white/92";
+  const utilityButtonClass =
+    "h-9 rounded-2xl border-border/65 bg-background/70 px-3.5 text-sm font-medium text-foreground shadow-none transition-colors hover:border-border/80 hover:bg-muted/45 hover:text-foreground";
+  const yearSelectClass =
+    "h-9 min-w-[90px] rounded-2xl border-border/70 bg-background/80 px-3.5 text-[0.98rem] font-semibold text-foreground shadow-none hover:border-border/85 hover:bg-muted/45 focus-visible:ring-2 focus-visible:ring-ring/60 md:text-[1rem] [&_svg]:opacity-70 [&_svg]:text-muted-foreground";
+
+  React.useEffect(() => {
+    if (!isInlineEditMode) return;
+    const profileIds = profiles.map((profile) => profile.id);
+    setEditingProfileId((current) => {
+      if (current && profileIds.includes(current)) return current;
+      return getPreferredEditingProfileId(selectedProfileIds, profileIds);
+    });
+  }, [isInlineEditMode, profiles, selectedProfileIds]);
+
+  React.useEffect(() => {
+    const wasOpen = previousProfileManagerOpenRef.current;
+    previousProfileManagerOpenRef.current = profileManagerOpen;
+
+    if (!wasOpen || profileManagerOpen) {
+      return;
+    }
+
+    const pendingCreateRestore = pendingProfileCreateRestoreRef.current;
+    if (!pendingCreateRestore) {
+      return;
+    }
+
+    pendingProfileCreateRestoreRef.current = null;
+
+    const createdProfile =
+      profiles.find((profile) => !pendingCreateRestore.knownProfileIds.includes(profile.id)) ??
+      null;
+
+    setSelectedProfiles(pendingCreateRestore.selectedProfileIds);
+
+    if (createdProfile) {
+      setEditingProfileId(createdProfile.id);
+    }
+  }, [profileManagerOpen, profiles, setSelectedProfiles]);
+
+  const toggleInlineEditMode = React.useCallback(() => {
+    setIsInlineEditMode((current) => {
+      const next = !current;
+      if (next) {
+        const profileIds = profiles.map((profile) => profile.id);
+        setEditingProfileId(getPreferredEditingProfileId(selectedProfileIds, profileIds));
+      }
+      return next;
+    });
+  }, [profiles, selectedProfileIds]);
+
+  const openCreateProfile = React.useCallback(() => {
+    pendingProfileCreateRestoreRef.current = {
+      knownProfileIds: profiles.map((profile) => profile.id),
+      selectedProfileIds: [...selectedProfileIds],
+    };
+    setProfileManagerIntent({ mode: "create" });
+    setProfileManagerOpen(true);
+  }, [profiles, selectedProfileIds]);
+
+  const openEditProfile = React.useCallback((profileId: string) => {
+    setProfileManagerIntent({ mode: "edit", profileId });
+    setProfileManagerOpen(true);
+  }, []);
+
+  const openCreateCategory = React.useCallback(() => {
+    if (!editingProfileId) return;
+    setCategoryCreateOpen(true);
+  }, [editingProfileId]);
+
+  const openEditCategory = React.useCallback((categoryId: string) => {
+    setEditingCategoryId(categoryId);
+    setCategoryEditOpen(true);
+  }, []);
+
   return (
-    <header className="mb-6">
-      <div className="grid grid-cols-[1fr_auto_1fr] items-end">
-        <div />
-        <div className="flex flex-col items-center gap-1.5">
-          <div className="inline-flex w-fit flex-col items-center">
-            <div className="inline-flex w-full items-baseline gap-2 leading-none">
-              <span className="inline-flex items-baseline gap-3 font-sans text-2xl font-medium tracking-[0.08em] text-neutral-900">
-                <span>DOZE</span>
-                <span>52</span>
-              </span>
+    <>
+      <header className="mb-4 space-y-3 md:mb-5 md:space-y-3.5">
+        <div className="grid min-h-10 grid-cols-[minmax(0,1fr)_auto] items-start gap-3 md:items-center md:gap-4">
+          <div className="justify-self-start">
+            <img src="/logo-doze52.png" alt="doze 52" className="h-8 w-auto md:h-9" />
+          </div>
+
+          <div className="min-w-0 justify-self-end">
+            <div className="flex flex-wrap items-center justify-end gap-1.5 sm:gap-2">
+              {isInlineEditMode ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className={utilityActiveEditClass}
+                  onClick={toggleInlineEditMode}
+                  aria-label="Finalizar edicao de perfis e categorias"
+                  title="Finalizar edicao de perfis e categorias"
+                >
+                  <Check className="h-4 w-4" />
+                  <span>Finalizar</span>
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon-sm"
+                  className={utilityIconClass}
+                  onClick={toggleInlineEditMode}
+                  aria-label="Editar perfis e categorias"
+                  title="Editar perfis e categorias"
+                >
+                  <PencilLine className="h-4 w-4" />
+                </Button>
+              )}
+
               <Select value={String(year)} onValueChange={(v) => onYearChange(Number(v))}>
-                <SelectTrigger className="relative top-[1px] h-7 min-w-[72px] align-middle border-transparent bg-transparent px-1.5 font-sans text-xl leading-none font-normal text-neutral-700 shadow-none hover:bg-transparent focus-visible:border-transparent focus-visible:ring-0 [&_svg]:ml-1 [&_svg]:opacity-80 [&_svg]:text-neutral-600">
+                <SelectTrigger className={yearSelectClass}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -47,22 +187,76 @@ export function AppHeader({
                   <SelectItem value="2027">2027</SelectItem>
                 </SelectContent>
               </Select>
+
+              <ThemeToggle />
+
+              <div className="flex h-9 items-center justify-end">
+                {authLoading ? null : isAuthenticated ? (
+                  <UserMenu />
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className={utilityButtonClass}
+                    onClick={(event) => {
+                      const rect = event.currentTarget.getBoundingClientRect();
+                      onOpenAuthDialog({ x: rect.right, y: rect.bottom });
+                    }}
+                  >
+                    Entrar
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
-          <CategoryBar compact />
         </div>
-        <div className="self-end justify-self-end">
-          <div className="flex h-8 min-w-[96px] items-center justify-end">
-            {authLoading ? null : isAuthenticated ? (
-              <UserMenu />
-            ) : (
-              <Button size="sm" className="h-8" onClick={onOpenAuthDialog}>
-                Entrar
-              </Button>
-            )}
-          </div>
+
+        <div className="mx-auto flex w-full max-w-[58rem] flex-col items-center gap-1.5 border-t border-border/45 pt-2.5 md:gap-2 md:pt-3">
+          <ProfileBar
+            compact
+            isInlineEditMode={isInlineEditMode}
+            editingProfileId={editingProfileId}
+            onEditingProfileChange={setEditingProfileId}
+            onCreateProfile={openCreateProfile}
+            onEditProfile={openEditProfile}
+          />
+
+          <CategoryBar
+            compact
+            isInlineEditMode={isInlineEditMode}
+            editingProfileId={editingProfileId}
+            onCreateCategory={openCreateCategory}
+            onEditCategory={openEditCategory}
+          />
         </div>
-      </div>
-    </header>
+
+        <div className="mx-auto h-px w-full max-w-[58rem] bg-border/45" />
+      </header>
+
+      <ProfileManager
+        open={profileManagerOpen}
+        onOpenChange={setProfileManagerOpen}
+        intent={profileManagerIntent ?? undefined}
+      />
+
+      <CategoryManager
+        mode="create"
+        open={categoryCreateOpen}
+        onOpenChange={setCategoryCreateOpen}
+        profileId={editingProfileId ?? undefined}
+      />
+
+      <CategoryManager
+        mode="edit"
+        open={categoryEditOpen}
+        onOpenChange={(open) => {
+          setCategoryEditOpen(open);
+          if (!open) {
+            setEditingCategoryId(null);
+          }
+        }}
+        categoryId={editingCategoryId ?? undefined}
+      />
+    </>
   );
 }
