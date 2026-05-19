@@ -17,47 +17,73 @@ const isIsoDate = (value: string) => {
   return !Number.isNaN(parsed.getTime());
 };
 
+const validateDayOrder = (dayOrder: CalendarEvent["dayOrder"]) => {
+  if (typeof dayOrder === "number") {
+    if (!Number.isInteger(dayOrder)) {
+      throw new ValidationError("Evento invalido: ordem deve ser inteira.");
+    }
+
+    if (dayOrder < 0) {
+      throw new ValidationError("Evento invalido: ordem nao pode ser negativa.");
+    }
+
+    return;
+  }
+
+  if (dayOrder && typeof dayOrder === "object") {
+    for (const value of Object.values(dayOrder)) {
+      if (!Number.isInteger(value)) {
+        throw new ValidationError("Evento invalido: ordem deve ser inteira.");
+      }
+
+      if (value < 0) {
+        throw new ValidationError("Evento invalido: ordem nao pode ser negativa.");
+      }
+    }
+  }
+};
+
 export const validateCategoryInput = (category: CategoryItem) => {
   if (!category.id?.trim()) {
     throw new ValidationError("Categoria invalida: id ausente.");
   }
+
   if (!category.name?.trim()) {
     throw new ValidationError("Categoria invalida: nome obrigatorio.");
   }
+
   if (!HEX_COLOR_RE.test(category.color)) {
     throw new ValidationError("Categoria invalida: cor fora do padrao.");
   }
+
   if (typeof category.visible !== "boolean") {
     throw new ValidationError("Categoria invalida: visibilidade obrigatoria.");
   }
 };
 
-export const validateEventInput = (event: CalendarEvent, categoryIds: Set<string>) => {
+export const validateEventInput = (
+  event: CalendarEvent,
+  categoryIds: Set<string>
+) => {
   if (!event.id?.trim()) {
     throw new ValidationError("Evento invalido: id ausente.");
   }
+
   if (!event.title?.trim()) {
     throw new ValidationError("Evento invalido: titulo obrigatorio.");
   }
+
   if (!event.categoryId?.trim() || !categoryIds.has(event.categoryId)) {
     throw new ValidationError("Evento invalido: categoria nao encontrada.");
   }
+
   if (!isIsoDate(event.startDate) || !isIsoDate(event.endDate)) {
     throw new ValidationError("Evento invalido: data fora do formato ISO.");
   }
+
   if (event.endDate < event.startDate) {
     throw new ValidationError("Evento invalido: fim nao pode ser antes do inicio.");
   }
-  if (!Number.isFinite(event.dayOrder) || !Number.isInteger(event.dayOrder)) {
-    throw new ValidationError("Evento invalido: ordem deve ser inteira.");
-  }
-  if (event.dayOrder < 0) {
-    throw new ValidationError("Evento invalido: ordem nao pode ser negativa.");
-  }
-  if (event.notes !== undefined && typeof event.notes !== "string") {
-    throw new ValidationError("Evento invalido: descricao invalida.");
-  }
-  if (typeof event.notes === "string" && event.notes.length > 2000) {
-    throw new ValidationError("Evento invalido: descricao muito longa.");
-  }
+
+  validateDayOrder(event.dayOrder);
 };
