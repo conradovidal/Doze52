@@ -51,6 +51,7 @@ import { expandEventsForYear } from "@/lib/recurrence";
 import type { AnchorPoint } from "@/lib/types";
 
 const toSnapshotHash = (snapshot: CalendarSnapshot) => JSON.stringify(snapshot);
+
 const SYNC_HINT_BY_KIND: Record<SyncError["kind"], string> = {
   missing_relation:
     "Schema pendente no Supabase (rode as migrations de perfis/icones).",
@@ -80,9 +81,15 @@ type RawSyncState =
   | { state: "loading" }
   | { state: "saving" }
   | { state: "synced" }
-  | { state: "error"; message: string; detail?: string | null; onRetry: () => void };
+  | {
+      state: "error";
+      message: string;
+      detail?: string | null;
+      onRetry: () => void;
+    };
 
 const PENDING_SYNC_STORAGE_PREFIX = "pending-sync:";
+
 const isDetailedSyncDiagnosticsEnabled =
   process.env.NODE_ENV !== "production" ||
   process.env.NEXT_PUBLIC_APP_ENV === "local" ||
@@ -100,6 +107,7 @@ const getPendingSyncStorageKey = (userId: string) =>
 const isCalendarSnapshotLike = (value: unknown): value is CalendarSnapshot => {
   if (typeof value !== "object" || value === null) return false;
   const record = value as Record<string, unknown>;
+
   return (
     Array.isArray(record.profiles) &&
     Array.isArray(record.categories) &&
@@ -107,19 +115,78 @@ const isCalendarSnapshotLike = (value: unknown): value is CalendarSnapshot => {
   );
 };
 
+const ensureSnapshotCoverage = (
+  snapshot: CalendarSnapshot
+): CalendarSnapshot => {
+  const profiles =
+    snapshot.profiles.length > 0
+      ? snapshot.profiles
+      : getOnboardingDefaultProfiles();
+
+  const profileIds = new Set(profiles.map((profile) => profile.id));
+  const fallbackProfileId = profileIds.has(ONBOARDING_DEFAULT_PROFILE_ID)
+    ? ONBOARDING_DEFAULT_PROFILE_ID
+    : profiles[0]?.id ?? ONBOARDING_DEFAULT_PROFILE_ID;
+
+  const categories =
+    snapshot.categories.length > 0
+      ? snapshot.categories
+      : getOnboardingDefaultCategories();
+
+  const normalizedCategories = categories.map((category) => ({
+    ...category,
+    profileId: profileIds.has(category.profileId)
+      ? category.profileId
+      : fallbackProfileId,
+  }));
+
+  const categoryIds = new Set(
+    normalizedCategories.map((category) => category.id)
+  );
+
+  const fallbackCategoryId = categoryIds.has(ONBOARDING_DEFAULT_CATEGORY_ID)
+    ? ONBOARDING_DEFAULT_CATEGORY_ID
+    : normalizedCategories[0]?.id ?? ONBOARDING_DEFAULT_CATEGORY_ID;
+
+  const colorByCategoryId = new Map(
+    normalizedCategories.map((category) => [category.id, category.color])
+  );
+
+  const events = snapshot.events.map((event) => {
+    const categoryId = categoryIds.has(event.categoryId)
+      ? event.categoryId
+      : fallbackCategoryId;
+
+    const color = colorByCategoryId.get(categoryId) ?? event.color;
+
+    if (categoryId === event.categoryId && color === event.color) {
+      return event;
+    }
+
+    return { ...event, categoryId, color };
+  });
+
+  return { profiles, categories: normalizedCategories, events };
+};
+
 const readPendingSyncSnapshot = (userId: string): CalendarSnapshot | null => {
   if (typeof window === "undefined") return null;
+
   const key = getPendingSyncStorageKey(userId);
+
   try {
     const raw = window.localStorage.getItem(key);
     if (!raw) return null;
+
     const parsed = JSON.parse(raw) as unknown;
     const payload = parsed as Partial<PendingSyncPayload>;
     const snapshot = payload?.snapshot ?? parsed;
+
     if (!isCalendarSnapshotLike(snapshot)) {
       window.localStorage.removeItem(key);
       return null;
     }
+
     return ensureSnapshotCoverage(snapshot);
   } catch {
     window.localStorage.removeItem(key);
@@ -129,10 +196,12 @@ const readPendingSyncSnapshot = (userId: string): CalendarSnapshot | null => {
 
 const writePendingSyncSnapshot = (userId: string, snapshot: CalendarSnapshot) => {
   if (typeof window === "undefined") return;
+
   const payload: PendingSyncPayload = {
     savedAt: new Date().toISOString(),
     snapshot: cloneSnapshot(snapshot),
   };
+
   window.localStorage.setItem(
     getPendingSyncStorageKey(userId),
     JSON.stringify(payload)
@@ -146,58 +215,17 @@ const clearPendingSyncSnapshot = (userId: string) => {
 
 const formatSyncDebugDetail = (error: SyncUiError) => {
   const parts: string[] = [];
+
   if (error.code) parts.push(`code:${error.code}`);
   if (typeof error.status === "number") parts.push(`status:${error.status}`);
+
   const meta = parts.length > 0 ? `[${parts.join(" | ")}]` : "";
   const raw = error.rawMessage?.trim() ?? "";
   const detail = [meta, raw].filter(Boolean).join(" ");
+
   if (!detail) return null;
+
   return detail.length > 180 ? `${detail.slice(0, 177)}...` : detail;
-};
-
-const ensureSnapshotCoverage = (
-  snapshot: CalendarSnapshot
-): CalendarSnapshot => {
-  const profiles =
-    snapshot.profiles.length > 0
-      ? snapshot.profiles
-      : getOnboardingDefaultProfiles();
-  const profileIds = new Set(profiles.map((profile) => profile.id));
-  const fallbackProfileId = profileIds.has(ONBOARDING_DEFAULT_PROFILE_ID)
-    ? ONBOARDING_DEFAULT_PROFILE_ID
-    : (profiles[0]?.id ?? ONBOARDING_DEFAULT_PROFILE_ID);
-
-  const categories =
-    snapshot.categories.length > 0
-      ? snapshot.categories
-      : getOnboardingDefaultCategories();
-  const normalizedCategories = categories.map((category) => ({
-    ...category,
-    profileId: profileIds.has(category.profileId)
-      ? category.profileId
-      : fallbackProfileId,
-  }));
-
-  const categoryIds = new Set(normalizedCategories.map((category) => category.id));
-  const fallbackCategoryId = categoryIds.has(ONBOARDING_DEFAULT_CATEGORY_ID)
-    ? ONBOARDING_DEFAULT_CATEGORY_ID
-    : (normalizedCategories[0]?.id ?? ONBOARDING_DEFAULT_CATEGORY_ID);
-  const colorByCategoryId = new Map(
-    normalizedCategories.map((category) => [category.id, category.color])
-  );
-
-  const events = snapshot.events.map((event) => {
-    const categoryId = categoryIds.has(event.categoryId)
-      ? event.categoryId
-      : fallbackCategoryId;
-    const color = colorByCategoryId.get(categoryId) ?? event.color;
-    if (categoryId === event.categoryId && color === event.color) {
-      return event;
-    }
-    return { ...event, categoryId, color };
-  });
-
-  return { profiles, categories: normalizedCategories, events };
 };
 
 const filterAnonymousDraft = (snapshot: CalendarSnapshot): CalendarSnapshot => ({
@@ -217,6 +245,7 @@ const mergeSnapshots = (
 ): CalendarSnapshot => {
   const mergedProfiles = [...remoteSnapshot.profiles];
   const profileIds = new Set(mergedProfiles.map((profile) => profile.id));
+
   for (const profile of localSnapshot.profiles) {
     if (!profile.id || profileIds.has(profile.id)) continue;
     mergedProfiles.push(profile);
@@ -225,6 +254,7 @@ const mergeSnapshots = (
 
   const mergedCategories = [...remoteSnapshot.categories];
   const categoryIds = new Set(mergedCategories.map((category) => category.id));
+
   for (const category of localSnapshot.categories) {
     if (!category.id || categoryIds.has(category.id)) continue;
     mergedCategories.push(category);
@@ -233,6 +263,7 @@ const mergeSnapshots = (
 
   const mergedEvents = [...remoteSnapshot.events];
   const eventIds = new Set(mergedEvents.map((event) => event.id));
+
   for (const event of localSnapshot.events) {
     if (!event.id || eventIds.has(event.id)) continue;
     mergedEvents.push(event);
@@ -248,11 +279,14 @@ const mergeSnapshots = (
 
 export default function HomePage() {
   const { notify } = useFeedback();
+
   const initialYear = React.useMemo(() => {
     const currentYear = new Date().getFullYear();
     return currentYear >= 2025 && currentYear <= 2027 ? currentYear : 2026;
   }, []);
+
   const [year, setYear] = React.useState<number>(initialYear);
+
   const profiles = useStore((s) => s.profiles);
   const events = useStore((s) => s.events);
   const categories = useStore((s) => s.categories);
@@ -270,13 +304,14 @@ export default function HomePage() {
   const resetCalendarFocusOnYearChange = useStore(
     (s) => s.resetCalendarFocusOnYearChange
   );
+
   const { session, loading: authLoading } = useAuth();
 
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [authDialogOpen, setAuthDialogOpen] = React.useState(false);
-  const [dialogAnchorPoint, setDialogAnchorPoint] = React.useState<AnchorPoint | undefined>(
-    undefined
-  );
+  const [dialogAnchorPoint, setDialogAnchorPoint] = React.useState<
+    AnchorPoint | undefined
+  >(undefined);
   const [authDialogAnchorPoint, setAuthDialogAnchorPoint] = React.useState<
     AnchorPoint | undefined
   >(undefined);
@@ -294,17 +329,19 @@ export default function HomePage() {
   const [isSyncing, setIsSyncing] = React.useState(false);
   const [isBootstrappingSync, setIsBootstrappingSync] = React.useState(false);
   const [hasQueuedSave, setHasQueuedSave] = React.useState(false);
-  const [syncOverlayStatus, setSyncOverlayStatus] = React.useState<SyncOverlayStatus | null>(
-    null
-  );
-  const [isSyncOverlayVisible, setIsSyncOverlayVisible] = React.useState(false);
-  const [isSyncOverlayErrorOpen, setIsSyncOverlayErrorOpen] = React.useState(false);
+  const [syncOverlayStatus, setSyncOverlayStatus] =
+    React.useState<SyncOverlayStatus | null>(null);
+  const [isSyncOverlayVisible, setIsSyncOverlayVisible] =
+    React.useState(false);
+  const [isSyncOverlayErrorOpen, setIsSyncOverlayErrorOpen] =
+    React.useState(false);
   const [remoteReady, setRemoteReady] = React.useState(false);
   const [syncBlocked, setSyncBlocked] = React.useState(false);
-  const [calendarCreateOnboarding, setCalendarCreateOnboarding] = React.useState<
-    ProductOnboardingState | null
+  const [calendarCreateOnboarding, setCalendarCreateOnboarding] =
+    React.useState<ProductOnboardingState | null>(null);
+  const [isMobileCalendarUi, setIsMobileCalendarUi] = React.useState<
+    boolean | null
   >(null);
-  const [isMobileCalendarUi, setIsMobileCalendarUi] = React.useState<boolean | null>(null);
   const [windowContext] = React.useState<"main" | "popup">(() => {
     if (typeof window === "undefined") return "main";
     return Boolean(window.opener) || window.name === "doze52_oauth"
@@ -314,6 +351,7 @@ export default function HomePage() {
   const [popupStatusMessage, setPopupStatusMessage] = React.useState(
     "Finalizando login..."
   );
+
   const [todayIso, setTodayIso] = React.useState<string>("");
   const lastSyncedHashRef = React.useRef<string>("");
   const saveTimerRef = React.useRef<number | null>(null);
@@ -333,10 +371,15 @@ export default function HomePage() {
   }, [profiles, categories, events]);
 
   const editingEvent = editingId ? getEventById(editingId) : null;
-  const renderEvents = React.useMemo(() => expandEventsForYear(events, year), [events, year]);
+
+  const renderEvents = React.useMemo(
+    () => expandEventsForYear(events, year),
+    [events, year]
+  );
 
   React.useEffect(() => {
     if (windowContext !== "popup") return;
+
     let finished = false;
     let attempts = 0;
     const maxAttempts = 30;
@@ -346,10 +389,12 @@ export default function HomePage() {
       type: "SUPABASE_AUTH_SUCCESS" | "SUPABASE_AUTH_ERROR"
     ) => {
       if (!window.opener) return;
+
       if (type === "SUPABASE_AUTH_SUCCESS") {
         window.opener.postMessage({ type }, window.location.origin);
         return;
       }
+
       window.opener.postMessage(
         { type, error: "oauth_callback_failed" },
         window.location.origin
@@ -373,35 +418,47 @@ export default function HomePage() {
     }
 
     const supabase = getSupabaseBrowserClient();
+
     const tryFinalize = async () => {
       if (finished) return;
+
       attempts += 1;
+
       const { data } = await supabase.auth.getSession();
+
       if (finished) return;
+
       if (data.session) {
         finished = true;
+
         if (timer !== null) {
           window.clearInterval(timer);
         }
+
         finishSuccess();
         return;
       }
+
       if (attempts >= maxAttempts) {
         finished = true;
+
         if (timer !== null) {
           window.clearInterval(timer);
         }
+
         finishError();
       }
     };
 
     void tryFinalize();
+
     timer = window.setInterval(() => {
       void tryFinalize();
     }, 500);
 
     return () => {
       finished = true;
+
       if (timer !== null) {
         window.clearInterval(timer);
       }
@@ -415,8 +472,10 @@ export default function HomePage() {
 
   React.useEffect(() => {
     if (windowContext !== "main") return;
+
     let rolloverTimer: number | null = null;
     let refreshInterval: number | null = null;
+
     const browserTimeZone =
       Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
 
@@ -429,10 +488,13 @@ export default function HomePage() {
       if (rolloverTimer !== null) {
         window.clearTimeout(rolloverTimer);
       }
+
       const now = new Date();
       const nextMidnight = new Date(now);
       nextMidnight.setHours(24, 0, 1, 0);
+
       const delayMs = Math.max(1000, nextMidnight.getTime() - now.getTime());
+
       rolloverTimer = window.setTimeout(() => {
         refreshTodayIso();
         scheduleNextRollover();
@@ -448,17 +510,21 @@ export default function HomePage() {
       if (document.visibilityState !== "visible") return;
       refreshAndReschedule();
     };
+
     const handleFocus = () => {
       refreshAndReschedule();
     };
+
     const handlePageShow = () => {
       refreshAndReschedule();
     };
 
     refreshAndReschedule();
+
     refreshInterval = window.setInterval(() => {
       refreshTodayIso();
     }, 60_000);
+
     document.addEventListener("visibilitychange", handleVisibilityChange);
     window.addEventListener("focus", handleFocus);
     window.addEventListener("pageshow", handlePageShow);
@@ -467,9 +533,11 @@ export default function HomePage() {
       if (rolloverTimer !== null) {
         window.clearTimeout(rolloverTimer);
       }
+
       if (refreshInterval !== null) {
         window.clearInterval(refreshInterval);
       }
+
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("focus", handleFocus);
       window.removeEventListener("pageshow", handlePageShow);
@@ -478,42 +546,60 @@ export default function HomePage() {
 
   React.useEffect(() => {
     if (windowContext !== "main") return;
+
     if (hasSupabaseEnv) return;
+
     const message =
       "Supabase nao configurado. Defina NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY neste ambiente.";
+
     logDevError("app.page.supabase-env", { message });
     logProdError("Supabase nao configurado neste ambiente.");
   }, [windowContext]);
 
   React.useEffect(() => {
     if (windowContext !== "main") return;
+
     const syncCreateOnboarding = () => {
       setCalendarCreateOnboarding(readProductOnboardingState("create-event"));
     };
 
     syncCreateOnboarding();
-    window.addEventListener(PRODUCT_ONBOARDING_RESET_EVENT, syncCreateOnboarding);
+
+    window.addEventListener(
+      PRODUCT_ONBOARDING_RESET_EVENT,
+      syncCreateOnboarding
+    );
+
     return () =>
-      window.removeEventListener(PRODUCT_ONBOARDING_RESET_EVENT, syncCreateOnboarding);
+      window.removeEventListener(
+        PRODUCT_ONBOARDING_RESET_EVENT,
+        syncCreateOnboarding
+      );
   }, [windowContext]);
 
   React.useEffect(() => {
     if (windowContext !== "main") return;
+
     const mediaQuery = window.matchMedia("(max-width: 767px)");
+
     const syncViewportMode = () => {
       setIsMobileCalendarUi(mediaQuery.matches);
     };
 
     syncViewportMode();
+
     mediaQuery.addEventListener("change", syncViewportMode);
+
     return () => mediaQuery.removeEventListener("change", syncViewportMode);
   }, [windowContext]);
 
   React.useEffect(() => {
     if (windowContext !== "main") return;
     if (authLoading) return;
+
     const currentUserId = session?.user.id ?? null;
     const previousUserId = previousSessionUserIdRef.current;
+
     const hasUserBoundLocalData =
       profiles.some((profile) => Boolean(profile.userId)) ||
       categories.some((category) => Boolean(category.userId)) ||
@@ -523,10 +609,12 @@ export default function HomePage() {
       if (previousUserId || hasUserBoundLocalData) {
         resetToOnboardingData();
       }
+
       if (saveTimerRef.current !== null) {
         window.clearTimeout(saveTimerRef.current);
         saveTimerRef.current = null;
       }
+
       setIsSyncing(false);
       setIsBootstrappingSync(false);
       setHasQueuedSave(false);
@@ -537,6 +625,7 @@ export default function HomePage() {
       previousSessionUserIdRef.current = null;
       return;
     }
+
     previousSessionUserIdRef.current = currentUserId;
   }, [
     authLoading,
@@ -552,19 +641,26 @@ export default function HomePage() {
     if (windowContext !== "main") return;
     if (calendarCreateOnboarding !== "pending") return;
     if (events.length === 0) return;
+
     setProductOnboardingState("create-event", "completed");
     setCalendarCreateOnboarding("completed");
   }, [calendarCreateOnboarding, events.length, windowContext]);
 
   const bootstrapRemote = React.useCallback(() => {
     if (windowContext !== "main") return () => {};
+
     const userId = session?.user.id;
+
     if (!userId) return () => {};
+
     let cancelled = false;
+
     const run = async () => {
       setIsBootstrappingSync(true);
       setSyncError(null);
+
       let snapshotToPersistOnFailure: CalendarSnapshot | null = null;
+
       try {
         const localSnapshot = filterAnonymousDraft(
           ensureSnapshotCoverage({
@@ -573,16 +669,21 @@ export default function HomePage() {
             events: eventsRef.current,
           })
         );
+
         const pendingSnapshot = readPendingSyncSnapshot(userId);
         const localDraftIsRelevant = hasRelevantLocalDraft(localSnapshot);
         const remoteSnapshot = await loadRemoteData();
+
         if (cancelled) return;
+
         const remoteIsEmpty =
           remoteSnapshot.profiles.length === 0 &&
           remoteSnapshot.categories.length === 0 &&
           remoteSnapshot.events.length === 0;
+
         const alreadyImported = isLocalImported(userId);
         const remoteHash = toSnapshotHash(remoteSnapshot);
+
         let nextSnapshot: CalendarSnapshot = remoteSnapshot;
         let shouldForceSave = false;
 
@@ -596,12 +697,17 @@ export default function HomePage() {
         }
 
         snapshotToPersistOnFailure = nextSnapshot;
+
         const nextHash = toSnapshotHash(nextSnapshot);
+
         replaceAllData(nextSnapshot);
+
         if (shouldForceSave || nextHash !== remoteHash) {
           await saveSnapshot(nextSnapshot);
+
           if (cancelled) return;
         }
+
         clearPendingSyncSnapshot(userId);
         markLocalImported(userId);
         lastSyncedHashRef.current = nextHash;
@@ -609,21 +715,26 @@ export default function HomePage() {
         setSyncBlocked(false);
       } catch (error) {
         if (cancelled) return;
+
         const syncError =
           error instanceof SyncError
             ? error
             : new SyncError("unknown", "Falhou ao carregar dados.", false);
+
         logDevError("app.page.bootstrap-remote", {
           kind: syncError.kind,
           message: syncError.userMessage,
           code: syncError.code,
           status: syncError.status,
         });
+
         logProdError("Falha ao carregar dados remotos.");
+
         if (snapshotToPersistOnFailure) {
           writePendingSyncSnapshot(userId, snapshotToPersistOnFailure);
           replaceAllData(snapshotToPersistOnFailure);
         }
+
         setSyncError({
           message: syncError.userMessage,
           kind: syncError.kind,
@@ -631,6 +742,7 @@ export default function HomePage() {
           status: syncError.status,
           rawMessage: syncError.rawMessage,
         });
+
         setRemoteReady(false);
         setSyncBlocked(true);
       } finally {
@@ -639,6 +751,7 @@ export default function HomePage() {
     };
 
     void run();
+
     return () => {
       cancelled = true;
     };
@@ -658,8 +771,10 @@ export default function HomePage() {
   React.useEffect(() => {
     if (windowContext !== "main") return;
     if (!session?.user.id || !remoteReady || syncBlocked || syncError) return;
+
     const nextSnapshot = { profiles, categories, events };
     const nextHash = JSON.stringify(nextSnapshot);
+
     if (nextHash === lastSyncedHashRef.current) {
       setHasQueuedSave(false);
       return;
@@ -668,12 +783,15 @@ export default function HomePage() {
     if (saveTimerRef.current !== null) {
       window.clearTimeout(saveTimerRef.current);
     }
+
     setHasQueuedSave(true);
+
     saveTimerRef.current = window.setTimeout(async () => {
       saveTimerRef.current = null;
       setHasQueuedSave(false);
       setIsSyncing(true);
       setSyncError(null);
+
       try {
         await saveSnapshot(nextSnapshot);
         clearPendingSyncSnapshot(session.user.id);
@@ -682,15 +800,23 @@ export default function HomePage() {
         const syncError =
           error instanceof SyncError
             ? error
-            : new SyncError("unknown", "Falhou ao salvar. Tente novamente.", false);
+            : new SyncError(
+                "unknown",
+                "Falhou ao salvar. Tente novamente.",
+                false
+              );
+
         logDevError("app.page.save-snapshot", {
           kind: syncError.kind,
           message: syncError.userMessage,
           code: syncError.code,
           status: syncError.status,
         });
+
         logProdError("Falha ao salvar dados.");
+
         writePendingSyncSnapshot(session.user.id, nextSnapshot);
+
         setSyncError({
           message: syncError.userMessage,
           kind: syncError.kind,
@@ -698,6 +824,7 @@ export default function HomePage() {
           status: syncError.status,
           rawMessage: syncError.rawMessage,
         });
+
         setSyncBlocked(true);
         setRemoteReady(false);
       } finally {
@@ -748,15 +875,19 @@ export default function HomePage() {
   const handleSubmit = async (payload: EventInput) => {
     if (editingId) {
       updateEvent(editingId, payload);
+
       notify({
         tone: "success",
         title: "Evento atualizado",
         description: "As alterações já foram aplicadas ao calendário.",
       });
+
       return;
     }
+
     addEvent(payload);
     completeCalendarCreateOnboarding();
+
     notify({
       tone: "success",
       title: "Evento criado",
@@ -766,6 +897,7 @@ export default function HomePage() {
 
   const handleMobileFabCreate = React.useCallback(() => {
     const fallbackTodayIso = todayIso || format(new Date(), "yyyy-MM-dd");
+
     setEditingId(null);
     setDialogAnchorPoint(undefined);
     setCreatingRange(null);
@@ -778,12 +910,15 @@ export default function HomePage() {
 
   const handleDeleteEvent = React.useCallback(() => {
     if (!editingId) return;
+
     deleteEvent(editingId);
+
     notify({
       tone: "success",
       title: "Evento excluído",
       description: "O calendário foi atualizado.",
     });
+
     setDialogAnchorPoint(undefined);
     setDialogOpen(false);
   }, [deleteEvent, editingId, notify]);
@@ -796,36 +931,50 @@ export default function HomePage() {
     setCreatingRange((prev) => {
       if (!prev) return prev;
       if (prev.hoverIso === hoverIso && prev.isDragging) return prev;
+
       return { ...prev, hoverIso, isDragging: true };
     });
   };
 
-  const handleFinishCreateRange = React.useCallback((endIso?: string, anchorPoint?: AnchorPoint) => {
-    setCreatingRange((prev) => {
-      if (!prev) return prev;
-      const resolvedEnd = endIso ?? prev.hoverIso;
-      const start = parseISO(prev.startIso);
-      const end = parseISO(resolvedEnd);
-      const normalizedStart = start <= end ? start : end;
-      const normalizedEnd = start <= end ? end : start;
-      setSeedRange({
-        startDate: format(normalizedStart, "yyyy-MM-dd"),
-        endDate: format(normalizedEnd, "yyyy-MM-dd"),
+  const handleFinishCreateRange = React.useCallback(
+    (endIso?: string, anchorPoint?: AnchorPoint) => {
+      setCreatingRange((prev) => {
+        if (!prev) return prev;
+
+        const resolvedEnd = endIso ?? prev.hoverIso;
+        const start = parseISO(prev.startIso);
+        const end = parseISO(resolvedEnd);
+        const normalizedStart = start <= end ? start : end;
+        const normalizedEnd = start <= end ? end : start;
+
+        setSeedRange({
+          startDate: format(normalizedStart, "yyyy-MM-dd"),
+          endDate: format(normalizedEnd, "yyyy-MM-dd"),
+        });
+
+        setEditingId(null);
+        setDialogAnchorPoint(anchorPoint);
+        setDialogOpen(true);
+
+        return null;
       });
-      setEditingId(null);
-      setDialogAnchorPoint(anchorPoint);
-      setDialogOpen(true);
-      return null;
-    });
-  }, []);
+    },
+    []
+  );
 
   React.useEffect(() => {
     if (windowContext !== "main") return;
+
     const onWindowMouseUp = (event: MouseEvent) => {
       if (!creatingRange) return;
-      handleFinishCreateRange(undefined, { x: event.clientX, y: event.clientY });
+      handleFinishCreateRange(undefined, {
+        x: event.clientX,
+        y: event.clientY,
+      });
     };
+
     window.addEventListener("mouseup", onWindowMouseUp);
+
     return () => window.removeEventListener("mouseup", onWindowMouseUp);
   }, [creatingRange, handleFinishCreateRange, windowContext]);
 
@@ -833,32 +982,37 @@ export default function HomePage() {
     syncError && isDetailedSyncDiagnosticsEnabled
       ? formatSyncDebugDetail(syncError)
       : null;
+
   const handleRetrySync = React.useCallback(() => {
     setSyncBlocked(false);
     setSyncError(null);
     void bootstrapRemote();
   }, [bootstrapRemote]);
+
   const rawSyncState = React.useMemo<RawSyncState>(() => {
     if (!session?.user.id) {
       return { state: "hidden" };
     }
+
     if (syncError || syncBlocked) {
       return {
         state: "error",
-        message:
-          syncError
-            ? SYNC_HINT_BY_KIND[syncError.kind] ?? syncError.message
-            : "Falha de sincronizacao. Tente novamente.",
+        message: syncError
+          ? SYNC_HINT_BY_KIND[syncError.kind] ?? syncError.message
+          : "Falha de sincronizacao. Tente novamente.",
         detail: syncDebugDetail,
         onRetry: handleRetrySync,
       };
     }
+
     if (!remoteReady || isBootstrappingSync) {
       return { state: "loading" };
     }
+
     if (hasQueuedSave || isSyncing) {
       return { state: "saving" };
     }
+
     return { state: "synced" };
   }, [
     handleRetrySync,
@@ -871,15 +1025,18 @@ export default function HomePage() {
     syncDebugDetail,
     syncError,
   ]);
+
   const clearSyncOverlayTimer = React.useCallback(() => {
     if (syncOverlayTimerRef.current !== null) {
       window.clearTimeout(syncOverlayTimerRef.current);
       syncOverlayTimerRef.current = null;
     }
   }, []);
+
   const handleSyncOverlayErrorOpenChange = React.useCallback((open: boolean) => {
     syncOverlayErrorOpenRef.current = open;
     setIsSyncOverlayErrorOpen(open);
+
     if (!open && shouldHideSyncOverlayAfterCloseRef.current) {
       shouldHideSyncOverlayAfterCloseRef.current = false;
       setIsSyncOverlayVisible(false);
@@ -919,13 +1076,16 @@ export default function HomePage() {
       setIsSyncOverlayErrorOpen(false);
       setSyncOverlayStatus(rawSyncState);
       setIsSyncOverlayVisible(true);
+
       syncOverlayTimerRef.current = window.setTimeout(() => {
         if (syncOverlayErrorOpenRef.current) {
           shouldHideSyncOverlayAfterCloseRef.current = true;
           return;
         }
+
         setIsSyncOverlayVisible(false);
       }, 6000);
+
       return;
     }
 
@@ -939,12 +1099,15 @@ export default function HomePage() {
       shouldHideSyncOverlayAfterCloseRef.current = false;
       syncOverlayErrorOpenRef.current = false;
       setIsSyncOverlayErrorOpen(false);
+
       if (!shouldShowSuccess) {
         setIsSyncOverlayVisible(false);
         return;
       }
+
       setSyncOverlayStatus(rawSyncState);
       setIsSyncOverlayVisible(true);
+
       syncOverlayTimerRef.current = window.setTimeout(() => {
         setIsSyncOverlayVisible(false);
       }, 1000);
@@ -956,8 +1119,10 @@ export default function HomePage() {
       clearSyncOverlayTimer();
     };
   }, [clearSyncOverlayTimer]);
+
   const showDesktopCreateCoachmark =
     calendarCreateOnboarding === "pending" && isMobileCalendarUi === false;
+
   const showMobileCreateCoachmark =
     calendarCreateOnboarding === "pending" && isMobileCalendarUi === true;
 
@@ -985,6 +1150,7 @@ export default function HomePage() {
         errorPopoverOpen={isSyncOverlayErrorOpen}
         onErrorPopoverOpenChange={handleSyncOverlayErrorOpenChange}
       />
+
       <div className="sticky top-0 z-30 -mx-4 px-4 pb-2 bg-background/92 backdrop-blur supports-[backdrop-filter]:bg-background/82 md:static md:mx-0 md:px-0 md:pb-0 md:bg-transparent md:backdrop-blur-none">
         <AppHeader
           year={year}
@@ -997,6 +1163,7 @@ export default function HomePage() {
           }}
         />
       </div>
+
       {!hasSupabaseEnv ? (
         <p className="mb-3 text-center text-sm text-amber-700">
           Supabase nao configurado neste ambiente.
@@ -1022,6 +1189,7 @@ export default function HomePage() {
             }}
             isMobileInteractionMode={isMobileCalendarUi === true}
           />
+
           {showDesktopCreateCoachmark ? (
             <Popover
               open={showDesktopCreateCoachmark}
@@ -1035,6 +1203,7 @@ export default function HomePage() {
                   className="pointer-events-none absolute top-4 left-[5.5rem] h-px w-px"
                 />
               </PopoverAnchor>
+
               <PopoverContent
                 align="start"
                 side="bottom"
@@ -1048,6 +1217,7 @@ export default function HomePage() {
                     num evento existente para editar.
                   </PopoverDescription>
                 </PopoverHeader>
+
                 <div className="mt-4 flex justify-end">
                   <Button
                     type="button"
@@ -1064,6 +1234,7 @@ export default function HomePage() {
           ) : null}
         </div>
       </div>
+
       {isMobileCalendarUi ? (
         <div
           className="fixed right-4 z-40 md:hidden"
@@ -1087,6 +1258,7 @@ export default function HomePage() {
                 <Plus className="size-5" />
               </Button>
             </PopoverAnchor>
+
             {showMobileCreateCoachmark ? (
               <PopoverContent
                 align="end"
@@ -1101,6 +1273,7 @@ export default function HomePage() {
                     navegar entre os focos do periodo.
                   </PopoverDescription>
                 </PopoverHeader>
+
                 <div className="mt-4 flex justify-end">
                   <Button
                     type="button"
@@ -1117,10 +1290,12 @@ export default function HomePage() {
           </Popover>
         </div>
       ) : null}
+
       <EventDialog
         open={dialogOpen}
         onOpenChange={(open) => {
           setDialogOpen(open);
+
           if (!open) {
             setDialogAnchorPoint(undefined);
             setSeedRange(null);
@@ -1131,14 +1306,14 @@ export default function HomePage() {
         seedRange={seedRange}
         anchorPoint={dialogAnchorPoint}
         onSubmit={handleSubmit}
-        onDelete={
-          editingId ? handleDeleteEvent : undefined
-        }
+        onDelete={editingId ? handleDeleteEvent : undefined}
       />
+
       <AuthDialog
         open={authDialogOpen}
         onOpenChange={(open) => {
           setAuthDialogOpen(open);
+
           if (!open) {
             setAuthDialogAnchorPoint(undefined);
           }
