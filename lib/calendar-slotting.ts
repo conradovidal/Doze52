@@ -3,8 +3,14 @@ import type { CalendarEvent } from "@/lib/types";
 
 const toDate = (iso: string) => parseISO(iso);
 
+const getDayOrder = (event: CalendarEvent) =>
+  typeof event.dayOrder === "number" ? event.dayOrder : 0;
+
 const compareMultiDay = (a: CalendarEvent, b: CalendarEvent) => {
-  if (a.dayOrder !== b.dayOrder) return a.dayOrder - b.dayOrder;
+  const aDayOrder = getDayOrder(a);
+  const bDayOrder = getDayOrder(b);
+
+  if (aDayOrder !== bDayOrder) return aDayOrder - bDayOrder;
   if (a.startDate !== b.startDate) return a.startDate.localeCompare(b.startDate);
   if (a.endDate !== b.endDate) return a.endDate.localeCompare(b.endDate);
   return a.id.localeCompare(b.id);
@@ -39,11 +45,13 @@ export const buildMultiDaySlotMap = (params: {
     ) {
       nextSlot += 1;
     }
+
     if (nextSlot === lastEndBySlot.length) {
       lastEndBySlot.push(clampedEnd);
     } else {
       lastEndBySlot[nextSlot] = clampedEnd;
     }
+
     slotMap.set(event.id, nextSlot);
   }
 
