@@ -1,20 +1,12 @@
 import { parseISO } from "date-fns";
 import type { CalendarEvent } from "@/lib/types";
+import {
+  compareEventsForContinuousSlotting,
+  isRenderableEventDateRange,
+  isSingleDayEvent,
+} from "@/lib/event-order";
 
 const toDate = (iso: string) => parseISO(iso);
-
-const getDayOrder = (event: CalendarEvent) =>
-  typeof event.dayOrder === "number" ? event.dayOrder : 0;
-
-const compareMultiDay = (a: CalendarEvent, b: CalendarEvent) => {
-  const aDayOrder = getDayOrder(a);
-  const bDayOrder = getDayOrder(b);
-
-  if (aDayOrder !== bDayOrder) return aDayOrder - bDayOrder;
-  if (a.startDate !== b.startDate) return a.startDate.localeCompare(b.startDate);
-  if (a.endDate !== b.endDate) return a.endDate.localeCompare(b.endDate);
-  return a.id.localeCompare(b.id);
-};
 
 export const buildMultiDaySlotMap = (params: {
   events: CalendarEvent[];
@@ -27,8 +19,9 @@ export const buildMultiDaySlotMap = (params: {
   const lastEndBySlot: Date[] = [];
 
   const candidates = params.events
-    .filter((event) => event.endDate > event.startDate)
-    .sort(compareMultiDay);
+    .filter((event) => !isSingleDayEvent(event))
+    .filter(isRenderableEventDateRange)
+    .sort(compareEventsForContinuousSlotting);
 
   for (const event of candidates) {
     const eventStart = toDate(event.startDate);
@@ -45,13 +38,11 @@ export const buildMultiDaySlotMap = (params: {
     ) {
       nextSlot += 1;
     }
-
     if (nextSlot === lastEndBySlot.length) {
       lastEndBySlot.push(clampedEnd);
     } else {
       lastEndBySlot[nextSlot] = clampedEnd;
     }
-
     slotMap.set(event.id, nextSlot);
   }
 

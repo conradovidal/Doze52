@@ -3,7 +3,6 @@
 import * as React from "react";
 import type { Session } from "@supabase/supabase-js";
 import { getSupabaseBrowserClient, hasSupabaseEnv } from "@/lib/supabase";
-import { getAppBaseUrl } from "@/lib/runtime-url";
 
 export type AuthSession = {
   accessToken: string;
@@ -20,10 +19,14 @@ export type AuthSession = {
 
 type AuthContextValue = {
   session: AuthSession | null;
+  user: AuthSession["user"] | null;
   loading: boolean;
+  refreshSessionFromClient: () => Promise<AuthSession | null>;
   signInWithPassword: (email: string, password: string) => Promise<void>;
   signUpWithPassword: (email: string, password: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
+  closeGooglePopupIfOpen: () => void;
+  isGooglePopupOpen: () => boolean;
   signOut: () => Promise<void>;
 };
 
@@ -47,12 +50,10 @@ const toAuthSession = (session: Session): AuthSession => {
   };
 };
 
-const supabaseEnvError =
-  "Supabase nao configurado. Defina NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.";
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = React.useState<AuthSession | null>(null);
   const [loading, setLoading] = React.useState(true);
+  const oauthPopupRef = React.useRef<Window | null>(null);
 
   React.useEffect(() => {
     if (!hasSupabaseEnv) {
@@ -66,6 +67,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const bootstrap = async () => {
       const { data, error } = await supabase.auth.getSession();
       if (error) {
+        if (process.env.NODE_ENV !== "production") {
+          console.error("[auth] getSession bootstrap error", {
+            message: error.message,
+          });
+        }
         setSession(null);
       } else {
         setSession(data.session ? toAuthSession(data.session) : null);
@@ -77,7 +83,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      if (process.env.NODE_ENV !== "production") {
+        console.info("[auth] state change", {
+          event,
+          userId: nextSession?.user?.id ?? null,
+        });
+      }
       setSession(nextSession ? toAuthSession(nextSession) : null);
       setLoading(false);
     });
@@ -85,8 +97,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
+  const refreshSessionFromClient = React.useCallback(async () => {
+    if (!hasSupabaseEnv) {
+      setSession(null);
+      return null;
+    }
+    const supabase = getSupabaseBrowserClient();
+    const { data, error } = await supabase.auth.getSession();
+    if (error || !data.session) {
+      setSession(null);
+      return null;
+    }
+    const nextSession = toAuthSession(data.session);
+    setSession(nextSession);
+    return nextSession;
+  }, []);
+
   const signInWithPassword = async (email: string, password: string) => {
-    if (!hasSupabaseEnv) throw new Error(supabaseEnvError);
+    if (!hasSupabaseEnv) {
+      throw new Error(
+        "Supabase nao configurado. Defina NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY."
+      );
+    }
     const supabase = getSupabaseBrowserClient();
     const { data, error } = await supabase.auth.signInWithPassword({
       email: email.trim(),
@@ -97,7 +129,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signUpWithPassword = async (email: string, password: string) => {
-    if (!hasSupabaseEnv) throw new Error(supabaseEnvError);
+    if (!hasSupabaseEnv) {
+      throw new Error(
+        "Supabase nao configurado. Defina NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY."
+      );
+    }
     const supabase = getSupabaseBrowserClient();
     const { data, error } = await supabase.auth.signUp({
       email: email.trim(),
@@ -108,26 +144,106 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(toAuthSession(data.session));
       return;
     }
-    throw new Error("Conta criada. Verifique seu email para continuar.");
+    throw new Error("Conta criada. Confirme seu email para continuar.");
   };
 
   const signInWithGoogle = async () => {
-    if (!hasSupabaseEnv) throw new Error(supabaseEnvError);
-    const supabase = getSupabaseBrowserClient();
-    const redirectTo = `${getAppBaseUrl()}/auth/callback`;
-    if (process.env.NODE_ENV !== "production") {
-      // Temporary debugging for environment-aware OAuth redirects.
-      console.info("[auth] google redirectTo:", redirectTo);
+    if (typeof window === "undefined") {
+      throw new Error("Google OAuth deve ser iniciado no client.");
     }
-    const { error } = await supabase.auth.signInWithOAuth({
+    if (!hasSupabaseEnv) {
+      throw new Error(
+        "Supabase nao configurado. Defina NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY."
+      );
+    }
+    const supabase = getSupabaseBrowserClient();
+    if (oauthPopupRef.current && !oauthPopupRef.current.closed) {
+      oauthPopupRef.current.focus();
+      return;
+    }
+
+    const origin = window.location.origin;
+    const popupRedirectTo = `${origin}/auth/callback/popup`;
+    const fallbackRedirectTo = `${origin}/auth/callback`;
+    if (process.env.NODE_ENV !== "production") {
+      console.info("[oauth] start", {
+        origin,
+        popupRedirectTo,
+        fallbackRedirectTo,
+      });
+    }
+    const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo,
+        redirectTo: popupRedirectTo,
         queryParams: { prompt: "select_account" },
+        skipBrowserRedirect: true,
       },
     });
     if (error) throw error;
+    if (!data?.url) {
+      throw new Error("Nao foi possivel iniciar login com popup.");
+    }
+
+    if (process.env.NODE_ENV !== "production") {
+      const authorizeUrl = new URL(data.url);
+      console.info("[oauth] authorize", {
+        url: data.url,
+        origin,
+        popupRedirectTo,
+        authorizeUrl: authorizeUrl.origin + authorizeUrl.pathname,
+        redirectToInAuthorize: authorizeUrl.searchParams.get("redirect_to"),
+        expectedRedirectUri: process.env.NEXT_PUBLIC_SUPABASE_URL
+          ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/callback`
+          : null,
+      });
+    }
+
+    const width = 520;
+    const height = 720;
+    const left = Math.max(window.screenX + (window.outerWidth - width) / 2, 0);
+    const top = Math.max(window.screenY + (window.outerHeight - height) / 2, 0);
+    const features = [
+      `width=${Math.round(width)}`,
+      `height=${Math.round(height)}`,
+      `left=${Math.round(left)}`,
+      `top=${Math.round(top)}`,
+      "popup=yes",
+      "resizable=yes",
+      "scrollbars=yes",
+      "toolbar=no",
+      "menubar=no",
+    ].join(",");
+    const popup = window.open(data.url, "doze52_oauth", features);
+
+    if (!popup) {
+      if (process.env.NODE_ENV !== "production") {
+        console.info("[oauth] fallback", { mode: "redirect", origin });
+      }
+      const { error: redirectError } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: fallbackRedirectTo,
+          queryParams: { prompt: "select_account" },
+        },
+      });
+      if (redirectError) throw redirectError;
+      return;
+    }
+
+    oauthPopupRef.current = popup;
   };
+
+  const closeGooglePopupIfOpen = () => {
+    if (!oauthPopupRef.current) return;
+    if (!oauthPopupRef.current.closed) {
+      oauthPopupRef.current.close();
+    }
+    oauthPopupRef.current = null;
+  };
+
+  const isGooglePopupOpen = () =>
+    Boolean(oauthPopupRef.current && !oauthPopupRef.current.closed);
 
   const signOut = async () => {
     if (!hasSupabaseEnv) {
@@ -144,10 +260,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     <AuthContext.Provider
       value={{
         session,
+        user: session?.user ?? null,
         loading,
+        refreshSessionFromClient,
         signInWithPassword,
         signUpWithPassword,
         signInWithGoogle,
+        closeGooglePopupIfOpen,
+        isGooglePopupOpen,
         signOut,
       }}
     >
@@ -161,4 +281,3 @@ export function useAuth() {
   if (!ctx) throw new Error("useAuth must be used inside AuthProvider");
   return ctx;
 }
-

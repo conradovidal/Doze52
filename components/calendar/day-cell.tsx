@@ -1,63 +1,141 @@
 "use client";
 
-import { isBefore, isToday, startOfDay } from "date-fns";
-import { fmtDayLabel } from "@/lib/date";
-
 export function DayCell({
   date,
+  dateIso,
+  todayIso,
   minHeightPx,
   isRangeSelected,
   isRangeStart,
   isRangeEnd,
   isInMonth,
+  isDropActive = false,
+  showCreateCue = false,
+  onDayHover,
+  onDayDrop,
+  onActivate,
 }: {
   date: Date;
+  dateIso: string;
+  todayIso: string;
   minHeightPx: number;
   isRangeSelected: boolean;
   isRangeStart: boolean;
   isRangeEnd: boolean;
   isInMonth: boolean;
+  isDropActive?: boolean;
+  showCreateCue?: boolean;
+  onDayHover?: (dateIso: string) => void;
+  onDayDrop?: (dateIso: string, transfer?: DataTransfer | null) => void;
+  onActivate?: (dateIso: string) => void;
 }) {
+  const isPast = dateIso < todayIso;
+
   if (!isInMonth) {
     return (
-      <div className="w-full bg-neutral-200" style={{ minHeight: `${minHeightPx}px` }} />
+      <div
+        data-day-iso={dateIso}
+        className={`w-full transition-colors ${
+          isPast
+            ? "bg-neutral-100/55 dark:bg-[hsl(var(--cal-cell-outside-past))]"
+            : "bg-neutral-50/45 dark:bg-[hsl(var(--cal-cell-outside))]"
+        } ${isDropActive ? "ring-1 ring-inset ring-border/70 bg-foreground/6" : ""}`}
+        style={{ minHeight: `${minHeightPx}px` }}
+        onDragOver={(e) => {
+          if (!onDayHover) return;
+          e.preventDefault();
+          e.stopPropagation();
+          onDayHover(dateIso);
+        }}
+        onDrop={(e) => {
+          if (!onDayDrop) return;
+          e.preventDefault();
+          e.stopPropagation();
+          onDayDrop(dateIso, e.dataTransfer);
+        }}
+      />
     );
   }
 
   const dayOfWeek = date.getDay(); // 0..6
-  const baseBg =
-    dayOfWeek === 0
-      ? "bg-neutral-100"
-      : dayOfWeek === 6
-        ? "bg-neutral-100"
-        : "bg-white";
-
-  const today = isToday(date);
-  const isPast = isBefore(startOfDay(date), startOfDay(new Date()));
+  const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+  const today = dateIso === todayIso;
+  const dayToneClass = isPast
+    ? isWeekend
+      ? "bg-neutral-200/55 dark:bg-[hsl(var(--cal-cell-weekend-past))]"
+      : "bg-neutral-100/72 dark:bg-[hsl(var(--cal-cell-weekday-past))]"
+    : isWeekend
+      ? "bg-neutral-100/78 dark:bg-[hsl(var(--cal-cell-weekend))]"
+      : "bg-white dark:bg-[hsl(var(--cal-cell-weekday))]";
+  const dayNumberToneClass = isWeekend
+    ? "text-neutral-500 dark:text-neutral-300"
+    : "text-muted-foreground dark:text-neutral-200";
+  const showCenterCreateCue = showCreateCue && !today && !isRangeSelected;
 
   return (
     <div
       data-day-cell
-      className={`flex w-full cursor-pointer flex-col px-1 py-0.5 ring-1 ring-inset transition-[box-shadow] duration-100 ${baseBg} ${
-        today ? "ring-black" : "ring-transparent hover:ring-neutral-400/70"
-      } ${isRangeSelected ? "bg-neutral-300/35 ring-neutral-500/80" : ""} ${
-        isRangeStart || isRangeEnd ? "ring-neutral-700" : ""
+      data-day-iso={dateIso}
+      className={`group relative flex w-full cursor-pointer flex-col px-1 py-1 ring-1 ring-inset transition-[background-color,box-shadow] duration-150 ${dayToneClass} ${
+        today
+          ? "ring-neutral-900 shadow-[inset_0_0_0_1px_rgba(23,23,23,0.06)] dark:ring-neutral-100 dark:shadow-none"
+          : showCreateCue
+            ? "ring-transparent hover:ring-neutral-400/85 hover:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.5),0_12px_24px_-20px_rgba(15,23,42,0.3)] dark:hover:bg-white/7 dark:hover:ring-neutral-400/70"
+            : "ring-transparent hover:ring-neutral-300/80 hover:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.46),0_10px_18px_-18px_rgba(15,23,42,0.26)] dark:hover:bg-white/6 dark:hover:ring-neutral-500/60"
+      } ${
+        isRangeSelected
+          ? "bg-neutral-300/35 ring-neutral-400/80 dark:bg-neutral-700/45 dark:ring-neutral-500/85"
+          : ""
+      } ${
+        isRangeStart || isRangeEnd
+          ? "ring-neutral-700 shadow-[inset_0_0_0_1px_rgba(38,38,38,0.12)] dark:ring-neutral-300 dark:shadow-none"
+          : ""
+      } ${
+        isDropActive ? "bg-foreground/8 ring-border" : ""
       } select-none`}
       style={{ minHeight: `${minHeightPx}px` }}
+      onDragOver={(e) => {
+        if (!onDayHover) return;
+        e.preventDefault();
+        e.stopPropagation();
+        onDayHover(dateIso);
+      }}
+      onDrop={(e) => {
+        if (!onDayDrop) return;
+        e.preventDefault();
+        e.stopPropagation();
+        onDayDrop(dateIso, e.dataTransfer);
+      }}
+      onClick={() => {
+        onActivate?.(dateIso);
+      }}
     >
-      <div className={`flex h-4 flex-none items-center gap-1 px-0.5 leading-none text-[10px] ${isPast ? "text-neutral-400" : "text-neutral-600"}`}>
+      {showCenterCreateCue ? (
+        <div className="pointer-events-none absolute inset-0 grid place-items-center opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+          <span className="text-[18px] font-medium leading-none text-foreground/28 dark:text-neutral-100/26">
+            +
+          </span>
+        </div>
+      ) : null}
+      <div
+        className={`grid h-6 w-full flex-none place-items-center px-0.5 text-[12px] ${dayNumberToneClass} ${
+          showCreateCue ? "pointer-events-none" : ""
+        }`}
+      >
         <span
-          className={`relative inline-flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-medium ${
-            today ? "bg-black text-white ring-1 ring-black" : ""
-          } aspect-square shrink-0`}
+          className={`grid h-5 min-w-5 place-items-center rounded-full px-1 text-[12px] font-semibold leading-none tabular-nums transition-colors ${
+            today
+              ? "bg-neutral-900 text-white ring-1 ring-neutral-900 dark:bg-neutral-100 dark:text-neutral-900 dark:ring-neutral-100"
+              : "group-hover:text-foreground dark:group-hover:text-neutral-100"
+          }`}
         >
           {date.getDate()}
         </span>
-        <span data-weekday className="font-light text-neutral-500">
-          {fmtDayLabel(date).split(" ")[1]}
-        </span>
       </div>
-      <div className="mt-0.5 flex-1" />
+      <div className="mt-1 flex-1" />
+      {showCreateCue ? (
+        <div className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-transparent transition-all duration-150 group-hover:ring-neutral-300/45 dark:group-hover:ring-neutral-500/30" />
+      ) : null}
     </div>
   );
 }
