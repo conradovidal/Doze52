@@ -11,60 +11,6 @@ export type ProductUpdateMilestone = {
   bullets: string[];
 };
 
-export type ProductRoadmapSection = {
-  key: "launched" | "in-progress" | "backlog" | "top-voted";
-  label: string;
-  eyebrow: string;
-  title: string;
-  description: string;
-  emptyStateTitle?: string;
-  emptyStateBody?: string;
-};
-
-export const PRODUCT_ROADMAP_SECTIONS: ProductRoadmapSection[] = [
-  {
-    key: "launched",
-    label: "Lancadas",
-    eyebrow: "Ja no produto",
-    title: "O que ja melhoramos no doze52",
-    description:
-      "Marcos importantes da evolucao do produto, sempre com foco no que mudou para o usuario.",
-  },
-  {
-    key: "in-progress",
-    label: "Em andamento",
-    eyebrow: "Proxima etapa",
-    title: "O que estiver em construcao aparecera aqui",
-    description:
-      "Quando abrirmos esse bloco, voce vai conseguir acompanhar o que esta sendo desenvolvido agora.",
-    emptyStateTitle: "Em breve",
-    emptyStateBody:
-      "Vamos usar esta area para mostrar melhorias em execucao e dar mais visibilidade ao que esta chegando.",
-  },
-  {
-    key: "backlog",
-    label: "Backlog",
-    eyebrow: "Ideias e melhorias",
-    title: "Espaco reservado para o backlog publico",
-    description:
-      "Aqui vamos organizar oportunidades futuras com mais clareza e contexto para o usuario.",
-    emptyStateTitle: "Em breve",
-    emptyStateBody:
-      "O backlog publico sera o lugar para acompanhar ideias que ainda nao entraram em desenvolvimento.",
-  },
-  {
-    key: "top-voted",
-    label: "Mais votadas",
-    eyebrow: "Participacao da comunidade",
-    title: "O ranking de prioridades vira nesta proxima fase",
-    description:
-      "Essa area vai concentrar as melhorias mais pedidas e ajudar a tornar a priorizacao mais transparente.",
-    emptyStateTitle: "Em breve",
-    emptyStateBody:
-      "Quando a votacao entrar no ar, voce vai ver aqui o que a comunidade mais quer ver no doze52.",
-  },
-];
-
 export const PRODUCT_UPDATE_MILESTONES: ProductUpdateMilestone[] = [
   {
     dateLabel: "11 de fevereiro de 2026",

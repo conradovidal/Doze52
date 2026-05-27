@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Check, PencilLine } from "lucide-react";
+import { BrandLogo } from "@/components/brand-logo";
 import { CategoryBar } from "@/components/category-bar";
 import { CategoryManager } from "@/components/category-manager";
 import { ProfileBar } from "@/components/profile-bar";
@@ -145,7 +146,7 @@ export function AppHeader({
       <header className="mb-4 space-y-3 md:mb-5 md:space-y-3.5">
         <div className="grid min-h-10 grid-cols-[minmax(0,1fr)_auto] items-start gap-3 md:items-center md:gap-4">
           <div className="justify-self-start">
-            <img src="/logo-doze52.png" alt="doze 52" className="h-8 w-auto md:h-9" />
+            <BrandLogo />
           </div>
 
           <div className="min-w-0 justify-self-end">

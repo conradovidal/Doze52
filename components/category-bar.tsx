@@ -21,7 +21,7 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Eye, EyeOff, GripVertical, Plus } from "lucide-react";
+import { Eye, EyeOff, GripVertical, PencilLine, Plus } from "lucide-react";
 import {
   arraysEqual,
   INLINE_SORTABLE_MEASURING,
@@ -40,6 +40,8 @@ const CHIP_LEADING_SLOT_CLASS =
   "inline-flex h-8 w-8 shrink-0 items-center justify-center";
 const CHIP_HANDLE_CLASS =
   "inline-flex h-8 w-8 shrink-0 touch-none cursor-grab items-center justify-center rounded-full text-muted-foreground/72 transition-colors hover:bg-muted/42 hover:text-foreground active:cursor-grabbing";
+const CHIP_EDIT_ACTION_CLASS =
+  "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted-foreground/72 transition-colors hover:bg-muted/42 hover:text-foreground";
 const CHIP_PLACEHOLDER_CLASS =
   "pointer-events-none absolute inset-[3px] rounded-full border border-dashed border-border/70 bg-muted/26";
 const CHIP_OVERLAY_CLASS =
@@ -122,19 +124,38 @@ function EditCategoryChip({
   chipRef?: (node: HTMLElement | null) => void;
 }) {
   const contentHiddenClass = isPlaceholder ? "invisible" : "";
+  const categoryTintStyle: React.CSSProperties = {
+    backgroundColor: hexToRgba(category.color, isOverlay ? 0.13 : 0.1),
+    borderColor: hexToRgba(category.color, isOverlay ? 0.3 : 0.22),
+    ...style,
+  };
+  const categoryAccentStyle: React.CSSProperties = {
+    color: category.color,
+  };
+  const categoryActionHoverStyle: React.CSSProperties = {
+    color: category.color,
+  };
 
   return (
     <div
       ref={chipRef}
-      style={style}
+      style={categoryTintStyle}
       className={cn(
         CHIP_SHELL_CLASS,
-        "border-border/60 bg-background text-foreground/78 hover:border-border/78 hover:bg-muted/30 hover:text-foreground",
+        "text-foreground/86 hover:brightness-[0.98]",
         isOverlay && CHIP_OVERLAY_CLASS,
-        isPlaceholder && "bg-background"
+        isPlaceholder && "bg-background/80"
       )}
     >
-      {isPlaceholder ? <div className={CHIP_PLACEHOLDER_CLASS} /> : null}
+      {isPlaceholder ? (
+        <div
+          className={CHIP_PLACEHOLDER_CLASS}
+          style={{
+            borderColor: hexToRgba(category.color, 0.38),
+            backgroundColor: hexToRgba(category.color, 0.1),
+          }}
+        />
+      ) : null}
 
       {interactiveHandle ? (
         <button
@@ -143,6 +164,7 @@ function EditCategoryChip({
           aria-label={`Reordenar categoria ${category.name}`}
           title={`Reordenar categoria ${category.name}`}
           className={cn(CHIP_HANDLE_CLASS, contentHiddenClass)}
+          style={categoryAccentStyle}
           {...handleAttributes}
           {...handleListeners}
         >
@@ -152,6 +174,7 @@ function EditCategoryChip({
         <span
           className={cn(CHIP_HANDLE_CLASS, "cursor-default", contentHiddenClass)}
           aria-hidden="true"
+          style={categoryAccentStyle}
         >
           <GripVertical className="h-3.5 w-3.5" />
         </span>
@@ -169,7 +192,7 @@ function EditCategoryChip({
       {isOverlay || isPlaceholder ? (
         <div
           className={cn(
-            "flex min-w-0 items-center gap-1.5 pl-1 pr-3 text-[0.78rem] font-medium",
+            "flex min-w-0 items-center gap-1.5 pl-1 pr-2 text-[0.78rem] font-medium",
             contentHiddenClass
           )}
         >
@@ -180,10 +203,43 @@ function EditCategoryChip({
           type="button"
           onClick={onEdit}
           aria-label={`Editar categoria ${category.name}`}
-          className="flex min-w-0 items-center gap-1.5 pl-1 pr-3 text-[0.78rem] font-medium"
+          className="flex min-w-0 items-center gap-1.5 pl-1 pr-2 text-[0.78rem] font-medium"
         >
           <span className="truncate">{category.name}</span>
         </button>
+      )}
+
+      {isOverlay || isPlaceholder ? (
+        <div className={cn("pr-1", contentHiddenClass)}>
+          <span className={CHIP_EDIT_ACTION_CLASS} style={categoryActionHoverStyle}>
+            <PencilLine className="h-3.5 w-3.5" />
+          </span>
+        </div>
+      ) : onEdit ? (
+        <div className="pr-1">
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onEdit?.();
+            }}
+            aria-label={`Editar categoria ${category.name}`}
+            title={`Editar categoria ${category.name}`}
+            className={CHIP_EDIT_ACTION_CLASS}
+            style={categoryActionHoverStyle}
+          >
+            <PencilLine className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      ) : (
+        <div className="pr-1">
+          <span
+            className={cn(CHIP_EDIT_ACTION_CLASS, "opacity-0")}
+            aria-hidden="true"
+          >
+            <PencilLine className="h-3.5 w-3.5" />
+          </span>
+        </div>
       )}
     </div>
   );
