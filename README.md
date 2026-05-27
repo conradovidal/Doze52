@@ -1,8 +1,10 @@
 <p align="center">
-  <img src="public/logo-doze52.svg" alt="doze52" width="340" />
+  <img src="public/doze52-logo-light.svg" alt="doze52 light logo" width="300" />
+  &nbsp;&nbsp;&nbsp;&nbsp;
+  <img src="public/doze52-logo-dark.svg" alt="doze52 dark logo" width="300" />
 </p>
 
-# doze52
+# Doze 52
 
 **Visual year planning for focus, routines, and long-range organization.**
 
@@ -11,8 +13,9 @@ doze52 is a product-in-progress built by Conrado Vidal. It is for people who thi
 The product combines a year-at-a-glance calendar, profile-based planning, categories, recurrence, and lightweight sync so planning feels visual, intentional, and usable in real life.
 
 <p align="center">
-  <img src="public/readme-product-preview.svg" alt="Illustrated preview of the doze52 experience" width="100%" />
+  <img src="public/Screenshot_Doze_52.png" alt="Preview of the Doze 52 experience" width="100%" />
 </p>
+
 
 ## Why this exists
 
