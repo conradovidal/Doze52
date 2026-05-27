@@ -92,6 +92,10 @@ export function CategoryManager({
   const canSave = name.trim().length > 0 && Boolean(profileDraftId);
   const canDelete = categories.length > 1;
   const normalizedColor = color.toLowerCase();
+  const presetColors = React.useMemo(
+    () => CATEGORY_COLOR_SETS.flatMap((set) => set.colors),
+    []
+  );
 
   const handleSave = async () => {
     if (!canSave) return;
@@ -204,32 +208,28 @@ export function CategoryManager({
             </div>
           </div>
 
-          <div className="space-y-2">
-            {CATEGORY_COLOR_SETS.map((set) => (
-              <div key={set.id} className="flex justify-center">
-                <div className="grid grid-cols-7 gap-2">
-                  {set.colors.map((preset) => {
-                    const selected = preset.toLowerCase() === normalizedColor;
-                    return (
-                      <button
-                        key={preset}
-                        type="button"
-                        onClick={() => setColor(preset)}
-                        aria-label={`Selecionar cor ${preset.toUpperCase()}`}
-                        className={`h-8 w-8 rounded-full border border-black/5 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-300 ${
-                          selected
-                            ? "ring-2 ring-neutral-400 ring-offset-2"
-                            : "hover:opacity-90"
-                        }`}
-                        style={{ backgroundColor: preset }}
-                      >
-                        <span className="sr-only">{preset.toUpperCase()}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
+          <div className="flex justify-center">
+            <div className="grid w-fit grid-cols-7 gap-x-3 gap-y-3 rounded-2xl bg-muted/18 p-3 sm:gap-x-4 sm:gap-y-3.5 sm:p-4">
+              {presetColors.map((preset) => {
+                const selected = preset.toLowerCase() === normalizedColor;
+                return (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setColor(preset)}
+                    aria-label={`Selecionar cor ${preset.toUpperCase()}`}
+                    className={`h-[34px] w-[34px] rounded-full border border-black/5 transition hover:scale-105 hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-300 sm:h-9 sm:w-9 ${
+                      selected
+                        ? "ring-2 ring-neutral-400 ring-offset-2 ring-offset-background"
+                        : ""
+                    }`}
+                    style={{ backgroundColor: preset }}
+                  >
+                    <span className="sr-only">{preset.toUpperCase()}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
         <DialogFooter className="sm:justify-between">

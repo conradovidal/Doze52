@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowUpRight,
@@ -16,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { AuthDialog } from "@/components/auth/auth-dialog";
+import { BrandLogo } from "@/components/brand-logo";
 import { ProfileIcon } from "@/components/profile-icon";
 import { YearGrid } from "@/components/calendar/year-grid";
 import { Button } from "@/components/ui/button";
@@ -221,13 +221,7 @@ function FrozenCalendarBackdrop() {
             <div className="mb-3 space-y-1">
               <div className="grid min-h-10 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:gap-x-3 md:gap-y-0">
                 <div className="justify-self-start">
-                  <Image
-                    src="/logo-doze52.png"
-                    alt=""
-                    width={1549}
-                    height={438}
-                    className="h-8 w-auto md:h-9"
-                  />
+                  <BrandLogo decorative />
                 </div>
                 <div className="min-w-0 justify-self-end md:col-start-3">
                   <div className="inline-flex h-10 items-center rounded-2xl border border-neutral-200/80 bg-white/72 px-4 text-xl font-normal text-neutral-900 shadow-sm dark:border-neutral-700/80 dark:bg-neutral-900/72 dark:text-neutral-100">

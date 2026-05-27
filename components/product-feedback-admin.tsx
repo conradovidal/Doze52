@@ -537,11 +537,11 @@ export function ProductFeedbackAdmin() {
           </p>
         </div>
         <Link
-          href="/melhorias"
+          href="/"
           className="inline-flex items-center gap-2 rounded-full border border-border/80 bg-background/80 px-4 py-2 text-sm text-foreground transition-colors hover:bg-muted"
         >
           <ArrowLeft className="h-4 w-4" />
-          Voltar ao hub
+          Voltar ao app
         </Link>
       </div>
 
