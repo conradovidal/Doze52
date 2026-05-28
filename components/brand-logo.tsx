@@ -23,12 +23,12 @@ export function BrandLogo({
       )}
     >
       <img
-        src="/doze52-logo-light.svg"
+        src="/logo-light-theme.svg"
         {...accessibilityProps}
         className="pointer-events-none absolute left-[-1.75rem] top-1/2 block h-40 w-40 -translate-y-1/2 object-contain dark:hidden md:left-[-1.875rem] md:h-44 md:w-44"
       />
       <img
-        src="/doze52-logo-dark.svg"
+        src="/logo-dark-theme.svg"
         {...accessibilityProps}
         className="pointer-events-none absolute left-[-1.75rem] top-1/2 hidden h-40 w-40 -translate-y-1/2 object-contain dark:block md:left-[-1.875rem] md:h-44 md:w-44"
       />
