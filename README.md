@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="public/logo-doze52.svg" alt="doze52" width="340" />
-</p>
-
 # doze52
 
 **Visual year planning for focus, routines, and long-range organization.**
@@ -9,10 +5,6 @@
 doze52 is a product-in-progress built by Conrado Vidal. It is for people who think better when they can see the whole year, not only the next task list.
 
 The product combines a year-at-a-glance calendar, profile-based planning, categories, recurrence, and lightweight sync so planning feels visual, intentional, and usable in real life.
-
-<p align="center">
-  <img src="public/readme-product-preview.svg" alt="Illustrated preview of the doze52 experience" width="100%" />
-</p>
 
 ## Why this exists
 
@@ -33,7 +25,6 @@ doze52 exists to help people structure focus across weeks, months, and the full 
 
 - Early public version, already usable.
 - Strongest focus today: calendar clarity, profile-based planning, and sync reliability.
-- Product evolution is being organized in public through the in-app `Melhorias & Prioridades` area.
 
 ## Product decisions that matter
 
@@ -41,13 +32,6 @@ doze52 exists to help people structure focus across weeks, months, and the full 
 - **Profiles before complexity**: work, personal, and other life contexts stay separated without heavy setup.
 - **Local safety + cloud sync**: the product protects local progress while keeping signed-in data synced.
 - **Polish is product work**: legibility, drag behavior, layout density, and modal flow are treated as core experience.
-
-## Roadmap right now
-
-- Turn the public improvements area into a clearer backlog and prioritization surface.
-- Keep improving sync resilience and trust signals.
-- Refine onboarding so the value of year planning becomes obvious faster.
-- Continue making the calendar denser, calmer, and easier to scan.
 
 ## Built with
 
