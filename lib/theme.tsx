@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import {
-  THEME_FAVICON_URLS,
   THEME_STORAGE_KEY,
   type ThemeMode,
   isThemeMode,
@@ -47,20 +46,6 @@ const applyThemeToDocument = (mode: ThemeMode) => {
   const root = document.documentElement;
   root.classList.toggle("dark", mode === "dark");
   root.style.colorScheme = mode;
-
-  let favicon = document.querySelector<HTMLLinkElement>(
-    'link[rel="icon"][data-doze52-theme-favicon="active"]'
-  );
-
-  if (!favicon) {
-    favicon = document.createElement("link");
-    favicon.rel = "icon";
-    favicon.type = "image/svg+xml";
-    favicon.dataset.doze52ThemeFavicon = "active";
-    document.head.appendChild(favicon);
-  }
-
-  favicon.href = THEME_FAVICON_URLS[mode];
 };
 
 const resolveInitialTheme = (): ThemeMode => {
