@@ -1,7 +1,7 @@
 <p align="center">
-  <img src="public/doze52-logo-light.svg" alt="doze52 light logo" width="300" />
+  <img src="public/doze52-logo-light.svg" alt="Doze 52 logo para tema claro" width="300" />
   &nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="public/doze52-logo-dark.svg" alt="doze52 dark logo" width="300" />
+  <img src="public/doze52-logo-dark.svg" alt="Doze 52 logo para tema escuro" width="300" />
 </p>
 
 # Doze 52
@@ -13,9 +13,8 @@ doze52 is a product-in-progress built by Conrado Vidal. It is for people who thi
 The product combines a year-at-a-glance calendar, profile-based planning, categories, recurrence, and lightweight sync so planning feels visual, intentional, and usable in real life.
 
 <p align="center">
-  <img src="public/Screenshot_Doze_52.png" alt="Preview of the Doze 52 experience" width="100%" />
+  <img src="public/Screenshot_Doze_52.png" alt="Screenshot real da aplicacao Doze 52" width="100%" />
 </p>
-
 
 ## Why this exists
 
@@ -36,7 +35,6 @@ doze52 exists to help people structure focus across weeks, months, and the full 
 
 - Early public version, already usable.
 - Strongest focus today: calendar clarity, profile-based planning, and sync reliability.
-- Product evolution is being organized in public through the in-app `Melhorias & Prioridades` area.
 
 ## Product decisions that matter
 
@@ -44,13 +42,6 @@ doze52 exists to help people structure focus across weeks, months, and the full 
 - **Profiles before complexity**: work, personal, and other life contexts stay separated without heavy setup.
 - **Local safety + cloud sync**: the product protects local progress while keeping signed-in data synced.
 - **Polish is product work**: legibility, drag behavior, layout density, and modal flow are treated as core experience.
-
-## Roadmap right now
-
-- Turn the public improvements area into a clearer backlog and prioritization surface.
-- Keep improving sync resilience and trust signals.
-- Refine onboarding so the value of year planning becomes obvious faster.
-- Continue making the calendar denser, calmer, and easier to scan.
 
 ## Built with
 

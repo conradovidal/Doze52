@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth";
-import { THEME_FAVICON_URLS } from "@/lib/theme-shared";
+import { FAVICON_URL } from "@/lib/theme-shared";
 import { ThemeProvider } from "@/lib/theme";
 import { FeedbackProvider } from "@/components/ui/feedback-provider";
 import { ThemeInitScript } from "@/components/theme-init-script";
@@ -13,14 +13,8 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       {
-        url: THEME_FAVICON_URLS.light,
+        url: FAVICON_URL,
         type: "image/svg+xml",
-        media: "(prefers-color-scheme: light)",
-      },
-      {
-        url: THEME_FAVICON_URLS.dark,
-        type: "image/svg+xml",
-        media: "(prefers-color-scheme: dark)",
       },
     ],
   },

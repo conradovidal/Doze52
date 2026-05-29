@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { cn } from "@/lib/utils";
 
 type BrandLogoProps = {
@@ -11,9 +12,7 @@ export function BrandLogo({
   className,
   decorative = false,
 }: BrandLogoProps) {
-  const accessibilityProps = decorative
-    ? { alt: "", "aria-hidden": true }
-    : { alt };
+  const imageAlt = decorative ? "" : alt;
 
   return (
     <span
@@ -22,14 +21,20 @@ export function BrandLogo({
         className
       )}
     >
-      <img
+      <Image
         src="/doze52-logo-light.svg"
-        {...accessibilityProps}
+        alt={imageAlt}
+        aria-hidden={decorative || undefined}
+        width={176}
+        height={176}
         className="pointer-events-none absolute left-[-1.75rem] top-1/2 block h-40 w-40 -translate-y-1/2 object-contain dark:hidden md:left-[-1.875rem] md:h-44 md:w-44"
       />
-      <img
+      <Image
         src="/doze52-logo-dark.svg"
-        {...accessibilityProps}
+        alt={imageAlt}
+        aria-hidden={decorative || undefined}
+        width={176}
+        height={176}
         className="pointer-events-none absolute left-[-1.75rem] top-1/2 hidden h-40 w-40 -translate-y-1/2 object-contain dark:block md:left-[-1.875rem] md:h-44 md:w-44"
       />
     </span>
