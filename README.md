@@ -35,7 +35,6 @@ doze52 exists to help people structure focus across weeks, months, and the full 
 
 - Early public version, already usable.
 - Strongest focus today: calendar clarity, profile-based planning, and sync reliability.
-- Product evolution is being organized in public through the in-app `Melhorias & Prioridades` area.
 
 ## Product decisions that matter
 
@@ -43,13 +42,6 @@ doze52 exists to help people structure focus across weeks, months, and the full 
 - **Profiles before complexity**: work, personal, and other life contexts stay separated without heavy setup.
 - **Local safety + cloud sync**: the product protects local progress while keeping signed-in data synced.
 - **Polish is product work**: legibility, drag behavior, layout density, and modal flow are treated as core experience.
-
-## Roadmap right now
-
-- Turn the public improvements area into a clearer backlog and prioritization surface.
-- Keep improving sync resilience and trust signals.
-- Refine onboarding so the value of year planning becomes obvious faster.
-- Continue making the calendar denser, calmer, and easier to scan.
 
 ## Built with
 

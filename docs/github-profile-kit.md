@@ -98,7 +98,6 @@ Recommended topics for `Doze52`:
 If you want a slightly sharper product angle, consider swapping one or two with:
 
 - `product-design`
-- `roadmap`
 - `long-term-planning`
 
 ## Manual GitHub UI checklist
