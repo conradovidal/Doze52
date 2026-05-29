@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { usePathname } from "next/navigation";
 import { Github, Instagram } from "lucide-react";
 
 function BrandXIcon({ className }: { className?: string }) {
@@ -26,11 +25,6 @@ type FooterLink = {
 };
 
 export function SiteFooter() {
-  const pathname = usePathname();
-  if (pathname?.startsWith("/melhorias")) {
-    return null;
-  }
-
   const supportEmail = "doze52cal@gmail.com";
   const gmailComposeUrl = `https://mail.google.com/mail/?view=cm&fs=1&tf=1&to=${encodeURIComponent(supportEmail)}`;
   const mailtoUrl = `mailto:${supportEmail}`;
