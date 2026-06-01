@@ -14,6 +14,7 @@ import {
 } from "date-fns";
 import type { AnchorPoint, CalendarRenderEvent } from "@/lib/types";
 import type { GlobalDragState } from "./year-grid";
+import type { ProfileIconId } from "@/lib/profile-icons";
 import { fmtMonthLabel } from "@/lib/date";
 import {
   hasCalendarEventDndPayloadType,
@@ -109,6 +110,7 @@ export function MonthRow({
   density = "year",
   events,
   visibleCategoryIds,
+  profileIconByCategoryId,
   multiDaySlotById,
   dragState,
   hasDragContext,
@@ -135,6 +137,7 @@ export function MonthRow({
   density?: MonthRowDensity;
   events: CalendarRenderEvent[];
   visibleCategoryIds: string[];
+  profileIconByCategoryId: Map<string, ProfileIconId>;
   multiDaySlotById: Map<string, number>;
   dragState: GlobalDragState;
   hasDragContext: boolean;
@@ -707,6 +710,7 @@ export function MonthRow({
                 <EventBar
                   event={seg.event}
                   todayIso={todayIso}
+                  profileIcon={profileIconByCategoryId.get(seg.event.categoryId)}
                   onClick={({ anchorPoint }) =>
                     onEditEvent({
                       eventId: seg.event.id,
@@ -943,6 +947,7 @@ export function MonthRow({
                             <EventBar
                               event={event}
                               todayIso={todayIso}
+                              profileIcon={profileIconByCategoryId.get(event.categoryId)}
                               onClick={({ anchorPoint }) =>
                                 onEditEvent({
                                   eventId: event.id,

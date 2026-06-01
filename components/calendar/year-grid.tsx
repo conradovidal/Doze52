@@ -9,8 +9,14 @@ import {
   parseISO,
   startOfYear,
 } from "date-fns";
-import type { AnchorPoint, CalendarRenderEvent, CategoryItem } from "@/lib/types";
+import type {
+  AnchorPoint,
+  CalendarProfile,
+  CalendarRenderEvent,
+  CategoryItem,
+} from "@/lib/types";
 import { useStore } from "@/lib/store";
+import { DEFAULT_PROFILE_ICON, type ProfileIconId } from "@/lib/profile-icons";
 import { buildMultiDaySlotMap } from "@/lib/calendar-slotting";
 import { readCalendarEventDndPayload } from "@/lib/calendar-dnd";
 import {
@@ -128,6 +134,7 @@ export function YearGrid({
   }) => void;
   isMobileInteractionMode?: boolean;
 }) {
+  const profiles = useStore((s) => s.profiles as CalendarProfile[]);
   const categories = useStore((s) => s.categories as CategoryItem[]);
   const selectedProfileIds = useStore((s) => s.selectedProfileIds);
   const viewMode = useStore((s) => s.viewMode);
@@ -147,6 +154,17 @@ export function YearGrid({
     },
     [categories, selectedProfileIds]
   );
+  const profileIconByCategoryId = React.useMemo(() => {
+    const iconByProfileId = new Map<string, ProfileIconId>(
+      profiles.map((profile) => [profile.id, profile.icon])
+    );
+    return new Map<string, ProfileIconId>(
+      categories.map((category) => [
+        category.id,
+        iconByProfileId.get(category.profileId) ?? DEFAULT_PROFILE_ICON,
+      ])
+    );
+  }, [categories, profiles]);
   const currentMonthIndex = React.useMemo(
     () => new Date().getMonth() as MonthIndex,
     []
@@ -515,16 +533,25 @@ export function YearGrid({
       const viewport = zoomViewportRef.current;
       if (!viewport) return;
 
-      const hasOverflow =
-        viewport.scrollWidth - viewport.clientWidth > 1;
-      if (!hasOverflow) return;
+      const maxScrollLeft = Math.max(0, viewport.scrollWidth - viewport.clientWidth);
+      if (maxScrollLeft <= 1) return;
 
       const horizontalDelta =
-        Math.abs(event.deltaX) > 0 ? event.deltaX : event.deltaY;
+        Math.abs(event.deltaX) > Math.abs(event.deltaY)
+          ? event.deltaX
+          : event.shiftKey
+            ? event.deltaY
+            : 0;
       if (horizontalDelta === 0) return;
 
+      const nextScrollLeft = Math.max(
+        0,
+        Math.min(maxScrollLeft, viewport.scrollLeft + horizontalDelta)
+      );
+      if (nextScrollLeft === viewport.scrollLeft) return;
+
       event.preventDefault();
-      viewport.scrollLeft += horizontalDelta;
+      viewport.scrollLeft = nextScrollLeft;
     },
     [creatingRange?.isDragging, hasDragContext, hasFocusZoom]
   );
@@ -587,6 +614,7 @@ export function YearGrid({
                     density={density}
                     events={events}
                     visibleCategoryIds={visibleCategoryIds}
+                    profileIconByCategoryId={profileIconByCategoryId}
                     multiDaySlotById={multiDaySlotById}
                     dragState={dragState}
                     hasDragContext={hasDragContext}
