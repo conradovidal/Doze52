@@ -9,8 +9,14 @@ import {
   parseISO,
   startOfYear,
 } from "date-fns";
-import type { AnchorPoint, CalendarRenderEvent, CategoryItem } from "@/lib/types";
+import type {
+  AnchorPoint,
+  CalendarProfile,
+  CalendarRenderEvent,
+  CategoryItem,
+} from "@/lib/types";
 import { useStore } from "@/lib/store";
+import { DEFAULT_PROFILE_ICON, type ProfileIconId } from "@/lib/profile-icons";
 import { buildMultiDaySlotMap } from "@/lib/calendar-slotting";
 import { readCalendarEventDndPayload } from "@/lib/calendar-dnd";
 import {
@@ -128,6 +134,7 @@ export function YearGrid({
   }) => void;
   isMobileInteractionMode?: boolean;
 }) {
+  const profiles = useStore((s) => s.profiles as CalendarProfile[]);
   const categories = useStore((s) => s.categories as CategoryItem[]);
   const selectedProfileIds = useStore((s) => s.selectedProfileIds);
   const viewMode = useStore((s) => s.viewMode);
@@ -147,6 +154,17 @@ export function YearGrid({
     },
     [categories, selectedProfileIds]
   );
+  const profileIconByCategoryId = React.useMemo(() => {
+    const iconByProfileId = new Map<string, ProfileIconId>(
+      profiles.map((profile) => [profile.id, profile.icon])
+    );
+    return new Map<string, ProfileIconId>(
+      categories.map((category) => [
+        category.id,
+        iconByProfileId.get(category.profileId) ?? DEFAULT_PROFILE_ICON,
+      ])
+    );
+  }, [categories, profiles]);
   const currentMonthIndex = React.useMemo(
     () => new Date().getMonth() as MonthIndex,
     []
@@ -596,6 +614,7 @@ export function YearGrid({
                     density={density}
                     events={events}
                     visibleCategoryIds={visibleCategoryIds}
+                    profileIconByCategoryId={profileIconByCategoryId}
                     multiDaySlotById={multiDaySlotById}
                     dragState={dragState}
                     hasDragContext={hasDragContext}
