@@ -1143,7 +1143,7 @@ export default function HomePage() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-none overflow-x-hidden px-4 pt-3 pb-2 md:pb-4">
+    <main className="mx-auto w-full max-w-none overflow-x-clip px-4 pt-3 pb-2 md:pb-4">
       <SyncStatusOverlay
         status={syncOverlayStatus}
         visible={isSyncOverlayVisible}
