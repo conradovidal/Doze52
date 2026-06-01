@@ -515,16 +515,25 @@ export function YearGrid({
       const viewport = zoomViewportRef.current;
       if (!viewport) return;
 
-      const hasOverflow =
-        viewport.scrollWidth - viewport.clientWidth > 1;
-      if (!hasOverflow) return;
+      const maxScrollLeft = Math.max(0, viewport.scrollWidth - viewport.clientWidth);
+      if (maxScrollLeft <= 1) return;
 
       const horizontalDelta =
-        Math.abs(event.deltaX) > 0 ? event.deltaX : event.deltaY;
+        Math.abs(event.deltaX) > Math.abs(event.deltaY)
+          ? event.deltaX
+          : event.shiftKey
+            ? event.deltaY
+            : 0;
       if (horizontalDelta === 0) return;
 
+      const nextScrollLeft = Math.max(
+        0,
+        Math.min(maxScrollLeft, viewport.scrollLeft + horizontalDelta)
+      );
+      if (nextScrollLeft === viewport.scrollLeft) return;
+
       event.preventDefault();
-      viewport.scrollLeft += horizontalDelta;
+      viewport.scrollLeft = nextScrollLeft;
     },
     [creatingRange?.isDragging, hasDragContext, hasFocusZoom]
   );
