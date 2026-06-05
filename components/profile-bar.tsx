@@ -51,6 +51,7 @@ const CREATE_ACTION_CLASS = `inline-flex h-8 w-8 items-center justify-center rou
 
 type ProfileBarProps = {
   compact?: boolean;
+  className?: string;
   isInlineEditMode?: boolean;
   editingProfileId?: string | null;
   onEditingProfileChange?: (profileId: string) => void;
@@ -241,6 +242,7 @@ function SortableEditProfileChip({
 
 export function ProfileBar({
   compact = false,
+  className,
   isInlineEditMode = false,
   editingProfileId,
   onEditingProfileChange,
@@ -277,7 +279,11 @@ export function ProfileBar({
   );
   const selectedSet = React.useMemo(() => new Set(selectedProfileIds), [selectedProfileIds]);
   const dragEnabled = isInlineEditMode && profiles.length > 1;
-  const barClass = `${compact ? "w-full min-h-8 justify-center" : "mb-2 min-h-8 justify-center"} flex flex-wrap items-center gap-1.5 sm:gap-2`;
+  const barClass = cn(
+    compact ? "w-full min-h-8 justify-center" : "mb-2 min-h-8 justify-center",
+    "flex flex-wrap items-center gap-1.5 sm:gap-2",
+    className
+  );
 
   const resetDragState = React.useCallback(() => {
     setActiveDrag(null);
