@@ -1,0 +1,490 @@
+{
+  "id": "formula-1-2026",
+  "name": "Fórmula 1 2026",
+  "description": "Corridas da temporada 2026 em um único calendário.",
+  "year": 2026,
+  "datasetStatus": "complete",
+  "updateNote": "Inclui as etapas listadas pela Fórmula 1 em 2026-06-03, sem separar resultados e próximas corridas.",
+  "source": {
+    "label": "Calendário oficial da Fórmula 1 2026",
+    "url": "https://www.formula1.com/en/racing/2026",
+    "lastVerified": "2026-06-03"
+  },
+  "profile": {
+    "id": "2026f100-0000-4000-8000-000000000001",
+    "name": "Fórmula 1 2026",
+    "icon": "calendar-days"
+  },
+  "categories": [
+    {
+      "id": "2026f100-0000-4000-8000-000000000002",
+      "key": "races",
+      "name": "Corridas",
+      "color": "#F97316"
+    }
+  ],
+  "events": [
+    {
+      "id": "2026f100-0000-4000-8000-000000000101",
+      "title": "F1 1: GP Austrália",
+      "date": "2026-03-08",
+      "time": "15:00",
+      "timezone": "Australia/Melbourne",
+      "city": "Melbourne",
+      "venue": "Albert Park",
+      "phase": "Grande Prêmio",
+      "homeTeam": "Austrália",
+      "awayTeam": "Fórmula 1",
+      "suggestedCategoryKey": "races",
+      "source": "Calendário oficial da Fórmula 1 2026",
+      "sourceUrl": "https://www.formula1.com/en/racing/2026",
+      "lastVerified": "2026-06-03",
+      "weekend": "06-08 Mar",
+      "notes": [
+        "FORMULA 1 QATAR AIRWAYS AUSTRALIAN GRAND PRIX 2026"
+      ],
+      "isBrazilMatch": false
+    },
+    {
+      "id": "2026f100-0000-4000-8000-000000000102",
+      "title": "F1 2: GP China",
+      "date": "2026-03-15",
+      "time": "15:00",
+      "timezone": "Asia/Shanghai",
+      "city": "Shanghai",
+      "venue": "Shanghai International Circuit",
+      "phase": "Grande Prêmio",
+      "homeTeam": "China",
+      "awayTeam": "Fórmula 1",
+      "suggestedCategoryKey": "races",
+      "source": "Calendário oficial da Fórmula 1 2026",
+      "sourceUrl": "https://www.formula1.com/en/racing/2026",
+      "lastVerified": "2026-06-03",
+      "weekend": "13-15 Mar",
+      "notes": [
+        "FORMULA 1 HEINEKEN CHINESE GRAND PRIX 2026"
+      ],
+      "isBrazilMatch": false
+    },
+    {
+      "id": "2026f100-0000-4000-8000-000000000103",
+      "title": "F1 3: GP Japão",
+      "date": "2026-03-29",
+      "time": "14:00",
+      "timezone": "Asia/Tokyo",
+      "city": "Suzuka",
+      "venue": "Suzuka Circuit",
+      "phase": "Grande Prêmio",
+      "homeTeam": "Japão",
+      "awayTeam": "Fórmula 1",
+      "suggestedCategoryKey": "races",
+      "source": "Calendário oficial da Fórmula 1 2026",
+      "sourceUrl": "https://www.formula1.com/en/racing/2026",
+      "lastVerified": "2026-06-03",
+      "weekend": "27-29 Mar",
+      "notes": [
+        "FORMULA 1 ARAMCO JAPANESE GRAND PRIX 2026"
+      ],
+      "isBrazilMatch": false
+    },
+    {
+      "id": "2026f100-0000-4000-8000-000000000104",
+      "title": "F1 4: GP Miami",
+      "date": "2026-05-03",
+      "time": "16:00",
+      "timezone": "America/New_York",
+      "city": "Miami",
+      "venue": "Miami International Autodrome",
+      "phase": "Grande Prêmio",
+      "homeTeam": "Miami",
+      "awayTeam": "Fórmula 1",
+      "suggestedCategoryKey": "races",
+      "source": "Calendário oficial da Fórmula 1 2026",
+      "sourceUrl": "https://www.formula1.com/en/racing/2026",
+      "lastVerified": "2026-06-03",
+      "weekend": "01-03 May",
+      "notes": [
+        "FORMULA 1 CRYPTO.COM MIAMI GRAND PRIX 2026"
+      ],
+      "isBrazilMatch": false
+    },
+    {
+      "id": "2026f100-0000-4000-8000-000000000105",
+      "title": "F1 5: GP Canadá",
+      "date": "2026-05-24",
+      "time": "14:00",
+      "timezone": "America/Toronto",
+      "city": "Montreal",
+      "venue": "Circuit Gilles Villeneuve",
+      "phase": "Grande Prêmio",
+      "homeTeam": "Canadá",
+      "awayTeam": "Fórmula 1",
+      "suggestedCategoryKey": "races",
+      "source": "Calendário oficial da Fórmula 1 2026",
+      "sourceUrl": "https://www.formula1.com/en/racing/2026",
+      "lastVerified": "2026-06-03",
+      "weekend": "22-24 May",
+      "notes": [
+        "FORMULA 1 LENOVO GRAND PRIX DU CANADA 2026"
+      ],
+      "isBrazilMatch": false
+    },
+    {
+      "id": "2026f100-0000-4000-8000-000000000106",
+      "title": "F1 6: GP Mônaco",
+      "date": "2026-06-07",
+      "time": "15:00",
+      "timezone": "Europe/Monaco",
+      "city": "Monaco",
+      "venue": "Circuit de Monaco",
+      "phase": "Grande Prêmio",
+      "homeTeam": "Mônaco",
+      "awayTeam": "Fórmula 1",
+      "suggestedCategoryKey": "races",
+      "source": "Calendário oficial da Fórmula 1 2026",
+      "sourceUrl": "https://www.formula1.com/en/racing/2026",
+      "lastVerified": "2026-06-03",
+      "weekend": "05-07 Jun",
+      "notes": [
+        "FORMULA 1 LOUIS VUITTON GRAND PRIX DE MONACO 2026"
+      ],
+      "isBrazilMatch": false
+    },
+    {
+      "id": "2026f100-0000-4000-8000-000000000107",
+      "title": "F1 7: GP Barcelona-Catalunya",
+      "date": "2026-06-14",
+      "time": "15:00",
+      "timezone": "Europe/Madrid",
+      "city": "Barcelona",
+      "venue": "Circuit de Barcelona-Catalunya",
+      "phase": "Grande Prêmio",
+      "homeTeam": "Barcelona-Catalunya",
+      "awayTeam": "Fórmula 1",
+      "suggestedCategoryKey": "races",
+      "source": "Calendário oficial da Fórmula 1 2026",
+      "sourceUrl": "https://www.formula1.com/en/racing/2026",
+      "lastVerified": "2026-06-03",
+      "weekend": "12-14 Jun",
+      "notes": [
+        "FORMULA 1 MSC CRUISES GRAN PREMIO DE BARCELONA-CATALUNYA 2026"
+      ],
+      "isBrazilMatch": false
+    },
+    {
+      "id": "2026f100-0000-4000-8000-000000000108",
+      "title": "F1 8: GP Áustria",
+      "date": "2026-06-28",
+      "time": "15:00",
+      "timezone": "Europe/Vienna",
+      "city": "Spielberg",
+      "venue": "Red Bull Ring",
+      "phase": "Grande Prêmio",
+      "homeTeam": "Áustria",
+      "awayTeam": "Fórmula 1",
+      "suggestedCategoryKey": "races",
+      "source": "Calendário oficial da Fórmula 1 2026",
+      "sourceUrl": "https://www.formula1.com/en/racing/2026",
+      "lastVerified": "2026-06-03",
+      "weekend": "26-28 Jun",
+      "notes": [
+        "FORMULA 1 LENOVO AUSTRIAN GRAND PRIX 2026"
+      ],
+      "isBrazilMatch": false
+    },
+    {
+      "id": "2026f100-0000-4000-8000-000000000109",
+      "title": "F1 9: GP Grã-Bretanha",
+      "date": "2026-07-05",
+      "time": "15:00",
+      "timezone": "Europe/London",
+      "city": "Silverstone",
+      "venue": "Silverstone Circuit",
+      "phase": "Grande Prêmio",
+      "homeTeam": "Grã-Bretanha",
+      "awayTeam": "Fórmula 1",
+      "suggestedCategoryKey": "races",
+      "source": "Calendário oficial da Fórmula 1 2026",
+      "sourceUrl": "https://www.formula1.com/en/racing/2026",
+      "lastVerified": "2026-06-03",
+      "weekend": "03-05 Jul",
+      "notes": [
+        "FORMULA 1 PIRELLI BRITISH GRAND PRIX 2026"
+      ],
+      "isBrazilMatch": false
+    },
+    {
+      "id": "2026f100-0000-4000-8000-000000000110",
+      "title": "F1 10: GP Bélgica",
+      "date": "2026-07-19",
+      "time": "15:00",
+      "timezone": "Europe/Brussels",
+      "city": "Spa-Francorchamps",
+      "venue": "Circuit de Spa-Francorchamps",
+      "phase": "Grande Prêmio",
+      "homeTeam": "Bélgica",
+      "awayTeam": "Fórmula 1",
+      "suggestedCategoryKey": "races",
+      "source": "Calendário oficial da Fórmula 1 2026",
+      "sourceUrl": "https://www.formula1.com/en/racing/2026",
+      "lastVerified": "2026-06-03",
+      "weekend": "17-19 Jul",
+      "notes": [
+        "FORMULA 1 MOET & CHANDON BELGIAN GRAND PRIX 2026"
+      ],
+      "isBrazilMatch": false
+    },
+    {
+      "id": "2026f100-0000-4000-8000-000000000111",
+      "title": "F1 11: GP Hungria",
+      "date": "2026-07-26",
+      "time": "15:00",
+      "timezone": "Europe/Budapest",
+      "city": "Budapest",
+      "venue": "Hungaroring",
+      "phase": "Grande Prêmio",
+      "homeTeam": "Hungria",
+      "awayTeam": "Fórmula 1",
+      "suggestedCategoryKey": "races",
+      "source": "Calendário oficial da Fórmula 1 2026",
+      "sourceUrl": "https://www.formula1.com/en/racing/2026",
+      "lastVerified": "2026-06-03",
+      "weekend": "24-26 Jul",
+      "notes": [
+        "FORMULA 1 AWS HUNGARIAN GRAND PRIX 2026"
+      ],
+      "isBrazilMatch": false
+    },
+    {
+      "id": "2026f100-0000-4000-8000-000000000112",
+      "title": "F1 12: GP Países Baixos",
+      "date": "2026-08-23",
+      "time": "15:00",
+      "timezone": "Europe/Amsterdam",
+      "city": "Zandvoort",
+      "venue": "Circuit Zandvoort",
+      "phase": "Grande Prêmio",
+      "homeTeam": "Países Baixos",
+      "awayTeam": "Fórmula 1",
+      "suggestedCategoryKey": "races",
+      "source": "Calendário oficial da Fórmula 1 2026",
+      "sourceUrl": "https://www.formula1.com/en/racing/2026",
+      "lastVerified": "2026-06-03",
+      "weekend": "21-23 Aug",
+      "notes": [
+        "FORMULA 1 HEINEKEN DUTCH GRAND PRIX 2026"
+      ],
+      "isBrazilMatch": false
+    },
+    {
+      "id": "2026f100-0000-4000-8000-000000000113",
+      "title": "F1 13: GP Itália",
+      "date": "2026-09-06",
+      "time": "15:00",
+      "timezone": "Europe/Rome",
+      "city": "Monza",
+      "venue": "Autodromo Nazionale Monza",
+      "phase": "Grande Prêmio",
+      "homeTeam": "Itália",
+      "awayTeam": "Fórmula 1",
+      "suggestedCategoryKey": "races",
+      "source": "Calendário oficial da Fórmula 1 2026",
+      "sourceUrl": "https://www.formula1.com/en/racing/2026",
+      "lastVerified": "2026-06-03",
+      "weekend": "04-06 Sep",
+      "notes": [
+        "FORMULA 1 PIRELLI GRAN PREMIO D'ITALIA 2026"
+      ],
+      "isBrazilMatch": false
+    },
+    {
+      "id": "2026f100-0000-4000-8000-000000000114",
+      "title": "F1 14: GP Espanha",
+      "date": "2026-09-13",
+      "time": "15:00",
+      "timezone": "Europe/Madrid",
+      "city": "Madrid",
+      "venue": "Madrid",
+      "phase": "Grande Prêmio",
+      "homeTeam": "Espanha",
+      "awayTeam": "Fórmula 1",
+      "suggestedCategoryKey": "races",
+      "source": "Calendário oficial da Fórmula 1 2026",
+      "sourceUrl": "https://www.formula1.com/en/racing/2026",
+      "lastVerified": "2026-06-03",
+      "weekend": "11-13 Sep",
+      "notes": [
+        "FORMULA 1 TAG HEUER GRAN PREMIO DE ESPANA 2026"
+      ],
+      "isBrazilMatch": false
+    },
+    {
+      "id": "2026f100-0000-4000-8000-000000000115",
+      "title": "F1 15: GP Azerbaijão",
+      "date": "2026-09-26",
+      "time": "15:00",
+      "timezone": "Asia/Baku",
+      "city": "Baku",
+      "venue": "Baku City Circuit",
+      "phase": "Grande Prêmio",
+      "homeTeam": "Azerbaijão",
+      "awayTeam": "Fórmula 1",
+      "suggestedCategoryKey": "races",
+      "source": "Calendário oficial da Fórmula 1 2026",
+      "sourceUrl": "https://www.formula1.com/en/racing/2026",
+      "lastVerified": "2026-06-03",
+      "weekend": "24-26 Sep",
+      "notes": [
+        "FORMULA 1 QATAR AIRWAYS AZERBAIJAN GRAND PRIX 2026"
+      ],
+      "isBrazilMatch": false
+    },
+    {
+      "id": "2026f100-0000-4000-8000-000000000116",
+      "title": "F1 16: GP Singapura",
+      "date": "2026-10-11",
+      "time": "20:00",
+      "timezone": "Asia/Singapore",
+      "city": "Singapore",
+      "venue": "Marina Bay Street Circuit",
+      "phase": "Grande Prêmio",
+      "homeTeam": "Singapura",
+      "awayTeam": "Fórmula 1",
+      "suggestedCategoryKey": "races",
+      "source": "Calendário oficial da Fórmula 1 2026",
+      "sourceUrl": "https://www.formula1.com/en/racing/2026",
+      "lastVerified": "2026-06-03",
+      "weekend": "09-11 Oct",
+      "notes": [
+        "FORMULA 1 SINGAPORE AIRLINES SINGAPORE GRAND PRIX 2026"
+      ],
+      "isBrazilMatch": false
+    },
+    {
+      "id": "2026f100-0000-4000-8000-000000000117",
+      "title": "F1 17: GP Estados Unidos",
+      "date": "2026-10-25",
+      "time": "14:00",
+      "timezone": "America/Chicago",
+      "city": "Austin",
+      "venue": "Circuit of The Americas",
+      "phase": "Grande Prêmio",
+      "homeTeam": "Estados Unidos",
+      "awayTeam": "Fórmula 1",
+      "suggestedCategoryKey": "races",
+      "source": "Calendário oficial da Fórmula 1 2026",
+      "sourceUrl": "https://www.formula1.com/en/racing/2026",
+      "lastVerified": "2026-06-03",
+      "weekend": "23-25 Oct",
+      "notes": [
+        "FORMULA 1 MSC CRUISES UNITED STATES GRAND PRIX 2026"
+      ],
+      "isBrazilMatch": false
+    },
+    {
+      "id": "2026f100-0000-4000-8000-000000000118",
+      "title": "F1 18: GP México",
+      "date": "2026-11-01",
+      "time": "14:00",
+      "timezone": "America/Mexico_City",
+      "city": "Mexico City",
+      "venue": "Autodromo Hermanos Rodriguez",
+      "phase": "Grande Prêmio",
+      "homeTeam": "México",
+      "awayTeam": "Fórmula 1",
+      "suggestedCategoryKey": "races",
+      "source": "Calendário oficial da Fórmula 1 2026",
+      "sourceUrl": "https://www.formula1.com/en/racing/2026",
+      "lastVerified": "2026-06-03",
+      "weekend": "30 Oct-01 Nov",
+      "notes": [
+        "FORMULA 1 GRAN PREMIO DE LA CIUDAD DE MEXICO 2026"
+      ],
+      "isBrazilMatch": false
+    },
+    {
+      "id": "2026f100-0000-4000-8000-000000000119",
+      "title": "F1 19: GP Brasil",
+      "date": "2026-11-08",
+      "time": "14:00",
+      "timezone": "America/Sao_Paulo",
+      "city": "São Paulo",
+      "venue": "Interlagos",
+      "phase": "Grande Prêmio",
+      "homeTeam": "Brasil",
+      "awayTeam": "Fórmula 1",
+      "suggestedCategoryKey": "races",
+      "source": "Calendário oficial da Fórmula 1 2026",
+      "sourceUrl": "https://www.formula1.com/en/racing/2026",
+      "lastVerified": "2026-06-03",
+      "weekend": "06-08 Nov",
+      "notes": [
+        "FORMULA 1 MSC CRUISES GRANDE PREMIO DE SAO PAULO 2026"
+      ],
+      "isBrazilMatch": false
+    },
+    {
+      "id": "2026f100-0000-4000-8000-000000000120",
+      "title": "F1 20: GP Las Vegas",
+      "date": "2026-11-21",
+      "time": "22:00",
+      "timezone": "America/Los_Angeles",
+      "city": "Las Vegas",
+      "venue": "Las Vegas Strip Circuit",
+      "phase": "Grande Prêmio",
+      "homeTeam": "Las Vegas",
+      "awayTeam": "Fórmula 1",
+      "suggestedCategoryKey": "races",
+      "source": "Calendário oficial da Fórmula 1 2026",
+      "sourceUrl": "https://www.formula1.com/en/racing/2026",
+      "lastVerified": "2026-06-03",
+      "weekend": "19-21 Nov",
+      "notes": [
+        "FORMULA 1 HEINEKEN LAS VEGAS GRAND PRIX 2026"
+      ],
+      "isBrazilMatch": false
+    },
+    {
+      "id": "2026f100-0000-4000-8000-000000000121",
+      "title": "F1 21: GP Catar",
+      "date": "2026-11-29",
+      "time": "19:00",
+      "timezone": "Asia/Qatar",
+      "city": "Lusail",
+      "venue": "Lusail International Circuit",
+      "phase": "Grande Prêmio",
+      "homeTeam": "Catar",
+      "awayTeam": "Fórmula 1",
+      "suggestedCategoryKey": "races",
+      "source": "Calendário oficial da Fórmula 1 2026",
+      "sourceUrl": "https://www.formula1.com/en/racing/2026",
+      "lastVerified": "2026-06-03",
+      "weekend": "27-29 Nov",
+      "notes": [
+        "FORMULA 1 QATAR AIRWAYS QATAR GRAND PRIX 2026"
+      ],
+      "isBrazilMatch": false
+    },
+    {
+      "id": "2026f100-0000-4000-8000-000000000122",
+      "title": "F1 22: GP Abu Dhabi",
+      "date": "2026-12-06",
+      "time": "17:00",
+      "timezone": "Asia/Dubai",
+      "city": "Yas Marina",
+      "venue": "Yas Marina Circuit",
+      "phase": "Grande Prêmio",
+      "homeTeam": "Abu Dhabi",
+      "awayTeam": "Fórmula 1",
+      "suggestedCategoryKey": "races",
+      "source": "Calendário oficial da Fórmula 1 2026",
+      "sourceUrl": "https://www.formula1.com/en/racing/2026",
+      "lastVerified": "2026-06-03",
+      "weekend": "04-06 Dec",
+      "notes": [
+        "FORMULA 1 ETIHAD AIRWAYS ABU DHABI GRAND PRIX 2026"
+      ],
+      "isBrazilMatch": false
+    }
+  ]
+}

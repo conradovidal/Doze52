@@ -28,6 +28,11 @@ const getHoverPreviewMaxWidth = () =>
 
 const getFirstWord = (title: string) => title.trim().split(/\s+/)[0] ?? "";
 
+const isCompactSymbolMatchupTitle = (title: string) => {
+  const tokens = title.trim().split(/\s+/).filter(Boolean);
+  return tokens.length === 2 && !/[0-9A-Za-zÀ-ÿ]/.test(title);
+};
+
 const getTextFont = (element: HTMLElement) => {
   const style = window.getComputedStyle(element);
   return (
@@ -186,10 +191,15 @@ export function EventBar({
     typeof window !== "undefined"
       ? getHoverPreviewMaxWidth()
       : HOVER_PREVIEW_MAX_WIDTH_PX;
+  const isCompactSymbolMatchup = isCompactSymbolMatchupTitle(event.title);
   const shouldKeepFirstWordPreview =
-    isOverflowing && doesFirstWordFit;
+    isOverflowing && doesFirstWordFit && !isCompactSymbolMatchup;
   const showProfileIcon =
-    isOverflowing && !shouldKeepFirstWordPreview && Boolean(profileIcon);
+    isOverflowing &&
+    !shouldKeepFirstWordPreview &&
+    Boolean(profileIcon) &&
+    !isCompactSymbolMatchup;
+  const titlePaddingClass = isCompactSymbolMatchup ? "px-1" : EVENT_ITEM_PADDING_X_CLASS;
 
   return (
     <>
@@ -238,7 +248,7 @@ export function EventBar({
         onFocus={showHoverPreview}
         onBlur={hideHoverPreview}
         aria-describedby={isHoverPreviewVisible ? hoverPreviewId : undefined}
-        className={`group relative block w-full cursor-pointer overflow-hidden border border-black/10 text-left text-neutral-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_8px_16px_-14px_rgba(15,23,42,0.32)] transition-[transform,box-shadow,opacity,filter] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 ${EVENT_ITEM_PADDING_X_CLASS} ${EVENT_ITEM_TEXT_CLASS} ${radius} ${
+        className={`group relative block w-full cursor-pointer overflow-hidden border border-black/10 text-left text-neutral-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_8px_16px_-14px_rgba(15,23,42,0.32)] transition-[transform,box-shadow,opacity,filter] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 ${titlePaddingClass} ${EVENT_ITEM_TEXT_CLASS} ${radius} ${
           isPast ? "opacity-65 saturate-[0.92]" : ""
         } ${
           isDragging
@@ -253,6 +263,8 @@ export function EventBar({
           ref={textRef}
           aria-hidden={showProfileIcon ? "true" : undefined}
           className={`block truncate ${EVENT_ITEM_LINE_HEIGHT_CLASS} ${
+            isCompactSymbolMatchup ? "text-center tracking-normal" : ""
+          } ${
             showProfileIcon ? "invisible" : ""
           }`}
           style={{ minHeight: `${EVENT_ITEM_HEIGHT_PX}px` }}

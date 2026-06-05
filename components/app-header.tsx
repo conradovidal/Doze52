@@ -5,6 +5,7 @@ import { Check, PencilLine } from "lucide-react";
 import { BrandLogo } from "@/components/brand-logo";
 import { CategoryBar } from "@/components/category-bar";
 import { CategoryManager } from "@/components/category-manager";
+import { CalendarPackLauncher } from "@/components/calendar-packs/calendar-pack-launcher";
 import { ProfileBar } from "@/components/profile-bar";
 import {
   ProfileManager,
@@ -29,6 +30,7 @@ type AppHeaderProps = {
   authLoading: boolean;
   isAuthenticated: boolean;
   onOpenAuthDialog: (anchorPoint?: AnchorPoint) => void;
+  onCalendarPackFocusYear: (year: number) => void;
 };
 
 const getPreferredEditingProfileId = (
@@ -42,6 +44,7 @@ export function AppHeader({
   authLoading,
   isAuthenticated,
   onOpenAuthDialog,
+  onCalendarPackFocusYear,
 }: AppHeaderProps) {
   const profiles = useStore((s) => s.profiles);
   const selectedProfileIds = useStore((s) => s.selectedProfileIds);
@@ -213,14 +216,22 @@ export function AppHeader({
         </div>
 
         <div className="mx-auto flex w-full max-w-[58rem] flex-col items-center gap-1.5 border-t border-border/45 pt-2.5 md:gap-2 md:pt-3">
-          <ProfileBar
-            compact
-            isInlineEditMode={isInlineEditMode}
-            editingProfileId={editingProfileId}
-            onEditingProfileChange={setEditingProfileId}
-            onCreateProfile={openCreateProfile}
-            onEditProfile={openEditProfile}
-          />
+          <div className="flex w-full flex-wrap items-center justify-center gap-1.5 sm:gap-2">
+            <CalendarPackLauncher
+              onFocusYear={onCalendarPackFocusYear}
+              className="shrink-0"
+            />
+
+            <ProfileBar
+              compact
+              className="w-auto min-w-0"
+              isInlineEditMode={isInlineEditMode}
+              editingProfileId={editingProfileId}
+              onEditingProfileChange={setEditingProfileId}
+              onCreateProfile={openCreateProfile}
+              onEditProfile={openEditProfile}
+            />
+          </div>
 
           <CategoryBar
             compact

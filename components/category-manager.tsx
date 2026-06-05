@@ -22,6 +22,11 @@ import {
   DEFAULT_CATEGORY_COLOR,
   getNearestCategoryColor,
 } from "@/lib/category-palette";
+import { calendarPacks } from "@/lib/calendar-packs";
+import {
+  findCalendarPackByCategoryId,
+  removeCalendarPackCategory,
+} from "@/lib/calendar-packs/import";
 import { useStore } from "@/lib/store";
 import type { AnchorPoint } from "@/lib/types";
 
@@ -49,9 +54,11 @@ export function CategoryManager({
 }: CategoryManagerProps) {
   const categories = useStore((s) => s.categories);
   const profiles = useStore((s) => s.profiles);
+  const events = useStore((s) => s.events);
   const createCategory = useStore((s) => s.createCategory);
   const updateCategory = useStore((s) => s.updateCategory);
   const deleteCategory = useStore((s) => s.deleteCategory);
+  const replaceAllData = useStore((s) => s.replaceAllData);
 
   const category = React.useMemo(
     () => categories.find((c) => c.id === categoryId),
@@ -68,6 +75,17 @@ export function CategoryManager({
   const currentProfile = React.useMemo(
     () => profiles.find((profile) => profile.id === profileDraftId || profile.id === effectiveProfileId) ?? null,
     [effectiveProfileId, profileDraftId, profiles]
+  );
+  const snapshot = React.useMemo(
+    () => ({ profiles, categories, events }),
+    [categories, events, profiles]
+  );
+  const calendarPackCategory = React.useMemo(
+    () =>
+      categoryId
+        ? findCalendarPackByCategoryId(snapshot, calendarPacks, categoryId)
+        : null,
+    [categoryId, snapshot]
   );
 
   React.useEffect(() => {
@@ -139,7 +157,12 @@ export function CategoryManager({
     try {
       setIsSaving(true);
       setSaveError(null);
-      deleteCategory(categoryId);
+      if (calendarPackCategory) {
+        const result = removeCalendarPackCategory(snapshot, categoryId);
+        replaceAllData(result.snapshot);
+      } else {
+        deleteCategory(categoryId);
+      }
       onOpenChange(false);
     } catch (error) {
       setSaveError(
