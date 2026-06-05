@@ -1157,6 +1157,7 @@ export default function HomePage() {
           onYearChange={handleYearChange}
           authLoading={authLoading}
           isAuthenticated={Boolean(session)}
+          onCalendarPackFocusYear={handleYearChange}
           onOpenAuthDialog={(anchorPoint) => {
             setAuthDialogAnchorPoint(anchorPoint);
             setAuthDialogOpen(true);
