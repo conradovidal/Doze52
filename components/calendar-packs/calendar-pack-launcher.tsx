@@ -48,12 +48,20 @@ const formatVerifiedDate = (value: string) => {
   return `${String(day).padStart(2, "0")}/${String(month).padStart(2, "0")}/${year}`;
 };
 
+const MOBILE_LAUNCHER_STYLE = {
+  height: "2.5rem",
+  minHeight: "2.5rem",
+} satisfies React.CSSProperties;
+const MOBILE_PACK_LABEL = "Mais calendários";
+
 export function CalendarPackLauncher({
   onFocusYear,
   className,
+  mobileDense = false,
 }: {
   onFocusYear?: (year: number) => void;
   className?: string;
+  mobileDense?: boolean;
 }) {
   const { notify } = useFeedback();
   const profiles = useStore((state) => state.profiles);
@@ -198,8 +206,11 @@ export function CalendarPackLauncher({
         type="button"
         variant="outline"
         size="sm"
+        style={mobileDense ? MOBILE_LAUNCHER_STYLE : undefined}
         className={cn(
           "relative h-8 rounded-full border-border/55 bg-background/70 px-2.5 text-[0.78rem] font-medium text-foreground/78 shadow-none transition-all hover:border-border/75 hover:bg-muted/35 hover:text-foreground",
+          mobileDense &&
+            "!h-10 justify-start gap-2 overflow-hidden rounded-[8px] !border-foreground !bg-foreground px-2.5 py-1 !text-background shadow-none whitespace-normal hover:!bg-foreground/92 hover:!text-background dark:!border-white/80 dark:!bg-white dark:!text-black dark:hover:!bg-white/92 dark:hover:!text-black",
           hasPackUpdates &&
             "border-amber-400/60 text-foreground hover:border-amber-400/75",
           className
@@ -207,8 +218,8 @@ export function CalendarPackLauncher({
         onClick={() => setOpen(true)}
         aria-label={
           hasPackUpdates
-            ? `Abrir pacotes de calendários. ${updateAriaCopy}`
-            : "Abrir pacotes de calendários"
+            ? `Abrir ${MOBILE_PACK_LABEL}. Destaque: Copa 2026. ${updateAriaCopy}`
+            : `Abrir ${MOBILE_PACK_LABEL}. Destaque: Copa 2026.`
         }
         title={hasPackUpdates ? "Atualizações disponíveis" : undefined}
       >
@@ -218,12 +229,37 @@ export function CalendarPackLauncher({
             aria-hidden="true"
           />
         ) : null}
-        <CalendarDays className="size-3.5" />
-        <span>Pacotes</span>
-        <span className="hidden items-center gap-1 rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300 sm:inline-flex">
-          <span aria-hidden="true">🇧🇷</span>
-          Copa
+        {mobileDense ? (
+          <span className="grid size-6 shrink-0 place-items-center self-center rounded-[7px] bg-background/14 text-[17px] font-semibold leading-none text-background dark:!bg-black/10 dark:!text-black">
+            +
+          </span>
+        ) : (
+          <CalendarDays className="size-3.5" />
+        )}
+        <span
+          className={cn(
+            mobileDense
+              ? "min-w-0 self-center text-left text-[0.72rem] font-semibold leading-[0.9rem]"
+              : ""
+          )}
+        >
+          {mobileDense ? (
+            <>
+              <span className="block">Calendários</span>
+              <span className="block text-[9px] font-semibold uppercase leading-[0.68rem] tracking-[0.08em] text-emerald-200/90 dark:!text-emerald-700">
+                🇧🇷 Copa 2026
+              </span>
+            </>
+          ) : (
+            "Pacotes"
+          )}
         </span>
+        {!mobileDense ? (
+          <span className="hidden items-center gap-1 rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300 sm:inline-flex">
+            <span aria-hidden="true">🇧🇷</span>
+            Copa
+          </span>
+        ) : null}
       </Button>
 
       <Dialog open={open} onOpenChange={handleOpenChange}>

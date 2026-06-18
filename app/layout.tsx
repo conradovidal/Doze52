@@ -8,12 +8,25 @@ import { ThemeInitScript } from "@/components/theme-init-script";
 import { SiteFooter } from "@/components/site-footer";
 
 export const metadata: Metadata = {
+  applicationName: "Doze 52",
   title: "Doze 52 | Sistema de estruturação de foco",
   description: "Planejamento visual anual com revisao mensal e habitos.",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: "Doze 52",
+    statusBarStyle: "default",
+  },
   icons: {
     icon: [
       {
         url: FAVICON_URL,
+        type: "image/svg+xml",
+      },
+    ],
+    apple: [
+      {
+        url: "/icon.svg",
         type: "image/svg+xml",
       },
     ],
@@ -27,13 +40,15 @@ export default function RootLayout({
 }) {
   return (
     <html lang="pt-BR" suppressHydrationWarning>
-      <body className="min-h-screen bg-background text-foreground">
+      <body className="h-dvh overflow-hidden bg-background text-foreground md:h-auto md:min-h-screen md:overflow-visible">
         <ThemeInitScript />
         <ThemeProvider>
           <FeedbackProvider>
             <AuthProvider>
-              <div className="flex min-h-screen flex-col">
-                <div className="flex-1">{children}</div>
+              <div className="flex h-dvh flex-col overflow-hidden md:h-auto md:min-h-screen md:overflow-visible">
+                <div className="min-h-0 flex-1 overflow-hidden md:overflow-visible">
+                  {children}
+                </div>
                 <SiteFooter />
               </div>
             </AuthProvider>

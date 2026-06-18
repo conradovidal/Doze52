@@ -32,6 +32,7 @@ import type { AnchorPoint } from "@/lib/types";
 
 const CHIP_TRIGGER_CLASS =
   "h-10 w-full rounded-xl border px-3 text-sm shadow-sm transition-colors";
+const CATEGORY_NAME_MAX_LENGTH = 28;
 
 type CategoryManagerProps = {
   mode: "edit" | "create";
@@ -107,7 +108,8 @@ export function CategoryManager({
   }, [open, mode, category, effectiveCreateProfileId]);
 
   const isEdit = mode === "edit";
-  const canSave = name.trim().length > 0 && Boolean(profileDraftId);
+  const normalizedName = name.trim().slice(0, CATEGORY_NAME_MAX_LENGTH).trim();
+  const canSave = normalizedName.length > 0 && Boolean(profileDraftId);
   const canDelete = categories.length > 1;
   const normalizedColor = color.toLowerCase();
   const presetColors = React.useMemo(
@@ -123,7 +125,7 @@ export function CategoryManager({
       if (isEdit) {
         if (!categoryId) return;
         updateCategory(categoryId, {
-          name: name.trim(),
+          name: normalizedName,
           color,
           profileId: profileDraftId,
         });
@@ -135,7 +137,7 @@ export function CategoryManager({
         return;
       }
       const id = createCategory({
-        name: name.trim(),
+        name: normalizedName,
         color,
         profileId: profileDraftId,
       });
@@ -191,7 +193,10 @@ export function CategoryManager({
             id="category-name"
             aria-label="Nome da categoria"
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) =>
+              setName(e.target.value.slice(0, CATEGORY_NAME_MAX_LENGTH))
+            }
+            maxLength={CATEGORY_NAME_MAX_LENGTH}
             placeholder="Nome da categoria"
             className="h-10 rounded-xl"
           />
