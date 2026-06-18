@@ -27,6 +27,8 @@ import {
 import { useStore } from "@/lib/store";
 import { ProfileIcon } from "@/components/profile-icon";
 
+const PROFILE_NAME_MAX_LENGTH = 28;
+
 export type ProfileManagerIntent =
   | { mode: "create" }
   | { mode: "edit"; profileId: string };
@@ -150,8 +152,9 @@ export function ProfileManager({
   }, [open, editorMode, profiles, editingProfileId, startCreate, startEdit]);
 
   const isEditMode = editorMode === "edit";
+  const normalizedName = name.trim().slice(0, PROFILE_NAME_MAX_LENGTH).trim();
   const canSave =
-    name.trim().length > 0 && (editorMode === "create" || Boolean(editingProfile));
+    normalizedName.length > 0 && (editorMode === "create" || Boolean(editingProfile));
   const canDelete = isEditMode && profiles.length > 1;
 
   const handleSave = async () => {
@@ -162,14 +165,14 @@ export function ProfileManager({
       if (editorMode === "edit") {
         if (!editingProfile) return;
         updateProfile(editingProfile.id, {
-          name: name.trim(),
+          name: normalizedName,
           icon,
         });
         onOpenChange(false);
         return;
       }
 
-      const createdId = createProfile({ name: name.trim(), icon });
+      const createdId = createProfile({ name: normalizedName, icon });
       if (createdId) {
         onOpenChange(false);
       }
@@ -248,7 +251,10 @@ export function ProfileManager({
               id="profile-name"
               aria-label="Nome do perfil"
               value={name}
-              onChange={(event) => setName(event.target.value)}
+              onChange={(event) =>
+                setName(event.target.value.slice(0, PROFILE_NAME_MAX_LENGTH))
+              }
+              maxLength={PROFILE_NAME_MAX_LENGTH}
               placeholder="Nome do perfil"
               className="h-11 flex-1 rounded-xl"
             />

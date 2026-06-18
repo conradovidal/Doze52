@@ -3,6 +3,7 @@
 import * as React from "react";
 import { format, parseISO } from "date-fns";
 import { Plus } from "lucide-react";
+import { MobileCalendarExperience } from "@/components/calendar/mobile-calendar-experience";
 import { YearGrid } from "@/components/calendar/year-grid";
 import { EventDialog } from "@/components/event-dialog";
 import { AppHeader } from "@/components/app-header";
@@ -49,6 +50,7 @@ import { logDevError, logProdError } from "@/lib/safe-log";
 import { getSupabaseBrowserClient, hasSupabaseEnv } from "@/lib/supabase";
 import { expandEventsForYear } from "@/lib/recurrence";
 import type { AnchorPoint } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 const toSnapshotHash = (snapshot: CalendarSnapshot) => JSON.stringify(snapshot);
 
@@ -342,6 +344,9 @@ export default function HomePage() {
   const [isMobileCalendarUi, setIsMobileCalendarUi] = React.useState<
     boolean | null
   >(null);
+  const [mobileActiveDateIso, setMobileActiveDateIso] = React.useState(() =>
+    format(new Date(), "yyyy-MM-dd")
+  );
   const [windowContext] = React.useState<"main" | "popup">(() => {
     if (typeof window === "undefined") return "main";
     return Boolean(window.opener) || window.name === "doze52_oauth"
@@ -549,10 +554,6 @@ export default function HomePage() {
 
     if (hasSupabaseEnv) return;
 
-    const message =
-      "Supabase nao configurado. Defina NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY neste ambiente.";
-
-    logDevError("app.page.supabase-env", { message });
     logProdError("Supabase nao configurado neste ambiente.");
   }, [windowContext]);
 
@@ -895,8 +896,9 @@ export default function HomePage() {
     });
   };
 
-  const handleMobileFabCreate = React.useCallback(() => {
-    const fallbackTodayIso = todayIso || format(new Date(), "yyyy-MM-dd");
+  const handleMobileFabCreate = React.useCallback((dateIso?: string) => {
+    const fallbackTodayIso =
+      dateIso || todayIso || format(new Date(), "yyyy-MM-dd");
 
     setEditingId(null);
     setDialogAnchorPoint(undefined);
@@ -1134,6 +1136,14 @@ export default function HomePage() {
     [resetCalendarFocusOnYearChange]
   );
 
+  React.useEffect(() => {
+    setMobileActiveDateIso((currentIso) => {
+      if (Number(currentIso.slice(0, 4)) === year) return currentIso;
+      if (todayIso && Number(todayIso.slice(0, 4)) === year) return todayIso;
+      return `${year}-01-01`;
+    });
+  }, [todayIso, year]);
+
   if (windowContext === "popup") {
     return (
       <main className="flex min-h-screen items-center justify-center px-4">
@@ -1143,7 +1153,14 @@ export default function HomePage() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-none overflow-x-clip px-4 pt-3 pb-2 md:pb-4">
+    <main
+      className={cn(
+        "mx-auto w-full max-w-none overflow-x-clip",
+        isMobileCalendarUi
+          ? "flex h-full min-h-0 flex-col overflow-hidden px-3 pt-2 pb-1"
+          : "px-4 pt-3 pb-2 md:pb-4"
+      )}
+    >
       <SyncStatusOverlay
         status={syncOverlayStatus}
         visible={isSyncOverlayVisible}
@@ -1151,12 +1168,20 @@ export default function HomePage() {
         onErrorPopoverOpenChange={handleSyncOverlayErrorOpenChange}
       />
 
-      <div className="sticky top-0 z-30 -mx-4 px-4 pb-2 bg-background/92 backdrop-blur supports-[backdrop-filter]:bg-background/82 md:static md:mx-0 md:px-0 md:pb-0 md:bg-transparent md:backdrop-blur-none">
+      <div
+        className={cn(
+          "z-30 bg-background",
+          isMobileCalendarUi
+            ? "shrink-0 pb-2"
+            : "sticky top-0 -mx-4 px-4 pb-2 md:static md:mx-0 md:bg-transparent md:px-0 md:pb-0"
+        )}
+      >
         <AppHeader
           year={year}
           onYearChange={handleYearChange}
           authLoading={authLoading}
           isAuthenticated={Boolean(session)}
+          isMobileCalendarUi={isMobileCalendarUi === true}
           onCalendarPackFocusYear={handleYearChange}
           onOpenAuthDialog={(anchorPoint) => {
             setAuthDialogAnchorPoint(anchorPoint);
@@ -1165,81 +1190,87 @@ export default function HomePage() {
         />
       </div>
 
-      {!hasSupabaseEnv ? (
-        <p className="mb-3 text-center text-sm text-amber-700">
-          Supabase nao configurado neste ambiente.
-        </p>
-      ) : null}
-
-      <div className="overflow-x-auto pb-1 md:overflow-visible">
-        <div data-calendar-focus-root className="relative">
-          <YearGrid
-            year={year}
-            todayIso={todayIso}
-            events={renderEvents}
-            onEditEvent={handleEditEvent}
-            creatingRange={creatingRange}
-            onStartCreateRange={handleStartCreateRange}
-            onHoverCreateRange={handleHoverCreateRange}
-            onFinishCreateRange={handleFinishCreateRange}
-            onMoveEventByDelta={moveEventByDelta}
-            onApplyDayReorder={({ dayIso, eventId, toIndex, orderedIds }) => {
-              void eventId;
-              void toIndex;
-              normalizeDayOrder(dayIso, orderedIds);
-            }}
-            isMobileInteractionMode={isMobileCalendarUi === true}
-          />
-
-          {showDesktopCreateCoachmark ? (
-            <Popover
-              open={showDesktopCreateCoachmark}
-              onOpenChange={(open) => {
-                if (!open) dismissCalendarCreateOnboarding();
+      {isMobileCalendarUi === true ? (
+          <MobileCalendarExperience
+          year={year}
+          todayIso={todayIso}
+          events={renderEvents}
+          activeDateIso={mobileActiveDateIso}
+          onActiveDateChange={setMobileActiveDateIso}
+          onYearChange={handleYearChange}
+          onEditEvent={handleEditEvent}
+        />
+      ) : (
+        <div className="overflow-x-auto pb-1 md:overflow-visible">
+          <div data-calendar-focus-root className="relative">
+            <YearGrid
+              year={year}
+              todayIso={todayIso}
+              events={renderEvents}
+              onEditEvent={handleEditEvent}
+              creatingRange={creatingRange}
+              onStartCreateRange={handleStartCreateRange}
+              onHoverCreateRange={handleHoverCreateRange}
+              onFinishCreateRange={handleFinishCreateRange}
+              onMoveEventByDelta={moveEventByDelta}
+              onApplyDayReorder={({ dayIso, eventId, toIndex, orderedIds }) => {
+                void eventId;
+                void toIndex;
+                normalizeDayOrder(dayIso, orderedIds);
               }}
-            >
-              <PopoverAnchor asChild>
-                <div
-                  aria-hidden="true"
-                  className="pointer-events-none absolute top-4 left-[5.5rem] h-px w-px"
-                />
-              </PopoverAnchor>
+              isMobileInteractionMode={false}
+            />
 
-              <PopoverContent
-                align="start"
-                side="bottom"
-                sideOffset={14}
-                className="w-[18.5rem] rounded-[1.4rem] p-4"
+            {showDesktopCreateCoachmark ? (
+              <Popover
+                open={showDesktopCreateCoachmark}
+                onOpenChange={(open) => {
+                  if (!open) dismissCalendarCreateOnboarding();
+                }}
               >
-                <PopoverHeader className="space-y-1.5">
-                  <PopoverTitle>Crie direto no calendario</PopoverTitle>
-                  <PopoverDescription className="text-sm leading-5">
-                    Clique ou arraste no calendario para criar um evento. Toque
-                    num evento existente para editar.
-                  </PopoverDescription>
-                </PopoverHeader>
+                <PopoverAnchor asChild>
+                  <div
+                    aria-hidden="true"
+                    className="pointer-events-none absolute top-4 left-[5.5rem] h-px w-px"
+                  />
+                </PopoverAnchor>
 
-                <div className="mt-4 flex justify-end">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="rounded-full"
-                    onClick={dismissCalendarCreateOnboarding}
-                  >
-                    Entendi
-                  </Button>
-                </div>
-              </PopoverContent>
-            </Popover>
-          ) : null}
+                <PopoverContent
+                  align="start"
+                  side="bottom"
+                  sideOffset={14}
+                  className="w-[18.5rem] rounded-[1.4rem] p-4"
+                >
+                  <PopoverHeader className="space-y-1.5">
+                    <PopoverTitle>Crie direto no calendario</PopoverTitle>
+                    <PopoverDescription className="text-sm leading-5">
+                      Clique ou arraste no calendario para criar um evento. Toque
+                      num evento existente para editar.
+                    </PopoverDescription>
+                  </PopoverHeader>
+
+                  <div className="mt-4 flex justify-end">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="rounded-full"
+                      onClick={dismissCalendarCreateOnboarding}
+                    >
+                      Entendi
+                    </Button>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            ) : null}
+          </div>
         </div>
-      </div>
+      )}
 
       {isMobileCalendarUi ? (
         <div
           className="fixed right-4 z-40 md:hidden"
-          style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 1rem)" }}
+          style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 2.75rem)" }}
         >
           <Popover
             open={showMobileCreateCoachmark}
@@ -1254,7 +1285,7 @@ export default function HomePage() {
                 variant="premium"
                 className="rounded-full shadow-[0_20px_40px_-24px_rgba(15,23,42,0.55)]"
                 aria-label="Novo evento"
-                onClick={handleMobileFabCreate}
+                onClick={() => handleMobileFabCreate(mobileActiveDateIso)}
               >
                 <Plus className="size-5" />
               </Button>
@@ -1270,8 +1301,8 @@ export default function HomePage() {
                 <PopoverHeader className="space-y-1.5">
                   <PopoverTitle>Crie pelo botão +</PopoverTitle>
                   <PopoverDescription className="text-sm leading-5">
-                    Use o + para criar um evento. Toque no calendario para
-                    navegar entre os focos do periodo.
+                    Use o + para criar no dia ativo. Toque no calendario para
+                    escolher o dia ou nos meses para saltar rapidamente.
                   </PopoverDescription>
                 </PopoverHeader>
 
@@ -1309,6 +1340,12 @@ export default function HomePage() {
         onSubmit={handleSubmit}
         onDelete={editingId ? handleDeleteEvent : undefined}
       />
+
+      {!hasSupabaseEnv ? (
+        <p className="mx-auto mt-1 max-w-[31rem] shrink-0 text-center text-[10px] font-medium leading-4 text-amber-700 md:mt-5 md:mb-1 md:max-w-none md:text-xs">
+          Supabase nao configurado neste ambiente.
+        </p>
+      ) : null}
 
       <AuthDialog
         open={authDialogOpen}
