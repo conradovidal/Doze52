@@ -48,6 +48,18 @@ const CHIP_OVERLAY_CLASS =
   "border-border/75 bg-background shadow-[0_18px_30px_-18px_rgba(15,23,42,0.28)]";
 const CREATE_ACTION_CLASS = `inline-flex h-8 w-8 items-center justify-center rounded-full border border-foreground/12 bg-foreground/[0.06] text-foreground/82 shadow-none transition-all ${MOTION_CLASS} hover:border-foreground/18 hover:bg-foreground/[0.1] hover:text-foreground`;
 
+const MOBILE_CHIP_LABEL_STYLE = {
+  display: "-webkit-box",
+  WebkitBoxOrient: "vertical",
+  WebkitLineClamp: 2,
+  overflow: "hidden",
+  overflowWrap: "anywhere",
+} satisfies React.CSSProperties;
+const MOBILE_CHIP_BUTTON_STYLE = {
+  height: "2.5rem",
+  minHeight: "2.5rem",
+} satisfies React.CSSProperties;
+
 const hexToRgba = (hex: string, alpha: number) => {
   const normalized = hex.trim().replace("#", "");
   const expanded =
@@ -85,6 +97,7 @@ const applyProfileOrderToAll = (
 
 type CategoryBarProps = {
   compact?: boolean;
+  mobileDense?: boolean;
   isInlineEditMode?: boolean;
   editingProfileId?: string | null;
   onCreateCategory?: () => void;
@@ -292,6 +305,7 @@ function SortableEditCategoryChip({
 
 export function CategoryBar({
   compact = false,
+  mobileDense = false,
   isInlineEditMode = false,
   editingProfileId,
   onCreateCategory,
@@ -353,7 +367,14 @@ export function CategoryBar({
     [orderedCategoriesForEditingProfile, activeDrag]
   );
   const dragEnabled = isInlineEditMode && orderedCategoriesForEditingProfile.length > 1;
-  const barClass = `${compact ? "w-full min-h-8 justify-center" : "mb-2 min-h-8 justify-center"} flex flex-wrap items-center gap-1.5 sm:gap-2`;
+  const barClass = cn(
+    mobileDense
+      ? "grid w-full grid-cols-2 gap-1.5 min-[430px]:grid-cols-3"
+      : compact
+        ? "w-full min-h-8 justify-center"
+        : "mb-2 min-h-8 justify-center",
+    mobileDense ? "" : "flex flex-wrap items-center gap-1.5 sm:gap-2"
+  );
 
   const resetDragState = React.useCallback(() => {
     setActiveDrag(null);
@@ -455,12 +476,18 @@ export function CategoryBar({
             type="button"
             aria-pressed={category.visible}
             onClick={() => toggleCategoryVisibility(category.id)}
-            className={`inline-flex h-8 items-center overflow-hidden rounded-full border text-[0.78rem] font-medium shadow-none transition-all ${MOTION_CLASS} ${
+            title={category.name}
+            className={`inline-flex items-center border text-[0.78rem] font-medium shadow-none transition-all ${MOTION_CLASS} ${
+              mobileDense
+                ? "h-10 w-full justify-start overflow-hidden rounded-[8px] pr-2 text-left"
+                : "h-8 overflow-hidden rounded-full"
+            } ${
               category.visible
                 ? "text-foreground hover:brightness-[0.97]"
-                : "bg-background/70 text-muted-foreground hover:border-border/75 hover:bg-muted/35 hover:text-foreground dark:bg-background/45 dark:hover:bg-accent/45"
+                : "bg-background text-muted-foreground hover:border-border hover:bg-muted hover:text-foreground"
             }`}
             style={{
+              ...(mobileDense ? MOBILE_CHIP_BUTTON_STYLE : {}),
               backgroundColor: category.visible
                 ? hexToRgba(category.color, 0.1)
                 : "hsl(var(--background))",
@@ -469,7 +496,14 @@ export function CategoryBar({
                 : "hsl(var(--border) / 0.72)",
             }}
           >
-            <span className={CHIP_LEADING_SLOT_CLASS} aria-hidden="true">
+            <span
+              className={cn(
+                mobileDense
+                  ? "inline-flex h-8 w-7 shrink-0 items-center justify-center"
+                  : CHIP_LEADING_SLOT_CLASS
+              )}
+              aria-hidden="true"
+            >
               <span
                 className="h-2.5 w-2.5 rounded-full"
                 style={{
@@ -479,9 +513,14 @@ export function CategoryBar({
               />
             </span>
             <span
-              className={`min-w-0 truncate pl-1 pr-3 ${
+              className={`min-w-0 pl-1 pr-3 ${
+                mobileDense
+                  ? "text-left text-[0.74rem] font-semibold leading-[0.84rem]"
+                  : "truncate"
+              } ${
                 category.visible ? "text-foreground" : "text-muted-foreground"
               }`}
+              style={mobileDense ? MOBILE_CHIP_LABEL_STYLE : undefined}
             >
               {category.name}
             </span>
@@ -491,10 +530,13 @@ export function CategoryBar({
         <button
           type="button"
           onClick={() => setCategoriesVisibility(displayedCategoryIds, !allDisplayedVisible)}
-          className={`inline-flex h-8 items-center justify-center rounded-full border px-2.5 text-muted-foreground/80 shadow-none transition-all ${MOTION_CLASS} ${
+          style={mobileDense ? MOBILE_CHIP_BUTTON_STYLE : undefined}
+          className={`inline-flex items-center justify-center border px-2.5 text-muted-foreground/80 shadow-none transition-all ${MOTION_CLASS} ${
+            mobileDense ? "h-10 w-full rounded-[8px]" : "h-8 rounded-full"
+          } ${
             allDisplayedVisible
-              ? "border-border/50 bg-background/70 hover:border-border/75 hover:bg-muted/35 hover:text-foreground"
-              : "border-border/55 bg-muted/25 text-foreground/85 hover:border-border/75 hover:bg-muted/45 hover:text-foreground"
+              ? "border-border bg-background hover:border-border hover:bg-muted hover:text-foreground"
+              : "border-border bg-muted text-foreground/85 hover:border-border hover:bg-muted hover:text-foreground"
           }`}
           aria-label={visibilityActionLabel}
           title={visibilityActionLabel}

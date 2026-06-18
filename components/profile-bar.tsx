@@ -49,9 +49,22 @@ const CHIP_OVERLAY_CLASS =
   "border-border/75 bg-background shadow-[0_18px_30px_-18px_rgba(15,23,42,0.28)]";
 const CREATE_ACTION_CLASS = `inline-flex h-8 w-8 items-center justify-center rounded-full border border-foreground/12 bg-foreground/[0.06] text-foreground/82 shadow-none transition-all ${MOTION_CLASS} hover:border-foreground/18 hover:bg-foreground/[0.1] hover:text-foreground`;
 
+const MOBILE_CHIP_LABEL_STYLE = {
+  display: "-webkit-box",
+  WebkitBoxOrient: "vertical",
+  WebkitLineClamp: 2,
+  overflow: "hidden",
+  overflowWrap: "anywhere",
+} satisfies React.CSSProperties;
+const MOBILE_CHIP_BUTTON_STYLE = {
+  height: "2.5rem",
+  minHeight: "2.5rem",
+} satisfies React.CSSProperties;
+
 type ProfileBarProps = {
   compact?: boolean;
   className?: string;
+  mobileDense?: boolean;
   isInlineEditMode?: boolean;
   editingProfileId?: string | null;
   onEditingProfileChange?: (profileId: string) => void;
@@ -243,6 +256,7 @@ function SortableEditProfileChip({
 export function ProfileBar({
   compact = false,
   className,
+  mobileDense = false,
   isInlineEditMode = false,
   editingProfileId,
   onEditingProfileChange,
@@ -280,8 +294,16 @@ export function ProfileBar({
   const selectedSet = React.useMemo(() => new Set(selectedProfileIds), [selectedProfileIds]);
   const dragEnabled = isInlineEditMode && profiles.length > 1;
   const barClass = cn(
-    compact ? "w-full min-h-8 justify-center" : "mb-2 min-h-8 justify-center",
-    "flex flex-wrap items-center gap-1.5 sm:gap-2",
+    mobileDense && !isInlineEditMode
+      ? "contents"
+      : compact
+        ? "w-full min-h-8 justify-center"
+        : "mb-2 min-h-8 justify-center",
+    mobileDense && isInlineEditMode
+      ? "grid w-full grid-cols-2 gap-1.5 min-[430px]:grid-cols-3"
+      : mobileDense && !isInlineEditMode
+        ? ""
+        : "flex flex-wrap items-center gap-1.5 sm:gap-2",
     className
   );
 
@@ -371,21 +393,44 @@ export function ProfileBar({
               type="button"
               aria-pressed={selected}
               onClick={() => toggleSelectedProfile(profile.id)}
-              className={`inline-flex h-8 items-center overflow-hidden rounded-full border text-[0.78rem] font-medium shadow-none transition-all ${MOTION_CLASS} ${
+              title={profile.name}
+              style={mobileDense ? MOBILE_CHIP_BUTTON_STYLE : undefined}
+              className={cn(
+                `inline-flex items-center border text-[0.78rem] font-medium shadow-none transition-all ${MOTION_CLASS}`,
+                mobileDense
+                  ? "h-10 w-full justify-start overflow-hidden rounded-[8px] px-2 text-left"
+                  : "h-8 overflow-hidden rounded-full",
                 selected
-                  ? "border-foreground/10 bg-foreground/[0.06] text-foreground hover:bg-foreground/[0.085] dark:border-white/10 dark:bg-white/10 dark:text-white dark:hover:bg-white/14"
-                  : "border-border/55 bg-background/70 text-foreground/72 hover:border-border/75 hover:bg-muted/35 hover:text-foreground dark:bg-background/45 dark:text-foreground/70 dark:hover:bg-accent/45"
-              }`}
+                  ? "border-border bg-muted text-foreground hover:bg-muted dark:border-white/15 dark:bg-muted dark:text-white"
+                  : "border-border bg-background text-foreground/72 hover:border-border hover:bg-muted hover:text-foreground dark:text-foreground/70"
+              )}
             >
-              <span className={CHIP_LEADING_SLOT_CLASS} aria-hidden="true">
+              <span
+                className={cn(
+                  mobileDense ? "mr-1.5 inline-flex h-6 w-6 shrink-0 items-center justify-center" : CHIP_LEADING_SLOT_CLASS
+                )}
+                aria-hidden="true"
+              >
                 <ProfileIcon icon={profile.icon} size={12} className="shrink-0" />
               </span>
-              <span className="min-w-0 truncate pl-1 pr-2">{profile.name}</span>
-              <span className="pr-1">
-                <span className={cn(CHIP_EDIT_ACTION_CLASS, "opacity-0")} aria-hidden="true">
-                  <PencilLine className="h-3.5 w-3.5" />
-                </span>
+              <span
+                className={cn(
+                  "min-w-0",
+                  mobileDense
+                    ? "pr-1 text-left text-[0.74rem] font-semibold leading-[0.84rem]"
+                    : "truncate pl-1 pr-2"
+                )}
+                style={mobileDense ? MOBILE_CHIP_LABEL_STYLE : undefined}
+              >
+                {profile.name}
               </span>
+              {!mobileDense ? (
+                <span className="pr-1">
+                  <span className={cn(CHIP_EDIT_ACTION_CLASS, "opacity-0")} aria-hidden="true">
+                    <PencilLine className="h-3.5 w-3.5" />
+                  </span>
+                </span>
+              ) : null}
             </button>
           );
         })}
