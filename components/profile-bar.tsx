@@ -36,19 +36,20 @@ import { cn } from "@/lib/utils";
 
 const MOTION_CLASS = "duration-[160ms] ease-[cubic-bezier(0.22,1,0.36,1)]";
 const CHIP_SHELL_CLASS =
-  "group relative inline-flex h-8 items-center overflow-hidden rounded-full border transition-[background-color,border-color,box-shadow,transform] shadow-none";
+  "group relative inline-flex h-8 items-center overflow-hidden rounded-[10px] border transition-[background-color,border-color,box-shadow,transform] shadow-none";
 const CHIP_LEADING_SLOT_CLASS =
-  "inline-flex h-8 w-8 shrink-0 items-center justify-center";
+  "inline-flex h-8 w-7 shrink-0 items-center justify-center";
+const READ_CHIP_LEADING_SLOT_CLASS =
+  "inline-flex h-8 w-6 shrink-0 items-center justify-center";
 const CHIP_HANDLE_CLASS =
-  "inline-flex h-8 w-8 shrink-0 touch-none cursor-grab items-center justify-center rounded-full text-muted-foreground/72 transition-colors hover:bg-muted/42 hover:text-foreground active:cursor-grabbing";
+  "inline-flex h-8 w-8 shrink-0 touch-none cursor-grab items-center justify-center rounded-[9px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground active:cursor-grabbing";
 const CHIP_EDIT_ACTION_CLASS =
-  "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted-foreground/72 transition-colors hover:bg-muted/42 hover:text-foreground";
+  "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground";
 const CHIP_PLACEHOLDER_CLASS =
-  "pointer-events-none absolute inset-[3px] rounded-full border border-dashed border-border/70 bg-muted/26";
+  "pointer-events-none absolute inset-[3px] rounded-[8px] border border-dashed border-border bg-muted";
 const CHIP_OVERLAY_CLASS =
-  "border-border/75 bg-background shadow-[0_18px_30px_-18px_rgba(15,23,42,0.28)]";
-const CREATE_ACTION_CLASS = `inline-flex h-8 w-8 items-center justify-center rounded-full border border-foreground/12 bg-foreground/[0.06] text-foreground/82 shadow-none transition-all ${MOTION_CLASS} hover:border-foreground/18 hover:bg-foreground/[0.1] hover:text-foreground`;
-
+  "border-border bg-card shadow-[0_18px_34px_-24px_rgba(15,23,42,0.36)]";
+const CREATE_ACTION_CLASS = `inline-flex h-8 w-8 items-center justify-center rounded-[10px] border border-border bg-card text-foreground shadow-none transition-all ${MOTION_CLASS} hover:border-foreground/20 hover:bg-muted`;
 const MOBILE_CHIP_LABEL_STYLE = {
   display: "-webkit-box",
   WebkitBoxOrient: "vertical",
@@ -86,6 +87,7 @@ function EditProfileChip({
   isActive,
   onSelect,
   onEdit,
+  mobileDense = false,
   interactiveHandle = false,
   handleAttributes,
   handleListeners,
@@ -99,6 +101,7 @@ function EditProfileChip({
   isActive: boolean;
   onSelect?: () => void;
   onEdit?: () => void;
+  mobileDense?: boolean;
   interactiveHandle?: boolean;
   handleAttributes?: SortableHandleAttributes;
   handleListeners?: SortableHandleListeners;
@@ -116,9 +119,10 @@ function EditProfileChip({
       style={style}
       className={cn(
         CHIP_SHELL_CLASS,
+        mobileDense && "h-10 w-full rounded-[8px]",
         isActive
-          ? "border-foreground/16 bg-foreground/[0.06] text-foreground"
-          : "border-border/60 bg-background text-foreground/78 hover:border-border/78 hover:bg-muted/30 hover:text-foreground",
+          ? "border-primary bg-primary text-primary-foreground"
+          : "border-border bg-card text-foreground/78 hover:border-foreground/18 hover:bg-muted hover:text-foreground",
         isOverlay && CHIP_OVERLAY_CLASS,
         isPlaceholder && "bg-background"
       )}
@@ -131,7 +135,11 @@ function EditProfileChip({
           ref={setHandleRef}
           aria-label={`Reordenar perfil ${profile.name}`}
           title={`Reordenar perfil ${profile.name}`}
-          className={cn(CHIP_HANDLE_CLASS, contentHiddenClass)}
+          className={cn(
+            CHIP_HANDLE_CLASS,
+            mobileDense && "h-10 w-8 rounded-[8px]",
+            contentHiddenClass
+          )}
           {...handleAttributes}
           {...handleListeners}
         >
@@ -139,7 +147,12 @@ function EditProfileChip({
         </button>
       ) : isOverlay || isPlaceholder ? (
         <span
-          className={cn(CHIP_HANDLE_CLASS, "cursor-default", contentHiddenClass)}
+          className={cn(
+            CHIP_HANDLE_CLASS,
+            "cursor-default",
+            mobileDense && "h-10 w-8 rounded-[8px]",
+            contentHiddenClass
+          )}
           aria-hidden="true"
         >
           <GripVertical className="h-3.5 w-3.5" />
@@ -153,26 +166,40 @@ function EditProfileChip({
       {isOverlay || isPlaceholder ? (
         <div
           className={cn(
-            "flex min-w-0 items-center gap-1.5 pl-1 pr-2 text-[0.78rem] font-medium",
+            "flex min-w-0 flex-1 self-stretch items-center gap-1.5 pl-1 pr-2 text-[0.78rem] font-semibold",
+            mobileDense && "text-left text-[0.74rem] leading-[0.84rem]",
             contentHiddenClass
           )}
         >
-          <span className="truncate">{profile.name}</span>
+          <span
+            className={mobileDense ? "min-w-0" : "truncate"}
+            style={mobileDense ? MOBILE_CHIP_LABEL_STYLE : undefined}
+          >
+            {profile.name}
+          </span>
         </div>
       ) : (
         <button
           type="button"
           onClick={onSelect}
           aria-label={`Selecionar perfil ${profile.name} para editar`}
-          className="flex min-w-0 items-center gap-1.5 pl-1 pr-2 text-[0.78rem] font-medium"
+          className={cn(
+            "flex min-w-0 flex-1 self-stretch items-center gap-1.5 pl-1 pr-2 text-[0.78rem] font-semibold",
+            mobileDense && "text-left text-[0.74rem] leading-[0.84rem]"
+          )}
         >
-          <span className="truncate">{profile.name}</span>
+          <span
+            className={mobileDense ? "min-w-0" : "truncate"}
+            style={mobileDense ? MOBILE_CHIP_LABEL_STYLE : undefined}
+          >
+            {profile.name}
+          </span>
         </button>
       )}
 
       {isOverlay || isPlaceholder ? (
         <div className={cn("pr-1", contentHiddenClass)}>
-          <span className={CHIP_EDIT_ACTION_CLASS}>
+          <span className={cn(CHIP_EDIT_ACTION_CLASS, mobileDense && "h-8 w-8")}>
             <PencilLine className="h-3.5 w-3.5" />
           </span>
         </div>
@@ -186,14 +213,17 @@ function EditProfileChip({
             }}
             aria-label={`Editar perfil ${profile.name}`}
             title={`Editar perfil ${profile.name}`}
-            className={CHIP_EDIT_ACTION_CLASS}
+            className={cn(CHIP_EDIT_ACTION_CLASS, mobileDense && "h-8 w-8")}
           >
             <PencilLine className="h-3.5 w-3.5" />
           </button>
         </div>
       ) : (
         <div className="pr-1">
-          <span className={cn(CHIP_EDIT_ACTION_CLASS, "opacity-0")} aria-hidden="true">
+          <span
+            className={cn(CHIP_EDIT_ACTION_CLASS, mobileDense && "h-8 w-8", "opacity-0")}
+            aria-hidden="true"
+          >
             <PencilLine className="h-3.5 w-3.5" />
           </span>
         </div>
@@ -206,12 +236,14 @@ function SortableEditProfileChip({
   profile,
   isActive,
   dragEnabled,
+  mobileDense = false,
   onSelect,
   onEdit,
 }: {
   profile: CalendarProfile;
   isActive: boolean;
   dragEnabled: boolean;
+  mobileDense?: boolean;
   onSelect: () => void;
   onEdit: () => void;
 }) {
@@ -242,6 +274,7 @@ function SortableEditProfileChip({
       isActive={isActive}
       onSelect={onSelect}
       onEdit={onEdit}
+      mobileDense={mobileDense}
       interactiveHandle={dragEnabled}
       handleAttributes={attributes}
       handleListeners={listeners}
@@ -294,16 +327,12 @@ export function ProfileBar({
   const selectedSet = React.useMemo(() => new Set(selectedProfileIds), [selectedProfileIds]);
   const dragEnabled = isInlineEditMode && profiles.length > 1;
   const barClass = cn(
-    mobileDense && !isInlineEditMode
+    mobileDense
       ? "contents"
       : compact
         ? "w-full min-h-8 justify-center"
         : "mb-2 min-h-8 justify-center",
-    mobileDense && isInlineEditMode
-      ? "grid w-full grid-cols-2 gap-1.5 min-[430px]:grid-cols-3"
-      : mobileDense && !isInlineEditMode
-        ? ""
-        : "flex flex-wrap items-center gap-1.5 sm:gap-2",
+    mobileDense ? "" : "flex flex-wrap items-center gap-1.5 sm:gap-2.5",
     className
   );
 
@@ -396,18 +425,20 @@ export function ProfileBar({
               title={profile.name}
               style={mobileDense ? MOBILE_CHIP_BUTTON_STYLE : undefined}
               className={cn(
-                `inline-flex items-center border text-[0.78rem] font-medium shadow-none transition-all ${MOTION_CLASS}`,
+                `inline-flex items-center overflow-hidden border text-[0.78rem] font-semibold shadow-none transition-[background-color,border-color,color,transform] ${MOTION_CLASS} active:translate-y-[1px]`,
                 mobileDense
-                  ? "h-10 w-full justify-start overflow-hidden rounded-[8px] px-2 text-left"
-                  : "h-8 overflow-hidden rounded-full",
+                  ? "h-10 w-full justify-start rounded-[8px] px-2 text-left"
+                  : "h-8 rounded-[10px]",
                 selected
-                  ? "border-border bg-muted text-foreground hover:bg-muted dark:border-white/15 dark:bg-muted dark:text-white"
-                  : "border-border bg-background text-foreground/72 hover:border-border hover:bg-muted hover:text-foreground dark:text-foreground/70"
+                  ? "border-primary bg-primary text-primary-foreground hover:bg-primary/90"
+                  : "border-border bg-card text-foreground/72 hover:border-foreground/18 hover:bg-muted hover:text-foreground"
               )}
             >
               <span
                 className={cn(
-                  mobileDense ? "mr-1.5 inline-flex h-6 w-6 shrink-0 items-center justify-center" : CHIP_LEADING_SLOT_CLASS
+                  mobileDense
+                    ? "mr-1.5 inline-flex h-6 w-6 shrink-0 items-center justify-center"
+                    : READ_CHIP_LEADING_SLOT_CLASS
                 )}
                 aria-hidden="true"
               >
@@ -417,20 +448,13 @@ export function ProfileBar({
                 className={cn(
                   "min-w-0",
                   mobileDense
-                    ? "pr-1 text-left text-[0.74rem] font-semibold leading-[0.84rem]"
-                    : "truncate pl-1 pr-2"
+                    ? "pr-1 text-left text-[0.74rem] leading-[0.84rem]"
+                    : "truncate pr-2.5"
                 )}
                 style={mobileDense ? MOBILE_CHIP_LABEL_STYLE : undefined}
               >
                 {profile.name}
               </span>
-              {!mobileDense ? (
-                <span className="pr-1">
-                  <span className={cn(CHIP_EDIT_ACTION_CLASS, "opacity-0")} aria-hidden="true">
-                    <PencilLine className="h-3.5 w-3.5" />
-                  </span>
-                </span>
-              ) : null}
             </button>
           );
         })}
@@ -459,6 +483,7 @@ export function ProfileBar({
               profile={profile}
               isActive={editingProfileId === profile.id}
               dragEnabled={dragEnabled}
+              mobileDense={mobileDense}
               onSelect={() => onEditingProfileChange?.(profile.id)}
               onEdit={() => onEditProfile?.(profile.id)}
             />
@@ -467,7 +492,7 @@ export function ProfileBar({
           <button
             type="button"
             onClick={onCreateProfile}
-            className={CREATE_ACTION_CLASS}
+            className={cn(CREATE_ACTION_CLASS, mobileDense && "h-10 w-full rounded-[8px]")}
             aria-label="Criar novo perfil"
             title="Criar novo perfil"
           >
@@ -483,6 +508,7 @@ export function ProfileBar({
                 <EditProfileChip
                   profile={activeProfile}
                   isActive={editingProfileId === activeProfile.id}
+                  mobileDense={mobileDense}
                   isOverlay
                   style={{ width: activeDrag?.width ?? undefined }}
                 />

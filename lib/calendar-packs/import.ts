@@ -7,8 +7,6 @@ import type {
   CalendarPackSelection,
 } from "./types";
 
-const DEFAULT_PROFILE_COLOR = "#64748B";
-
 export type CalendarPackImportStatus = "created" | "updated" | "already-exists";
 
 export type CalendarPackImportResult = {
@@ -234,48 +232,34 @@ export const findCalendarPackByCategoryId = (
 export const importCalendarPack = (
   snapshot: CalendarSnapshot,
   pack: CalendarPack,
-  selection: CalendarPackSelection
+  selection: CalendarPackSelection,
+  targetProfileId: string
 ): CalendarPackImportResult => {
+  const targetProfile = snapshot.profiles.find(
+    (profile) => profile.id === targetProfileId
+  );
+  if (!targetProfile) {
+    throw new Error("Target profile not found.");
+  }
+
   const selectedPackEvents = getCalendarPackEvents(pack, selection);
-  const existingProfile = findPackProfile(snapshot.profiles, pack);
   const selectedCategoryKeys = new Set(
     selectedPackEvents.map((event) => event.suggestedCategoryKey)
   );
   const selectedPackCategories = pack.categories.filter((category) =>
     selectedCategoryKeys.has(category.key)
   );
-  const shouldCreateProfile = selectedPackCategories.some(
-    (packCategory) => !findPackCategoryAnywhere(snapshot.categories, packCategory)
+  const profileId = targetProfile.id;
+  const hadExistingPackCategory = selectedPackCategories.some((packCategory) =>
+    Boolean(findPackCategoryAnywhere(snapshot.categories, packCategory))
   );
-  const profileId =
-    existingProfile?.id ??
-    (shouldCreateProfile ? pack.profile.id : snapshot.profiles[0]?.id ?? pack.profile.id);
-
-  let nextProfiles = existingProfile
-    ? snapshot.profiles.map((profile) =>
-        profile.id === existingProfile.id
-          ? {
-              ...profile,
-              name: pack.profile.name,
-              color: DEFAULT_PROFILE_COLOR,
-              icon: pack.profile.icon,
-            }
-          : profile
-      )
-    : [...snapshot.profiles];
-
-  if (shouldCreateProfile && !existingProfile) {
-    nextProfiles = [
-      ...nextProfiles,
-      {
-        id: profileId,
-        name: pack.profile.name,
-        color: DEFAULT_PROFILE_COLOR,
-        icon: pack.profile.icon,
-        position: snapshot.profiles.length,
-      },
-    ];
-  }
+  const packEventIdsBeforeImport = new Set(
+    selectedPackEvents.flatMap(getPackEventIds)
+  );
+  const hadExistingPackEvent = snapshot.events.some((event) =>
+    packEventIdsBeforeImport.has(event.id)
+  );
+  const nextProfiles = [...snapshot.profiles];
 
   const categoryIdByKey = new Map<string, string>();
   let addedCategoryCount = 0;
@@ -399,7 +383,9 @@ export const importCalendarPack = (
     nextCategories.length - categoriesAfterLegacyCleanup.length;
 
   const status: CalendarPackImportStatus =
-    shouldCreateProfile && !existingProfile
+    !hadExistingPackCategory &&
+    !hadExistingPackEvent &&
+    (addedCategoryCount > 0 || addedEventCount > 0)
       ? "created"
       : addedCategoryCount > 0 ||
           updatedCategoryCount > 0 ||

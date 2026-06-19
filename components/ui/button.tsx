@@ -11,7 +11,7 @@ const buttonVariants = cva(
       variant: {
         default: "bg-primary text-primary-foreground hover:bg-primary/90",
         premium:
-          "bg-neutral-900 text-neutral-50 shadow-sm hover:bg-neutral-800 focus-visible:ring-neutral-300 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-200 dark:focus-visible:ring-neutral-700",
+          "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 focus-visible:ring-ring/50",
         destructive:
           "bg-destructive text-white hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60",
         dangerSoft:
@@ -21,7 +21,7 @@ const buttonVariants = cva(
         secondary:
           "bg-secondary text-secondary-foreground hover:bg-secondary/80",
         toolActive:
-          "bg-neutral-900 text-neutral-50 shadow-sm hover:bg-neutral-800 focus-visible:ring-neutral-300 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-200 dark:focus-visible:ring-neutral-700",
+          "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 focus-visible:ring-ring/50",
         ghost:
           "hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50",
         link: "text-primary underline-offset-4 hover:underline",

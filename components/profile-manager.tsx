@@ -272,7 +272,7 @@ export function ProfileManager({
                   title={option.label}
                   className={`inline-flex h-10 items-center justify-center rounded-xl border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-300 ${
                     selected
-                      ? "border-foreground/80 bg-foreground text-background shadow-sm"
+                      ? "border-primary bg-primary text-primary-foreground shadow-sm"
                       : "border-border/80 bg-muted/25 text-muted-foreground hover:bg-muted/60 hover:text-foreground"
                   }`}
                 >

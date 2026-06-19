@@ -80,7 +80,7 @@ export function UserMenu() {
         <Button
           variant="outline"
           size="sm"
-          className="h-9 w-9 overflow-hidden rounded-2xl border-border/65 bg-background/70 p-0 text-muted-foreground shadow-none transition-colors hover:border-border/80 hover:bg-muted/45 hover:text-foreground"
+          className="h-9 w-9 overflow-hidden rounded-[10px] border-border bg-card p-0 text-muted-foreground shadow-none transition-colors hover:border-foreground/18 hover:bg-muted hover:text-foreground"
         >
           {avatarUrl && !brokenAvatar ? (
             // eslint-disable-next-line @next/next/no-img-element
