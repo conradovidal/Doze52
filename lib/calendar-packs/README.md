@@ -7,9 +7,9 @@ the product needs pack-specific lifecycle metadata later.
 ## Current packs
 
 - `world-cup-2026-pack.json`: 104 mapped tournament events. The UI exposes this as
-  two category-level packs: Jogos do Brasil and Restante da Copa.
+  two subscription options: Jogos do Brasil and Copa de 2026.
 - `formula-1-2026-pack.json`: Formula 1 2026 events listed by the official F1 calendar
-  on 2026-06-03, exposed as one Corridas category.
+  on 2026-06-03, exposed as Corridas F1.
 
 Keep pack `profile.id`, category `id`s, and event `id`s stable. Importing the same pack
 must remain idempotent for users who already added it. Packs are tracked by category and

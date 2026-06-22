@@ -26,6 +26,8 @@ import { useStore } from "@/lib/store";
 import type { AnchorPoint } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
+const CATEGORY_COLLAPSE_STORAGE_KEY = "doze52-categories-expanded";
+
 type AppHeaderProps = {
   year: number;
   onYearChange: (year: number) => void;
@@ -55,8 +57,6 @@ export function AppHeader({
   const setSelectedProfiles = useStore((s) => s.setSelectedProfiles);
 
   const [isInlineEditMode, setIsInlineEditMode] = React.useState(false);
-  const [areMobileFiltersCollapsed, setAreMobileFiltersCollapsed] =
-    React.useState(true);
   const [editingProfileId, setEditingProfileId] = React.useState<string | null>(null);
   const [profileManagerOpen, setProfileManagerOpen] = React.useState(false);
   const [profileManagerIntent, setProfileManagerIntent] =
@@ -64,6 +64,9 @@ export function AppHeader({
   const [categoryCreateOpen, setCategoryCreateOpen] = React.useState(false);
   const [categoryEditOpen, setCategoryEditOpen] = React.useState(false);
   const [editingCategoryId, setEditingCategoryId] = React.useState<string | null>(null);
+  const [categoriesExpanded, setCategoriesExpanded] = React.useState(true);
+  const [areMobileFiltersCollapsed, setAreMobileFiltersCollapsed] =
+    React.useState(true);
 
   const pendingProfileCreateRestoreRef = React.useRef<{
     knownProfileIds: string[];
@@ -72,16 +75,19 @@ export function AppHeader({
   const previousProfileManagerOpenRef = React.useRef(false);
 
   const utilityIconClass =
-    "h-9 w-9 rounded-2xl border-border/65 bg-background text-muted-foreground shadow-none transition-colors hover:border-border/80 hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50";
+    "h-8 w-8 rounded-[10px] border-border bg-card text-muted-foreground shadow-none transition-colors hover:border-foreground/18 hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 md:h-9 md:w-9";
   const utilityActiveEditClass =
-    "h-9 rounded-full border border-foreground/15 bg-foreground px-3.5 text-sm font-medium text-background shadow-none transition-colors hover:bg-foreground/92 focus-visible:ring-2 focus-visible:ring-ring/50 dark:border-white/15 dark:bg-white dark:text-black dark:hover:bg-white/92";
+    "h-8 rounded-[10px] border border-primary bg-primary px-2.5 text-xs font-semibold text-primary-foreground shadow-none transition-colors hover:border-primary/20 hover:bg-primary/90 hover:text-primary-foreground focus-visible:ring-2 focus-visible:ring-ring/50 md:h-9 md:px-3.5 md:text-sm";
   const utilityButtonClass =
-    "h-9 rounded-2xl border-border/65 bg-background px-3.5 text-sm font-medium text-foreground shadow-none transition-colors hover:border-border/80 hover:bg-muted hover:text-foreground";
+    "h-8 rounded-[10px] border-border bg-card px-2.5 text-xs font-semibold text-foreground shadow-none transition-colors hover:border-foreground/18 hover:bg-muted hover:text-foreground md:h-9 md:px-3.5 md:text-sm";
   const yearSelectClass =
-    "h-9 min-w-[90px] rounded-2xl border-border/70 bg-background px-3.5 text-[0.98rem] font-semibold text-foreground shadow-none hover:border-border/85 hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/60 md:text-[1rem] [&_svg]:opacity-70 [&_svg]:text-muted-foreground";
-  const filterPanelId = React.useId();
+    "h-8 min-w-[82px] rounded-[10px] border-border bg-card px-2.5 text-[0.9rem] font-semibold text-foreground shadow-none hover:border-foreground/18 hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/60 md:h-9 md:min-w-[90px] md:px-3.5 md:text-[1rem] [&_svg]:opacity-70 [&_svg]:text-muted-foreground";
+  const categoryToggleClass =
+    "inline-flex h-8 w-8 items-center justify-center rounded-[10px] border border-border bg-card text-foreground/70 shadow-none transition-[background-color,border-color,color,box-shadow,transform] duration-150 ease-out hover:border-foreground/18 hover:bg-muted hover:text-foreground active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45";
+  const effectiveCategoriesExpanded = categoriesExpanded || isInlineEditMode;
   const isMobileMode = isMobileCalendarUi === true;
-  const showFilterPanel =
+  const filterPanelId = React.useId();
+  const showMobileFilterPanel =
     !isMobileMode || !areMobileFiltersCollapsed || isInlineEditMode;
   const selectedProfile = React.useMemo(
     () =>
@@ -126,6 +132,32 @@ export function AppHeader({
     }
   }, [profileManagerOpen, profiles, setSelectedProfiles]);
 
+  React.useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(CATEGORY_COLLAPSE_STORAGE_KEY);
+      if (stored === "true" || stored === "false") {
+        setCategoriesExpanded(stored === "true");
+      }
+    } catch {
+      // Keep categories visible when storage is unavailable.
+    }
+  }, []);
+
+  React.useEffect(() => {
+    if (isInlineEditMode) {
+      setAreMobileFiltersCollapsed(false);
+    }
+  }, [isInlineEditMode]);
+
+  const setPersistedCategoriesExpanded = React.useCallback((expanded: boolean) => {
+    setCategoriesExpanded(expanded);
+    try {
+      window.localStorage.setItem(CATEGORY_COLLAPSE_STORAGE_KEY, String(expanded));
+    } catch {
+      // Ignore storage errors; this is only a local UI preference.
+    }
+  }, []);
+
   const toggleInlineEditMode = React.useCallback(() => {
     setIsInlineEditMode((current) => {
       const next = !current;
@@ -136,12 +168,6 @@ export function AppHeader({
       return next;
     });
   }, [profiles, selectedProfileIds]);
-
-  React.useEffect(() => {
-    if (isInlineEditMode) {
-      setAreMobileFiltersCollapsed(false);
-    }
-  }, [isInlineEditMode]);
 
   const openCreateProfile = React.useCallback(() => {
     pendingProfileCreateRestoreRef.current = {
@@ -169,18 +195,18 @@ export function AppHeader({
 
   return (
     <>
-      <header className="mb-2 space-y-2 md:mb-5 md:space-y-3.5">
-        <div className="grid min-h-10 grid-cols-[minmax(0,1fr)_auto] items-start gap-3 md:items-center md:gap-4">
+      <header className="mb-4 space-y-3 md:mb-5 md:space-y-3.5">
+        <div className="grid min-h-9 grid-cols-[auto_minmax(0,1fr)] items-start gap-2.5 md:min-h-10 md:grid-cols-[minmax(0,1fr)_auto] md:items-center md:gap-4">
           <div className="justify-self-start">
             <BrandLogo />
           </div>
 
-          <div className="min-w-0 justify-self-end">
-            <div className="flex flex-wrap items-center justify-end gap-1.5 sm:gap-2">
+          <div className="w-full min-w-0 justify-self-end">
+            <div className="flex min-w-0 flex-wrap items-center justify-end gap-1 sm:gap-2">
               {isInlineEditMode ? (
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="premium"
                   size="sm"
                   className={utilityActiveEditClass}
                   onClick={toggleInlineEditMode}
@@ -188,7 +214,7 @@ export function AppHeader({
                   title="Finalizar edicao de perfis e categorias"
                 >
                   <Check className="h-4 w-4" />
-                  <span>Finalizar</span>
+                  <span className="hidden min-[420px]:inline">Finalizar</span>
                 </Button>
               ) : (
                 <Button
@@ -217,7 +243,7 @@ export function AppHeader({
 
               <ThemeToggle />
 
-              <div className="flex h-9 items-center justify-end">
+              <div className="flex h-8 items-center justify-end md:h-9">
                 {authLoading ? null : isAuthenticated ? (
                   <UserMenu />
                 ) : (
@@ -238,20 +264,13 @@ export function AppHeader({
           </div>
         </div>
 
-        <div className="mx-auto flex w-full max-w-[58rem] flex-col items-center border-t border-border/50 pt-2.5 md:gap-2 md:pt-3">
-          <div
-            className={cn(
-              "w-full",
-              isMobileMode
-                ? "overflow-hidden rounded-[10px] border border-border bg-card"
-                : "contents"
-            )}
-          >
-            {isMobileMode ? (
+        <div className="mx-auto flex w-full max-w-[62rem] flex-col items-center gap-1.5 border-t border-border/45 pt-2.5 md:gap-2 md:pt-3">
+          {isMobileMode ? (
+            <div className="w-full overflow-hidden rounded-[10px] border border-border bg-card">
               <button
                 type="button"
-                className="flex h-11 w-full items-center justify-between gap-3 bg-transparent px-3 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/45 md:hidden"
-                aria-expanded={showFilterPanel}
+                className="flex h-11 w-full items-center justify-between gap-3 bg-transparent px-3 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/45"
+                aria-expanded={showMobileFilterPanel}
                 aria-controls={filterPanelId}
                 onClick={() =>
                   setAreMobileFiltersCollapsed((current) => !current)
@@ -275,85 +294,153 @@ export function AppHeader({
                 <ChevronDown
                   className={cn(
                     "h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
-                    showFilterPanel ? "rotate-180" : "rotate-0"
+                    showMobileFilterPanel ? "rotate-180" : "rotate-0"
                   )}
+                  aria-hidden="true"
                 />
               </button>
-            ) : null}
 
-            <div
-              id={filterPanelId}
-              className={cn(
-                "grid w-full transition-[grid-template-rows,opacity,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] md:flex md:translate-y-0 md:opacity-100",
-                showFilterPanel
-                  ? "grid-rows-[1fr] translate-y-0 opacity-100"
-                  : "pointer-events-none grid-rows-[0fr] -translate-y-1 opacity-0 md:pointer-events-auto"
-              )}
-            >
               <div
+                id={filterPanelId}
                 className={cn(
-                  "min-h-0 overflow-hidden transition-[padding,border-color] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
-                  isMobileMode
-                    ? cn(
-                        "border-t px-2",
-                        showFilterPanel
-                          ? "border-border/55 py-2"
-                          : "border-transparent py-0"
-                      )
-                    : "flex w-full flex-col items-center gap-1.5 md:gap-2"
+                  "grid w-full transition-[grid-template-rows,opacity,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
+                  showMobileFilterPanel
+                    ? "grid-rows-[1fr] translate-y-0 opacity-100"
+                    : "pointer-events-none grid-rows-[0fr] -translate-y-1 opacity-0"
                 )}
               >
                 <div
                   className={cn(
-                    "w-full",
-                    isMobileMode && !isInlineEditMode
-                      ? "grid grid-cols-2 gap-1.5 min-[430px]:grid-cols-3"
-                      : "flex flex-wrap items-center justify-center gap-1.5 sm:gap-2"
+                    "min-h-0 overflow-hidden border-t px-2 transition-[padding,border-color] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
+                    showMobileFilterPanel
+                      ? "border-border/55 py-2"
+                      : "border-transparent py-0"
                   )}
                 >
-                  <CalendarPackLauncher
-                    onFocusYear={onCalendarPackFocusYear}
-                    mobileDense={isMobileMode && !isInlineEditMode}
-                    className={cn(
-                      isMobileMode && !isInlineEditMode
-                        ? "w-full"
-                        : "shrink-0"
-                    )}
-                  />
+                  <div className="grid w-full grid-cols-2 gap-1.5 min-[430px]:grid-cols-3">
+                    <CalendarPackLauncher
+                      onFocusYear={onCalendarPackFocusYear}
+                      mobileDense
+                      className="w-full justify-start"
+                    />
 
-                  <ProfileBar
-                    compact
-                    mobileDense={isMobileMode}
-                    className="w-auto min-w-0"
-                    isInlineEditMode={isInlineEditMode}
-                    editingProfileId={editingProfileId}
-                    onEditingProfileChange={setEditingProfileId}
-                    onCreateProfile={openCreateProfile}
-                    onEditProfile={openEditProfile}
-                  />
-                </div>
+                    <ProfileBar
+                      compact
+                      mobileDense
+                      className="col-span-2 min-[430px]:col-span-2"
+                      isInlineEditMode={isInlineEditMode}
+                      editingProfileId={editingProfileId}
+                      onEditingProfileChange={setEditingProfileId}
+                      onCreateProfile={openCreateProfile}
+                      onEditProfile={openEditProfile}
+                    />
+                  </div>
 
-                <div
-                  className={cn(
-                    "w-full",
-                    isMobileMode
-                      ? "mt-2 border-t border-border/55 pt-2"
-                      : "contents"
-                  )}
-                >
-                  <CategoryBar
-                    compact
-                    mobileDense={isMobileMode}
-                    isInlineEditMode={isInlineEditMode}
-                    editingProfileId={editingProfileId}
-                    onCreateCategory={openCreateCategory}
-                    onEditCategory={openEditCategory}
-                  />
+                  <div className="mt-2 border-t border-border/55 pt-2">
+                    <CategoryBar
+                      compact
+                      mobileDense
+                      isInlineEditMode={isInlineEditMode}
+                      editingProfileId={editingProfileId}
+                      onCreateCategory={openCreateCategory}
+                      onEditCategory={openEditCategory}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          ) : (
+            <>
+              <div className="-mx-4 w-[calc(100%+2rem)] overflow-x-auto px-4 pb-0.5 doze52-scrollbar-none sm:mx-0 sm:w-full sm:px-0 md:overflow-visible">
+                <div className="flex w-max min-w-full flex-nowrap items-center justify-start gap-x-1.5 gap-y-1.5 sm:w-full sm:flex-wrap sm:justify-center sm:gap-x-0">
+                  <div className="flex shrink-0 items-center">
+                    <CalendarPackLauncher
+                      onFocusYear={onCalendarPackFocusYear}
+                      className="shrink-0"
+                    />
+                  </div>
+
+                  <div
+                    aria-hidden="true"
+                    className="mx-4 hidden h-6 w-px shrink-0 bg-border/80 dark:bg-muted sm:block md:mx-5"
+                  />
+
+                  <div className="flex shrink-0 flex-nowrap items-center justify-center gap-1.5 sm:flex-wrap sm:gap-2">
+                    <ProfileBar
+                      compact
+                      className="w-max flex-nowrap justify-start sm:w-auto"
+                      isInlineEditMode={isInlineEditMode}
+                      editingProfileId={editingProfileId}
+                      onEditingProfileChange={setEditingProfileId}
+                      onCreateProfile={openCreateProfile}
+                      onEditProfile={openEditProfile}
+                    />
+
+                    <button
+                      type="button"
+                      className={`${categoryToggleClass} ${
+                        isInlineEditMode
+                          ? "cursor-default opacity-70 hover:border-border hover:bg-card hover:text-foreground/70 active:translate-y-0"
+                          : ""
+                      }`}
+                      disabled={isInlineEditMode}
+                      onClick={() =>
+                        setPersistedCategoriesExpanded(!categoriesExpanded)
+                      }
+                      aria-label={
+                        isInlineEditMode
+                          ? "Categorias abertas durante a edicao"
+                          : effectiveCategoriesExpanded
+                            ? "Recolher categorias"
+                            : "Mostrar categorias"
+                      }
+                      aria-expanded={effectiveCategoriesExpanded}
+                      aria-controls={
+                        effectiveCategoriesExpanded
+                          ? "app-header-categories"
+                          : undefined
+                      }
+                      title={
+                        isInlineEditMode
+                          ? "Categorias abertas durante a edicao"
+                          : effectiveCategoriesExpanded
+                            ? "Recolher categorias"
+                            : "Mostrar categorias"
+                      }
+                    >
+                      <ChevronDown
+                        className={`h-3.5 w-3.5 transition-transform duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                          effectiveCategoriesExpanded ? "rotate-180" : ""
+                        }`}
+                        aria-hidden="true"
+                      />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {effectiveCategoriesExpanded ? (
+                <div
+                  id="app-header-categories"
+                  className="w-full origin-top transition-[opacity,transform] duration-150 ease-out"
+                >
+                  <div className="-mx-4 overflow-x-auto px-4 pb-0.5 doze52-scrollbar-none sm:mx-0 sm:px-0 md:overflow-visible">
+                    <CategoryBar
+                      compact
+                      className="w-max min-w-full flex-nowrap justify-start sm:w-full sm:flex-wrap sm:justify-center"
+                      isInlineEditMode={isInlineEditMode}
+                      editingProfileId={editingProfileId}
+                      onCreateCategory={openCreateCategory}
+                      onEditCategory={openEditCategory}
+                    />
+                  </div>
+                </div>
+              ) : null}
+            </>
+          )}
         </div>
+
+        <div className="mx-auto h-px w-full max-w-[62rem] bg-border/45" />
       </header>
 
       <ProfileManager

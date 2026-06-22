@@ -1,5 +1,9 @@
 import type { CalendarPack, CalendarPackSelection } from "./types";
-import { getCalendarPackEvents } from "./import";
+import {
+  getCalendarPackEventNotes,
+  getCalendarPackEvents,
+  getCalendarPackEventTitle,
+} from "./import";
 
 const ICS_EVENT_DURATION_MINUTES = 150;
 
@@ -69,14 +73,8 @@ export const generateCalendarPackIcs = (
   ];
 
   for (const event of getCalendarPackEvents(pack, selection)) {
-    const phase = event.group ? `${event.phase} - Grupo ${event.group}` : event.phase;
-    const description = [
-      `Horario: ${event.time} (${event.timezone})`,
-      `Local: ${event.venue} - ${event.city}`,
-      `Fase: ${phase}`,
-      `Fonte: ${event.source}`,
-      `Verificado em: ${event.lastVerified}`,
-    ].join("\n");
+    const title = getCalendarPackEventTitle(event, pack);
+    const description = getCalendarPackEventNotes(event, pack);
 
     lines.push(
       "BEGIN:VEVENT",
@@ -88,7 +86,7 @@ export const generateCalendarPackIcs = (
         event.time,
         ICS_EVENT_DURATION_MINUTES
       )}`,
-      `SUMMARY:${escapeIcsText(event.title)}`,
+      `SUMMARY:${escapeIcsText(title)}`,
       `LOCATION:${escapeIcsText(`${event.venue}, ${event.city}`)}`,
       `DESCRIPTION:${escapeIcsText(description)}`,
       `CATEGORIES:${event.isBrazilMatch ? "Brasil" : "Outros jogos"}`,

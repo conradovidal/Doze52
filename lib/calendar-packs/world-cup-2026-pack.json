@@ -1,10 +1,10 @@
 {
   "id": "world-cup-2026",
   "name": "Copa de 2026",
-  "description": "Jogos do Brasil e o restante da Copa em calendários separados.",
+  "description": "Jogos do Brasil e Copa de 2026 em calendários separados.",
   "year": 2026,
   "datasetStatus": "complete",
-  "updateNote": "Inclui os 104 jogos mapeados, com Jogos do Brasil e Restante da Copa como calendários separados.",
+  "updateNote": "Inclui os 104 jogos mapeados, com Jogos do Brasil e Copa de 2026 como calendários separados.",
   "source": {
     "label": "FIFA",
     "url": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
@@ -25,7 +25,7 @@
     {
       "id": "20265200-0000-4000-8000-000000000003",
       "key": "other",
-      "name": "Restante da Copa",
+      "name": "Copa de 2026",
       "color": "#0F766E"
     }
   ],
@@ -116,7 +116,7 @@
     },
     {
       "id": "20265200-0000-4000-8000-000000000005",
-      "title": "🇭🇹 🏴",
+      "title": "🇭🇹 \uD83C\uDFF4\uDB40\uDC67\uDB40\uDC62\uDB40\uDC73\uDB40\uDC63\uDB40\uDC74\uDB40\uDC7F",
       "date": "2026-06-13",
       "time": "21:00",
       "timezone": "America/New_York",
@@ -479,7 +479,7 @@
     },
     {
       "id": "20265200-0000-4000-8000-000000000022",
-      "title": "🏴 🇭🇷",
+      "title": "\uD83C\uDFF4\uDB40\uDC67\uDB40\uDC62\uDB40\uDC65\uDB40\uDC6E\uDB40\uDC67\uDB40\uDC7F 🇭🇷",
       "date": "2026-06-17",
       "time": "15:00",
       "timezone": "America/Chicago",
@@ -650,7 +650,7 @@
     },
     {
       "id": "20265200-0000-4000-8000-000000000030",
-      "title": "🏴 🇲🇦",
+      "title": "\uD83C\uDFF4\uDB40\uDC67\uDB40\uDC62\uDB40\uDC73\uDB40\uDC63\uDB40\uDC74\uDB40\uDC7F 🇲🇦",
       "date": "2026-06-19",
       "time": "18:00",
       "timezone": "America/New_York",
@@ -968,7 +968,7 @@
     },
     {
       "id": "20265200-0000-4000-8000-000000000045",
-      "title": "🏴 🇬🇭",
+      "title": "\uD83C\uDFF4\uDB40\uDC67\uDB40\uDC62\uDB40\uDC65\uDB40\uDC6E\uDB40\uDC67\uDB40\uDC7F 🇬🇭",
       "date": "2026-06-23",
       "time": "16:00",
       "timezone": "America/New_York",
@@ -1052,7 +1052,7 @@
     },
     {
       "id": "20265200-0000-4000-8000-000000000049",
-      "title": "🏴 🇧🇷",
+      "title": "\uD83C\uDFF4\uDB40\uDC67\uDB40\uDC62\uDB40\uDC73\uDB40\uDC63\uDB40\uDC74\uDB40\uDC7F 🇧🇷",
       "date": "2026-06-24",
       "time": "18:00",
       "timezone": "America/New_York",
@@ -1436,7 +1436,7 @@
     },
     {
       "id": "20265200-0000-4000-8000-000000000067",
-      "title": "🇵🇦 🏴",
+      "title": "🇵🇦 \uD83C\uDFF4\uDB40\uDC67\uDB40\uDC62\uDB40\uDC65\uDB40\uDC6E\uDB40\uDC67\uDB40\uDC7F",
       "date": "2026-06-27",
       "time": "17:00",
       "timezone": "America/New_York",

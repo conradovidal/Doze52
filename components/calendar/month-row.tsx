@@ -561,7 +561,7 @@ export function MonthRow({
             </span>
           </button>
         ) : (
-          <span className="flex h-full w-full items-center justify-center bg-[linear-gradient(180deg,rgba(255,255,255,0.78),rgba(244,244,245,0.94))] px-1 py-2.5 text-[9.5px] font-medium uppercase tracking-[0.12em] text-foreground/72 dark:bg-[linear-gradient(180deg,rgba(38,38,38,0.9),rgba(28,28,30,0.98))] dark:text-neutral-200/78 min-[420px]:px-1.5 min-[420px]:text-[10px] min-[420px]:tracking-[0.14em] md:px-2 md:text-[10.5px]">
+          <span className="flex h-full w-full items-center justify-center bg-card px-1 py-2.5 text-[9.5px] font-medium uppercase tracking-[0.12em] text-foreground/68 min-[420px]:px-1.5 min-[420px]:text-[10px] min-[420px]:tracking-[0.14em] md:px-2 md:text-[10.5px]">
             {monthLabel}
           </span>
         )}
@@ -709,7 +709,6 @@ export function MonthRow({
               >
                 <EventBar
                   event={seg.event}
-                  todayIso={todayIso}
                   profileIcon={profileIconByCategoryId.get(seg.event.categoryId)}
                   onClick={({ anchorPoint }) =>
                     onEditEvent({
@@ -946,7 +945,6 @@ export function MonthRow({
                           >
                             <EventBar
                               event={event}
-                              todayIso={todayIso}
                               profileIcon={profileIconByCategoryId.get(event.categoryId)}
                               onClick={({ anchorPoint }) =>
                                 onEditEvent({
@@ -959,7 +957,7 @@ export function MonthRow({
                               isDragging={isDragged}
                               className={
                                 isDragged
-                                  ? "opacity-40"
+                                  ? "brightness-[0.96] saturate-[0.96]"
                                   : draggingSingleDay
                                     ? "pointer-events-none"
                                     : ""

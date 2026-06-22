@@ -4,6 +4,7 @@ import * as React from "react";
 import {
   THEME_STORAGE_KEY,
   type ThemeMode,
+  getThemeFaviconUrl,
   isThemeMode,
 } from "@/lib/theme-shared";
 
@@ -46,6 +47,18 @@ const applyThemeToDocument = (mode: ThemeMode) => {
   const root = document.documentElement;
   root.classList.toggle("dark", mode === "dark");
   root.style.colorScheme = mode;
+
+  let favicon = document.querySelector<HTMLLinkElement>(
+    'link[data-doze52-favicon="active"]'
+  );
+  if (!favicon) {
+    favicon = document.createElement("link");
+    favicon.setAttribute("data-doze52-favicon", "active");
+    document.head.appendChild(favicon);
+  }
+  favicon.rel = "icon";
+  favicon.type = "image/svg+xml";
+  favicon.href = getThemeFaviconUrl(mode);
 };
 
 const resolveInitialTheme = (): ThemeMode => {

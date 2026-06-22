@@ -49,8 +49,8 @@ import {
 import { logDevError, logProdError } from "@/lib/safe-log";
 import { getSupabaseBrowserClient, hasSupabaseEnv } from "@/lib/supabase";
 import { expandEventsForYear } from "@/lib/recurrence";
-import type { AnchorPoint } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import type { AnchorPoint } from "@/lib/types";
 
 const toSnapshotHash = (snapshot: CalendarSnapshot) => JSON.stringify(snapshot);
 
@@ -96,6 +96,8 @@ const isDetailedSyncDiagnosticsEnabled =
   process.env.NODE_ENV !== "production" ||
   process.env.NEXT_PUBLIC_APP_ENV === "local" ||
   process.env.NEXT_PUBLIC_APP_ENV === "dev";
+
+const MOBILE_CALENDAR_UI_MAX_WIDTH_PX = 767;
 
 const cloneSnapshot = (snapshot: CalendarSnapshot): CalendarSnapshot => ({
   profiles: snapshot.profiles.map((profile) => ({ ...profile })),
@@ -554,6 +556,10 @@ export default function HomePage() {
 
     if (hasSupabaseEnv) return;
 
+    const message =
+      "Supabase nao configurado. Defina NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY neste ambiente.";
+
+    logDevError("app.page.supabase-env", { message });
     logProdError("Supabase nao configurado neste ambiente.");
   }, [windowContext]);
 
@@ -578,20 +584,79 @@ export default function HomePage() {
       );
   }, [windowContext]);
 
-  React.useEffect(() => {
+  React.useLayoutEffect(() => {
     if (windowContext !== "main") return;
 
     const mediaQuery = window.matchMedia("(max-width: 767px)");
+    let animationFrameId: number | null = null;
 
-    const syncViewportMode = () => {
-      setIsMobileCalendarUi(mediaQuery.matches);
+    const getMeasuredWidth = () => {
+      const appShellWidth =
+        document
+          .querySelector("[data-doze52-app-shell]")
+          ?.getBoundingClientRect().width ?? Number.POSITIVE_INFINITY;
+      const documentWidth =
+        document.documentElement.clientWidth || Number.POSITIVE_INFINITY;
+      const viewportWidth = window.visualViewport?.width ?? Number.POSITIVE_INFINITY;
+      const innerWidth = window.innerWidth || Number.POSITIVE_INFINITY;
+      return Math.min(appShellWidth, documentWidth, viewportWidth, innerWidth);
     };
 
+    const resolveViewportMode = () => {
+      const searchParams = new URLSearchParams(window.location.search);
+      const forcedMobileUi = searchParams.get("mobileUi");
+      if (forcedMobileUi === "1" || forcedMobileUi === "true") return true;
+      if (forcedMobileUi === "0" || forcedMobileUi === "false") return false;
+      return (
+        mediaQuery.matches ||
+        getMeasuredWidth() <= MOBILE_CALENDAR_UI_MAX_WIDTH_PX
+      );
+    };
+
+    const applyViewportMode = () => {
+      setIsMobileCalendarUi(resolveViewportMode());
+    };
+
+    const syncViewportMode = () => {
+      if (animationFrameId !== null) {
+        window.cancelAnimationFrame(animationFrameId);
+      }
+
+      animationFrameId = window.requestAnimationFrame(() => {
+        animationFrameId = null;
+        applyViewportMode();
+      });
+    };
+
+    applyViewportMode();
     syncViewportMode();
 
+    const resizeObserver =
+      typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver(syncViewportMode);
+    resizeObserver?.observe(document.documentElement);
+    if (document.body) {
+      resizeObserver?.observe(document.body);
+    }
+
+    window.addEventListener("resize", syncViewportMode);
+    window.visualViewport?.addEventListener("resize", syncViewportMode);
+    window.addEventListener("pageshow", syncViewportMode);
+    window.addEventListener("popstate", syncViewportMode);
     mediaQuery.addEventListener("change", syncViewportMode);
 
-    return () => mediaQuery.removeEventListener("change", syncViewportMode);
+    return () => {
+      if (animationFrameId !== null) {
+        window.cancelAnimationFrame(animationFrameId);
+      }
+      resizeObserver?.disconnect();
+      window.removeEventListener("resize", syncViewportMode);
+      window.visualViewport?.removeEventListener("resize", syncViewportMode);
+      window.removeEventListener("pageshow", syncViewportMode);
+      window.removeEventListener("popstate", syncViewportMode);
+      mediaQuery.removeEventListener("change", syncViewportMode);
+    };
   }, [windowContext]);
 
   React.useEffect(() => {
@@ -897,8 +962,7 @@ export default function HomePage() {
   };
 
   const handleMobileFabCreate = React.useCallback((dateIso?: string) => {
-    const fallbackTodayIso =
-      dateIso || todayIso || format(new Date(), "yyyy-MM-dd");
+    const fallbackTodayIso = dateIso || todayIso || format(new Date(), "yyyy-MM-dd");
 
     setEditingId(null);
     setDialogAnchorPoint(undefined);
@@ -1154,10 +1218,11 @@ export default function HomePage() {
 
   return (
     <main
+      data-doze52-app-shell
       className={cn(
         "mx-auto w-full max-w-none overflow-x-clip",
         isMobileCalendarUi
-          ? "flex h-full min-h-0 flex-col overflow-hidden px-3 pt-2 pb-1"
+          ? "flex h-[100dvh] min-h-0 flex-col overflow-hidden px-3 pt-2 pb-1"
           : "px-4 pt-3 pb-2 md:pb-4"
       )}
     >
@@ -1173,7 +1238,7 @@ export default function HomePage() {
           "z-30 bg-background",
           isMobileCalendarUi
             ? "shrink-0 pb-2"
-            : "sticky top-0 -mx-4 px-4 pb-2 md:static md:mx-0 md:bg-transparent md:px-0 md:pb-0"
+            : "sticky top-0 -mx-4 px-4 pb-2 backdrop-blur supports-[backdrop-filter]:bg-background/82 md:static md:mx-0 md:bg-transparent md:px-0 md:pb-0 md:backdrop-blur-none"
         )}
       >
         <AppHeader
@@ -1191,7 +1256,7 @@ export default function HomePage() {
       </div>
 
       {isMobileCalendarUi === true ? (
-          <MobileCalendarExperience
+        <MobileCalendarExperience
           year={year}
           todayIso={todayIso}
           events={renderEvents}
@@ -1202,7 +1267,11 @@ export default function HomePage() {
         />
       ) : (
         <div className="overflow-x-auto pb-1 md:overflow-visible">
-          <div data-calendar-focus-root className="relative">
+          <div
+            data-calendar-focus-root
+            data-calendar-ui-mode="desktop"
+            className="relative doze52-calendar-mode-transition"
+          >
             <YearGrid
               year={year}
               todayIso={todayIso}
@@ -1269,7 +1338,7 @@ export default function HomePage() {
 
       {isMobileCalendarUi ? (
         <div
-          className="fixed right-4 z-40 md:hidden"
+          className="fixed right-4 z-40"
           style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 2.75rem)" }}
         >
           <Popover
@@ -1323,6 +1392,12 @@ export default function HomePage() {
         </div>
       ) : null}
 
+      {!hasSupabaseEnv ? (
+        <p className="mx-auto mt-4 w-fit rounded-full border border-amber-200/70 bg-amber-50/70 px-3 py-1 text-center text-[11px] font-medium text-amber-700 dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-amber-300">
+          Supabase nao configurado neste ambiente.
+        </p>
+      ) : null}
+
       <EventDialog
         open={dialogOpen}
         onOpenChange={(open) => {
@@ -1340,12 +1415,6 @@ export default function HomePage() {
         onSubmit={handleSubmit}
         onDelete={editingId ? handleDeleteEvent : undefined}
       />
-
-      {!hasSupabaseEnv ? (
-        <p className="mx-auto mt-1 max-w-[31rem] shrink-0 text-center text-[10px] font-medium leading-4 text-amber-700 md:mt-5 md:mb-1 md:max-w-none md:text-xs">
-          Supabase nao configurado neste ambiente.
-        </p>
-      ) : null}
 
       <AuthDialog
         open={authDialogOpen}

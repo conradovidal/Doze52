@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { THEME_ASSET_VERSION } from "@/lib/theme-shared";
 import { cn } from "@/lib/utils";
 
 type BrandLogoProps = {
@@ -8,7 +9,7 @@ type BrandLogoProps = {
 };
 
 export function BrandLogo({
-  alt = "Doze 52",
+  alt = "Doze52",
   className,
   decorative = false,
 }: BrandLogoProps) {
@@ -17,27 +18,29 @@ export function BrandLogo({
   return (
     <span
       className={cn(
-        "relative block h-9 w-36 overflow-visible md:h-10 md:w-40",
+        "inline-flex h-9 w-[96px] items-center md:h-10 md:w-[104px]",
         className
       )}
     >
       <Image
-        src="/doze52-logo-light.svg"
+        src={`/doze52-logo-light.svg?v=${THEME_ASSET_VERSION}`}
         alt={imageAlt}
         aria-hidden={decorative || undefined}
+        width={104}
+        height={26}
         priority
-        width={176}
-        height={176}
-        className="pointer-events-none absolute left-[-1.75rem] top-1/2 block h-40 w-40 -translate-y-1/2 object-contain dark:hidden md:left-[-1.875rem] md:h-44 md:w-44"
+        sizes="104px"
+        className="pointer-events-none block h-auto w-full object-contain object-left dark:hidden"
       />
       <Image
-        src="/doze52-logo-dark.svg"
+        src={`/doze52-logo-dark.svg?v=${THEME_ASSET_VERSION}`}
         alt={imageAlt}
         aria-hidden={decorative || undefined}
+        width={104}
+        height={26}
         priority
-        width={176}
-        height={176}
-        className="pointer-events-none absolute left-[-1.75rem] top-1/2 hidden h-40 w-40 -translate-y-1/2 object-contain dark:block md:left-[-1.875rem] md:h-44 md:w-44"
+        sizes="104px"
+        className="pointer-events-none hidden h-auto w-full object-contain object-left dark:block"
       />
     </span>
   );

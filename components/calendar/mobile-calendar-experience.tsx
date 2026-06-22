@@ -62,7 +62,7 @@ const MONTH_SHORT_LABELS = [
 
 const WEEKDAY_SHORT_LABELS = ["dom", "seg", "ter", "qua", "qui", "sex", "sab"] as const;
 const DAY_ACTIVE_TOP_THRESHOLD = 12;
-const MONTH_CENTER_SWITCH_THRESHOLD = 14;
+const MONTH_REVEAL_MARGIN = 8;
 
 const toIsoDate = (date: Date) => format(date, "yyyy-MM-dd");
 
@@ -197,11 +197,6 @@ export function MobileCalendarExperience({
   const activeMonthRef = React.useRef(activeMonthIndex);
   const scrollAnimationFrameRef = React.useRef<number | null>(null);
   const programmaticScrollRef = React.useRef(false);
-  const monthProgrammaticScrollRef = React.useRef(false);
-  const monthUserScrollRef = React.useRef(false);
-  const monthScrollFrameRef = React.useRef<number | null>(null);
-  const monthScrollSettleTimerRef = React.useRef<number | null>(null);
-  const monthProgrammaticTimerRef = React.useRef<number | null>(null);
 
   React.useEffect(() => {
     activeDateRef.current = activeDateIso;
@@ -310,105 +305,36 @@ export function MobileCalendarExperience({
     [scrollListTo, setActiveFromDate]
   );
 
-  const getCenteredMonthCandidate = React.useCallback(() => {
-    const scroller = monthScrollerRef.current;
-    if (!scroller) {
-      return {
-        distance: 0,
-        index: activeMonthRef.current,
-      };
-    }
-
-    const scrollerRect = scroller.getBoundingClientRect();
-    const scrollerCenter = scrollerRect.left + scrollerRect.width / 2;
-    let closestIndex = activeMonthRef.current;
-    let closestDistance = Number.POSITIVE_INFINITY;
-
-    monthButtonRefs.current.forEach((button, index) => {
-      if (!button) return;
-      const rect = button.getBoundingClientRect();
-      const buttonCenter = rect.left + rect.width / 2;
-      const distance = Math.abs(buttonCenter - scrollerCenter);
-
-      if (distance < closestDistance) {
-        closestDistance = distance;
-        closestIndex = index;
-      }
-    });
-
-    return {
-      distance: closestDistance,
-      index: closestIndex,
-    };
-  }, []);
-
-  const centerMonthButton = React.useCallback(
+  const revealMonthButton = React.useCallback(
     (monthIndex: number, behavior: ScrollBehavior = "smooth") => {
       const scroller = monthScrollerRef.current;
       const button = monthButtonRefs.current[monthIndex];
       if (!scroller || !button) return;
 
-      if (monthProgrammaticTimerRef.current !== null) {
-        window.clearTimeout(monthProgrammaticTimerRef.current);
-      }
-      monthProgrammaticScrollRef.current = true;
-
       const scrollerRect = scroller.getBoundingClientRect();
       const buttonRect = button.getBoundingClientRect();
-      const targetLeft =
-        scroller.scrollLeft +
-        buttonRect.left -
-        scrollerRect.left -
-        (scroller.clientWidth - buttonRect.width) / 2;
+      let targetLeft = scroller.scrollLeft;
+      const leftOverflow = buttonRect.left - scrollerRect.left - MONTH_REVEAL_MARGIN;
+      const rightOverflow =
+        buttonRect.right - scrollerRect.right + MONTH_REVEAL_MARGIN;
+
+      if (leftOverflow < 0) {
+        targetLeft += leftOverflow;
+      } else if (rightOverflow > 0) {
+        targetLeft += rightOverflow;
+      } else {
+        return;
+      }
+
+      const maxScrollLeft = scroller.scrollWidth - scroller.clientWidth;
 
       scroller.scrollTo({
-        left: Math.max(0, targetLeft),
+        left: Math.max(0, Math.min(targetLeft, maxScrollLeft)),
         behavior,
       });
-
-      monthProgrammaticTimerRef.current = window.setTimeout(
-        () => {
-          monthProgrammaticScrollRef.current = false;
-          monthProgrammaticTimerRef.current = null;
-        },
-        behavior === "auto" ? 0 : 720
-      );
     },
     []
   );
-
-  const handleMonthScrollerScroll = React.useCallback(() => {
-    if (monthProgrammaticScrollRef.current) return;
-
-    if (monthScrollFrameRef.current === null) {
-      monthScrollFrameRef.current = window.requestAnimationFrame(() => {
-        monthScrollFrameRef.current = null;
-        const nextMonth = getCenteredMonthCandidate();
-
-        if (
-          nextMonth.distance <= MONTH_CENTER_SWITCH_THRESHOLD &&
-          activeMonthRef.current !== nextMonth.index
-        ) {
-          activeMonthRef.current = nextMonth.index;
-          setActiveMonthIndex(nextMonth.index);
-        }
-      });
-    }
-
-    monthUserScrollRef.current = true;
-
-    if (monthScrollSettleTimerRef.current !== null) {
-      window.clearTimeout(monthScrollSettleTimerRef.current);
-    }
-
-    monthScrollSettleTimerRef.current = window.setTimeout(() => {
-      const settledMonth = getCenteredMonthCandidate().index;
-      monthUserScrollRef.current = false;
-      monthScrollSettleTimerRef.current = null;
-      centerMonthButton(settledMonth, "smooth");
-      scrollToDate(new Date(year, settledMonth, 1), "smooth");
-    }, 220);
-  }, [centerMonthButton, getCenteredMonthCandidate, scrollToDate, year]);
 
   const handleTodayClick = React.useCallback(() => {
     if (!todayIso) return;
@@ -421,36 +347,20 @@ export function MobileCalendarExperience({
     }
 
     const today = getSafeDate(todayIso, year);
-    centerMonthButton(today.getMonth(), "smooth");
+    revealMonthButton(today.getMonth(), "smooth");
     scrollToDate(today, "smooth");
   }, [
-    centerMonthButton,
     onActiveDateChange,
     onYearChange,
+    revealMonthButton,
     scrollToDate,
     todayIso,
     year,
   ]);
 
   React.useEffect(() => {
-    if (monthUserScrollRef.current) return;
-    centerMonthButton(activeMonthIndex, "smooth");
-  }, [activeMonthIndex, centerMonthButton]);
-
-  React.useEffect(
-    () => () => {
-      if (monthScrollFrameRef.current !== null) {
-        window.cancelAnimationFrame(monthScrollFrameRef.current);
-      }
-      if (monthScrollSettleTimerRef.current !== null) {
-        window.clearTimeout(monthScrollSettleTimerRef.current);
-      }
-      if (monthProgrammaticTimerRef.current !== null) {
-        window.clearTimeout(monthProgrammaticTimerRef.current);
-      }
-    },
-    []
-  );
+    revealMonthButton(activeMonthIndex, "smooth");
+  }, [activeMonthIndex, revealMonthButton]);
 
   const syncActiveFromScroll = React.useCallback(() => {
     if (programmaticScrollRef.current) return;
@@ -535,26 +445,26 @@ export function MobileCalendarExperience({
         : new Date(year, 0, 1);
 
     scrollToDate(initialDate, "auto");
-    centerMonthButton(initialDate.getMonth(), "auto");
+    revealMonthButton(initialDate.getMonth(), "auto");
     const frameId = window.requestAnimationFrame(() => {
       scrollToDate(initialDate, "auto");
-      centerMonthButton(initialDate.getMonth(), "auto");
+      revealMonthButton(initialDate.getMonth(), "auto");
     });
     const timeoutId = window.setTimeout(() => {
       scrollToDate(initialDate, "auto");
-      centerMonthButton(initialDate.getMonth(), "auto");
+      revealMonthButton(initialDate.getMonth(), "auto");
     }, 120);
 
     return () => {
       window.cancelAnimationFrame(frameId);
       window.clearTimeout(timeoutId);
     };
-  }, [centerMonthButton, scrollToDate, year]);
+  }, [revealMonthButton, scrollToDate, year]);
 
   return (
     <section
       data-mobile-calendar-experience
-      className="mx-auto flex min-h-0 w-full max-w-[31rem] flex-1 flex-col md:hidden"
+      className="mx-auto flex min-h-0 w-full max-w-[31rem] flex-1 flex-col"
     >
       <div className="-mx-3 mb-2 flex shrink-0 items-center gap-2 border-y border-border/65 bg-muted/28 px-3 py-2">
         <button
@@ -569,14 +479,10 @@ export function MobileCalendarExperience({
         <div className="relative min-w-0 flex-1">
           <nav
             ref={monthScrollerRef}
-            onScroll={handleMonthScrollerScroll}
-            className="min-w-0 overflow-x-auto rounded-full bg-muted/45 p-1 shadow-[inset_0_0_0_1px_hsl(var(--border)/0.55)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            className="min-w-0 overflow-x-auto overscroll-x-contain rounded-[12px] bg-muted/45 p-1 shadow-[inset_0_0_0_1px_hsl(var(--border)/0.55)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             aria-label={`Meses de ${year}`}
           >
-            <div
-              className="relative z-10 flex min-w-max items-center gap-1"
-              style={{ paddingInline: "calc(50% - 1.25rem)" }}
-            >
+            <div className="flex min-w-max items-center gap-1">
               {MONTH_LABELS.map((monthLabel, monthIndex) => {
                 const active = monthIndex === activeMonthIndex;
 
@@ -590,13 +496,13 @@ export function MobileCalendarExperience({
                     aria-pressed={active}
                     aria-label={monthLabel}
                     className={cn(
-                      "size-10 shrink-0 rounded-full border text-[12px] font-semibold transition-[background-color,border-color,color,box-shadow,transform] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45",
+                      "h-10 min-w-10 shrink-0 rounded-[9px] border px-3 text-[12px] font-semibold transition-[background-color,border-color,color,box-shadow,transform] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45",
                       active
-                        ? "border-transparent bg-transparent text-transparent"
+                        ? "border-primary bg-primary text-primary-foreground shadow-[0_10px_22px_-18px_rgba(15,23,42,0.55)]"
                         : "border-transparent bg-transparent text-foreground/62 hover:bg-background hover:text-foreground"
                     )}
                     onClick={() => {
-                      centerMonthButton(monthIndex, "smooth");
+                      revealMonthButton(monthIndex, "smooth");
                       scrollToDate(new Date(year, monthIndex, 1), "smooth");
                     }}
                   >
@@ -606,12 +512,6 @@ export function MobileCalendarExperience({
               })}
             </div>
           </nav>
-          <span
-            className="pointer-events-none absolute left-1/2 top-1/2 z-20 grid size-10 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-foreground text-[12px] font-semibold text-background shadow-[0_10px_22px_-14px_rgba(0,0,0,0.78)]"
-            aria-hidden="true"
-          >
-            {MONTH_SHORT_LABELS[activeMonthIndex]}
-          </span>
         </div>
       </div>
 
