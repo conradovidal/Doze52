@@ -590,7 +590,7 @@ export function YearGrid({
               title={QUARTER_LABELS[group.quarterIndex]}
               className={cn(
                 LATERAL_KEY_BASE_CLASS,
-                "h-auto self-stretch w-[1.95rem] shrink-0 border-r border-border/85 px-0 shadow-[inset_-1px_0_0_rgba(255,255,255,0.3)] min-[420px]:w-[2.1rem] md:w-[2.25rem] dark:shadow-[inset_-1px_0_0_rgba(255,255,255,0.05)]",
+                "h-auto self-stretch w-[1.95rem] shrink-0 border-r border-border px-0 min-[420px]:w-[2.1rem] md:w-[2.25rem]",
                 quarterRailShapeClass,
                 isQuarterSelected ? LATERAL_KEY_ACTIVE_CLASS : LATERAL_KEY_REST_CLASS
               )}
@@ -655,7 +655,7 @@ export function YearGrid({
   return (
     <div
       className={cn(
-        "w-full overflow-hidden rounded-[1.75rem] border border-border/75 bg-card/94 shadow-[0_14px_28px_-22px_rgba(15,23,42,0.16),0_34px_72px_-54px_rgba(15,23,42,0.18)] backdrop-blur-sm",
+        "w-full overflow-hidden rounded-[1.35rem] border border-border bg-card shadow-[0_18px_42px_-34px_rgba(15,23,42,0.24)]",
         canvasWidthClass
       )}
     >
@@ -682,7 +682,7 @@ export function YearGrid({
       </div>
 
       {hasFocusZoom ? (
-        <div className="flex justify-end border-t border-border/65 bg-[linear-gradient(180deg,rgba(255,255,255,0.52),rgba(249,249,250,0.88))] px-3 py-2.5 dark:bg-[linear-gradient(180deg,rgba(31,31,35,0.72),rgba(22,22,25,0.96))] md:px-4 md:py-3">
+        <div className="flex justify-end border-t border-border bg-card px-3 py-2.5 md:px-4 md:py-3">
           <label className="flex w-[10.75rem] items-center justify-end gap-2.5 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground min-[420px]:w-[11.5rem] md:w-[12.25rem]">
             <span className="shrink-0">Zoom</span>
             <input

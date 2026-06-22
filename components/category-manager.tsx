@@ -20,6 +20,7 @@ import {
 import {
   CATEGORY_COLOR_SETS,
   DEFAULT_CATEGORY_COLOR,
+  getCategoryColorToken,
   getNearestCategoryColor,
 } from "@/lib/category-palette";
 import { calendarPacks } from "@/lib/calendar-packs";
@@ -112,6 +113,10 @@ export function CategoryManager({
   const canSave = normalizedName.length > 0 && Boolean(profileDraftId);
   const canDelete = categories.length > 1;
   const normalizedColor = color.toLowerCase();
+  const currentColorToken = React.useMemo(
+    () => getCategoryColorToken(color),
+    [color]
+  );
   const presetColors = React.useMemo(
     () => CATEGORY_COLOR_SETS.flatMap((set) => set.colors),
     []
@@ -226,10 +231,17 @@ export function CategoryManager({
               </SelectContent>
             </Select>
 
-            <div className="inline-flex h-10 max-w-full items-center gap-2 rounded-xl border border-border/75 bg-muted/20 px-3 text-sm text-foreground shadow-sm sm:max-w-[220px]">
+            <div
+              className="inline-flex h-10 max-w-full items-center gap-2 rounded-xl border px-3 text-sm font-medium shadow-sm sm:max-w-[220px]"
+              style={{
+                backgroundColor: currentColorToken.soft,
+                borderColor: currentColorToken.border,
+                color: currentColorToken.text,
+              }}
+            >
               <span
                 className="h-2.5 w-2.5 shrink-0 rounded-full ring-1 ring-black/8"
-                style={{ backgroundColor: color }}
+                style={{ backgroundColor: currentColorToken.base }}
                 aria-hidden="true"
               />
               <span className="truncate">{name.trim() || "Categoria"}</span>
@@ -237,23 +249,26 @@ export function CategoryManager({
           </div>
 
           <div className="flex justify-center">
-            <div className="grid w-fit grid-cols-7 gap-x-3 gap-y-3 rounded-2xl bg-muted/18 p-3 sm:gap-x-4 sm:gap-y-3.5 sm:p-4">
+            <div className="grid w-fit grid-cols-5 gap-x-3 gap-y-3 rounded-2xl bg-muted/18 p-3 sm:gap-x-4 sm:gap-y-3.5 sm:p-4">
               {presetColors.map((preset) => {
                 const selected = preset.toLowerCase() === normalizedColor;
+                const presetToken = getCategoryColorToken(preset);
                 return (
                   <button
                     key={preset}
                     type="button"
                     onClick={() => setColor(preset)}
-                    aria-label={`Selecionar cor ${preset.toUpperCase()}`}
-                    className={`h-[34px] w-[34px] rounded-full border border-black/5 transition hover:scale-105 hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-300 sm:h-9 sm:w-9 ${
-                      selected
-                        ? "ring-2 ring-neutral-400 ring-offset-2 ring-offset-background"
-                        : ""
-                    }`}
-                    style={{ backgroundColor: preset }}
+                    aria-label={`Selecionar cor ${presetToken.label}`}
+                    title={presetToken.label}
+                    className="h-[34px] w-[34px] rounded-full border border-black/5 transition hover:scale-105 hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-300 sm:h-9 sm:w-9"
+                    style={{
+                      backgroundColor: presetToken.base,
+                      boxShadow: selected
+                        ? `0 0 0 2px var(--background), 0 0 0 4px ${presetToken.base}`
+                        : undefined,
+                    }}
                   >
-                    <span className="sr-only">{preset.toUpperCase()}</span>
+                    <span className="sr-only">{presetToken.label}</span>
                   </button>
                 );
               })}

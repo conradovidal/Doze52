@@ -37,7 +37,7 @@ export function DayCell({
         data-day-iso={dateIso}
         className={`w-full transition-colors ${
           isPast
-            ? "bg-neutral-100/55 dark:bg-[hsl(var(--cal-cell-outside-past))]"
+            ? "bg-neutral-200/70 dark:bg-[hsl(var(--cal-cell-outside-past))]"
             : "bg-neutral-50/45 dark:bg-[hsl(var(--cal-cell-outside))]"
         } ${isDropActive ? "ring-1 ring-inset ring-border/70 bg-foreground/6" : ""}`}
         style={{ minHeight: `${minHeightPx}px` }}
@@ -62,14 +62,16 @@ export function DayCell({
   const today = dateIso === todayIso;
   const dayToneClass = isPast
     ? isWeekend
-      ? "bg-neutral-200/55 dark:bg-[hsl(var(--cal-cell-weekend-past))]"
-      : "bg-neutral-100/72 dark:bg-[hsl(var(--cal-cell-weekday-past))]"
+      ? "bg-neutral-300/62 dark:bg-[hsl(var(--cal-cell-weekend-past))]"
+      : "bg-neutral-200/82 dark:bg-[hsl(var(--cal-cell-weekday-past))]"
     : isWeekend
       ? "bg-neutral-100/78 dark:bg-[hsl(var(--cal-cell-weekend))]"
       : "bg-white dark:bg-[hsl(var(--cal-cell-weekday))]";
-  const dayNumberToneClass = isWeekend
-    ? "text-neutral-500 dark:text-neutral-300"
-    : "text-muted-foreground dark:text-neutral-200";
+  const dayNumberToneClass = isPast
+    ? "text-neutral-400 dark:text-neutral-500/75"
+    : isWeekend
+      ? "text-neutral-500 dark:text-neutral-200/86"
+      : "text-muted-foreground dark:text-neutral-100/88";
   const showCenterCreateCue = showCreateCue && !today && !isRangeSelected;
 
   return (
@@ -126,7 +128,7 @@ export function DayCell({
           className={`grid h-5 min-w-5 place-items-center rounded-full px-1 text-[12px] font-semibold leading-none tabular-nums transition-colors ${
             today
               ? "bg-neutral-900 text-white ring-1 ring-neutral-900 dark:bg-neutral-100 dark:text-neutral-900 dark:ring-neutral-100"
-              : "group-hover:text-foreground dark:group-hover:text-neutral-100"
+              : "group-hover:text-foreground dark:group-hover:text-white"
           }`}
         >
           {date.getDate()}

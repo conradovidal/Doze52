@@ -29,25 +29,25 @@ import {
   pointerAwareCollisionDetection,
   preserveActivatorOffsetModifier,
 } from "@/lib/inline-sortable";
+import { getCategoryColorToken } from "@/lib/category-palette";
 import { useStore } from "@/lib/store";
 import type { CategoryItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const MOTION_CLASS = "duration-[160ms] ease-[cubic-bezier(0.22,1,0.36,1)]";
 const CHIP_SHELL_CLASS =
-  "group relative inline-flex h-8 items-center overflow-hidden rounded-full border transition-[background-color,border-color,box-shadow,transform] shadow-none";
+  "group relative inline-flex h-8 items-center overflow-hidden rounded-[10px] border transition-[background-color,border-color,box-shadow,transform] shadow-none";
 const CHIP_LEADING_SLOT_CLASS =
-  "inline-flex h-8 w-8 shrink-0 items-center justify-center";
+  "inline-flex h-8 w-7 shrink-0 items-center justify-center";
 const CHIP_HANDLE_CLASS =
-  "inline-flex h-8 w-8 shrink-0 touch-none cursor-grab items-center justify-center rounded-full text-muted-foreground/72 transition-colors hover:bg-muted/42 hover:text-foreground active:cursor-grabbing";
+  "inline-flex h-8 w-8 shrink-0 touch-none cursor-grab items-center justify-center rounded-[9px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground active:cursor-grabbing";
 const CHIP_EDIT_ACTION_CLASS =
-  "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted-foreground/72 transition-colors hover:bg-muted/42 hover:text-foreground";
+  "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground";
 const CHIP_PLACEHOLDER_CLASS =
-  "pointer-events-none absolute inset-[3px] rounded-full border border-dashed border-border/70 bg-muted/26";
+  "pointer-events-none absolute inset-[3px] rounded-[8px] border border-dashed border-border bg-muted";
 const CHIP_OVERLAY_CLASS =
-  "border-border/75 bg-background shadow-[0_18px_30px_-18px_rgba(15,23,42,0.28)]";
-const CREATE_ACTION_CLASS = `inline-flex h-8 w-8 items-center justify-center rounded-full border border-foreground/12 bg-foreground/[0.06] text-foreground/82 shadow-none transition-all ${MOTION_CLASS} hover:border-foreground/18 hover:bg-foreground/[0.1] hover:text-foreground`;
-
+  "border-border bg-card shadow-[0_18px_34px_-24px_rgba(15,23,42,0.36)]";
+const CREATE_ACTION_CLASS = `inline-flex h-8 w-8 items-center justify-center rounded-[10px] border border-border bg-card text-foreground shadow-none transition-all ${MOTION_CLASS} hover:border-foreground/20 hover:bg-muted`;
 const MOBILE_CHIP_LABEL_STYLE = {
   display: "-webkit-box",
   WebkitBoxOrient: "vertical",
@@ -59,27 +59,6 @@ const MOBILE_CHIP_BUTTON_STYLE = {
   height: "2.5rem",
   minHeight: "2.5rem",
 } satisfies React.CSSProperties;
-
-const hexToRgba = (hex: string, alpha: number) => {
-  const normalized = hex.trim().replace("#", "");
-  const expanded =
-    normalized.length === 3
-      ? normalized
-          .split("")
-          .map((part) => `${part}${part}`)
-          .join("")
-      : normalized;
-
-  if (!/^[0-9a-fA-F]{6}$/.test(expanded)) {
-    return `rgba(99, 102, 241, ${alpha})`;
-  }
-
-  const int = Number.parseInt(expanded, 16);
-  const r = (int >> 16) & 255;
-  const g = (int >> 8) & 255;
-  const b = int & 255;
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-};
 
 const applyProfileOrderToAll = (
   allCategories: CategoryItem[],
@@ -97,6 +76,7 @@ const applyProfileOrderToAll = (
 
 type CategoryBarProps = {
   compact?: boolean;
+  className?: string;
   mobileDense?: boolean;
   isInlineEditMode?: boolean;
   editingProfileId?: string | null;
@@ -116,6 +96,7 @@ type SortableHandleRef = ReturnType<typeof useSortable>["setActivatorNodeRef"];
 function EditCategoryChip({
   category,
   onEdit,
+  mobileDense = false,
   interactiveHandle = false,
   handleAttributes,
   handleListeners,
@@ -127,6 +108,7 @@ function EditCategoryChip({
 }: {
   category: CategoryItem;
   onEdit?: () => void;
+  mobileDense?: boolean;
   interactiveHandle?: boolean;
   handleAttributes?: SortableHandleAttributes;
   handleListeners?: SortableHandleListeners;
@@ -137,16 +119,18 @@ function EditCategoryChip({
   chipRef?: (node: HTMLElement | null) => void;
 }) {
   const contentHiddenClass = isPlaceholder ? "invisible" : "";
+  const colorToken = getCategoryColorToken(category.color);
   const categoryTintStyle: React.CSSProperties = {
-    backgroundColor: hexToRgba(category.color, isOverlay ? 0.13 : 0.1),
-    borderColor: hexToRgba(category.color, isOverlay ? 0.3 : 0.22),
+    backgroundColor: colorToken.soft,
+    borderColor: colorToken.border,
+    color: colorToken.text,
     ...style,
   };
   const categoryAccentStyle: React.CSSProperties = {
-    color: category.color,
+    color: colorToken.base,
   };
   const categoryActionHoverStyle: React.CSSProperties = {
-    color: category.color,
+    color: colorToken.base,
   };
 
   return (
@@ -155,7 +139,8 @@ function EditCategoryChip({
       style={categoryTintStyle}
       className={cn(
         CHIP_SHELL_CLASS,
-        "text-foreground/86 hover:brightness-[0.98]",
+        mobileDense && "h-10 w-full rounded-[8px]",
+        "hover:brightness-[0.985]",
         isOverlay && CHIP_OVERLAY_CLASS,
         isPlaceholder && "bg-background/80"
       )}
@@ -164,8 +149,8 @@ function EditCategoryChip({
         <div
           className={CHIP_PLACEHOLDER_CLASS}
           style={{
-            borderColor: hexToRgba(category.color, 0.38),
-            backgroundColor: hexToRgba(category.color, 0.1),
+            borderColor: colorToken.border,
+            backgroundColor: colorToken.soft,
           }}
         />
       ) : null}
@@ -176,7 +161,11 @@ function EditCategoryChip({
           ref={setHandleRef}
           aria-label={`Reordenar categoria ${category.name}`}
           title={`Reordenar categoria ${category.name}`}
-          className={cn(CHIP_HANDLE_CLASS, contentHiddenClass)}
+          className={cn(
+            CHIP_HANDLE_CLASS,
+            mobileDense && "h-10 w-8 rounded-[8px]",
+            contentHiddenClass
+          )}
           style={categoryAccentStyle}
           {...handleAttributes}
           {...handleListeners}
@@ -185,7 +174,12 @@ function EditCategoryChip({
         </button>
       ) : isOverlay || isPlaceholder ? (
         <span
-          className={cn(CHIP_HANDLE_CLASS, "cursor-default", contentHiddenClass)}
+          className={cn(
+            CHIP_HANDLE_CLASS,
+            "cursor-default",
+            mobileDense && "h-10 w-8 rounded-[8px]",
+            contentHiddenClass
+          )}
           aria-hidden="true"
           style={categoryAccentStyle}
         >
@@ -196,7 +190,7 @@ function EditCategoryChip({
           <span
             className="h-2.5 w-2.5 rounded-full"
             style={{
-              backgroundColor: category.color,
+              backgroundColor: colorToken.base,
             }}
           />
         </span>
@@ -205,26 +199,43 @@ function EditCategoryChip({
       {isOverlay || isPlaceholder ? (
         <div
           className={cn(
-            "flex min-w-0 items-center gap-1.5 pl-1 pr-2 text-[0.78rem] font-medium",
+            "flex min-w-0 flex-1 self-stretch items-center gap-1.5 pl-1 pr-2 text-[0.78rem] font-medium",
+            mobileDense && "text-left text-[0.74rem] leading-[0.84rem]",
             contentHiddenClass
           )}
         >
-          <span className="truncate">{category.name}</span>
+          <span
+            className={mobileDense ? "min-w-0" : "truncate"}
+            style={mobileDense ? MOBILE_CHIP_LABEL_STYLE : undefined}
+          >
+            {category.name}
+          </span>
         </div>
       ) : (
         <button
           type="button"
           onClick={onEdit}
           aria-label={`Editar categoria ${category.name}`}
-          className="flex min-w-0 items-center gap-1.5 pl-1 pr-2 text-[0.78rem] font-medium"
+          className={cn(
+            "flex min-w-0 flex-1 self-stretch items-center gap-1.5 pl-1 pr-2 text-[0.78rem] font-semibold",
+            mobileDense && "text-left text-[0.74rem] leading-[0.84rem]"
+          )}
         >
-          <span className="truncate">{category.name}</span>
+          <span
+            className={mobileDense ? "min-w-0" : "truncate"}
+            style={mobileDense ? MOBILE_CHIP_LABEL_STYLE : undefined}
+          >
+            {category.name}
+          </span>
         </button>
       )}
 
       {isOverlay || isPlaceholder ? (
         <div className={cn("pr-1", contentHiddenClass)}>
-          <span className={CHIP_EDIT_ACTION_CLASS} style={categoryActionHoverStyle}>
+          <span
+            className={cn(CHIP_EDIT_ACTION_CLASS, mobileDense && "h-8 w-8")}
+            style={categoryActionHoverStyle}
+          >
             <PencilLine className="h-3.5 w-3.5" />
           </span>
         </div>
@@ -238,7 +249,7 @@ function EditCategoryChip({
             }}
             aria-label={`Editar categoria ${category.name}`}
             title={`Editar categoria ${category.name}`}
-            className={CHIP_EDIT_ACTION_CLASS}
+            className={cn(CHIP_EDIT_ACTION_CLASS, mobileDense && "h-8 w-8")}
             style={categoryActionHoverStyle}
           >
             <PencilLine className="h-3.5 w-3.5" />
@@ -247,7 +258,7 @@ function EditCategoryChip({
       ) : (
         <div className="pr-1">
           <span
-            className={cn(CHIP_EDIT_ACTION_CLASS, "opacity-0")}
+            className={cn(CHIP_EDIT_ACTION_CLASS, mobileDense && "h-8 w-8", "opacity-0")}
             aria-hidden="true"
           >
             <PencilLine className="h-3.5 w-3.5" />
@@ -261,10 +272,12 @@ function EditCategoryChip({
 function SortableEditCategoryChip({
   category,
   dragEnabled,
+  mobileDense = false,
   onEdit,
 }: {
   category: CategoryItem;
   dragEnabled: boolean;
+  mobileDense?: boolean;
   onEdit: () => void;
 }) {
   const {
@@ -292,6 +305,7 @@ function SortableEditCategoryChip({
     <EditCategoryChip
       category={category}
       onEdit={onEdit}
+      mobileDense={mobileDense}
       interactiveHandle={dragEnabled}
       handleAttributes={attributes}
       handleListeners={listeners}
@@ -305,6 +319,7 @@ function SortableEditCategoryChip({
 
 export function CategoryBar({
   compact = false,
+  className,
   mobileDense = false,
   isInlineEditMode = false,
   editingProfileId,
@@ -373,7 +388,8 @@ export function CategoryBar({
       : compact
         ? "w-full min-h-8 justify-center"
         : "mb-2 min-h-8 justify-center",
-    mobileDense ? "" : "flex flex-wrap items-center gap-1.5 sm:gap-2"
+    mobileDense ? "" : "flex flex-wrap items-center gap-1.5 sm:gap-2",
+    className
   );
 
   const resetDragState = React.useCallback(() => {
@@ -470,74 +486,76 @@ export function CategoryBar({
   if (!isInlineEditMode) {
     return (
       <div className={barClass}>
-        {displayedCategories.map((category) => (
-          <button
-            key={category.id}
-            type="button"
-            aria-pressed={category.visible}
-            onClick={() => toggleCategoryVisibility(category.id)}
-            title={category.name}
-            className={`inline-flex items-center border text-[0.78rem] font-medium shadow-none transition-all ${MOTION_CLASS} ${
-              mobileDense
-                ? "h-10 w-full justify-start overflow-hidden rounded-[8px] pr-2 text-left"
-                : "h-8 overflow-hidden rounded-full"
-            } ${
-              category.visible
-                ? "text-foreground hover:brightness-[0.97]"
-                : "bg-background text-muted-foreground hover:border-border hover:bg-muted hover:text-foreground"
-            }`}
-            style={{
-              ...(mobileDense ? MOBILE_CHIP_BUTTON_STYLE : {}),
-              backgroundColor: category.visible
-                ? hexToRgba(category.color, 0.1)
-                : "hsl(var(--background))",
-              borderColor: category.visible
-                ? hexToRgba(category.color, 0.2)
-                : "hsl(var(--border) / 0.72)",
-            }}
-          >
-            <span
+        {displayedCategories.map((category) => {
+          const colorToken = getCategoryColorToken(category.color);
+          return (
+            <button
+              key={category.id}
+              type="button"
+              aria-pressed={category.visible}
+              onClick={() => toggleCategoryVisibility(category.id)}
+              title={category.name}
               className={cn(
+                `inline-flex items-center overflow-hidden border text-[0.78rem] font-semibold shadow-none transition-all ${MOTION_CLASS}`,
                 mobileDense
-                  ? "inline-flex h-8 w-7 shrink-0 items-center justify-center"
-                  : CHIP_LEADING_SLOT_CLASS
+                  ? "h-10 w-full justify-start rounded-[8px] pr-2 text-left"
+                  : "h-8 rounded-[10px]",
+                category.visible
+                  ? "hover:brightness-[0.985]"
+                  : "border-dashed bg-card/80 text-muted-foreground/75 hover:border-foreground/18 hover:bg-muted hover:text-foreground"
               )}
-              aria-hidden="true"
+              style={{
+                ...(mobileDense ? MOBILE_CHIP_BUTTON_STYLE : {}),
+                backgroundColor: category.visible ? colorToken.soft : "var(--card)",
+                borderColor: category.visible ? colorToken.border : "var(--border)",
+                color: category.visible ? colorToken.text : undefined,
+                boxShadow: category.visible
+                  ? "inset 0 0 0 1px rgba(255,255,255,0.42)"
+                  : undefined,
+              }}
             >
               <span
-                className="h-2.5 w-2.5 rounded-full"
-                style={{
-                  backgroundColor: category.color,
-                  opacity: category.visible ? 0.92 : 0.5,
-                }}
-              />
-            </span>
-            <span
-              className={`min-w-0 pl-1 pr-3 ${
-                mobileDense
-                  ? "text-left text-[0.74rem] font-semibold leading-[0.84rem]"
-                  : "truncate"
-              } ${
-                category.visible ? "text-foreground" : "text-muted-foreground"
-              }`}
-              style={mobileDense ? MOBILE_CHIP_LABEL_STYLE : undefined}
-            >
-              {category.name}
-            </span>
-          </button>
-        ))}
+                className={cn(
+                  mobileDense
+                    ? "inline-flex h-8 w-7 shrink-0 items-center justify-center"
+                    : CHIP_LEADING_SLOT_CLASS
+                )}
+                aria-hidden="true"
+              >
+                <span
+                  className="h-2.5 w-2.5 rounded-full"
+                  style={{
+                    backgroundColor: colorToken.base,
+                    opacity: category.visible ? 0.95 : 0.32,
+                  }}
+                />
+              </span>
+              <span
+                className={`min-w-0 pl-1 pr-3 ${
+                  mobileDense
+                    ? "text-left text-[0.74rem] leading-[0.84rem]"
+                    : "truncate"
+                } ${
+                  category.visible ? "" : "text-muted-foreground/75"
+                }`}
+                style={mobileDense ? MOBILE_CHIP_LABEL_STYLE : undefined}
+              >
+                {category.name}
+              </span>
+            </button>
+          );
+        })}
 
         <button
           type="button"
           onClick={() => setCategoriesVisibility(displayedCategoryIds, !allDisplayedVisible)}
-          style={mobileDense ? MOBILE_CHIP_BUTTON_STYLE : undefined}
-          className={`inline-flex items-center justify-center border px-2.5 text-muted-foreground/80 shadow-none transition-all ${MOTION_CLASS} ${
-            mobileDense ? "h-10 w-full rounded-[8px]" : "h-8 rounded-full"
-          } ${
+          className={cn(
+            `inline-flex items-center justify-center rounded-[10px] border text-muted-foreground shadow-none transition-all ${MOTION_CLASS}`,
+            mobileDense ? "h-10 w-full px-2.5" : "h-8 px-2.5",
             allDisplayedVisible
-              ? "border-border bg-background hover:border-border hover:bg-muted hover:text-foreground"
-              : "border-border bg-muted text-foreground/85 hover:border-border hover:bg-muted hover:text-foreground"
-          }`}
+              ? "border-border bg-card hover:border-foreground/18 hover:bg-muted hover:text-foreground"
+              : "border-foreground/18 bg-muted text-foreground hover:border-foreground/22 hover:bg-muted/80"
+          )}
           aria-label={visibilityActionLabel}
           title={visibilityActionLabel}
         >
@@ -567,6 +585,7 @@ export function CategoryBar({
               key={category.id}
               category={category}
               dragEnabled={dragEnabled}
+              mobileDense={mobileDense}
               onEdit={() => onEditCategory?.(category.id)}
             />
           ))}
@@ -575,11 +594,12 @@ export function CategoryBar({
             type="button"
             onClick={onCreateCategory}
             disabled={!editingProfileId}
-            className={`${CREATE_ACTION_CLASS} ${
-              editingProfileId
-                ? ""
-                : "cursor-not-allowed border-border/55 bg-background/80 text-muted-foreground/55 hover:border-border/55 hover:bg-background/80 hover:text-muted-foreground/55"
-            }`}
+            className={cn(
+              CREATE_ACTION_CLASS,
+              mobileDense && "h-10 w-full rounded-[8px]",
+              !editingProfileId &&
+                "cursor-not-allowed border-border bg-card text-muted-foreground/55 hover:border-border hover:bg-card hover:text-muted-foreground/55"
+            )}
             aria-label="Criar nova categoria"
             title="Criar nova categoria"
           >
@@ -594,6 +614,7 @@ export function CategoryBar({
               {activeCategory ? (
                 <EditCategoryChip
                   category={activeCategory}
+                  mobileDense={mobileDense}
                   isOverlay
                   style={{ width: activeDrag?.width ?? undefined }}
                 />

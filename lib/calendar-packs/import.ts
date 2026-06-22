@@ -7,8 +7,6 @@ import type {
   CalendarPackSelection,
 } from "./types";
 
-const DEFAULT_PROFILE_COLOR = "#64748B";
-
 export type CalendarPackImportStatus = "created" | "updated" | "already-exists";
 
 export type CalendarPackImportResult = {
@@ -45,6 +43,72 @@ const normalizeLabel = (value: string) =>
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .trim();
+
+const ENGLAND_FLAG = "\u{1F3F4}\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}\u{E007F}";
+const SCOTLAND_FLAG = "\u{1F3F4}\u{E0067}\u{E0062}\u{E0073}\u{E0063}\u{E0074}\u{E007F}";
+
+const WORLD_CUP_FLAG_BY_TEAM = new Map<string, string>([
+  ["África do Sul", "🇿🇦"],
+  ["Alemanha", "🇩🇪"],
+  ["Argélia", "🇩🇿"],
+  ["Arábia Saudita", "🇸🇦"],
+  ["Argentina", "🇦🇷"],
+  ["Austrália", "🇦🇺"],
+  ["Áustria", "🇦🇹"],
+  ["Bélgica", "🇧🇪"],
+  ["Bósnia e Herzegovina", "🇧🇦"],
+  ["Brasil", "🇧🇷"],
+  ["Cabo Verde", "🇨🇻"],
+  ["Canadá", "🇨🇦"],
+  ["Catar", "🇶🇦"],
+  ["Colômbia", "🇨🇴"],
+  ["Coreia do Sul", "🇰🇷"],
+  ["Costa do Marfim", "🇨🇮"],
+  ["Croácia", "🇭🇷"],
+  ["Curaçao", "🇨🇼"],
+  ["Egito", "🇪🇬"],
+  ["Equador", "🇪🇨"],
+  ["Escócia", SCOTLAND_FLAG],
+  ["Espanha", "🇪🇸"],
+  ["Estados Unidos", "🇺🇸"],
+  ["França", "🇫🇷"],
+  ["Gana", "🇬🇭"],
+  ["Haiti", "🇭🇹"],
+  ["Inglaterra", ENGLAND_FLAG],
+  ["Irã", "🇮🇷"],
+  ["Iraque", "🇮🇶"],
+  ["Japão", "🇯🇵"],
+  ["Jordânia", "🇯🇴"],
+  ["Marrocos", "🇲🇦"],
+  ["México", "🇲🇽"],
+  ["Noruega", "🇳🇴"],
+  ["Nova Zelândia", "🇳🇿"],
+  ["Países Baixos", "🇳🇱"],
+  ["Panamá", "🇵🇦"],
+  ["Paraguai", "🇵🇾"],
+  ["Portugal", "🇵🇹"],
+  ["RD Congo", "🇨🇩"],
+  ["Senegal", "🇸🇳"],
+  ["Suécia", "🇸🇪"],
+  ["Suíça", "🇨🇭"],
+  ["Tchéquia", "🇨🇿"],
+  ["Tunísia", "🇹🇳"],
+  ["Turquia", "🇹🇷"],
+  ["Uruguai", "🇺🇾"],
+  ["Uzbequistão", "🇺🇿"],
+]);
+
+const getWorldCupEventTitle = (event: CalendarPackEvent) => {
+  const homeFlag = WORLD_CUP_FLAG_BY_TEAM.get(event.homeTeam);
+  const awayFlag = WORLD_CUP_FLAG_BY_TEAM.get(event.awayTeam);
+  return homeFlag && awayFlag ? `${homeFlag} ${awayFlag}` : event.title;
+};
+
+export const getCalendarPackEventTitle = (
+  event: CalendarPackEvent,
+  pack: CalendarPack
+) =>
+  pack.id.startsWith("world-cup-2026") ? getWorldCupEventTitle(event) : event.title;
 
 export const getCalendarPackEvents = (
   pack: CalendarPack,
@@ -113,7 +177,99 @@ const nextDayOrder = (maxOrderByDate: Map<string, number>, date: string) => {
   return next;
 };
 
-const getPackEventNotes = (event: CalendarPackEvent) => {
+const BRAZIL_TIME_ZONE = "America/Sao_Paulo";
+
+const getTimeZoneParts = (date: Date, timeZone: string) => {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).formatToParts(date);
+
+  const valueByType = new Map(parts.map((part) => [part.type, part.value]));
+  return {
+    year: Number(valueByType.get("year")),
+    month: Number(valueByType.get("month")),
+    day: Number(valueByType.get("day")),
+    hour: Number(valueByType.get("hour")),
+    minute: Number(valueByType.get("minute")),
+  };
+};
+
+const getUtcDateForZonedTime = (date: string, time: string, timeZone: string) => {
+  const [year, month, day] = date.split("-").map(Number);
+  const [hour, minute] = time.split(":").map(Number);
+  if (!year || !month || !day || Number.isNaN(hour) || Number.isNaN(minute)) {
+    return null;
+  }
+
+  const utcGuess = Date.UTC(year, month - 1, day, hour, minute);
+  const zonedParts = getTimeZoneParts(new Date(utcGuess), timeZone);
+  const zonedAsUtc = Date.UTC(
+    zonedParts.year,
+    zonedParts.month - 1,
+    zonedParts.day,
+    zonedParts.hour,
+    zonedParts.minute
+  );
+  const offset = zonedAsUtc - utcGuess;
+  return new Date(utcGuess - offset);
+};
+
+const formatBrazilTime = (event: CalendarPackEvent) => {
+  const date = getUtcDateForZonedTime(event.date, event.time, event.timezone);
+  if (!date) return `${event.time} (Brasília)`;
+
+  const time = new Intl.DateTimeFormat("pt-BR", {
+    timeZone: BRAZIL_TIME_ZONE,
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(date);
+  const brazilDate = new Intl.DateTimeFormat("en-CA", {
+    timeZone: BRAZIL_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+
+  if (brazilDate !== event.date) {
+    const shortDate = new Intl.DateTimeFormat("pt-BR", {
+      timeZone: BRAZIL_TIME_ZONE,
+      day: "2-digit",
+      month: "2-digit",
+    }).format(date);
+    return `${time} (Brasília, ${shortDate})`;
+  }
+
+  return `${time} (Brasília)`;
+};
+
+const getWorldCupEventNotes = (event: CalendarPackEvent) => {
+  const phase = event.group ? `${event.phase}, grupo ${event.group}` : event.phase;
+  return [
+    `${event.homeTeam} x ${event.awayTeam}`,
+    formatBrazilTime(event),
+    phase,
+    event.venue && event.city ? `${event.venue}, ${event.city}` : null,
+    event.result ? `Resultado ${event.result}` : null,
+  ]
+    .filter(Boolean)
+    .join("\n");
+};
+
+export const getCalendarPackEventNotes = (
+  event: CalendarPackEvent,
+  pack: CalendarPack
+) => {
+  if (pack.id.startsWith("world-cup-2026")) {
+    return getWorldCupEventNotes(event);
+  }
+
   const phase = event.group ? `${event.phase} - Grupo ${event.group}` : event.phase;
   return [
     `Horario: ${event.time} (${event.timezone})`,
@@ -132,9 +288,13 @@ const getPackEventNotes = (event: CalendarPackEvent) => {
 const hasEquivalentEvent = (
   events: CalendarEvent[],
   packEvent: CalendarPackEvent,
-  categoryId: string
+  categoryId: string,
+  expectedTitle: string
 ) => {
-  const title = normalizeLabel(packEvent.title);
+  const titles = new Set([
+    normalizeLabel(expectedTitle),
+    normalizeLabel(packEvent.title),
+  ]);
   const packEventIds = new Set(getPackEventIds(packEvent));
   return events.some(
     (event) =>
@@ -142,7 +302,7 @@ const hasEquivalentEvent = (
       (event.startDate === packEvent.date &&
         event.endDate === packEvent.date &&
         event.categoryId === categoryId &&
-        normalizeLabel(event.title) === title)
+        titles.has(normalizeLabel(event.title)))
   );
 };
 
@@ -166,11 +326,12 @@ export const getCalendarPackAvailability = (
       .map((eventId) => eventsById.get(eventId))
       .find(Boolean);
     const expectedCategoryId = categoryIdByKey.get(packEvent.suggestedCategoryKey);
-    const expectedNotes = getPackEventNotes(packEvent);
+    const expectedTitle = getCalendarPackEventTitle(packEvent, pack);
+    const expectedNotes = getCalendarPackEventNotes(packEvent, pack);
     return Boolean(
       legacyEvent ||
         (event && expectedCategoryId && event.categoryId !== expectedCategoryId) ||
-        (event && (event.title !== packEvent.title || event.notes !== expectedNotes))
+        (event && (event.title !== expectedTitle || event.notes !== expectedNotes))
     );
   });
   const profileId = packCategories[0]?.profileId ?? profile?.id ?? null;
@@ -234,48 +395,34 @@ export const findCalendarPackByCategoryId = (
 export const importCalendarPack = (
   snapshot: CalendarSnapshot,
   pack: CalendarPack,
-  selection: CalendarPackSelection
+  selection: CalendarPackSelection,
+  targetProfileId: string
 ): CalendarPackImportResult => {
+  const targetProfile = snapshot.profiles.find(
+    (profile) => profile.id === targetProfileId
+  );
+  if (!targetProfile) {
+    throw new Error("Target profile not found.");
+  }
+
   const selectedPackEvents = getCalendarPackEvents(pack, selection);
-  const existingProfile = findPackProfile(snapshot.profiles, pack);
   const selectedCategoryKeys = new Set(
     selectedPackEvents.map((event) => event.suggestedCategoryKey)
   );
   const selectedPackCategories = pack.categories.filter((category) =>
     selectedCategoryKeys.has(category.key)
   );
-  const shouldCreateProfile = selectedPackCategories.some(
-    (packCategory) => !findPackCategoryAnywhere(snapshot.categories, packCategory)
+  const profileId = targetProfile.id;
+  const hadExistingPackCategory = selectedPackCategories.some((packCategory) =>
+    Boolean(findPackCategoryAnywhere(snapshot.categories, packCategory))
   );
-  const profileId =
-    existingProfile?.id ??
-    (shouldCreateProfile ? pack.profile.id : snapshot.profiles[0]?.id ?? pack.profile.id);
-
-  let nextProfiles = existingProfile
-    ? snapshot.profiles.map((profile) =>
-        profile.id === existingProfile.id
-          ? {
-              ...profile,
-              name: pack.profile.name,
-              color: DEFAULT_PROFILE_COLOR,
-              icon: pack.profile.icon,
-            }
-          : profile
-      )
-    : [...snapshot.profiles];
-
-  if (shouldCreateProfile && !existingProfile) {
-    nextProfiles = [
-      ...nextProfiles,
-      {
-        id: profileId,
-        name: pack.profile.name,
-        color: DEFAULT_PROFILE_COLOR,
-        icon: pack.profile.icon,
-        position: snapshot.profiles.length,
-      },
-    ];
-  }
+  const packEventIdsBeforeImport = new Set(
+    selectedPackEvents.flatMap(getPackEventIds)
+  );
+  const hadExistingPackEvent = snapshot.events.some((event) =>
+    packEventIdsBeforeImport.has(event.id)
+  );
+  const nextProfiles = [...snapshot.profiles];
 
   const categoryIdByKey = new Map<string, string>();
   let addedCategoryCount = 0;
@@ -328,6 +475,8 @@ export const importCalendarPack = (
       nextCategories[0]?.id;
 
     const category = categoryId ? categoriesById.get(categoryId) : null;
+    const expectedTitle = getCalendarPackEventTitle(packEvent, pack);
+    const expectedNotes = getCalendarPackEventNotes(packEvent, pack);
     const legacyIds = new Set(packEvent.legacyIds ?? []);
     const currentEventIndex = nextEvents.findIndex((event) => event.id === packEvent.id);
     const legacyEventIndex = nextEvents.findIndex((event) => legacyIds.has(event.id));
@@ -341,12 +490,12 @@ export const importCalendarPack = (
       const nextEvent = {
         ...currentEvent,
         id: packEvent.id,
-        title: packEvent.title,
+        title: expectedTitle,
         categoryId,
         color: category.color,
         startDate: packEvent.date,
         endDate: packEvent.date,
-        notes: getPackEventNotes(packEvent),
+        notes: expectedNotes,
       };
       const changed =
         currentEvent.title !== nextEvent.title ||
@@ -363,19 +512,19 @@ export const importCalendarPack = (
       continue;
     }
 
-    if (!categoryId || hasEquivalentEvent(nextEvents, packEvent, categoryId)) {
+    if (!categoryId || hasEquivalentEvent(nextEvents, packEvent, categoryId, expectedTitle)) {
       skippedEventCount += 1;
       continue;
     }
 
     nextEvents.push({
       id: packEvent.id,
-      title: packEvent.title,
+      title: expectedTitle,
       categoryId,
       color: category?.color ?? pack.categories[0]?.color ?? "#2563EB",
       startDate: packEvent.date,
       endDate: packEvent.date,
-      notes: getPackEventNotes(packEvent),
+      notes: expectedNotes,
       createdAt: new Date().toISOString(),
       dayOrder: nextDayOrder(orderByDate, packEvent.date),
     });
@@ -399,7 +548,9 @@ export const importCalendarPack = (
     nextCategories.length - categoriesAfterLegacyCleanup.length;
 
   const status: CalendarPackImportStatus =
-    shouldCreateProfile && !existingProfile
+    !hadExistingPackCategory &&
+    !hadExistingPackEvent &&
+    (addedCategoryCount > 0 || addedEventCount > 0)
       ? "created"
       : addedCategoryCount > 0 ||
           updatedCategoryCount > 0 ||

@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { CalendarDays, Loader2, Trash2 } from "lucide-react";
+import { Check, Loader2, Plus, Trash2 } from "lucide-react";
+import { ProfileIcon } from "@/components/profile-icon";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -11,7 +12,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useFeedback } from "@/components/ui/feedback-provider";
-import { calendarPackGroups } from "@/lib/calendar-packs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { calendarPacks } from "@/lib/calendar-packs";
 import {
   getCalendarPackAvailability,
   importCalendarPack,
@@ -42,18 +50,6 @@ const statusCopy: Record<PackFlowState, string> = {
   error: "Erro",
 };
 
-const formatVerifiedDate = (value: string) => {
-  const [year, month, day] = value.split("-").map(Number);
-  if (!year || !month || !day) return value;
-  return `${String(day).padStart(2, "0")}/${String(month).padStart(2, "0")}/${year}`;
-};
-
-const MOBILE_LAUNCHER_STYLE = {
-  height: "2.5rem",
-  minHeight: "2.5rem",
-} satisfies React.CSSProperties;
-const MOBILE_PACK_LABEL = "Mais calendários";
-
 export function CalendarPackLauncher({
   onFocusYear,
   className,
@@ -68,10 +64,15 @@ export function CalendarPackLauncher({
   const categories = useStore((state) => state.categories);
   const events = useStore((state) => state.events);
   const replaceAllData = useStore((state) => state.replaceAllData);
+  const selectedProfileIds = useStore((state) => state.selectedProfileIds);
   const setSelectedProfiles = useStore((state) => state.setSelectedProfiles);
 
   const [open, setOpen] = React.useState(false);
   const [flowByPack, setFlowByPack] = React.useState<Record<string, PackFlowState>>({});
+  const [targetProfileByPack, setTargetProfileByPack] = React.useState<
+    Record<string, string>
+  >({});
+  const [expandedPackId, setExpandedPackId] = React.useState<string | null>(null);
 
   const snapshot = React.useMemo(
     () => ({ profiles, categories, events }),
@@ -81,30 +82,26 @@ export function CalendarPackLauncher({
   const availabilityByPack = React.useMemo(
     () =>
       new Map(
-        calendarPackGroups.flatMap((group) =>
-          group.packs.map((pack) => [
-            pack.id,
-            getCalendarPackAvailability(snapshot, pack),
-          ])
-        )
+        calendarPacks.map((pack) => [
+          pack.id,
+          getCalendarPackAvailability(snapshot, pack),
+        ])
       ),
     [snapshot]
   );
   const packUpdateCount = React.useMemo(
     () =>
-      calendarPackGroups
-        .flatMap((group) => group.packs)
-        .filter((pack) => {
-          const availability = availabilityByPack.get(pack.id);
-          if (!availability) return false;
-          const isPresent =
-            Boolean(availability.hasAnyCategory) ||
-            Boolean(availability.hasImportedEvents);
-          const isComplete =
-            availability.importedEventCount >= availability.totalEventCount &&
-            !availability.hasMismatchedEvents;
-          return isPresent && !isComplete;
-        }).length,
+      calendarPacks.filter((pack) => {
+        const availability = availabilityByPack.get(pack.id);
+        if (!availability) return false;
+        const isPresent =
+          Boolean(availability.hasAnyCategory) ||
+          Boolean(availability.hasImportedEvents);
+        const isComplete =
+          availability.importedEventCount >= availability.totalEventCount &&
+          !availability.hasMismatchedEvents;
+        return isPresent && !isComplete;
+      }).length,
     [availabilityByPack]
   );
   const hasPackUpdates = packUpdateCount > 0;
@@ -112,6 +109,36 @@ export function CalendarPackLauncher({
     packUpdateCount === 1
       ? "1 atualização disponível"
       : `${packUpdateCount} atualizações disponíveis`;
+  const launcherAriaCopy = hasPackUpdates
+    ? `Abrir assinaturas de calendário. ${updateAriaCopy}`
+    : "Abrir assinaturas de calendário. Calendários disponíveis para adicionar";
+  const activeProfileId = React.useMemo(
+    () =>
+      selectedProfileIds.find((profileId) =>
+        profiles.some((profile) => profile.id === profileId)
+      ) ??
+      profiles[0]?.id ??
+      null,
+    [profiles, selectedProfileIds]
+  );
+  const profileNameById = React.useMemo(
+    () => new Map(profiles.map((profile) => [profile.id, profile.name])),
+    [profiles]
+  );
+
+  const getTargetProfileId = React.useCallback(
+    (packId: string, fallbackProfileId?: string | null) => {
+      const savedProfileId = targetProfileByPack[packId];
+      if (savedProfileId && profileNameById.has(savedProfileId)) {
+        return savedProfileId;
+      }
+      if (fallbackProfileId && profileNameById.has(fallbackProfileId)) {
+        return fallbackProfileId;
+      }
+      return activeProfileId;
+    },
+    [activeProfileId, profileNameById, targetProfileByPack]
+  );
 
   const setPackFlow = React.useCallback((packId: string, state: PackFlowState) => {
     setFlowByPack((current) => ({ ...current, [packId]: state }));
@@ -131,17 +158,28 @@ export function CalendarPackLauncher({
     setOpen(nextOpen);
     if (!nextOpen) {
       setFlowByPack({});
+      setExpandedPackId(null);
     }
   }, []);
 
   const handleImport = React.useCallback(
-    (pack: CalendarPack) => {
+    (pack: CalendarPack, targetProfileId: string | null) => {
+      if (!targetProfileId || !profileNameById.has(targetProfileId)) {
+        notify({
+          tone: "error",
+          title: "Escolha um perfil",
+          description: "Selecione onde este calendário deve entrar.",
+        });
+        return;
+      }
+
       setPackFlow(pack.id, "adding");
 
       try {
-        const result = importCalendarPack(snapshot, pack, "all");
+        const result = importCalendarPack(snapshot, pack, "all", targetProfileId);
         replaceAllData(result.snapshot);
         focusPack(pack, result.profileId);
+        setExpandedPackId(null);
 
         if (result.status === "already-exists") {
           setPackFlow(pack.id, "exists");
@@ -160,7 +198,9 @@ export function CalendarPackLauncher({
             result.status === "updated"
               ? "Calendário atualizado"
               : "Calendário adicionado",
-          description: `${pack.name} entrou no seu Doze 52.`,
+          description: `${pack.name} entrou em ${
+            profileNameById.get(result.profileId) ?? "seu Doze 52"
+          }.`,
         });
       } catch {
         setPackFlow(pack.id, "error");
@@ -171,7 +211,7 @@ export function CalendarPackLauncher({
         });
       }
     },
-    [focusPack, notify, replaceAllData, setPackFlow, snapshot]
+    [focusPack, notify, profileNameById, replaceAllData, setPackFlow, snapshot]
   );
 
   const handleRemove = React.useCallback(
@@ -183,6 +223,7 @@ export function CalendarPackLauncher({
         replaceAllData(result.snapshot);
         onFocusYear?.(pack.year);
         setPackFlow(pack.id, "removed");
+        setExpandedPackId(null);
         notify({
           tone: "success",
           title: "Calendário removido",
@@ -204,108 +245,52 @@ export function CalendarPackLauncher({
     <>
       <Button
         type="button"
-        variant="outline"
-        size="sm"
-        style={mobileDense ? MOBILE_LAUNCHER_STYLE : undefined}
+        variant="default"
+        size={mobileDense ? "lg" : "sm"}
         className={cn(
-          "relative h-8 rounded-full border-border/55 bg-background/70 px-2.5 text-[0.78rem] font-medium text-foreground/78 shadow-none transition-all hover:border-border/75 hover:bg-muted/35 hover:text-foreground",
-          mobileDense &&
-            "!h-10 justify-start gap-2 overflow-hidden rounded-[8px] !border-foreground !bg-foreground px-2.5 py-1 !text-background shadow-none whitespace-normal hover:!bg-foreground/92 hover:!text-background dark:!border-white/80 dark:!bg-white dark:!text-black dark:hover:!bg-white/92 dark:hover:!text-black",
-          hasPackUpdates &&
-            "border-amber-400/60 text-foreground hover:border-amber-400/75",
+          "relative rounded-[10px] border border-primary/14 bg-primary px-2.5 text-[0.78rem] font-semibold text-primary-foreground shadow-none transition-[background-color,border-color,box-shadow,transform,color] duration-150 ease-out hover:border-primary/20 hover:bg-primary/90 hover:text-primary-foreground active:translate-y-[1px] focus-visible:ring-2 focus-visible:ring-ring/45",
+          mobileDense ? "h-10 justify-start rounded-[8px] text-left" : "h-8",
+          hasPackUpdates && "ring-1 ring-rose-500/35 dark:ring-rose-300/45",
           className
         )}
         onClick={() => setOpen(true)}
-        aria-label={
-          hasPackUpdates
-            ? `Abrir ${MOBILE_PACK_LABEL}. Destaque: Copa 2026. ${updateAriaCopy}`
-            : `Abrir ${MOBILE_PACK_LABEL}. Destaque: Copa 2026.`
-        }
-        title={hasPackUpdates ? "Atualizações disponíveis" : undefined}
+        aria-label={launcherAriaCopy}
+        title={hasPackUpdates ? "Atualizações disponíveis" : "Calendários disponíveis"}
       >
-        {hasPackUpdates ? (
-          <span
-            className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full bg-amber-400 ring-2 ring-background"
-            aria-hidden="true"
-          />
-        ) : null}
-        {mobileDense ? (
-          <span className="grid size-6 shrink-0 place-items-center self-center rounded-[7px] bg-background/14 text-[17px] font-semibold leading-none text-background dark:!bg-black/10 dark:!text-black">
-            +
-          </span>
-        ) : (
-          <CalendarDays className="size-3.5" />
-        )}
         <span
           className={cn(
-            mobileDense
-              ? "min-w-0 self-center text-left text-[0.72rem] font-semibold leading-[0.9rem]"
-              : ""
+            "absolute -right-0.5 -top-0.5 rounded-full bg-rose-500 ring-2 ring-background dark:bg-rose-400",
+            hasPackUpdates
+              ? "size-3 shadow-[0_0_0_4px_rgba(244,63,94,0.16)]"
+              : "size-2.5"
           )}
-        >
-          {mobileDense ? (
-            <>
-              <span className="block">Calendários</span>
-              <span className="block text-[9px] font-semibold uppercase leading-[0.68rem] tracking-[0.08em] text-emerald-200/90 dark:!text-emerald-700">
-                🇧🇷 Copa 2026
-              </span>
-            </>
-          ) : (
-            "Pacotes"
-          )}
+          aria-hidden="true"
+        />
+        <Plus className="size-3.5" />
+        <span>Calendários</span>
+        <span className="hidden items-center gap-1 rounded-[7px] bg-primary-foreground/14 px-1.5 py-0.5 text-[11px] font-bold text-current lg:inline-flex dark:bg-primary-foreground/10">
+          <span aria-hidden="true">🇧🇷</span>
+          Copa
         </span>
-        {!mobileDense ? (
-          <span className="hidden items-center gap-1 rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300 sm:inline-flex">
-            <span aria-hidden="true">🇧🇷</span>
-            Copa
-          </span>
-        ) : null}
       </Button>
 
       <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogContent className="sm:max-w-[560px]">
-          <DialogHeader className="pr-8">
-            <DialogTitle>Pacotes de calendários</DialogTitle>
+        <DialogContent className="max-h-[calc(100dvh-1.5rem)] overflow-y-auto sm:max-w-[600px]">
+          <DialogHeader className="pr-8 text-left">
+            <DialogTitle>Assinaturas de calendário</DialogTitle>
             <DialogDescription>
-              Adicione, remova ou atualize categorias prontas. Atualizar preserva o perfil onde elas estão.
+              Escolha uma assinatura e confirme o perfil onde ela deve entrar.
             </DialogDescription>
           </DialogHeader>
 
           {hasPackUpdates ? (
-            <div className="rounded-[8px] border border-amber-400/35 bg-amber-400/10 px-3 py-2 text-xs leading-5 text-amber-800 dark:text-amber-200">
+            <div className="rounded-[8px] border border-rose-500/25 bg-rose-500/10 px-3 py-2 text-xs leading-5 text-rose-700 dark:border-rose-300/25 dark:bg-rose-400/10 dark:text-rose-200">
               Há atualizações disponíveis para calendários já adicionados.
             </div>
           ) : null}
 
-          <div className="grid gap-3">
-            {calendarPackGroups.map((group) => (
-              <section
-                key={group.id}
-                className="rounded-[8px] border border-border/75 bg-background p-3 shadow-sm"
-              >
-                <div className="mb-2.5 flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                      {group.badge ? (
-                        <span aria-hidden="true">{group.badge}</span>
-                      ) : null}
-                      {group.title}
-                    </h3>
-                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                      {group.description}
-                    </p>
-                    {group.packs[0]?.source ? (
-                      <p className="mt-1 text-[11px] leading-4 text-muted-foreground/82">
-                        Dados verificados em{" "}
-                        {formatVerifiedDate(group.packs[0].source.lastVerified)}
-                        {" · "}Fonte: {group.packs[0].source.label}
-                      </p>
-                    ) : null}
-                  </div>
-                </div>
-
-                <div className="grid gap-2">
-                  {group.packs.map((pack) => {
+          <div className="grid gap-2 rounded-[8px] border border-border/75 bg-background p-2.5 shadow-sm sm:p-3">
+            {calendarPacks.map((pack) => {
                     const availability = availabilityByPack.get(pack.id);
                     const importedEventCount = availability?.importedEventCount ?? 0;
                     const totalEventCount = availability?.totalEventCount ?? pack.events.length;
@@ -326,55 +311,58 @@ export function CalendarPackLauncher({
                           : "idle";
                     const isBusy =
                       displayedState === "adding" || displayedState === "removing";
+                    const targetProfileId = getTargetProfileId(
+                      pack.id,
+                      availability?.profileId
+                    );
+                    const targetProfileName = targetProfileId
+                      ? profileNameById.get(targetProfileId)
+                      : null;
+                    const showAddDetails = !isPresent && expandedPackId === pack.id;
 
                     return (
                       <article
                         key={pack.id}
-                        className="flex flex-col gap-2 rounded-[8px] border border-border/60 bg-muted/15 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between"
+                        className={cn(
+                          "rounded-[8px] border border-border/60 bg-muted/15 px-3 py-2.5 transition-[background-color,border-color,box-shadow]",
+                          showAddDetails &&
+                            "border-foreground/16 bg-background shadow-[0_12px_24px_-24px_rgba(15,23,42,0.28)]"
+                        )}
                       >
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <h4 className="text-sm font-medium text-foreground">
-                              {pack.name}
-                            </h4>
-                            <span
-                              className={cn(
-                                "rounded-full px-2 py-0.5 text-[11px]",
-                                displayedState === "error"
-                                  ? "bg-destructive/10 text-destructive"
-                                  : "bg-muted text-muted-foreground"
-                              )}
-                            >
-                              {isBusy ? (
-                                <span className="inline-flex items-center gap-1.5">
-                                  <Loader2 className="size-3 animate-spin" />
-                                  {statusCopy[displayedState]}
-                                </span>
-                              ) : (
-                                statusCopy[displayedState]
-                              )}
-                            </span>
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h4 className="text-sm font-medium text-foreground">
+                                {pack.name}
+                              </h4>
+                              <span
+                                className={cn(
+                                  "rounded-full px-2 py-0.5 text-[11px]",
+                                  displayedState === "error"
+                                    ? "bg-destructive/10 text-destructive"
+                                    : displayedState === "partial"
+                                      ? "bg-rose-500/10 text-rose-700 dark:bg-rose-400/10 dark:text-rose-200"
+                                    : "bg-muted text-muted-foreground"
+                                )}
+                              >
+                                {isBusy ? (
+                                  <span className="inline-flex items-center gap-1.5">
+                                    <Loader2 className="size-3 animate-spin" />
+                                    {statusCopy[displayedState]}
+                                  </span>
+                                ) : (
+                                  statusCopy[displayedState]
+                                )}
+                              </span>
+                            </div>
+                            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                              {pack.description}
+                            </p>
                           </div>
-                          <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                            {pack.description}
-                          </p>
-                        </div>
 
-                        <div className="flex shrink-0 flex-wrap gap-2 sm:justify-end">
-                          {isPresent ? (
-                            <>
-                              {!isComplete ? (
-                                <Button
-                                  type="button"
-                                  variant="premium"
-                                  size="xs"
-                                  className="rounded-full"
-                                  disabled={isBusy}
-                                  onClick={() => handleImport(pack)}
-                                >
-                                  Atualizar
-                                </Button>
-                              ) : (
+                          <div className="flex shrink-0 flex-wrap gap-1.5 sm:justify-end sm:gap-2">
+                            {isPresent ? (
+                              <>
                                 <Button
                                   type="button"
                                   variant="outline"
@@ -384,41 +372,114 @@ export function CalendarPackLauncher({
                                 >
                                   Ver
                                 </Button>
-                              )}
-                              <Button
-                                type="button"
-                                variant="dangerSoft"
-                                size="xs"
-                                className="rounded-full"
-                                disabled={isBusy}
-                                onClick={() => handleRemove(pack)}
-                              >
-                                <Trash2 className="size-3.5" />
-                                Remover
-                              </Button>
-                            </>
-                          ) : (
-                            <Button
-                              type="button"
-                              variant="premium"
-                              size="xs"
-                              className="rounded-full"
-                              disabled={isBusy}
-                              onClick={() => handleImport(pack)}
-                            >
-                              {displayedState === "adding" ? (
-                                <Loader2 className="size-3.5 animate-spin" />
-                              ) : null}
-                              Adicionar
-                            </Button>
-                          )}
+                                {!isComplete ? (
+                                  <Button
+                                    type="button"
+                                    variant="premium"
+                                    size="xs"
+                                    className="rounded-full"
+                                    disabled={isBusy}
+                                    onClick={() =>
+                                      handleImport(
+                                        pack,
+                                        availability?.profileId ?? targetProfileId
+                                      )
+                                    }
+                                  >
+                                    Atualizar
+                                  </Button>
+                                ) : null}
+                                <Button
+                                  type="button"
+                                  variant="dangerSoft"
+                                  size="xs"
+                                  className="rounded-full"
+                                  disabled={isBusy}
+                                  onClick={() => handleRemove(pack)}
+                                >
+                                  <Trash2 className="size-3.5" />
+                                  Remover
+                                </Button>
+                              </>
+                            ) : (
+                              <>
+                                {showAddDetails ? (
+                                  <div className="flex min-w-0 items-center justify-end gap-1.5">
+                                    <Select
+                                      value={targetProfileId ?? ""}
+                                      onValueChange={(profileId) =>
+                                        setTargetProfileByPack((current) => ({
+                                          ...current,
+                                          [pack.id]: profileId,
+                                        }))
+                                      }
+                                    >
+                                      <SelectTrigger
+                                        size="sm"
+                                        className="h-7 w-[8.25rem] rounded-[9px] border-border bg-card px-2.5 text-xs font-semibold shadow-none hover:border-foreground/18 hover:bg-muted sm:w-[9rem]"
+                                        aria-label={`Perfil para ${pack.name}`}
+                                      >
+                                        <SelectValue placeholder="Perfil" />
+                                      </SelectTrigger>
+                                      <SelectContent align="end">
+                                        {profiles.map((profile) => (
+                                          <SelectItem key={profile.id} value={profile.id}>
+                                            <ProfileIcon
+                                              icon={profile.icon}
+                                              size={13}
+                                              className="shrink-0"
+                                            />
+                                            <span>{profile.name}</span>
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                    <Button
+                                      type="button"
+                                      variant="premium"
+                                      size="icon-xs"
+                                      className="rounded-[9px]"
+                                      disabled={isBusy || !targetProfileId}
+                                      onClick={() => handleImport(pack, targetProfileId)}
+                                      aria-label={
+                                        targetProfileName
+                                          ? `Adicionar ${pack.name} ao perfil ${targetProfileName}`
+                                          : `Adicionar ${pack.name}`
+                                      }
+                                      title={
+                                        targetProfileName
+                                          ? `Adicionar em ${targetProfileName}`
+                                          : "Escolha um perfil"
+                                      }
+                                    >
+                                      {displayedState === "adding" ? (
+                                        <Loader2 className="size-3.5 animate-spin" />
+                                      ) : (
+                                        <Check className="size-3.5" />
+                                      )}
+                                      <span className="sr-only">Confirmar</span>
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <Button
+                                    type="button"
+                                    variant="premium"
+                                    size="xs"
+                                    className="rounded-full"
+                                    disabled={isBusy}
+                                    onClick={() => setExpandedPackId(pack.id)}
+                                  >
+                                    <Plus className="size-3.5" />
+                                    Adicionar
+                                  </Button>
+                                )}
+                              </>
+                            )}
+                          </div>
                         </div>
                       </article>
                     );
-                  })}
-                </div>
-              </section>
-            ))}
+            })}
           </div>
         </DialogContent>
       </Dialog>

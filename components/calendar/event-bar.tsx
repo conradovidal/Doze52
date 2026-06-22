@@ -10,12 +10,15 @@ import {
   EVENT_ITEM_PADDING_X_CLASS,
   EVENT_ITEM_TEXT_CLASS,
 } from "@/lib/calendar-layout";
+import { getCategoryColorToken } from "@/lib/category-palette";
 import type { ProfileIconId } from "@/lib/profile-icons";
 
 const HOVER_PREVIEW_VERTICAL_GAP_PX = 8;
 const HOVER_PREVIEW_VIEWPORT_PADDING_PX = 12;
 const HOVER_PREVIEW_MAX_WIDTH_PX = 420;
 const HOVER_PREVIEW_MIN_WIDTH_PX = 180;
+const COMPACT_SYMBOL_FONT_FAMILY =
+  '"Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
 
 const getHoverPreviewMaxWidth = () =>
   Math.min(
@@ -51,7 +54,6 @@ const measureTextWidth = (element: HTMLElement, value: string) => {
 
 export function EventBar({
   event,
-  todayIso,
   onClick,
   draggable = false,
   onDragStart,
@@ -63,7 +65,6 @@ export function EventBar({
   className,
 }: {
   event: CalendarEvent;
-  todayIso: string;
   onClick?: (payload: { anchorPoint: AnchorPoint }) => void;
   draggable?: boolean;
   onDragStart?: (e: React.DragEvent<HTMLButtonElement>) => void;
@@ -74,7 +75,10 @@ export function EventBar({
   profileIcon?: ProfileIconId;
   className?: string;
 }) {
-  const isPast = event.endDate < todayIso;
+  const colorToken = React.useMemo(
+    () => getCategoryColorToken(event.color),
+    [event.color]
+  );
   const isDragCycleRef = React.useRef(false);
   const lastDragEndAtRef = React.useRef(0);
   const buttonRef = React.useRef<HTMLButtonElement | null>(null);
@@ -248,15 +252,15 @@ export function EventBar({
         onFocus={showHoverPreview}
         onBlur={hideHoverPreview}
         aria-describedby={isHoverPreviewVisible ? hoverPreviewId : undefined}
-        className={`group relative block w-full cursor-pointer overflow-hidden border border-black/10 text-left text-neutral-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_8px_16px_-14px_rgba(15,23,42,0.32)] transition-[transform,box-shadow,opacity,filter] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 ${titlePaddingClass} ${EVENT_ITEM_TEXT_CLASS} ${radius} ${
-          isPast ? "opacity-65 saturate-[0.92]" : ""
-        } ${
+        className={`group relative block w-full cursor-pointer overflow-hidden border text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.52)] transition-[transform,box-shadow,filter] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 ${titlePaddingClass} ${EVENT_ITEM_TEXT_CLASS} ${radius} ${
           isDragging
-            ? "opacity-40"
-            : "hover:-translate-y-px hover:brightness-[1.02] hover:shadow-[0_14px_24px_-18px_rgba(15,23,42,0.5),inset_0_1px_0_rgba(255,255,255,0.24)]"
+            ? "brightness-[0.96] saturate-[0.96]"
+            : "hover:-translate-y-px hover:brightness-[0.99] hover:shadow-[0_10px_18px_-16px_rgba(15,23,42,0.32),inset_0_1px_0_rgba(255,255,255,0.62)]"
         } ${className ?? ""}`}
         style={{
-          backgroundColor: event.color,
+          backgroundColor: colorToken.soft,
+          borderColor: colorToken.border,
+          color: colorToken.text,
         }}
       >
         <span
@@ -267,16 +271,24 @@ export function EventBar({
           } ${
             showProfileIcon ? "invisible" : ""
           }`}
-          style={{ minHeight: `${EVENT_ITEM_HEIGHT_PX}px` }}
+          style={{
+            minHeight: `${EVENT_ITEM_HEIGHT_PX}px`,
+            fontFamily: isCompactSymbolMatchup
+              ? COMPACT_SYMBOL_FONT_FAMILY
+              : undefined,
+          }}
         >
           {event.title}
         </span>
         {showProfileIcon && profileIcon ? (
-          <span className="pointer-events-none absolute inset-0 grid place-items-center text-neutral-100/95">
+          <span
+            className="pointer-events-none absolute inset-0 grid place-items-center"
+            style={{ color: colorToken.text }}
+          >
             <ProfileIcon
               icon={profileIcon}
               size={12}
-              className="drop-shadow-[0_1px_1px_rgba(0,0,0,0.22)]"
+              className="drop-shadow-[0_1px_1px_rgba(255,255,255,0.42)]"
             />
           </span>
         ) : null}
@@ -293,11 +305,18 @@ export function EventBar({
                 left: hoverPreviewStyle?.left ?? 0,
                 top: hoverPreviewStyle?.top ?? 0,
                 maxWidth: hoverPreviewStyle?.maxWidth ?? initialPreviewMaxWidthPx,
-                borderLeftColor: event.color,
+                borderLeftColor: colorToken.base,
                 visibility: hoverPreviewStyle ? "visible" : "hidden",
               }}
             >
-              <span className="block whitespace-normal break-words leading-[1.35]">
+              <span
+                className="block whitespace-normal break-words leading-[1.35]"
+                style={{
+                  fontFamily: isCompactSymbolMatchup
+                    ? COMPACT_SYMBOL_FONT_FAMILY
+                    : undefined,
+                }}
+              >
                 {event.title}
               </span>
             </div>,

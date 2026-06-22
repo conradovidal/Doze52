@@ -80,18 +80,18 @@ export function UserMenu() {
         <Button
           variant="outline"
           size="sm"
-          className="h-9 w-9 overflow-hidden rounded-2xl border-border/65 bg-background/70 p-0 text-muted-foreground shadow-none transition-colors hover:border-border/80 hover:bg-muted/45 hover:text-foreground"
+          className="h-8 w-8 overflow-hidden rounded-[10px] border-border bg-card p-0 text-muted-foreground shadow-none transition-colors hover:border-foreground/18 hover:bg-muted hover:text-foreground md:h-9 md:w-9"
         >
           {avatarUrl && !brokenAvatar ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={avatarUrl}
               alt="Perfil"
-              className="h-9 w-9 rounded-[inherit] object-cover"
+              className="h-8 w-8 rounded-[inherit] object-cover md:h-9 md:w-9"
               onError={() => setBrokenAvatar(true)}
             />
           ) : (
-            <span className="inline-flex h-9 w-9 items-center justify-center rounded-[inherit] bg-muted/70 text-xs text-muted-foreground">
+            <span className="inline-flex h-8 w-8 items-center justify-center rounded-[inherit] bg-muted/70 text-xs text-muted-foreground md:h-9 md:w-9">
               {fallbackInitial}
             </span>
           )}

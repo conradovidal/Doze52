@@ -13,28 +13,32 @@ if (!brazilCategory || !otherCategory) {
   throw new Error("World Cup 2026 pack categories are incomplete.");
 }
 
+const copaCategory = {
+  ...otherCategory,
+  name: "Copa de 2026",
+};
+
 export const worldCup2026BrazilPack: CalendarPack = {
   ...baseWorldCup2026Pack,
   id: "world-cup-2026-brazil",
   name: "Jogos do Brasil",
-  eyebrow: "Copa de 2026",
+  eyebrow: "Brasil em destaque",
   description: "Partidas da seleção brasileira na fase de grupos.",
   categories: [brazilCategory],
   events: baseWorldCup2026Pack.events.filter((event) => event.isBrazilMatch),
 };
 
-export const worldCup2026RestOfCupPack: CalendarPack = {
+export const worldCup2026AllPack: CalendarPack = {
   ...baseWorldCup2026Pack,
-  id: "world-cup-2026-rest-of-cup",
-  name: "Restante da Copa",
-  eyebrow: "Copa de 2026",
-  description: "Todos os outros jogos, incluindo grupos e mata-mata.",
-  categories: [otherCategory],
+  id: "world-cup-2026",
+  name: "Copa de 2026",
+  eyebrow: "Todos os jogos",
+  description: "Todos os jogos do torneio, com o Brasil em categoria própria.",
+  categories: [brazilCategory, copaCategory],
   legacyCategoryIds: ["20265200-0000-4000-8000-000000000004"],
-  events: baseWorldCup2026Pack.events.filter((event) => !event.isBrazilMatch),
 };
 
 export const worldCup2026Packs = [
   worldCup2026BrazilPack,
-  worldCup2026RestOfCupPack,
+  worldCup2026AllPack,
 ] as const;
