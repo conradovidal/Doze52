@@ -709,7 +709,6 @@ export function MonthRow({
               >
                 <EventBar
                   event={seg.event}
-                  todayIso={todayIso}
                   profileIcon={profileIconByCategoryId.get(seg.event.categoryId)}
                   onClick={({ anchorPoint }) =>
                     onEditEvent({
@@ -946,7 +945,6 @@ export function MonthRow({
                           >
                             <EventBar
                               event={event}
-                              todayIso={todayIso}
                               profileIcon={profileIconByCategoryId.get(event.categoryId)}
                               onClick={({ anchorPoint }) =>
                                 onEditEvent({
@@ -959,7 +957,7 @@ export function MonthRow({
                               isDragging={isDragged}
                               className={
                                 isDragged
-                                  ? "opacity-40"
+                                  ? "brightness-[0.96] saturate-[0.96]"
                                   : draggingSingleDay
                                     ? "pointer-events-none"
                                     : ""

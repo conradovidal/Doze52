@@ -1,0 +1,597 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Doze52 - Exploracao da barra de meses</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #ffffff;
+        --surface: #f8fafc;
+        --subtle: #f1f5f9;
+        --border: #e2e8f0;
+        --text: #1f2937;
+        --muted: #6b7280;
+        --brand: #1f2937;
+        --selected: #ffffff;
+        --shadow: 0 18px 40px -34px rgba(15, 23, 42, 0.55);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", sans-serif;
+      }
+
+      main {
+        width: min(1160px, 100%);
+        margin: 0 auto;
+        padding: 28px 20px 36px;
+      }
+
+      header {
+        max-width: 760px;
+        margin-bottom: 22px;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 24px;
+        line-height: 1.1;
+        letter-spacing: 0;
+      }
+
+      header p {
+        margin: 10px 0 0;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.6;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+      }
+
+      .option {
+        display: grid;
+        gap: 14px;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: var(--surface);
+        padding: 16px;
+        box-shadow: var(--shadow);
+      }
+
+      .option h2 {
+        margin: 0;
+        font-size: 15px;
+        line-height: 1.25;
+        letter-spacing: 0;
+      }
+
+      .phone {
+        overflow: hidden;
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        background: #ffffff;
+      }
+
+      .phone-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 1px solid var(--border);
+        padding: 12px;
+      }
+
+      .logo {
+        font-size: 22px;
+        font-weight: 500;
+        letter-spacing: -0.02em;
+      }
+
+      .year {
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: var(--surface);
+        padding: 7px 10px;
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .filters {
+        display: grid;
+        gap: 8px;
+        padding: 12px;
+      }
+
+      .filter-row {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 6px;
+      }
+
+      .chip {
+        display: flex;
+        height: 40px;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 8px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: #ffffff;
+        padding: 0 10px;
+        color: var(--text);
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .chip.dark {
+        border-color: var(--brand);
+        background: var(--brand);
+        color: var(--selected);
+      }
+
+      .dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 999px;
+        background: #3b82f6;
+      }
+
+      .calendar-surface {
+        min-height: 168px;
+        border-top: 1px solid var(--border);
+        background: #f8fafc;
+        padding: 12px;
+      }
+
+      .month-shell {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        border-block: 1px solid rgba(226, 232, 240, 0.9);
+        background: rgba(241, 245, 249, 0.72);
+        margin: -12px -12px 12px;
+        padding: 8px 12px;
+      }
+
+      .today {
+        display: inline-flex;
+        height: 40px;
+        flex: 0 0 auto;
+        align-items: center;
+        gap: 7px;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        background: #ffffff;
+        padding: 0 12px;
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .today::before {
+        content: "";
+        width: 6px;
+        height: 6px;
+        border-radius: 999px;
+        background: currentColor;
+      }
+
+      .month-track {
+        min-width: 0;
+        flex: 1;
+        overflow: hidden;
+      }
+
+      .months {
+        display: flex;
+        min-width: max-content;
+        gap: 4px;
+      }
+
+      .month {
+        display: grid;
+        height: 40px;
+        min-width: 42px;
+        place-items: center;
+        border: 1px solid transparent;
+        border-radius: 9px;
+        background: transparent;
+        padding: 0 11px;
+        color: rgba(31, 41, 55, 0.64);
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .month.active {
+        border-color: var(--brand);
+        background: var(--brand);
+        color: var(--selected);
+      }
+
+      .days {
+        display: grid;
+        gap: 7px;
+      }
+
+      .day {
+        display: grid;
+        grid-template-columns: 54px 1fr;
+        min-height: 58px;
+        gap: 8px;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: #ffffff;
+        padding: 8px;
+      }
+
+      .date {
+        display: grid;
+        place-items: center;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        font-size: 20px;
+        font-weight: 800;
+      }
+
+      .event {
+        align-self: center;
+        height: 26px;
+        border: 1px solid #bfdbfe;
+        border-radius: 8px;
+        background: #dbeafe;
+      }
+
+      .notes {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .notes h3 {
+        margin: 0 0 5px;
+        font-size: 12px;
+      }
+
+      .notes ul {
+        margin: 0;
+        padding-left: 16px;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.45;
+      }
+
+      .a .month-track {
+        border-radius: 12px;
+        background: rgba(241, 245, 249, 0.78);
+        padding: 4px;
+        box-shadow: inset 0 0 0 1px rgba(226, 232, 240, 0.76);
+      }
+
+      .b .month-track {
+        border-radius: 999px;
+        background: rgba(241, 245, 249, 0.9);
+        padding: 4px;
+        box-shadow: inset 0 0 0 1px rgba(226, 232, 240, 0.84);
+      }
+
+      .b .month {
+        border-radius: 999px;
+      }
+
+      .b .month.active {
+        box-shadow: 0 12px 22px -18px rgba(15, 23, 42, 0.7);
+      }
+
+      .c .month-shell {
+        background: #ffffff;
+      }
+
+      .c .month-track {
+        border-bottom: 1px solid var(--border);
+      }
+
+      .c .month {
+        position: relative;
+        min-width: 44px;
+        border-radius: 0;
+        color: rgba(31, 41, 55, 0.58);
+      }
+
+      .c .month.active {
+        border-color: transparent;
+        background: transparent;
+        color: var(--brand);
+      }
+
+      .c .month.active::after {
+        content: "";
+        position: absolute;
+        right: 10px;
+        bottom: -1px;
+        left: 10px;
+        height: 3px;
+        border-radius: 999px 999px 0 0;
+        background: var(--brand);
+      }
+
+      .d .month-track {
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: #ffffff;
+        padding: 3px;
+      }
+
+      .d .months {
+        gap: 2px;
+      }
+
+      .d .month {
+        min-width: 40px;
+        border-radius: 7px;
+      }
+
+      .d .month.active {
+        border-color: transparent;
+      }
+
+      @media (max-width: 820px) {
+        main {
+          padding-inline: 14px;
+        }
+
+        .grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Exploracao da barra de meses mobile</h1>
+        <p>
+          Todas as opcoes preservam o comportamento aprovado: meses em trilho
+          livre, sem troca de ano aqui, e clique no mes navegando os dias.
+        </p>
+      </header>
+
+      <section class="grid" aria-label="Opcoes de barra de meses">
+        <article class="option a">
+          <h2>A. Rail arredondado estruturado</h2>
+          <div class="phone">
+            <div class="phone-top">
+              <div class="logo">Doze52</div>
+              <div class="year">2026</div>
+            </div>
+            <div class="filters">
+              <div class="filter-row">
+                <div class="chip dark">Calendarios</div>
+                <div class="chip">Profissional</div>
+              </div>
+              <div class="filter-row">
+                <div class="chip"><span class="dot"></span>Reunioes</div>
+                <div class="chip"><span class="dot"></span>Entregas</div>
+              </div>
+            </div>
+            <div class="calendar-surface">
+              <div class="month-shell">
+                <div class="today">Hoje</div>
+                <div class="month-track">
+                  <div class="months">
+                    <div class="month">jan</div>
+                    <div class="month">fev</div>
+                    <div class="month active">mar</div>
+                    <div class="month">abr</div>
+                    <div class="month">mai</div>
+                    <div class="month">jun</div>
+                  </div>
+                </div>
+              </div>
+              <div class="days">
+                <div class="day"><div class="date">3</div><div class="event"></div></div>
+                <div class="day"><div class="date">4</div><div class="event"></div></div>
+              </div>
+            </div>
+          </div>
+          <div class="notes">
+            <div>
+              <h3>Pros</h3>
+              <ul>
+                <li>Mais perto do visual atual.</li>
+                <li>Ativo muito claro.</li>
+                <li>Boa sensacao de componente.</li>
+              </ul>
+            </div>
+            <div>
+              <h3>Contras</h3>
+              <ul>
+                <li>Um pouco mais visualmente pesado.</li>
+                <li>Compete levemente com Hoje.</li>
+              </ul>
+            </div>
+          </div>
+        </article>
+
+        <article class="option b">
+          <h2>B. Capsule redondinha</h2>
+          <div class="phone">
+            <div class="phone-top">
+              <div class="logo">Doze52</div>
+              <div class="year">2026</div>
+            </div>
+            <div class="filters">
+              <div class="filter-row">
+                <div class="chip dark">Calendarios</div>
+                <div class="chip">Profissional</div>
+              </div>
+              <div class="filter-row">
+                <div class="chip"><span class="dot"></span>Reunioes</div>
+                <div class="chip"><span class="dot"></span>Entregas</div>
+              </div>
+            </div>
+            <div class="calendar-surface">
+              <div class="month-shell">
+                <div class="today">Hoje</div>
+                <div class="month-track">
+                  <div class="months">
+                    <div class="month">jan</div>
+                    <div class="month">fev</div>
+                    <div class="month active">mar</div>
+                    <div class="month">abr</div>
+                    <div class="month">mai</div>
+                    <div class="month">jun</div>
+                  </div>
+                </div>
+              </div>
+              <div class="days">
+                <div class="day"><div class="date">3</div><div class="event"></div></div>
+                <div class="day"><div class="date">4</div><div class="event"></div></div>
+              </div>
+            </div>
+          </div>
+          <div class="notes">
+            <div>
+              <h3>Pros</h3>
+              <ul>
+                <li>Recupera a barra redondinha antiga.</li>
+                <li>Fica macia e facil de tocar.</li>
+                <li>Bom equilibrio com o botao Hoje.</li>
+              </ul>
+            </div>
+            <div>
+              <h3>Contras</h3>
+              <ul>
+                <li>Menos alinhada aos chips quadradinhos.</li>
+                <li>Pode parecer menos madura.</li>
+              </ul>
+            </div>
+          </div>
+        </article>
+
+        <article class="option c">
+          <h2>C. Tabs com underline</h2>
+          <div class="phone">
+            <div class="phone-top">
+              <div class="logo">Doze52</div>
+              <div class="year">2026</div>
+            </div>
+            <div class="filters">
+              <div class="filter-row">
+                <div class="chip dark">Calendarios</div>
+                <div class="chip">Profissional</div>
+              </div>
+              <div class="filter-row">
+                <div class="chip"><span class="dot"></span>Reunioes</div>
+                <div class="chip"><span class="dot"></span>Entregas</div>
+              </div>
+            </div>
+            <div class="calendar-surface">
+              <div class="month-shell">
+                <div class="today">Hoje</div>
+                <div class="month-track">
+                  <div class="months">
+                    <div class="month">jan</div>
+                    <div class="month">fev</div>
+                    <div class="month active">mar</div>
+                    <div class="month">abr</div>
+                    <div class="month">mai</div>
+                    <div class="month">jun</div>
+                  </div>
+                </div>
+              </div>
+              <div class="days">
+                <div class="day"><div class="date">3</div><div class="event"></div></div>
+                <div class="day"><div class="date">4</div><div class="event"></div></div>
+              </div>
+            </div>
+          </div>
+          <div class="notes">
+            <div>
+              <h3>Pros</h3>
+              <ul>
+                <li>Mais calmo e menos poluido.</li>
+                <li>Otimo para dashboard maduro.</li>
+                <li>Economiza peso visual.</li>
+              </ul>
+            </div>
+            <div>
+              <h3>Contras</h3>
+              <ul>
+                <li>Ativo chama menos atencao.</li>
+                <li>Menos tatil no mobile.</li>
+              </ul>
+            </div>
+          </div>
+        </article>
+
+        <article class="option d">
+          <h2>D. Segmented compacto</h2>
+          <div class="phone">
+            <div class="phone-top">
+              <div class="logo">Doze52</div>
+              <div class="year">2026</div>
+            </div>
+            <div class="filters">
+              <div class="filter-row">
+                <div class="chip dark">Calendarios</div>
+                <div class="chip">Profissional</div>
+              </div>
+              <div class="filter-row">
+                <div class="chip"><span class="dot"></span>Reunioes</div>
+                <div class="chip"><span class="dot"></span>Entregas</div>
+              </div>
+            </div>
+            <div class="calendar-surface">
+              <div class="month-shell">
+                <div class="today">Hoje</div>
+                <div class="month-track">
+                  <div class="months">
+                    <div class="month">jan</div>
+                    <div class="month">fev</div>
+                    <div class="month active">mar</div>
+                    <div class="month">abr</div>
+                    <div class="month">mai</div>
+                    <div class="month">jun</div>
+                  </div>
+                </div>
+              </div>
+              <div class="days">
+                <div class="day"><div class="date">3</div><div class="event"></div></div>
+                <div class="day"><div class="date">4</div><div class="event"></div></div>
+              </div>
+            </div>
+          </div>
+          <div class="notes">
+            <div>
+              <h3>Pros</h3>
+              <ul>
+                <li>Muito organizado e consistente.</li>
+                <li>Conversa com chips quadrados.</li>
+                <li>Boa leitura do estado ativo.</li>
+              </ul>
+            </div>
+            <div>
+              <h3>Contras</h3>
+              <ul>
+                <li>Menos leve que underline.</li>
+                <li>Pode parecer controle de sistema.</li>
+              </ul>
+            </div>
+          </div>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>

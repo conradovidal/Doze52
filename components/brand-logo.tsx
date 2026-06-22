@@ -18,7 +18,7 @@ export function BrandLogo({
   return (
     <span
       className={cn(
-        "relative block h-9 w-[7.5rem] overflow-visible md:h-10 md:w-32",
+        "inline-flex h-9 w-[96px] items-center md:h-10 md:w-[104px]",
         className
       )}
     >
@@ -26,21 +26,21 @@ export function BrandLogo({
         src={`/doze52-logo-light.svg?v=${THEME_ASSET_VERSION}`}
         alt={imageAlt}
         aria-hidden={decorative || undefined}
+        width={104}
+        height={26}
         priority
-        width={176}
-        height={176}
-        priority
-        className="pointer-events-none absolute left-[-1.65rem] top-1/2 block h-44 w-44 -translate-y-1/2 object-contain dark:hidden md:left-[-1.75rem] md:h-48 md:w-48"
+        sizes="104px"
+        className="pointer-events-none block h-auto w-full object-contain object-left dark:hidden"
       />
       <Image
         src={`/doze52-logo-dark.svg?v=${THEME_ASSET_VERSION}`}
         alt={imageAlt}
         aria-hidden={decorative || undefined}
+        width={104}
+        height={26}
         priority
-        width={176}
-        height={176}
-        priority
-        className="pointer-events-none absolute left-[-1.65rem] top-1/2 hidden h-44 w-44 -translate-y-1/2 object-contain dark:block md:left-[-1.75rem] md:h-48 md:w-48"
+        sizes="104px"
+        className="pointer-events-none hidden h-auto w-full object-contain object-left dark:block"
       />
     </span>
   );

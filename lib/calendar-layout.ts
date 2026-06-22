@@ -10,5 +10,5 @@ export const MONTH_ROW_BOTTOM_PADDING_PX = 8;
 
 export const EVENT_ITEM_PADDING_X_CLASS = "px-2.5";
 export const EVENT_ITEM_RADIUS_CLASS = "rounded-[8px]";
-export const EVENT_ITEM_TEXT_CLASS = "text-[11px] font-semibold tracking-[-0.01em]";
+export const EVENT_ITEM_TEXT_CLASS = "text-[11px] font-medium tracking-normal";
 export const EVENT_ITEM_LINE_HEIGHT_CLASS = "leading-[18px]";

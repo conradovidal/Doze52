@@ -8,44 +8,30 @@ import { cn } from "@/lib/utils";
 export function ThemeToggle() {
   const { mode, setTheme } = useTheme();
   const [mounted, setMounted] = React.useState(false);
+  const renderedMode = mounted ? mode : "light";
+  const isLight = renderedMode === "light";
+  const nextMode = isLight ? "dark" : "light";
 
   React.useEffect(() => {
     setMounted(true);
   }, []);
 
-  const isLight = mode === "light";
-  const nextMode = isLight ? "dark" : "light";
-  const label = mounted
-    ? isLight
-      ? "Ativar tema escuro"
-      : "Ativar tema claro"
-    : "Alternar tema";
-  const title = mounted ? (isLight ? "Tema claro" : "Tema escuro") : "Tema";
-
   return (
     <button
       type="button"
       onClick={() => setTheme(nextMode)}
-      aria-label={label}
-      title={title}
+      aria-label={isLight ? "Ativar tema escuro" : "Ativar tema claro"}
+      title={isLight ? "Tema claro" : "Tema escuro"}
       className={cn(
-        "inline-flex h-9 w-9 items-center justify-center rounded-[10px] border border-border bg-card text-muted-foreground shadow-none transition-colors duration-150",
+        "inline-flex h-8 w-8 items-center justify-center rounded-[10px] border border-border bg-card text-muted-foreground shadow-none transition-colors duration-150 md:h-9 md:w-9",
         "hover:border-foreground/18 hover:bg-muted hover:text-foreground",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
       )}
     >
       <span className="sr-only">
-        {mounted
-          ? isLight
-            ? "Mudar para tema escuro"
-            : "Mudar para tema claro"
-          : "Alternar tema"}
+        {isLight ? "Mudar para tema escuro" : "Mudar para tema claro"}
       </span>
-      {!mounted || isLight ? (
-        <MoonStar className="h-4 w-4" />
-      ) : (
-        <SunMedium className="h-4 w-4" />
-      )}
+      {isLight ? <MoonStar className="h-4 w-4" /> : <SunMedium className="h-4 w-4" />}
     </button>
   );
 }

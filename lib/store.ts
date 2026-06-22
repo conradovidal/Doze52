@@ -12,7 +12,6 @@ import {
   CATEGORY_COLOR_BASE_VIOLET,
   DEFAULT_CATEGORY_COLOR,
   ONBOARDING_CATEGORY_COLOR_BY_ID,
-  PREVIOUS_ONBOARDING_COLOR_BY_ID,
 } from "./category-palette";
 import {
   normalizeProfileIconId,
@@ -311,25 +310,6 @@ export const isOnboardingCategoriesSnapshot = (categories: CategoryItem[]) => {
 const defaultProfiles: CalendarProfile[] = getOnboardingDefaultProfiles();
 const defaultProfileId = ONBOARDING_DEFAULT_PROFILE_ID;
 const defaultCategoryId = ONBOARDING_DEFAULT_CATEGORY_ID;
-const normalizeColorForCompare = (value: string | undefined | null) =>
-  (value ?? "").trim().toLowerCase();
-
-const migrateOnboardingCategoryColors = (categories: CategoryItem[]) =>
-  categories.map((category) => {
-    const previousColor = PREVIOUS_ONBOARDING_COLOR_BY_ID[category.id];
-    const nextColor = ONBOARDING_CATEGORY_COLOR_BY_ID[category.id];
-    if (!previousColor || !nextColor) return category;
-    if (
-      normalizeColorForCompare(category.color) !==
-      normalizeColorForCompare(previousColor)
-    ) {
-      return category;
-    }
-    return {
-      ...category,
-      color: nextColor,
-    };
-  });
 
 const getAllProfileIds = (profiles: CalendarProfile[]) => profiles.map((profile) => profile.id);
 
@@ -988,11 +968,9 @@ export const useStore = create<StoreState>()(
         const profiles = normalizePersistedProfiles(persisted.profiles, {
           forLegacyData: useLegacyDefaults,
         });
-        const categories = migrateOnboardingCategoryColors(
-          normalizePersistedCategories(persisted.categories, profiles, {
-            forLegacyData: useLegacyDefaults,
-          })
-        );
+        const categories = normalizePersistedCategories(persisted.categories, profiles, {
+          forLegacyData: useLegacyDefaults,
+        });
         const selectedProfileIds = ensureSelectedProfileIds(
           persisted.selectedProfileIds,
           profiles

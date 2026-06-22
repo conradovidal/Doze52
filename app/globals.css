@@ -120,12 +120,12 @@
   --sidebar-accent-foreground: #f9fafb;
   --sidebar-border: #4b5563;
   --sidebar-ring: #9ca3af;
-  --cal-cell-weekday: 217 19% 22%;
-  --cal-cell-weekend: 217 19% 19%;
-  --cal-cell-outside: 220 16% 15%;
-  --cal-cell-weekday-past: 220 16% 15%;
-  --cal-cell-weekend-past: 220 16% 13%;
-  --cal-cell-outside-past: 220 16% 11%;
+  --cal-cell-weekday: 217 18% 24%;
+  --cal-cell-weekend: 217 17% 21%;
+  --cal-cell-outside: 220 15% 16%;
+  --cal-cell-weekday-past: 220 14% 15%;
+  --cal-cell-weekend-past: 220 14% 13%;
+  --cal-cell-outside-past: 220 14% 11%;
 }
 
 @layer base {
@@ -141,5 +141,39 @@
 
   ::selection {
     @apply bg-primary text-primary-foreground;
+  }
+}
+
+@layer utilities {
+  @keyframes doze52-calendar-mode-shift {
+    from {
+      opacity: 0.82;
+      transform: translateY(6px) scale(0.998);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  .doze52-calendar-mode-transition {
+    animation: doze52-calendar-mode-shift 220ms cubic-bezier(0.22, 1, 0.36, 1);
+    transform-origin: top center;
+  }
+
+  .doze52-scrollbar-none {
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .doze52-scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .doze52-calendar-mode-transition {
+      animation: none;
+    }
   }
 }
