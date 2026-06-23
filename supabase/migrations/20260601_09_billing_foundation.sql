@@ -84,6 +84,7 @@ as $$
     from public.billing_subscriptions subscription
     where subscription.user_id = p_user_id
       and subscription.status in ('active', 'trialing')
+      and subscription.current_period_end > now()
       and auth.uid() = p_user_id
   );
 $$;

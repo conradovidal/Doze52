@@ -261,7 +261,7 @@ export const syncStripeSubscription = async (
         stripe_price_id: firstItem?.price.id ?? null,
         status: subscription.status,
         current_period_end: toIsoFromUnixSeconds(firstItem?.current_period_end),
-        cancel_at_period_end: subscription.cancel_at_period_end,
+        cancel_at_period_end: Boolean(subscription.cancel_at_period_end || subscription.cancel_at),
       },
       { onConflict: "user_id" }
     );
