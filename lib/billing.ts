@@ -12,6 +12,16 @@ export const PRO_SUBSCRIPTION_STATUSES = ["active", "trialing"] as const;
 export const isProSubscriptionStatus = (status: string | null | undefined) =>
   PRO_SUBSCRIPTION_STATUSES.some((proStatus) => proStatus === status);
 
+export type BillingPlan = "free" | "pro";
+
+export type BillingStatusPayload = {
+  plan: BillingPlan;
+  status: string | null;
+  currentPeriodEnd: string | null;
+  cancelAtPeriodEnd: boolean;
+  canManageBilling: boolean;
+};
+
 export class BillingNotFoundError extends Error {
   constructor(message: string) {
     super(message);
@@ -65,6 +75,45 @@ export const getBillingCustomerId = async (userId: string) => {
 
   if (error) throw error;
   return (data?.stripe_customer_id as string | undefined) ?? null;
+};
+
+export const getBillingStatusForUser = async (
+  userId: string
+): Promise<BillingStatusPayload> => {
+  const supabase = getSupabaseAdminClient();
+  const [customerResult, subscriptionResult] = await Promise.all([
+    supabase
+      .from("billing_customers")
+      .select("stripe_customer_id")
+      .eq("user_id", userId)
+      .maybeSingle(),
+    supabase
+      .from("billing_subscriptions")
+      .select("status, current_period_end, cancel_at_period_end")
+      .eq("user_id", userId)
+      .maybeSingle(),
+  ]);
+
+  if (customerResult.error) throw customerResult.error;
+  if (subscriptionResult.error) throw subscriptionResult.error;
+
+  const subscription = subscriptionResult.data as
+    | {
+        status?: string | null;
+        current_period_end?: string | null;
+        cancel_at_period_end?: boolean | null;
+      }
+    | null
+    | undefined;
+  const status = subscription?.status ?? null;
+
+  return {
+    plan: isProSubscriptionStatus(status) ? "pro" : "free",
+    status,
+    currentPeriodEnd: subscription?.current_period_end ?? null,
+    cancelAtPeriodEnd: Boolean(subscription?.cancel_at_period_end),
+    canManageBilling: Boolean(customerResult.data?.stripe_customer_id),
+  };
 };
 
 const upsertBillingCustomer = async (params: {
@@ -212,7 +261,7 @@ export const syncStripeSubscription = async (
         stripe_price_id: firstItem?.price.id ?? null,
         status: subscription.status,
         current_period_end: toIsoFromUnixSeconds(firstItem?.current_period_end),
-        cancel_at_period_end: subscription.cancel_at_period_end,
+        cancel_at_period_end: Boolean(subscription.cancel_at_period_end || subscription.cancel_at),
       },
       { onConflict: "user_id" }
     );

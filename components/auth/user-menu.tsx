@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Download, LogOut, Sparkles } from "lucide-react";
+import { CreditCard, Crown, Download, ExternalLink, LogOut, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useFeedback } from "@/components/ui/feedback-provider";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -10,6 +10,7 @@ import { resetAllProductOnboarding } from "@/lib/onboarding";
 import { exportUserData, saveSnapshot } from "@/lib/sync";
 import { logDevError, logProdError } from "@/lib/safe-log";
 import { useStore } from "@/lib/store";
+import { useBillingStatus } from "@/lib/use-billing-status";
 
 export function UserMenu() {
   const { notify } = useFeedback();
@@ -17,10 +18,15 @@ export function UserMenu() {
   const profiles = useStore((state) => state.profiles);
   const categories = useStore((state) => state.categories);
   const events = useStore((state) => state.events);
+  const { billingStatus, isLoading: isBillingLoading } = useBillingStatus(
+    Boolean(session)
+  );
   const [open, setOpen] = useState(false);
   const [brokenAvatar, setBrokenAvatar] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [isOpeningCheckout, setIsOpeningCheckout] = useState(false);
+  const [isOpeningPortal, setIsOpeningPortal] = useState(false);
 
   const metadata = session?.user.metadata ?? {};
   const fullName =
@@ -43,8 +49,75 @@ export function UserMenu() {
   const avatarUrl = metadataAvatar;
   const fallbackInitial =
     (displayName || session?.user.email || "").trim().charAt(0).toUpperCase() || "?";
+  const isPro = billingStatus.plan === "pro";
+  const isCancellingPro = isPro && billingStatus.cancelAtPeriodEnd;
+  const billingBadgeLabel = isBillingLoading
+    ? "Plano..."
+    : isCancellingPro
+      ? "Cancelando em breve"
+      : isPro
+        ? "Pro"
+        : "Free";
+  const billingSummary = isPro
+    ? "Múltiplos perfis, categorias ilimitadas e dark theme."
+    : "1 perfil, até 5 categorias, eventos ilimitados e visão anual.";
+  const billingBadgeClass = isPro
+    ? "border-emerald-200/80 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-100"
+    : "border-border/70 bg-muted/45 text-muted-foreground";
 
   if (!session) return null;
+
+  const openBillingRedirect = async (params: {
+    endpoint: "/api/billing/checkout" | "/api/billing/portal";
+    setLoading: (loading: boolean) => void;
+    logKey: string;
+    errorTitle: string;
+    errorDescription: string;
+  }) => {
+    try {
+      params.setLoading(true);
+      const response = await fetch(params.endpoint, { method: "POST" });
+      const payload = (await response.json().catch(() => null)) as {
+        url?: unknown;
+      } | null;
+
+      if (!response.ok || typeof payload?.url !== "string") {
+        throw new Error("Billing redirect URL missing.");
+      }
+
+      window.location.href = payload.url;
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Falha no redirecionamento.";
+      logDevError(params.logKey, { message });
+      logProdError("Falha ao abrir billing Stripe.");
+      notify({
+        tone: "error",
+        title: params.errorTitle,
+        description: params.errorDescription,
+      });
+    } finally {
+      params.setLoading(false);
+    }
+  };
+
+  const handleUpgrade = () =>
+    openBillingRedirect({
+      endpoint: "/api/billing/checkout",
+      setLoading: setIsOpeningCheckout,
+      logKey: "user-menu.billing.checkout",
+      errorTitle: "Nao foi possivel abrir o upgrade",
+      errorDescription: "Tente novamente em instantes.",
+    });
+
+  const handleManageBilling = () =>
+    openBillingRedirect({
+      endpoint: "/api/billing/portal",
+      setLoading: setIsOpeningPortal,
+      logKey: "user-menu.billing.portal",
+      errorTitle: "Nao foi possivel abrir a assinatura",
+      errorDescription: "Tente novamente em instantes.",
+    });
 
   const handleSignOut = async () => {
     try {
@@ -97,7 +170,7 @@ export function UserMenu() {
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-60 rounded-2xl border-border/80 p-4">
+      <PopoverContent align="end" className="w-72 rounded-2xl border-border/80 p-4">
         <div className="space-y-3.5">
           <div>
             <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
@@ -105,6 +178,49 @@ export function UserMenu() {
             </p>
             <p className="truncate text-sm font-medium">{displayName}</p>
             <p className="truncate text-xs text-muted-foreground">{email}</p>
+          </div>
+          <div className="rounded-2xl border border-border/70 bg-muted/20 p-3">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                Plano
+              </p>
+              <span
+                className={`inline-flex max-w-[9rem] items-center justify-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${billingBadgeClass}`}
+              >
+                {billingBadgeLabel}
+              </span>
+            </div>
+            <p className="text-xs leading-5 text-muted-foreground">
+              {billingSummary}
+            </p>
+            <div className="mt-3 space-y-1.5">
+              {!isPro ? (
+                <Button
+                  variant="premium"
+                  size="sm"
+                  className="w-full justify-start rounded-xl"
+                  disabled={isOpeningCheckout || isOpeningPortal}
+                  onClick={handleUpgrade}
+                >
+                  <Crown size={14} className="mr-2" />
+                  {isOpeningCheckout ? "Abrindo..." : "Upgrade para Pro"}
+                </Button>
+              ) : null}
+
+              {billingStatus.canManageBilling ? (
+                <Button
+                  variant={isPro ? "ghost" : "outline"}
+                  size="sm"
+                  className="w-full justify-start rounded-xl"
+                  disabled={isOpeningCheckout || isOpeningPortal}
+                  onClick={handleManageBilling}
+                >
+                  <CreditCard size={14} className="mr-2" />
+                  {isOpeningPortal ? "Abrindo..." : "Gerenciar assinatura"}
+                  <ExternalLink size={12} className="ml-auto" />
+                </Button>
+              ) : null}
+            </div>
           </div>
           <div className="space-y-1.5">
             <Button

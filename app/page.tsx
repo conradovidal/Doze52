@@ -480,6 +480,45 @@ export default function HomePage() {
   React.useEffect(() => {
     if (windowContext !== "main") return;
 
+    const url = new URL(window.location.href);
+    const billingStatus = url.searchParams.get("billing");
+
+    if (
+      billingStatus !== "success" &&
+      billingStatus !== "cancelled" &&
+      billingStatus !== "portal"
+    ) {
+      return;
+    }
+
+    if (billingStatus === "success") {
+      notify({
+        tone: "info",
+        title: "Estamos confirmando sua assinatura",
+        description: "O Pro aparece quando o webhook da Stripe atualizar sua conta.",
+      });
+    } else if (billingStatus === "cancelled") {
+      notify({
+        tone: "info",
+        title: "Upgrade cancelado",
+        description: "Nenhuma alteração foi aplicada ao seu plano.",
+      });
+    } else {
+      notify({
+        tone: "success",
+        title: "Assinatura atualizada",
+        description: "As mudanças do portal serão refletidas assim que a Stripe confirmar.",
+      });
+    }
+
+    url.searchParams.delete("billing");
+    const nextUrl = `${url.pathname}${url.search}${url.hash}`;
+    window.history.replaceState(null, "", nextUrl || "/");
+  }, [notify, windowContext]);
+
+  React.useEffect(() => {
+    if (windowContext !== "main") return;
+
     let rolloverTimer: number | null = null;
     let refreshInterval: number | null = null;
 
