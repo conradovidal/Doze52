@@ -29,6 +29,7 @@ import {
   removeCalendarPackCategory,
 } from "@/lib/calendar-packs/import";
 import { useStore } from "@/lib/store";
+import { useTheme } from "@/lib/theme";
 import type { AnchorPoint } from "@/lib/types";
 
 const CHIP_TRIGGER_CLASS =
@@ -54,6 +55,7 @@ export function CategoryManager({
   onCreated,
   anchorPoint,
 }: CategoryManagerProps) {
+  const { mode: themeMode } = useTheme();
   const categories = useStore((s) => s.categories);
   const profiles = useStore((s) => s.profiles);
   const events = useStore((s) => s.events);
@@ -114,12 +116,8 @@ export function CategoryManager({
   const canDelete = categories.length > 1;
   const normalizedColor = color.toLowerCase();
   const currentColorToken = React.useMemo(
-    () => getCategoryColorToken(color),
-    [color]
-  );
-  const presetColors = React.useMemo(
-    () => CATEGORY_COLOR_SETS.flatMap((set) => set.colors),
-    []
+    () => getCategoryColorToken(color, themeMode),
+    [color, themeMode]
   );
 
   const handleSave = async () => {
@@ -241,38 +239,55 @@ export function CategoryManager({
             >
               <span
                 className="h-2.5 w-2.5 shrink-0 rounded-full ring-1 ring-black/8"
-                style={{ backgroundColor: currentColorToken.base }}
+                style={{ backgroundColor: currentColorToken.indicator }}
                 aria-hidden="true"
               />
               <span className="truncate">{name.trim() || "Categoria"}</span>
             </div>
           </div>
 
-          <div className="flex justify-center">
-            <div className="grid w-fit grid-cols-5 gap-x-3 gap-y-3 rounded-2xl bg-muted/18 p-3 sm:gap-x-4 sm:gap-y-3.5 sm:p-4">
-              {presetColors.map((preset) => {
-                const selected = preset.toLowerCase() === normalizedColor;
-                const presetToken = getCategoryColorToken(preset);
-                return (
-                  <button
-                    key={preset}
-                    type="button"
-                    onClick={() => setColor(preset)}
-                    aria-label={`Selecionar cor ${presetToken.label}`}
-                    title={presetToken.label}
-                    className="h-[34px] w-[34px] rounded-full border border-black/5 transition hover:scale-105 hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-300 sm:h-9 sm:w-9"
-                    style={{
-                      backgroundColor: presetToken.base,
-                      boxShadow: selected
-                        ? `0 0 0 2px var(--background), 0 0 0 4px ${presetToken.base}`
-                        : undefined,
-                    }}
-                  >
-                    <span className="sr-only">{presetToken.label}</span>
-                  </button>
-                );
-              })}
-            </div>
+          <div className="mx-auto w-full max-w-[21rem] space-y-3.5">
+            {CATEGORY_COLOR_SETS.map((set, index) => (
+              <fieldset
+                key={set.id}
+                className={index === 0 ? "space-y-2" : "space-y-2 border-t border-border/50 pt-3"}
+              >
+                <legend className="text-[11px] font-medium tracking-wide text-muted-foreground">
+                  {set.label}
+                </legend>
+                <div className="grid grid-cols-8 gap-2 sm:gap-2.5">
+                  {set.colors.map((preset) => {
+                    const selected = preset.toLowerCase() === normalizedColor;
+                    const presetToken = getCategoryColorToken(preset, themeMode);
+                    return (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => setColor(preset)}
+                        aria-label={`Selecionar ${presetToken.label}`}
+                        aria-pressed={selected}
+                        title={presetToken.label}
+                        className="grid size-[30px] place-items-center rounded-full border transition-[transform,opacity,box-shadow] hover:scale-105 hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45 sm:size-8"
+                        style={{
+                          backgroundColor: presetToken.soft,
+                          borderColor: presetToken.border,
+                          boxShadow: selected
+                            ? `0 0 0 2px var(--background), 0 0 0 4px ${presetToken.indicator}`
+                            : undefined,
+                        }}
+                      >
+                        <span
+                          aria-hidden="true"
+                          className="size-2.5 rounded-full"
+                          style={{ backgroundColor: presetToken.indicator }}
+                        />
+                        <span className="sr-only">{presetToken.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </fieldset>
+            ))}
           </div>
         </div>
         <DialogFooter className="sm:justify-between">

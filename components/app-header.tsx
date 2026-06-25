@@ -195,7 +195,12 @@ export function AppHeader({
 
   return (
     <>
-      <header className="mb-4 space-y-3 md:mb-5 md:space-y-3.5">
+      <header
+        className={cn(
+          "space-y-3 bg-background md:space-y-3.5",
+          isMobileMode ? "mb-1" : "mb-4 md:mb-5"
+        )}
+      >
         <div className="grid min-h-9 grid-cols-[auto_minmax(0,1fr)] items-start gap-2.5 md:min-h-10 md:grid-cols-[minmax(0,1fr)_auto] md:items-center md:gap-4">
           <div className="justify-self-start">
             <BrandLogo />
@@ -264,12 +269,19 @@ export function AppHeader({
           </div>
         </div>
 
-        <div className="mx-auto flex w-full max-w-[62rem] flex-col items-center gap-1.5 border-t border-border/45 pt-2.5 md:gap-2 md:pt-3">
+        <div
+          className={cn(
+            "mx-auto flex w-full flex-col items-center gap-1.5 md:gap-2",
+            isMobileMode
+              ? "max-w-[31rem]"
+              : "max-w-[62rem] border-t border-border/45 pt-2.5 md:pt-3"
+          )}
+        >
           {isMobileMode ? (
             <div className="w-full overflow-hidden rounded-[10px] border border-border bg-card">
               <button
                 type="button"
-                className="flex h-11 w-full items-center justify-between gap-3 bg-transparent px-3 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/45"
+                className="m-[3px] flex h-10 w-[calc(100%-6px)] items-center justify-between gap-3 rounded-[8px] bg-transparent px-2.5 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/45"
                 aria-expanded={showMobileFilterPanel}
                 aria-controls={filterPanelId}
                 onClick={() =>
@@ -278,7 +290,7 @@ export function AppHeader({
               >
                 <span className="flex min-w-0 items-center gap-2.5">
                   {selectedProfile ? (
-                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-[8px] border border-border bg-background">
+                    <span className="grid h-7 w-7 shrink-0 place-items-center text-foreground/72">
                       <ProfileIcon
                         icon={selectedProfile.icon}
                         size={13}
@@ -311,10 +323,10 @@ export function AppHeader({
               >
                 <div
                   className={cn(
-                    "min-h-0 overflow-hidden border-t px-2 transition-[padding,border-color] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
+                    "min-h-0 overflow-hidden px-2 transition-[padding,border-color] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
                     showMobileFilterPanel
-                      ? "border-border/55 py-2"
-                      : "border-transparent py-0"
+                      ? "border-t border-border/55 py-2"
+                      : "border-0 py-0"
                   )}
                 >
                   <div className="grid w-full grid-cols-2 gap-1.5 min-[430px]:grid-cols-3">
@@ -440,7 +452,9 @@ export function AppHeader({
           )}
         </div>
 
-        <div className="mx-auto h-px w-full max-w-[62rem] bg-border/45" />
+        {isMobileMode ? null : (
+          <div className="mx-auto h-px w-full max-w-[62rem] bg-border/45" />
+        )}
       </header>
 
       <ProfileManager

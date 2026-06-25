@@ -1,7 +1,11 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth";
-import { FAVICON_URL } from "@/lib/theme-shared";
+import {
+  FAVICON_URL,
+  THEME_CHROME_COLOR_DARK,
+  THEME_CHROME_COLOR_LIGHT,
+} from "@/lib/theme-shared";
 import { ThemeProvider } from "@/lib/theme";
 import { FeedbackProvider } from "@/components/ui/feedback-provider";
 import { ThemeInitScript } from "@/components/theme-init-script";
@@ -31,6 +35,20 @@ export const metadata: Metadata = {
       },
     ],
   },
+};
+
+export const viewport: Viewport = {
+  colorScheme: "light dark",
+  themeColor: [
+    {
+      media: "(prefers-color-scheme: light)",
+      color: THEME_CHROME_COLOR_LIGHT,
+    },
+    {
+      media: "(prefers-color-scheme: dark)",
+      color: THEME_CHROME_COLOR_DARK,
+    },
+  ],
 };
 
 export default function RootLayout({

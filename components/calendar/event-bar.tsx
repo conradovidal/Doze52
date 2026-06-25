@@ -12,6 +12,7 @@ import {
 } from "@/lib/calendar-layout";
 import { getCategoryColorToken } from "@/lib/category-palette";
 import type { ProfileIconId } from "@/lib/profile-icons";
+import { useTheme } from "@/lib/theme";
 
 const HOVER_PREVIEW_VERTICAL_GAP_PX = 8;
 const HOVER_PREVIEW_VIEWPORT_PADDING_PX = 12;
@@ -75,9 +76,10 @@ export function EventBar({
   profileIcon?: ProfileIconId;
   className?: string;
 }) {
+  const { mode: themeMode } = useTheme();
   const colorToken = React.useMemo(
-    () => getCategoryColorToken(event.color),
-    [event.color]
+    () => getCategoryColorToken(event.color, themeMode),
+    [event.color, themeMode]
   );
   const isDragCycleRef = React.useRef(false);
   const lastDragEndAtRef = React.useRef(0);
@@ -305,7 +307,7 @@ export function EventBar({
                 left: hoverPreviewStyle?.left ?? 0,
                 top: hoverPreviewStyle?.top ?? 0,
                 maxWidth: hoverPreviewStyle?.maxWidth ?? initialPreviewMaxWidthPx,
-                borderLeftColor: colorToken.base,
+                borderLeftColor: colorToken.indicator,
                 visibility: hoverPreviewStyle ? "visible" : "hidden",
               }}
             >

@@ -42,13 +42,13 @@ const CHIP_LEADING_SLOT_CLASS =
 const READ_CHIP_LEADING_SLOT_CLASS =
   "inline-flex h-8 w-6 shrink-0 items-center justify-center";
 const CHIP_HANDLE_CLASS =
-  "inline-flex h-8 w-8 shrink-0 touch-none cursor-grab items-center justify-center rounded-[9px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground active:cursor-grabbing";
+  "inline-flex h-8 w-8 shrink-0 touch-none cursor-grab items-center justify-center rounded-[9px] transition-colors active:cursor-grabbing";
 const CHIP_EDIT_ACTION_CLASS =
-  "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground";
+  "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] transition-colors";
 const CHIP_PLACEHOLDER_CLASS =
-  "pointer-events-none absolute inset-[3px] rounded-[8px] border border-dashed border-border bg-muted";
+  "pointer-events-none absolute inset-[3px] rounded-[8px] border border-dashed border-border bg-muted/70";
 const CHIP_OVERLAY_CLASS =
-  "border-border bg-card shadow-[0_18px_34px_-24px_rgba(15,23,42,0.36)]";
+  "shadow-[0_18px_34px_-24px_rgba(15,23,42,0.36)]";
 const CREATE_ACTION_CLASS = `inline-flex h-8 w-8 items-center justify-center rounded-[10px] border border-border bg-card text-foreground shadow-none transition-all ${MOTION_CLASS} hover:border-foreground/20 hover:bg-muted`;
 const MOBILE_CHIP_LABEL_STYLE = {
   display: "-webkit-box",
@@ -112,6 +112,9 @@ function EditProfileChip({
   chipRef?: (node: HTMLElement | null) => void;
 }) {
   const contentHiddenClass = isPlaceholder ? "invisible" : "";
+  const utilityToneClass = isActive
+    ? "text-primary-foreground/70 hover:bg-primary-foreground/10 hover:text-primary-foreground"
+    : "text-muted-foreground hover:bg-muted hover:text-foreground";
 
   return (
     <div
@@ -120,11 +123,13 @@ function EditProfileChip({
       className={cn(
         CHIP_SHELL_CLASS,
         mobileDense && "h-10 w-full rounded-[8px]",
-        isActive
-          ? "border-primary bg-primary text-primary-foreground"
-          : "border-border bg-card text-foreground/78 hover:border-foreground/18 hover:bg-muted hover:text-foreground",
+        isPlaceholder
+          ? "border-border bg-card text-muted-foreground"
+          : isActive
+            ? "border-primary bg-primary text-primary-foreground"
+            : "border-border bg-card text-foreground/78 hover:border-foreground/18 hover:bg-muted hover:text-foreground",
         isOverlay && CHIP_OVERLAY_CLASS,
-        isPlaceholder && "bg-background"
+        isPlaceholder && "shadow-none"
       )}
     >
       {isPlaceholder ? <div className={CHIP_PLACEHOLDER_CLASS} /> : null}
@@ -137,6 +142,7 @@ function EditProfileChip({
           title={`Reordenar perfil ${profile.name}`}
           className={cn(
             CHIP_HANDLE_CLASS,
+            utilityToneClass,
             mobileDense && "h-10 w-8 rounded-[8px]",
             contentHiddenClass
           )}
@@ -150,6 +156,7 @@ function EditProfileChip({
           className={cn(
             CHIP_HANDLE_CLASS,
             "cursor-default",
+            utilityToneClass,
             mobileDense && "h-10 w-8 rounded-[8px]",
             contentHiddenClass
           )}
@@ -199,7 +206,13 @@ function EditProfileChip({
 
       {isOverlay || isPlaceholder ? (
         <div className={cn("pr-1", contentHiddenClass)}>
-          <span className={cn(CHIP_EDIT_ACTION_CLASS, mobileDense && "h-8 w-8")}>
+          <span
+            className={cn(
+              CHIP_EDIT_ACTION_CLASS,
+              utilityToneClass,
+              mobileDense && "h-8 w-8"
+            )}
+          >
             <PencilLine className="h-3.5 w-3.5" />
           </span>
         </div>
@@ -213,7 +226,11 @@ function EditProfileChip({
             }}
             aria-label={`Editar perfil ${profile.name}`}
             title={`Editar perfil ${profile.name}`}
-            className={cn(CHIP_EDIT_ACTION_CLASS, mobileDense && "h-8 w-8")}
+            className={cn(
+              CHIP_EDIT_ACTION_CLASS,
+              utilityToneClass,
+              mobileDense && "h-8 w-8"
+            )}
           >
             <PencilLine className="h-3.5 w-3.5" />
           </button>
