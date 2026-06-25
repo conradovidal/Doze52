@@ -14,6 +14,8 @@ import {
   compareEventsByVisualPriority,
   isRenderableEventDateRange,
 } from "@/lib/event-order";
+import { getCategoryColorToken } from "@/lib/category-palette";
+import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 
 type MobileCalendarExperienceProps = {
@@ -102,25 +104,28 @@ const getEventAriaLabel = (event: CalendarRenderEvent, dayIso: string) => {
 function MobileEventButton({
   event,
   dayIso,
-  todayIso,
   onEditEvent,
 }: {
   event: CalendarRenderEvent;
   dayIso: string;
-  todayIso: string;
   onEditEvent: MobileCalendarExperienceProps["onEditEvent"];
 }) {
-  const isPast = Boolean(todayIso) && event.endDate < todayIso;
+  const { mode: themeMode } = useTheme();
+  const colorToken = React.useMemo(
+    () => getCategoryColorToken(event.color, themeMode),
+    [event.color, themeMode]
+  );
 
   return (
     <button
       type="button"
       aria-label={getEventAriaLabel(event, dayIso)}
-      className={cn(
-        "grid h-7 w-full grid-cols-[3px_minmax(0,1fr)] overflow-hidden rounded-[8px] border border-border/70 bg-background text-left shadow-[0_8px_18px_-18px_rgba(15,23,42,0.5)] transition-[background-color,border-color] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55",
-        "hover:border-border hover:bg-muted/28",
-        isPast ? "opacity-62 saturate-[0.9]" : ""
-      )}
+      className="block h-7 w-full overflow-hidden rounded-[8px] border text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.52)] transition-[transform,box-shadow,filter] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 hover:-translate-y-px hover:brightness-[0.99] hover:shadow-[0_10px_18px_-16px_rgba(15,23,42,0.32),inset_0_1px_0_rgba(255,255,255,0.62)]"
+      style={{
+        backgroundColor: colorToken.soft,
+        borderColor: colorToken.border,
+        color: colorToken.text,
+      }}
       onClick={(eventClick) => {
         const rect = eventClick.currentTarget.getBoundingClientRect();
         onEditEvent({
@@ -133,11 +138,8 @@ function MobileEventButton({
         });
       }}
     >
-      <span aria-hidden="true" style={{ backgroundColor: event.color }} />
-      <span className="min-w-0 px-2 py-1">
-        <span className="block truncate text-[12px] font-semibold leading-[18px] text-foreground">
-          {event.title}
-        </span>
+      <span className="block min-w-0 truncate px-2.5 text-[12px] font-semibold leading-[26px]">
+        {event.title}
       </span>
     </button>
   );
@@ -464,22 +466,22 @@ export function MobileCalendarExperience({
   return (
     <section
       data-mobile-calendar-experience
-      className="mx-auto flex min-h-0 w-full max-w-[31rem] flex-1 flex-col"
+      className="flex min-h-0 w-full flex-1 flex-col"
     >
-      <div className="-mx-3 mb-2 flex shrink-0 items-center gap-2 border-y border-border/65 bg-muted/28 px-3 py-2">
+      <div className="mx-auto flex w-full max-w-[31rem] shrink-0 items-center gap-1.5 rounded-[10px] border border-border/65 bg-muted/28 p-[3px]">
         <button
           type="button"
-          className="inline-flex h-10 shrink-0 items-center rounded-full border border-border bg-card px-3 text-[12px] font-semibold text-foreground shadow-none transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45"
+          className="inline-flex h-10 shrink-0 items-center rounded-[9px] border border-border bg-card px-3 text-[12px] font-semibold text-foreground shadow-none transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45"
           onClick={handleTodayClick}
         >
           <span className="mr-1.5 size-1.5 rounded-full bg-current" aria-hidden="true" />
           Hoje
         </button>
 
-        <div className="relative min-w-0 flex-1">
+        <div className="relative min-w-0 flex-1 overflow-hidden rounded-[9px]">
           <nav
             ref={monthScrollerRef}
-            className="min-w-0 overflow-x-auto overscroll-x-contain rounded-[12px] bg-muted/45 p-1 shadow-[inset_0_0_0_1px_hsl(var(--border)/0.55)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            className="min-w-0 overflow-x-auto overscroll-x-contain px-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             aria-label={`Meses de ${year}`}
           >
             <div className="flex min-w-max items-center gap-1">
@@ -496,7 +498,7 @@ export function MobileCalendarExperience({
                     aria-pressed={active}
                     aria-label={monthLabel}
                     className={cn(
-                      "h-10 min-w-10 shrink-0 rounded-[9px] border px-3 text-[12px] font-semibold transition-[background-color,border-color,color,box-shadow,transform] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45",
+                      "h-10 min-w-10 shrink-0 rounded-[8px] border px-3 text-[12px] font-semibold transition-[background-color,border-color,color,box-shadow,transform] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45",
                       active
                         ? "border-primary bg-primary text-primary-foreground shadow-[0_10px_22px_-18px_rgba(15,23,42,0.55)]"
                         : "border-transparent bg-transparent text-foreground/62 hover:bg-background hover:text-foreground"
@@ -516,18 +518,26 @@ export function MobileCalendarExperience({
       </div>
 
       <div
+        data-mobile-calendar-divider
+        aria-hidden="true"
+        className="mt-2 mb-1 h-px w-full shrink-0 bg-border/45"
+      />
+
+      <div
         ref={listRef}
         onScroll={syncActiveFromScroll}
         onTouchMove={syncActiveFromScroll}
         onWheel={syncActiveFromScroll}
-        className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1 pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="mx-auto min-h-0 w-full max-w-[31rem] flex-1 overflow-y-auto overscroll-contain pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
-        <div className="space-y-2">
+        <div className="space-y-1">
           {yearDays.map((day) => {
             const dayIso = toIsoDate(day);
             const dayEvents = getEventsForDay(visibleEvents, dayIso);
             const active = dayIso === activeDateIso;
             const today = Boolean(todayIso) && dayIso === todayIso;
+            const isPast = Boolean(todayIso) && dayIso < todayIso;
+            const isWeekend = day.getDay() === 0 || day.getDay() === 6;
             const weekday = WEEKDAY_SHORT_LABELS[day.getDay()];
 
             return (
@@ -536,11 +546,19 @@ export function MobileCalendarExperience({
                 data-mobile-day
                 data-date-iso={dayIso}
                 data-month-index={day.getMonth()}
+                data-day-state={today ? "today" : isPast ? "past" : "future"}
                 className={cn(
-                  "grid min-h-[4.85rem] grid-cols-[3.95rem_minmax(0,1fr)] gap-2 rounded-[10px] border p-2 transition-colors",
+                  "grid min-h-[4.75rem] grid-cols-[3.75rem_minmax(0,1fr)] gap-2 rounded-[8px] border p-2 transition-[background-color,border-color,box-shadow]",
+                  isPast
+                    ? isWeekend
+                      ? "bg-[hsl(var(--cal-cell-weekend-past))]"
+                      : "bg-[hsl(var(--cal-cell-weekday-past))]"
+                    : isWeekend
+                      ? "bg-muted/38"
+                      : "bg-card",
                   active
-                    ? "border-foreground/70 bg-card"
-                    : "border-border bg-card"
+                    ? "border-foreground/70 shadow-[0_12px_24px_-22px_rgba(15,23,42,0.55)]"
+                    : "border-border"
                 )}
               >
                 <button
@@ -550,12 +568,14 @@ export function MobileCalendarExperience({
                 >
                   <span
                     className={cn(
-                      "flex h-[3.55rem] w-[3.55rem] flex-col items-center justify-center rounded-[12px] border text-center tabular-nums",
+                      "flex h-[3.55rem] w-[3.55rem] flex-col items-center justify-center text-center tabular-nums transition-[background-color,color,box-shadow]",
                       today
-                        ? "border-foreground bg-foreground text-background"
+                        ? "rounded-[10px] bg-foreground text-background shadow-[0_10px_20px_-16px_rgba(15,23,42,0.72)]"
                         : active
-                          ? "border-foreground bg-background text-foreground"
-                          : "border-border bg-background text-foreground"
+                          ? "text-foreground"
+                          : isPast
+                            ? "text-foreground/72"
+                            : "text-foreground"
                     )}
                   >
                     <span className="text-[21px] font-semibold leading-6">
@@ -572,13 +592,12 @@ export function MobileCalendarExperience({
                   </span>
                 </button>
 
-                <div className="flex min-w-0 flex-col justify-center gap-1.5">
+                <div className="flex min-w-0 flex-col justify-start gap-1">
                   {dayEvents.map((event) => (
                     <MobileEventButton
                       key={`${event.id}-${dayIso}`}
                       event={event}
                       dayIso={dayIso}
-                      todayIso={todayIso}
                       onEditEvent={onEditEvent}
                     />
                   ))}

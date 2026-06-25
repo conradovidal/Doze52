@@ -18,7 +18,9 @@ import {
   SelectItem,
   SelectTrigger,
 } from "@/components/ui/select";
+import { getCategoryColorToken } from "@/lib/category-palette";
 import { useStore } from "@/lib/store";
+import { useTheme } from "@/lib/theme";
 import type { AnchorPoint, CalendarEvent, RecurrenceType } from "@/lib/types";
 import { logDevError, logProdError } from "@/lib/safe-log";
 import { ValidationError, validateEventInput } from "@/lib/validation";
@@ -57,6 +59,7 @@ export function EventDialog({
   }) => Promise<void> | void;
   onDelete?: () => Promise<void> | void;
 }) {
+  const { mode: themeMode } = useTheme();
   const categories = useStore((s) => s.categories);
   const profiles = useStore((s) => s.profiles);
   const selectedProfileIds = useStore((s) => s.selectedProfileIds);
@@ -276,7 +279,12 @@ export function EventDialog({
                   <span className="inline-flex min-w-0 items-center gap-1.5 pr-2">
                     <span
                       className="h-2.5 w-2.5 rounded-full"
-                      style={{ backgroundColor: currentCategory?.color ?? "#9ca3af" }}
+                      style={{
+                        backgroundColor: currentCategory
+                          ? getCategoryColorToken(currentCategory.color, themeMode)
+                              .indicator
+                          : "#9ca3af",
+                      }}
                     />
                     <span className="truncate">
                       {currentCategory?.name ?? "Sem categoria"}
@@ -289,7 +297,12 @@ export function EventDialog({
                       <span className="inline-flex items-center gap-2">
                         <span
                           className="h-2.5 w-2.5 rounded-full"
-                          style={{ backgroundColor: category.color }}
+                          style={{
+                            backgroundColor: getCategoryColorToken(
+                              category.color,
+                              themeMode
+                            ).indicator,
+                          }}
                         />
                         {category.name}
                       </span>

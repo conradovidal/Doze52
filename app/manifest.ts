@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { THEME_CHROME_COLOR_FALLBACK } from "@/lib/theme-shared";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
@@ -8,8 +9,8 @@ export default function manifest(): MetadataRoute.Manifest {
     start_url: "/",
     scope: "/",
     display: "standalone",
-    background_color: "#fbfbfa",
-    theme_color: "#01adee",
+    background_color: THEME_CHROME_COLOR_FALLBACK,
+    theme_color: THEME_CHROME_COLOR_FALLBACK,
     icons: [
       {
         src: "/icon.svg",
