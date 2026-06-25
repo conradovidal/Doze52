@@ -43,7 +43,9 @@ import {
   SelectItem,
   SelectTrigger,
 } from "@/components/ui/select";
+import { getCategoryColorToken } from "@/lib/category-palette";
 import { useStore } from "@/lib/store";
+import { useTheme } from "@/lib/theme";
 import type { CalendarProfile, CategoryItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -412,6 +414,7 @@ function CategoryRowVisual({
   style?: React.CSSProperties;
   rowRef?: (node: HTMLElement | null) => void;
 }) {
+  const { mode: themeMode } = useTheme();
   const BodyComp = isOverlay || isPlaceholder ? "div" : "button";
   const bodyProps =
     BodyComp === "button"
@@ -454,7 +457,9 @@ function CategoryRowVisual({
       >
         <span
           className="h-3.5 w-3.5 shrink-0 rounded-full ring-1 ring-black/8"
-          style={{ backgroundColor: category.color }}
+          style={{
+            backgroundColor: getCategoryColorToken(category.color, themeMode).indicator,
+          }}
           aria-hidden="true"
         />
 

@@ -4,6 +4,7 @@ import * as React from "react";
 import {
   THEME_STORAGE_KEY,
   type ThemeMode,
+  getThemeChromeColor,
   getThemeFaviconUrl,
   isThemeMode,
 } from "@/lib/theme-shared";
@@ -59,6 +60,21 @@ const applyThemeToDocument = (mode: ThemeMode) => {
   favicon.rel = "icon";
   favicon.type = "image/svg+xml";
   favicon.href = getThemeFaviconUrl(mode);
+
+  const themeColor = getThemeChromeColor(mode);
+  const themeColorMetas = Array.from(
+    document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')
+  );
+  if (themeColorMetas.length === 0) {
+    const themeColorMeta = document.createElement("meta");
+    themeColorMeta.name = "theme-color";
+    themeColorMeta.content = themeColor;
+    document.head.appendChild(themeColorMeta);
+  } else {
+    for (const themeColorMeta of themeColorMetas) {
+      themeColorMeta.content = themeColor;
+    }
+  }
 };
 
 const resolveInitialTheme = (): ThemeMode => {

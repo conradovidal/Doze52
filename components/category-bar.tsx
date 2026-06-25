@@ -31,6 +31,7 @@ import {
 } from "@/lib/inline-sortable";
 import { getCategoryColorToken } from "@/lib/category-palette";
 import { useStore } from "@/lib/store";
+import { useTheme } from "@/lib/theme";
 import type { CategoryItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -118,8 +119,9 @@ function EditCategoryChip({
   style?: React.CSSProperties;
   chipRef?: (node: HTMLElement | null) => void;
 }) {
+  const { mode: themeMode } = useTheme();
   const contentHiddenClass = isPlaceholder ? "invisible" : "";
-  const colorToken = getCategoryColorToken(category.color);
+  const colorToken = getCategoryColorToken(category.color, themeMode);
   const categoryTintStyle: React.CSSProperties = {
     backgroundColor: colorToken.soft,
     borderColor: colorToken.border,
@@ -127,10 +129,10 @@ function EditCategoryChip({
     ...style,
   };
   const categoryAccentStyle: React.CSSProperties = {
-    color: colorToken.base,
+    color: colorToken.indicator,
   };
   const categoryActionHoverStyle: React.CSSProperties = {
-    color: colorToken.base,
+    color: colorToken.indicator,
   };
 
   return (
@@ -190,7 +192,7 @@ function EditCategoryChip({
           <span
             className="h-2.5 w-2.5 rounded-full"
             style={{
-              backgroundColor: colorToken.base,
+              backgroundColor: colorToken.indicator,
             }}
           />
         </span>
@@ -326,6 +328,7 @@ export function CategoryBar({
   onCreateCategory,
   onEditCategory,
 }: CategoryBarProps) {
+  const { mode: themeMode } = useTheme();
   const selectedProfileIds = useStore((s) => s.selectedProfileIds);
   const categories = useStore((s) => s.categories);
   const toggleCategoryVisibility = useStore((s) => s.toggleCategoryVisibility);
@@ -487,7 +490,7 @@ export function CategoryBar({
     return (
       <div className={barClass}>
         {displayedCategories.map((category) => {
-          const colorToken = getCategoryColorToken(category.color);
+          const colorToken = getCategoryColorToken(category.color, themeMode);
           return (
             <button
               key={category.id}
@@ -525,7 +528,7 @@ export function CategoryBar({
                 <span
                   className="h-2.5 w-2.5 rounded-full"
                   style={{
-                    backgroundColor: colorToken.base,
+                    backgroundColor: colorToken.indicator,
                     opacity: category.visible ? 0.95 : 0.32,
                   }}
                 />
