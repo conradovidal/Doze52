@@ -235,6 +235,11 @@ export function AppHeader({
                 </Button>
               )}
 
+              <CalendarPackLauncher
+                onFocusYear={onCalendarPackFocusYear}
+                className="shrink-0"
+              />
+
               <Select value={String(year)} onValueChange={(v) => onYearChange(Number(v))}>
                 <SelectTrigger className={yearSelectClass}>
                   <SelectValue />
@@ -329,17 +334,11 @@ export function AppHeader({
                       : "border-0 py-0"
                   )}
                 >
-                  <div className="grid w-full grid-cols-2 gap-1.5 min-[430px]:grid-cols-3">
-                    <CalendarPackLauncher
-                      onFocusYear={onCalendarPackFocusYear}
-                      mobileDense
-                      className="w-full justify-start"
-                    />
-
+                  <div className="grid w-full grid-cols-1 gap-1.5">
                     <ProfileBar
                       compact
                       mobileDense
-                      className="col-span-2 min-[430px]:col-span-2"
+                      className="w-full"
                       isInlineEditMode={isInlineEditMode}
                       editingProfileId={editingProfileId}
                       onEditingProfileChange={setEditingProfileId}
@@ -364,19 +363,7 @@ export function AppHeader({
           ) : (
             <>
               <div className="-mx-4 w-[calc(100%+2rem)] overflow-x-auto px-4 pb-0.5 doze52-scrollbar-none sm:mx-0 sm:w-full sm:px-0 md:overflow-visible">
-                <div className="flex w-max min-w-full flex-nowrap items-center justify-start gap-x-1.5 gap-y-1.5 sm:w-full sm:flex-wrap sm:justify-center sm:gap-x-0">
-                  <div className="flex shrink-0 items-center">
-                    <CalendarPackLauncher
-                      onFocusYear={onCalendarPackFocusYear}
-                      className="shrink-0"
-                    />
-                  </div>
-
-                  <div
-                    aria-hidden="true"
-                    className="mx-4 hidden h-6 w-px shrink-0 bg-border/80 dark:bg-muted sm:block md:mx-5"
-                  />
-
+                <div className="flex w-max min-w-full flex-nowrap items-center justify-start gap-x-1.5 gap-y-1.5 sm:w-full sm:flex-wrap sm:justify-center sm:gap-x-2">
                   <div className="flex shrink-0 flex-nowrap items-center justify-center gap-1.5 sm:flex-wrap sm:gap-2">
                     <ProfileBar
                       compact

@@ -23,7 +23,7 @@ export const worldCup2026BrazilPack: CalendarPack = {
   id: "world-cup-2026-brazil",
   name: "Jogos do Brasil",
   eyebrow: "Brasil em destaque",
-  description: "Partidas da seleção brasileira na fase de grupos.",
+  description: "Partidas da seleção brasileira no torneio.",
   categories: [brazilCategory],
   events: baseWorldCup2026Pack.events.filter((event) => event.isBrazilMatch),
 };
@@ -32,9 +32,10 @@ export const worldCup2026AllPack: CalendarPack = {
   ...baseWorldCup2026Pack,
   id: "world-cup-2026",
   name: "Copa de 2026",
-  eyebrow: "Todos os jogos",
-  description: "Todos os jogos do torneio, com o Brasil em categoria própria.",
-  categories: [brazilCategory, copaCategory],
+  eyebrow: "Demais jogos",
+  description: "Demais jogos do torneio; adicione Jogos do Brasil separadamente.",
+  categories: [copaCategory],
+  events: baseWorldCup2026Pack.events.filter((event) => !event.isBrazilMatch),
   legacyCategoryIds: ["20265200-0000-4000-8000-000000000004"],
 };
 

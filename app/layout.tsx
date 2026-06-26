@@ -58,13 +58,13 @@ export default function RootLayout({
 }) {
   return (
     <html lang="pt-BR" suppressHydrationWarning>
-      <body className="h-dvh overflow-hidden bg-background text-foreground md:h-auto md:min-h-screen md:overflow-visible">
+      <body className="h-dvh overflow-hidden bg-background text-foreground">
         <ThemeInitScript />
         <ThemeProvider>
           <FeedbackProvider>
             <AuthProvider>
-              <div className="flex h-dvh flex-col overflow-hidden md:h-auto md:min-h-screen md:overflow-visible">
-                <div className="min-h-0 flex-1 overflow-hidden md:overflow-visible">
+              <div className="flex h-dvh flex-col overflow-hidden">
+                <div className="min-h-0 flex-1 overflow-auto">
                   {children}
                 </div>
                 <SiteFooter />

@@ -1259,10 +1259,10 @@ export default function HomePage() {
     <main
       data-doze52-app-shell
       className={cn(
-        "mx-auto w-full max-w-none overflow-x-clip",
+        "mx-auto w-full max-w-none",
         isMobileCalendarUi
           ? "flex h-[100dvh] min-h-0 flex-col overflow-hidden px-3 pt-2 pb-1"
-          : "px-4 pt-3 pb-2 md:pb-4"
+          : "min-h-full px-4 pt-3 pb-2 md:pb-4"
       )}
     >
       <SyncStatusOverlay
