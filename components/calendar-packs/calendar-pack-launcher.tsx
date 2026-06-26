@@ -110,8 +110,8 @@ export function CalendarPackLauncher({
       ? "1 atualização disponível"
       : `${packUpdateCount} atualizações disponíveis`;
   const launcherAriaCopy = hasPackUpdates
-    ? `Abrir assinaturas de calendário. ${updateAriaCopy}`
-    : "Abrir assinaturas de calendário. Calendários disponíveis para adicionar";
+    ? `Adicionar ou gerenciar calendários. ${updateAriaCopy}`
+    : "Adicionar ou gerenciar calendários. Novas assinaturas disponíveis.";
   const activeProfileId = React.useMemo(
     () =>
       selectedProfileIds.find((profileId) =>
@@ -245,33 +245,25 @@ export function CalendarPackLauncher({
     <>
       <Button
         type="button"
-        variant="default"
+        variant="outline"
         size={mobileDense ? "lg" : "sm"}
         className={cn(
-          "relative rounded-[10px] border border-primary/14 bg-primary px-2.5 text-[0.78rem] font-semibold text-primary-foreground shadow-none transition-[background-color,border-color,box-shadow,transform,color] duration-150 ease-out hover:border-primary/20 hover:bg-primary/90 hover:text-primary-foreground active:translate-y-[1px] focus-visible:ring-2 focus-visible:ring-ring/45",
-          mobileDense ? "h-10 justify-start rounded-[8px] text-left" : "h-8",
-          hasPackUpdates && "ring-1 ring-rose-500/35 dark:ring-rose-300/45",
+          "relative rounded-[10px] border-border bg-card text-[0.78rem] font-semibold text-foreground shadow-none transition-[background-color,border-color,box-shadow,transform,color] duration-150 ease-out hover:border-foreground/18 hover:bg-muted hover:text-foreground active:translate-y-[1px] focus-visible:ring-2 focus-visible:ring-ring/45",
+          mobileDense
+            ? "h-10 justify-start rounded-[8px] text-left"
+            : "h-8 px-2.5 pr-3 md:h-9 md:px-3 md:pr-3.5 md:text-sm",
           className
         )}
         onClick={() => setOpen(true)}
         aria-label={launcherAriaCopy}
         title={hasPackUpdates ? "Atualizações disponíveis" : "Calendários disponíveis"}
       >
-        <span
-          className={cn(
-            "absolute -right-0.5 -top-0.5 rounded-full bg-rose-500 ring-2 ring-background dark:bg-rose-400",
-            hasPackUpdates
-              ? "size-3 shadow-[0_0_0_4px_rgba(244,63,94,0.16)]"
-              : "size-2.5"
-          )}
-          aria-hidden="true"
-        />
-        <Plus className="size-3.5" />
+        <Plus className="size-3.5 text-muted-foreground" />
         <span>Calendários</span>
-        <span className="hidden items-center gap-1 rounded-[7px] bg-primary-foreground/14 px-1.5 py-0.5 text-[11px] font-bold text-current lg:inline-flex dark:bg-primary-foreground/10">
-          <span aria-hidden="true">🇧🇷</span>
-          Copa
-        </span>
+        <span
+          aria-hidden="true"
+          className="absolute right-0 top-0 size-2 rounded-full border-[1.5px] border-card bg-rose-500 shadow-[0_0_0_1px_rgba(244,63,94,0.16)] dark:border-background"
+        />
       </Button>
 
       <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -363,15 +355,6 @@ export function CalendarPackLauncher({
                           <div className="flex shrink-0 flex-wrap gap-1.5 sm:justify-end sm:gap-2">
                             {isPresent ? (
                               <>
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="xs"
-                                  className="rounded-full"
-                                  onClick={() => focusPack(pack, availability?.profileId ?? null)}
-                                >
-                                  Ver
-                                </Button>
                                 {!isComplete ? (
                                   <Button
                                     type="button"

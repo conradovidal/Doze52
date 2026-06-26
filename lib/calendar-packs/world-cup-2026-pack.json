@@ -4,11 +4,11 @@
   "description": "Jogos do Brasil e Copa de 2026 em calendários separados.",
   "year": 2026,
   "datasetStatus": "complete",
-  "updateNote": "Inclui os 104 jogos mapeados, com Jogos do Brasil e Copa de 2026 como calendários separados.",
+  "updateNote": "Inclui os 104 jogos mapeados, com Jogos do Brasil e Copa de 2026 como calendários separados e confrontos definidos dos 16 avos.",
   "source": {
-    "label": "FIFA",
-    "url": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-    "lastVerified": "2026-06-04"
+    "label": "FIFA / Sports Illustrated",
+    "url": "https://www.si.com/soccer/every-confirmed-round-of-32-match-2026-world-cup",
+    "lastVerified": "2026-06-26"
   },
   "profile": {
     "id": "20265200-0000-4000-8000-000000000001",
@@ -1562,22 +1562,22 @@
     },
     {
       "id": "20265200-0000-4000-8000-000000000073",
-      "title": "Fase de 32: 2º Grupo A x 2º Grupo B",
+      "title": "🇿🇦 🇨🇦",
       "date": "2026-06-28",
       "time": "12:00",
       "timezone": "America/Los_Angeles",
       "city": "Los Angeles",
       "venue": "SoFi Stadium",
       "phase": "Fase de 32",
-      "homeTeam": "2º colocado do Grupo A",
-      "awayTeam": "2º colocado do Grupo B",
+      "homeTeam": "África do Sul",
+      "awayTeam": "Canadá",
       "suggestedCategoryKey": "other",
-      "source": "FIFA",
-      "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "source": "Sports Illustrated",
+      "sourceUrl": "https://www.si.com/soccer/every-confirmed-round-of-32-match-2026-world-cup",
+      "lastVerified": "2026-06-26",
       "isBrazilMatch": false,
       "notes": [
-        "Confronto: 2º colocado do Grupo A x 2º colocado do Grupo B"
+        "Confronto: África do Sul x Canadá"
       ]
     },
     {
@@ -1602,42 +1602,42 @@
     },
     {
       "id": "20265200-0000-4000-8000-000000000075",
-      "title": "Fase de 32: 1º Grupo F x 2º Grupo C",
+      "title": "🇳🇱 🇲🇦",
       "date": "2026-06-29",
       "time": "19:00",
       "timezone": "America/Mexico_City",
       "city": "Monterrey",
       "venue": "Estadio BBVA",
       "phase": "Fase de 32",
-      "homeTeam": "1º colocado do Grupo F",
-      "awayTeam": "2º colocado do Grupo C",
+      "homeTeam": "Países Baixos",
+      "awayTeam": "Marrocos",
       "suggestedCategoryKey": "other",
-      "source": "FIFA",
-      "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "source": "Sports Illustrated",
+      "sourceUrl": "https://www.si.com/soccer/every-confirmed-round-of-32-match-2026-world-cup",
+      "lastVerified": "2026-06-26",
       "isBrazilMatch": false,
       "notes": [
-        "Confronto: 1º colocado do Grupo F x 2º colocado do Grupo C"
+        "Confronto: Países Baixos x Marrocos"
       ]
     },
     {
       "id": "20265200-0000-4000-8000-000000000076",
-      "title": "Fase de 32: 1º Grupo C x 2º Grupo F",
+      "title": "🇧🇷 🇯🇵",
       "date": "2026-06-29",
       "time": "12:00",
       "timezone": "America/Chicago",
       "city": "Houston",
       "venue": "NRG Stadium",
       "phase": "Fase de 32",
-      "homeTeam": "1º colocado do Grupo C",
-      "awayTeam": "2º colocado do Grupo F",
-      "suggestedCategoryKey": "other",
-      "source": "FIFA",
-      "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
-      "isBrazilMatch": false,
+      "homeTeam": "Brasil",
+      "awayTeam": "Japão",
+      "suggestedCategoryKey": "brazil",
+      "source": "Sports Illustrated",
+      "sourceUrl": "https://www.si.com/soccer/every-confirmed-round-of-32-match-2026-world-cup",
+      "lastVerified": "2026-06-26",
+      "isBrazilMatch": true,
       "notes": [
-        "Confronto: 1º colocado do Grupo C x 2º colocado do Grupo F"
+        "Confronto: Brasil x Japão"
       ]
     },
     {
@@ -1722,22 +1722,22 @@
     },
     {
       "id": "20265200-0000-4000-8000-000000000081",
-      "title": "Fase de 32: 1º Grupo D x 3º melhor (B/E/F/I/J)",
+      "title": "🇺🇸 🇧🇦",
       "date": "2026-07-01",
       "time": "17:00",
       "timezone": "America/Los_Angeles",
       "city": "San Francisco Bay Area",
       "venue": "Levi's Stadium",
       "phase": "Fase de 32",
-      "homeTeam": "1º colocado do Grupo D",
-      "awayTeam": "3º colocado dos Grupos B/E/F/I/J",
+      "homeTeam": "Estados Unidos",
+      "awayTeam": "Bósnia e Herzegovina",
       "suggestedCategoryKey": "other",
-      "source": "FIFA",
-      "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "source": "Sports Illustrated",
+      "sourceUrl": "https://www.si.com/soccer/every-confirmed-round-of-32-match-2026-world-cup",
+      "lastVerified": "2026-06-26",
       "isBrazilMatch": false,
       "notes": [
-        "Confronto: 1º colocado do Grupo D x 3º colocado dos Grupos B/E/F/I/J"
+        "Confronto: Estados Unidos x Bósnia e Herzegovina"
       ]
     },
     {

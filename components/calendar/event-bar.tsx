@@ -260,8 +260,8 @@ export function EventBar({
             : "hover:-translate-y-px hover:brightness-[0.99] hover:shadow-[0_10px_18px_-16px_rgba(15,23,42,0.32),inset_0_1px_0_rgba(255,255,255,0.62)]"
         } ${className ?? ""}`}
         style={{
-          backgroundColor: colorToken.soft,
-          borderColor: colorToken.border,
+          backgroundColor: colorToken.eventSoft,
+          borderColor: colorToken.eventBorder,
           color: colorToken.text,
         }}
       >

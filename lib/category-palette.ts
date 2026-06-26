@@ -4,216 +4,270 @@ export type CategoryColorToken = {
   id: string;
   label: string;
   base: string;
-  soft: string;
-  border: string;
+  chipSoft: string;
+  chipBorder: string;
+  eventSoft: string;
+  eventBorder: string;
   text: string;
 };
 
 export type ResolvedCategoryColorToken = CategoryColorToken & {
+  soft: string;
+  border: string;
   indicator: string;
 };
 
-export const CATEGORY_COLOR_SOFT_BLUE = "#93B4E8";
-export const CATEGORY_COLOR_SOFT_VIOLET = "#B7A5DD";
-export const CATEGORY_COLOR_SOFT_ROSE = "#D9A2B4";
-export const CATEGORY_COLOR_SOFT_CORAL = "#DEA08F";
-export const CATEGORY_COLOR_SOFT_AMBER = "#D7B56D";
-export const CATEGORY_COLOR_SOFT_GREEN = "#91B89D";
-export const CATEGORY_COLOR_SOFT_TEAL = "#83B8B4";
-export const CATEGORY_COLOR_SOFT_GRAPHITE = "#A9B0BA";
+export const CATEGORY_COLOR_BASE_BLUE = "#4F8FD6";
+export const CATEGORY_COLOR_BASE_INDIGO = "#8EA5F7";
+export const CATEGORY_COLOR_BASE_VIOLET = "#B79AEF";
+export const CATEGORY_COLOR_BASE_PURPLE = "#C78AD9";
+export const CATEGORY_COLOR_BASE_PINK = "#F09CCF";
+export const CATEGORY_COLOR_BASE_ROSE = "#F4A6B8";
+export const CATEGORY_COLOR_BASE_RED = "#EF8F8F";
+export const CATEGORY_COLOR_BASE_ORANGE = "#EBA16D";
+export const CATEGORY_COLOR_BASE_AMBER = "#E7B957";
+export const CATEGORY_COLOR_BASE_YELLOW = "#E1D15D";
+export const CATEGORY_COLOR_BASE_LIME = "#A8CD6C";
+export const CATEGORY_COLOR_BASE_GREEN = "#58B76F";
+export const CATEGORY_COLOR_BASE_EMERALD = "#86C7A0";
+export const CATEGORY_COLOR_BASE_MINT = "#5EC9C5";
+export const CATEGORY_COLOR_BASE_CYAN = "#72CFE3";
+export const CATEGORY_COLOR_BASE_SKY = "#93C5FD";
+export const CATEGORY_COLOR_BASE_SLATE = "#CBD5E1";
+export const CATEGORY_COLOR_BASE_ZINC = "#D0D3DA";
+export const CATEGORY_COLOR_BASE_TERRA = "#D6A060";
+export const CATEGORY_COLOR_BASE_GRAPHITE = "#9CA6B4";
 
-export const CATEGORY_COLOR_DEEP_BLUE = "#446A9E";
-export const CATEGORY_COLOR_DEEP_VIOLET = "#6D5A98";
-export const CATEGORY_COLOR_DEEP_ROSE = "#9A536B";
-export const CATEGORY_COLOR_DEEP_CORAL = "#A85E4C";
-export const CATEGORY_COLOR_DEEP_AMBER = "#987335";
-export const CATEGORY_COLOR_DEEP_GREEN = "#4E7D5B";
-export const CATEGORY_COLOR_DEEP_TEAL = "#407A77";
-export const CATEGORY_COLOR_DEEP_GRAPHITE = "#535C68";
-
-// Legacy exports remain unchanged so persisted values and onboarding snapshots
-// keep their current storage shape. Rendering maps them to the premium palette.
-export const CATEGORY_COLOR_BASE_BLUE = "#2563EB";
-export const CATEGORY_COLOR_BASE_INDIGO = "#4F46E5";
-export const CATEGORY_COLOR_BASE_VIOLET = "#7C3AED";
-export const CATEGORY_COLOR_BASE_PURPLE = "#9333EA";
-export const CATEGORY_COLOR_BASE_PINK = "#DB2777";
-export const CATEGORY_COLOR_BASE_ROSE = "#E11D48";
-export const CATEGORY_COLOR_BASE_RED = "#DC2626";
-export const CATEGORY_COLOR_BASE_ORANGE = "#EA580C";
-export const CATEGORY_COLOR_BASE_AMBER = "#D97706";
-export const CATEGORY_COLOR_BASE_YELLOW = "#CA8A04";
-export const CATEGORY_COLOR_BASE_LIME = "#65A30D";
-export const CATEGORY_COLOR_BASE_GREEN = "#16A34A";
-export const CATEGORY_COLOR_BASE_EMERALD = "#059669";
-export const CATEGORY_COLOR_BASE_MINT = "#0D9488";
-export const CATEGORY_COLOR_BASE_CYAN = "#0891B2";
-export const CATEGORY_COLOR_BASE_SKY = "#0284C7";
-export const CATEGORY_COLOR_BASE_SLATE = "#475569";
-export const CATEGORY_COLOR_BASE_ZINC = "#52525B";
-export const CATEGORY_COLOR_BASE_TERRA = "#A16207";
-export const CATEGORY_COLOR_BASE_GRAPHITE = "#1F2937";
-
-export const DEFAULT_CATEGORY_COLOR = CATEGORY_COLOR_SOFT_BLUE;
+export const DEFAULT_CATEGORY_COLOR = CATEGORY_COLOR_BASE_BLUE;
 
 export const CATEGORY_COLOR_TOKENS = [
   {
-    id: "blue-soft",
-    label: "Azul suave",
-    base: CATEGORY_COLOR_SOFT_BLUE,
-    soft: "#EAF1FB",
-    border: "#C9D8EF",
-    text: "#29476F",
+    id: "blue",
+    label: "Azul",
+    base: CATEGORY_COLOR_BASE_BLUE,
+    chipSoft: "#DCEBFA",
+    chipBorder: "#8EB7E7",
+    eventSoft: "#73A7E0",
+    eventBorder: "#4F8FD6",
+    text: "#0E3767",
   },
   {
-    id: "violet-soft",
-    label: "Violeta suave",
-    base: CATEGORY_COLOR_SOFT_VIOLET,
-    soft: "#F1EDF8",
-    border: "#D9CFEA",
-    text: "#51416F",
+    id: "indigo",
+    label: "Índigo",
+    base: CATEGORY_COLOR_BASE_INDIGO,
+    chipSoft: "#E8ECFF",
+    chipBorder: "#B7C5FF",
+    eventSoft: "#B7C5FF",
+    eventBorder: "#8EA5F7",
+    text: "#293A8E",
   },
   {
-    id: "rose-soft",
-    label: "Rosa suave",
-    base: CATEGORY_COLOR_SOFT_ROSE,
-    soft: "#F8EDF1",
-    border: "#E8CBD5",
-    text: "#6D3A4B",
+    id: "violet",
+    label: "Violeta",
+    base: CATEGORY_COLOR_BASE_VIOLET,
+    chipSoft: "#F1EAFF",
+    chipBorder: "#D8C4F6",
+    eventSoft: "#D8C4F6",
+    eventBorder: "#B79AEF",
+    text: "#57348B",
   },
   {
-    id: "coral-soft",
-    label: "Coral suave",
-    base: CATEGORY_COLOR_SOFT_CORAL,
-    soft: "#FAEEE9",
-    border: "#EBCBC1",
-    text: "#744137",
+    id: "purple",
+    label: "Roxo",
+    base: CATEGORY_COLOR_BASE_PURPLE,
+    chipSoft: "#F6E9FB",
+    chipBorder: "#E0B7EC",
+    eventSoft: "#E0B7EC",
+    eventBorder: "#C78AD9",
+    text: "#6C307F",
   },
   {
-    id: "amber-soft",
-    label: "Âmbar suave",
-    base: CATEGORY_COLOR_SOFT_AMBER,
-    soft: "#FAF4E5",
-    border: "#E9D8AE",
-    text: "#6B5528",
+    id: "pink",
+    label: "Pink",
+    base: CATEGORY_COLOR_BASE_PINK,
+    chipSoft: "#FCE6F2",
+    chipBorder: "#F5ABD0",
+    eventSoft: "#F5ABD0",
+    eventBorder: "#F09CCF",
+    text: "#832B58",
   },
   {
-    id: "green-soft",
-    label: "Verde suave",
-    base: CATEGORY_COLOR_SOFT_GREEN,
-    soft: "#ECF5EF",
-    border: "#C7DDCE",
-    text: "#355C42",
+    id: "rose",
+    label: "Rosa",
+    base: CATEGORY_COLOR_BASE_ROSE,
+    chipSoft: "#FCE7EE",
+    chipBorder: "#F4A6B8",
+    eventSoft: "#F7B9C7",
+    eventBorder: "#E38AA3",
+    text: "#8A2444",
   },
   {
-    id: "teal-soft",
-    label: "Turquesa suave",
-    base: CATEGORY_COLOR_SOFT_TEAL,
-    soft: "#EAF5F4",
-    border: "#C2DDDA",
-    text: "#305D5A",
+    id: "red",
+    label: "Vermelho",
+    base: CATEGORY_COLOR_BASE_RED,
+    chipSoft: "#FDE5E5",
+    chipBorder: "#F2A4A4",
+    eventSoft: "#F2A4A4",
+    eventBorder: "#EF8F8F",
+    text: "#842222",
   },
   {
-    id: "graphite-soft",
-    label: "Grafite suave",
-    base: CATEGORY_COLOR_SOFT_GRAPHITE,
-    soft: "#F1F3F5",
-    border: "#D5D9DE",
-    text: "#414852",
+    id: "orange",
+    label: "Laranja",
+    base: CATEGORY_COLOR_BASE_ORANGE,
+    chipSoft: "#FBE7D8",
+    chipBorder: "#F1B07C",
+    eventSoft: "#F1B07C",
+    eventBorder: "#EBA16D",
+    text: "#7D3F13",
   },
   {
-    id: "blue-deep",
-    label: "Azul profundo",
-    base: CATEGORY_COLOR_DEEP_BLUE,
-    soft: "#DCE7F5",
-    border: "#AFC4DE",
-    text: "#203B60",
+    id: "amber",
+    label: "Âmbar",
+    base: CATEGORY_COLOR_BASE_AMBER,
+    chipSoft: "#F8EBCB",
+    chipBorder: "#E7B957",
+    eventSoft: "#ECC873",
+    eventBorder: "#D3A13F",
+    text: "#76510A",
   },
   {
-    id: "violet-deep",
-    label: "Violeta profundo",
-    base: CATEGORY_COLOR_DEEP_VIOLET,
-    soft: "#E6E0F0",
-    border: "#C3B8D9",
-    text: "#3E315C",
+    id: "yellow",
+    label: "Amarelo",
+    base: CATEGORY_COLOR_BASE_YELLOW,
+    chipSoft: "#F8F0C9",
+    chipBorder: "#E8D76E",
+    eventSoft: "#E8D76E",
+    eventBorder: "#E1D15D",
+    text: "#685D09",
   },
   {
-    id: "rose-deep",
-    label: "Rosa profundo",
-    base: CATEGORY_COLOR_DEEP_ROSE,
-    soft: "#F0DCE3",
-    border: "#D7AFC0",
-    text: "#5D2D3D",
+    id: "lime",
+    label: "Lima",
+    base: CATEGORY_COLOR_BASE_LIME,
+    chipSoft: "#EAF4D2",
+    chipBorder: "#B9D982",
+    eventSoft: "#B9D982",
+    eventBorder: "#A8CD6C",
+    text: "#405F14",
   },
   {
-    id: "coral-deep",
-    label: "Coral profundo",
-    base: CATEGORY_COLOR_DEEP_CORAL,
-    soft: "#F2DDD7",
-    border: "#D9AE9F",
-    text: "#643326",
+    id: "green",
+    label: "Verde",
+    base: CATEGORY_COLOR_BASE_GREEN,
+    chipSoft: "#DDF2E3",
+    chipBorder: "#8BCF9B",
+    eventSoft: "#73C987",
+    eventBorder: "#58B76F",
+    text: "#0F5224",
   },
   {
-    id: "amber-deep",
-    label: "Âmbar profundo",
-    base: CATEGORY_COLOR_DEEP_AMBER,
-    soft: "#F2E7CF",
-    border: "#D7C092",
-    text: "#5B431D",
+    id: "emerald",
+    label: "Esmeralda",
+    base: CATEGORY_COLOR_BASE_EMERALD,
+    chipSoft: "#E1F3EA",
+    chipBorder: "#9ED2B2",
+    eventSoft: "#AAD8BC",
+    eventBorder: "#78C198",
+    text: "#1F5B3F",
   },
   {
-    id: "green-deep",
-    label: "Verde profundo",
-    base: CATEGORY_COLOR_DEEP_GREEN,
-    soft: "#DCEADF",
-    border: "#B1CCB8",
-    text: "#294B32",
+    id: "mint",
+    label: "Menta",
+    base: CATEGORY_COLOR_BASE_MINT,
+    chipSoft: "#D9F4F2",
+    chipBorder: "#8ADAD7",
+    eventSoft: "#7FD6D2",
+    eventBorder: "#4BB8B3",
+    text: "#0B5E5A",
   },
   {
-    id: "teal-deep",
-    label: "Turquesa profundo",
-    base: CATEGORY_COLOR_DEEP_TEAL,
-    soft: "#D9EAE8",
-    border: "#AACBC7",
-    text: "#214B49",
+    id: "cyan",
+    label: "Ciano",
+    base: CATEGORY_COLOR_BASE_CYAN,
+    chipSoft: "#DDF4FA",
+    chipBorder: "#8CD8E8",
+    eventSoft: "#8CD8E8",
+    eventBorder: "#72CFE3",
+    text: "#165E73",
   },
   {
-    id: "graphite-deep",
-    label: "Grafite profundo",
-    base: CATEGORY_COLOR_DEEP_GRAPHITE,
-    soft: "#E1E4E8",
-    border: "#B9BEC6",
-    text: "#2D333B",
+    id: "sky",
+    label: "Sky",
+    base: CATEGORY_COLOR_BASE_SKY,
+    chipSoft: "#DBECFF",
+    chipBorder: "#93C5FD",
+    eventSoft: "#A9D1FE",
+    eventBorder: "#72ACEF",
+    text: "#1D4E89",
+  },
+  {
+    id: "slate",
+    label: "Slate",
+    base: CATEGORY_COLOR_BASE_SLATE,
+    chipSoft: "#F1F5F9",
+    chipBorder: "#CBD5E1",
+    eventSoft: "#D7E0EA",
+    eventBorder: "#AEBBCC",
+    text: "#334155",
+  },
+  {
+    id: "zinc",
+    label: "Zinc",
+    base: CATEGORY_COLOR_BASE_ZINC,
+    chipSoft: "#F3F4F6",
+    chipBorder: "#DADDE4",
+    eventSoft: "#DADDE4",
+    eventBorder: "#B9BEC8",
+    text: "#3F3F46",
+  },
+  {
+    id: "terra",
+    label: "Terra",
+    base: CATEGORY_COLOR_BASE_TERRA,
+    chipSoft: "#F7E9D1",
+    chipBorder: "#E4B87A",
+    eventSoft: "#E4B87A",
+    eventBorder: "#D6A060",
+    text: "#704512",
+  },
+  {
+    id: "graphite",
+    label: "Grafite",
+    base: CATEGORY_COLOR_BASE_GRAPHITE,
+    chipSoft: "#E8EBEF",
+    chipBorder: "#C5CDD6",
+    eventSoft: "#C5CDD6",
+    eventBorder: "#9CA6B4",
+    text: "#18202B",
   },
 ] as const satisfies readonly CategoryColorToken[];
 
 export const CATEGORY_COLOR_SETS = [
   {
-    id: "soft",
-    label: "Suaves",
+    id: "pastel",
+    label: "Pastel",
     colors: [
-      CATEGORY_COLOR_SOFT_BLUE,
-      CATEGORY_COLOR_SOFT_VIOLET,
-      CATEGORY_COLOR_SOFT_ROSE,
-      CATEGORY_COLOR_SOFT_CORAL,
-      CATEGORY_COLOR_SOFT_AMBER,
-      CATEGORY_COLOR_SOFT_GREEN,
-      CATEGORY_COLOR_SOFT_TEAL,
-      CATEGORY_COLOR_SOFT_GRAPHITE,
-    ],
-  },
-  {
-    id: "deep",
-    label: "Profundas",
-    colors: [
-      CATEGORY_COLOR_DEEP_BLUE,
-      CATEGORY_COLOR_DEEP_VIOLET,
-      CATEGORY_COLOR_DEEP_ROSE,
-      CATEGORY_COLOR_DEEP_CORAL,
-      CATEGORY_COLOR_DEEP_AMBER,
-      CATEGORY_COLOR_DEEP_GREEN,
-      CATEGORY_COLOR_DEEP_TEAL,
-      CATEGORY_COLOR_DEEP_GRAPHITE,
+      CATEGORY_COLOR_BASE_BLUE,
+      CATEGORY_COLOR_BASE_INDIGO,
+      CATEGORY_COLOR_BASE_VIOLET,
+      CATEGORY_COLOR_BASE_PURPLE,
+      CATEGORY_COLOR_BASE_PINK,
+      CATEGORY_COLOR_BASE_ROSE,
+      CATEGORY_COLOR_BASE_RED,
+      CATEGORY_COLOR_BASE_ORANGE,
+      CATEGORY_COLOR_BASE_AMBER,
+      CATEGORY_COLOR_BASE_YELLOW,
+      CATEGORY_COLOR_BASE_LIME,
+      CATEGORY_COLOR_BASE_GREEN,
+      CATEGORY_COLOR_BASE_EMERALD,
+      CATEGORY_COLOR_BASE_MINT,
+      CATEGORY_COLOR_BASE_CYAN,
+      CATEGORY_COLOR_BASE_SKY,
+      CATEGORY_COLOR_BASE_SLATE,
+      CATEGORY_COLOR_BASE_ZINC,
+      CATEGORY_COLOR_BASE_TERRA,
+      CATEGORY_COLOR_BASE_GRAPHITE,
     ],
   },
 ] as const;
@@ -229,28 +283,27 @@ const CATEGORY_COLOR_TOKEN_BY_BASE = new Map(
 );
 
 const CATEGORY_COLOR_ALIASES = new Map<string, string>([
-  [CATEGORY_COLOR_BASE_BLUE.toLowerCase(), CATEGORY_COLOR_SOFT_BLUE],
-  [CATEGORY_COLOR_BASE_SKY.toLowerCase(), CATEGORY_COLOR_SOFT_BLUE],
-  [CATEGORY_COLOR_BASE_INDIGO.toLowerCase(), CATEGORY_COLOR_SOFT_VIOLET],
-  [CATEGORY_COLOR_BASE_VIOLET.toLowerCase(), CATEGORY_COLOR_SOFT_VIOLET],
-  [CATEGORY_COLOR_BASE_PURPLE.toLowerCase(), CATEGORY_COLOR_SOFT_VIOLET],
-  [CATEGORY_COLOR_BASE_PINK.toLowerCase(), CATEGORY_COLOR_SOFT_ROSE],
-  [CATEGORY_COLOR_BASE_ROSE.toLowerCase(), CATEGORY_COLOR_SOFT_ROSE],
-  [CATEGORY_COLOR_BASE_RED.toLowerCase(), CATEGORY_COLOR_SOFT_CORAL],
-  [CATEGORY_COLOR_BASE_ORANGE.toLowerCase(), CATEGORY_COLOR_SOFT_CORAL],
-  ["#f97316", CATEGORY_COLOR_SOFT_CORAL],
-  [CATEGORY_COLOR_BASE_YELLOW.toLowerCase(), CATEGORY_COLOR_SOFT_AMBER],
-  [CATEGORY_COLOR_BASE_AMBER.toLowerCase(), CATEGORY_COLOR_SOFT_AMBER],
-  [CATEGORY_COLOR_BASE_TERRA.toLowerCase(), CATEGORY_COLOR_SOFT_AMBER],
-  [CATEGORY_COLOR_BASE_LIME.toLowerCase(), CATEGORY_COLOR_SOFT_GREEN],
-  [CATEGORY_COLOR_BASE_GREEN.toLowerCase(), CATEGORY_COLOR_SOFT_GREEN],
-  [CATEGORY_COLOR_BASE_EMERALD.toLowerCase(), CATEGORY_COLOR_SOFT_TEAL],
-  [CATEGORY_COLOR_BASE_MINT.toLowerCase(), CATEGORY_COLOR_SOFT_TEAL],
-  [CATEGORY_COLOR_BASE_CYAN.toLowerCase(), CATEGORY_COLOR_SOFT_TEAL],
-  ["#0f766e", CATEGORY_COLOR_SOFT_TEAL],
-  [CATEGORY_COLOR_BASE_SLATE.toLowerCase(), CATEGORY_COLOR_SOFT_GRAPHITE],
-  [CATEGORY_COLOR_BASE_ZINC.toLowerCase(), CATEGORY_COLOR_SOFT_GRAPHITE],
-  [CATEGORY_COLOR_BASE_GRAPHITE.toLowerCase(), CATEGORY_COLOR_SOFT_GRAPHITE],
+  ["#2563eb", CATEGORY_COLOR_BASE_BLUE],
+  ["#4f46e5", CATEGORY_COLOR_BASE_INDIGO],
+  ["#7c3aed", CATEGORY_COLOR_BASE_VIOLET],
+  ["#9333ea", CATEGORY_COLOR_BASE_PURPLE],
+  ["#db2777", CATEGORY_COLOR_BASE_PINK],
+  ["#e11d48", CATEGORY_COLOR_BASE_ROSE],
+  ["#dc2626", CATEGORY_COLOR_BASE_RED],
+  ["#ea580c", CATEGORY_COLOR_BASE_ORANGE],
+  ["#d97706", CATEGORY_COLOR_BASE_AMBER],
+  ["#ca8a04", CATEGORY_COLOR_BASE_YELLOW],
+  ["#65a30d", CATEGORY_COLOR_BASE_LIME],
+  ["#16a34a", CATEGORY_COLOR_BASE_GREEN],
+  ["#059669", CATEGORY_COLOR_BASE_EMERALD],
+  ["#0d9488", CATEGORY_COLOR_BASE_MINT],
+  ["#0f766e", CATEGORY_COLOR_BASE_MINT],
+  ["#0891b2", CATEGORY_COLOR_BASE_CYAN],
+  ["#0284c7", CATEGORY_COLOR_BASE_SKY],
+  ["#475569", CATEGORY_COLOR_BASE_SLATE],
+  ["#52525b", CATEGORY_COLOR_BASE_ZINC],
+  ["#a16207", CATEGORY_COLOR_BASE_TERRA],
+  ["#1f2937", CATEGORY_COLOR_BASE_GRAPHITE],
 ]);
 
 const normalizeHex = (value: string | undefined | null) => {
@@ -358,26 +411,19 @@ export const getCategoryColorToken = (
   value: string | undefined | null,
   mode: ThemeMode = "light"
 ): ResolvedCategoryColorToken => {
+  void mode;
+
   const nearestColor = getNearestCategoryColor(value);
   const token =
     CATEGORY_COLOR_TOKEN_BY_BASE.get(nearestColor.toLowerCase()) ??
     CATEGORY_COLOR_TOKEN_BY_BASE.get(DEFAULT_CATEGORY_COLOR.toLowerCase()) ??
     CATEGORY_COLOR_TOKENS[0];
 
-  if (mode === "light") {
-    return {
-      ...token,
-      indicator: token.base,
-    };
-  }
-
-  const backgroundWeight = token.id.endsWith("-deep") ? 34 : 24;
   return {
     ...token,
-    soft: `color-mix(in oklab, ${token.base} ${backgroundWeight}%, #111827)`,
-    border: `color-mix(in oklab, ${token.base} 54%, #374151)`,
-    text: `color-mix(in oklab, ${token.base} 22%, #F9FAFB)`,
-    indicator: `color-mix(in oklab, ${token.base} 72%, #F9FAFB)`,
+    soft: token.chipSoft,
+    border: token.chipBorder,
+    indicator: token.base,
   };
 };
 
