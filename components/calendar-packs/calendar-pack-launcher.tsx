@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Check, Loader2, Plus, Trash2 } from "lucide-react";
+import { ProUpgradeDialog } from "@/components/billing/pro-upgrade-dialog";
 import { ProfileIcon } from "@/components/profile-icon";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,7 +27,9 @@ import {
   removeCalendarPack,
 } from "@/lib/calendar-packs/import";
 import type { CalendarPack } from "@/lib/calendar-packs/types";
+import { isLimitReached } from "@/lib/entitlements";
 import { useStore } from "@/lib/store";
+import { useBilling } from "@/lib/use-billing";
 import { cn } from "@/lib/utils";
 
 type PackFlowState =
@@ -54,12 +57,15 @@ export function CalendarPackLauncher({
   onFocusYear,
   className,
   mobileDense = false,
+  onRequireAuth,
 }: {
   onFocusYear?: (year: number) => void;
   className?: string;
   mobileDense?: boolean;
+  onRequireAuth?: () => void;
 }) {
   const { notify } = useFeedback();
+  const { isPro, limits } = useBilling();
   const profiles = useStore((state) => state.profiles);
   const categories = useStore((state) => state.categories);
   const events = useStore((state) => state.events);
@@ -73,6 +79,7 @@ export function CalendarPackLauncher({
     Record<string, string>
   >({});
   const [expandedPackId, setExpandedPackId] = React.useState<string | null>(null);
+  const [upgradeDialogOpen, setUpgradeDialogOpen] = React.useState(false);
 
   const snapshot = React.useMemo(
     () => ({ profiles, categories, events }),
@@ -105,13 +112,27 @@ export function CalendarPackLauncher({
     [availabilityByPack]
   );
   const hasPackUpdates = packUpdateCount > 0;
+  const subscribedPackCount = React.useMemo(
+    () =>
+      calendarPacks.filter((pack) => {
+        const availability = availabilityByPack.get(pack.id);
+        return (
+          Boolean(availability?.hasAnyCategory) ||
+          Boolean(availability?.hasImportedEvents)
+        );
+      }).length,
+    [availabilityByPack]
+  );
+  const isCalendarSubscriptionLimitReached =
+    !isPro &&
+    isLimitReached(subscribedPackCount, limits.maxCalendarSubscriptions);
   const updateAriaCopy =
     packUpdateCount === 1
       ? "1 atualização disponível"
       : `${packUpdateCount} atualizações disponíveis`;
   const launcherAriaCopy = hasPackUpdates
     ? `Adicionar ou gerenciar calendários. ${updateAriaCopy}`
-    : "Adicionar ou gerenciar calendários. Novas assinaturas disponíveis.";
+    : "Adicionar ou gerenciar calendários. Novos calendários disponíveis.";
   const activeProfileId = React.useMemo(
     () =>
       selectedProfileIds.find((profileId) =>
@@ -164,6 +185,16 @@ export function CalendarPackLauncher({
 
   const handleImport = React.useCallback(
     (pack: CalendarPack, targetProfileId: string | null) => {
+      const availability = availabilityByPack.get(pack.id);
+      const isPresent =
+        Boolean(availability?.hasAnyCategory) ||
+        Boolean(availability?.hasImportedEvents);
+
+      if (!isPresent && isCalendarSubscriptionLimitReached) {
+        setUpgradeDialogOpen(true);
+        return;
+      }
+
       if (!targetProfileId || !profileNameById.has(targetProfileId)) {
         notify({
           tone: "error",
@@ -211,7 +242,16 @@ export function CalendarPackLauncher({
         });
       }
     },
-    [focusPack, notify, profileNameById, replaceAllData, setPackFlow, snapshot]
+    [
+      availabilityByPack,
+      focusPack,
+      isCalendarSubscriptionLimitReached,
+      notify,
+      profileNameById,
+      replaceAllData,
+      setPackFlow,
+      snapshot,
+    ]
   );
 
   const handleRemove = React.useCallback(
@@ -256,7 +296,11 @@ export function CalendarPackLauncher({
         )}
         onClick={() => setOpen(true)}
         aria-label={launcherAriaCopy}
-        title={hasPackUpdates ? "Atualizações disponíveis" : "Calendários disponíveis"}
+        title={
+          hasPackUpdates
+            ? "Atualizações disponíveis"
+            : "Calendários disponíveis"
+        }
       >
         <Plus className="size-3.5 text-muted-foreground" />
         <span>Calendários</span>
@@ -269,9 +313,9 @@ export function CalendarPackLauncher({
       <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent className="max-h-[calc(100dvh-1.5rem)] overflow-y-auto sm:max-w-[600px]">
           <DialogHeader className="pr-8 text-left">
-            <DialogTitle>Assinaturas de calendário</DialogTitle>
+            <DialogTitle>Calendários</DialogTitle>
             <DialogDescription>
-              Escolha uma assinatura e confirme o perfil onde ela deve entrar.
+              Adicione calendários prontos ao seu ano.
             </DialogDescription>
           </DialogHeader>
 
@@ -426,8 +470,8 @@ export function CalendarPackLauncher({
                                       onClick={() => handleImport(pack, targetProfileId)}
                                       aria-label={
                                         targetProfileName
-                                          ? `Adicionar ${pack.name} ao perfil ${targetProfileName}`
-                                          : `Adicionar ${pack.name}`
+                                          ? `Adicionar calendário ${pack.name} ao perfil ${targetProfileName}`
+                                          : `Adicionar calendário ${pack.name}`
                                       }
                                       title={
                                         targetProfileName
@@ -450,10 +494,16 @@ export function CalendarPackLauncher({
                                     size="xs"
                                     className="rounded-full"
                                     disabled={isBusy}
-                                    onClick={() => setExpandedPackId(pack.id)}
+                                    onClick={() => {
+                                      if (isCalendarSubscriptionLimitReached) {
+                                        setUpgradeDialogOpen(true);
+                                        return;
+                                      }
+                                      setExpandedPackId(pack.id);
+                                    }}
                                   >
                                     <Plus className="size-3.5" />
-                                    Adicionar
+                                    Adicionar calendário
                                   </Button>
                                 )}
                               </>
@@ -466,6 +516,13 @@ export function CalendarPackLauncher({
           </div>
         </DialogContent>
       </Dialog>
+
+      <ProUpgradeDialog
+        open={upgradeDialogOpen}
+        onOpenChange={setUpgradeDialogOpen}
+        reason="calendar-subscriptions"
+        onRequireAuth={onRequireAuth}
+      />
     </>
   );
 }

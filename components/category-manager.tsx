@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { ProUpgradeDialog } from "@/components/billing/pro-upgrade-dialog";
 import { ProfileIcon } from "@/components/profile-icon";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,12 +25,14 @@ import {
   getNearestCategoryColor,
 } from "@/lib/category-palette";
 import { calendarPacks } from "@/lib/calendar-packs";
+import { isLimitReached } from "@/lib/entitlements";
 import {
   findCalendarPackByCategoryId,
   removeCalendarPackCategory,
 } from "@/lib/calendar-packs/import";
 import { useStore } from "@/lib/store";
 import { useTheme } from "@/lib/theme";
+import { useBilling } from "@/lib/use-billing";
 import type { AnchorPoint } from "@/lib/types";
 
 const CHIP_TRIGGER_CLASS =
@@ -44,6 +47,7 @@ type CategoryManagerProps = {
   profileId?: string;
   onCreated?: (id: string) => void;
   anchorPoint?: AnchorPoint;
+  onRequireAuth?: () => void;
 };
 
 export function CategoryManager({
@@ -54,7 +58,9 @@ export function CategoryManager({
   profileId,
   onCreated,
   anchorPoint,
+  onRequireAuth,
 }: CategoryManagerProps) {
+  const { isPro, limits } = useBilling();
   const { mode: themeMode } = useTheme();
   const categories = useStore((s) => s.categories);
   const profiles = useStore((s) => s.profiles);
@@ -111,6 +117,11 @@ export function CategoryManager({
   }, [open, mode, category, effectiveCreateProfileId]);
 
   const isEdit = mode === "edit";
+  const isCreateBlocked =
+    open &&
+    mode === "create" &&
+    !isPro &&
+    isLimitReached(categories.length, limits.maxCategories);
   const normalizedName = name.trim().slice(0, CATEGORY_NAME_MAX_LENGTH).trim();
   const canSave = normalizedName.length > 0 && Boolean(profileDraftId);
   const canDelete = categories.length > 1;
@@ -137,6 +148,10 @@ export function CategoryManager({
       }
       if (!profileDraftId) {
         setSaveError("Selecione um perfil antes de criar a categoria.");
+        return;
+      }
+      if (!isPro && isLimitReached(categories.length, limits.maxCategories)) {
+        setSaveError("Mais categorias fazem parte do Doze52 Pro.");
         return;
       }
       const id = createCategory({
@@ -179,6 +194,17 @@ export function CategoryManager({
       setIsSaving(false);
     }
   };
+
+  if (isCreateBlocked) {
+    return (
+      <ProUpgradeDialog
+        open={open}
+        onOpenChange={onOpenChange}
+        reason="categories"
+        onRequireAuth={onRequireAuth}
+      />
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

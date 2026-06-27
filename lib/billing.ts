@@ -1,5 +1,10 @@
 import type { User } from "@supabase/supabase-js";
 
+import {
+  resolveBillingPlan,
+  type BillingPlan,
+  type BillingStatusPayload,
+} from "@/lib/entitlements";
 import { getSupabaseAdminClient } from "@/lib/supabase-server";
 import {
   getStripe,
@@ -7,20 +12,7 @@ import {
   type Stripe,
 } from "@/lib/stripe";
 
-export const PRO_SUBSCRIPTION_STATUSES = ["active", "trialing"] as const;
-
-export const isProSubscriptionStatus = (status: string | null | undefined) =>
-  PRO_SUBSCRIPTION_STATUSES.some((proStatus) => proStatus === status);
-
-export type BillingPlan = "free" | "pro";
-
-export type BillingStatusPayload = {
-  plan: BillingPlan;
-  status: string | null;
-  currentPeriodEnd: string | null;
-  cancelAtPeriodEnd: boolean;
-  canManageBilling: boolean;
-};
+export type { BillingPlan, BillingStatusPayload };
 
 export class BillingNotFoundError extends Error {
   constructor(message: string) {
@@ -106,11 +98,12 @@ export const getBillingStatusForUser = async (
     | null
     | undefined;
   const status = subscription?.status ?? null;
+  const currentPeriodEnd = subscription?.current_period_end ?? null;
 
   return {
-    plan: isProSubscriptionStatus(status) ? "pro" : "free",
+    plan: resolveBillingPlan({ status, currentPeriodEnd }),
     status,
-    currentPeriodEnd: subscription?.current_period_end ?? null,
+    currentPeriodEnd,
     cancelAtPeriodEnd: Boolean(subscription?.cancel_at_period_end),
     canManageBilling: Boolean(customerResult.data?.stripe_customer_id),
   };

@@ -2,17 +2,11 @@
 
 import * as React from "react";
 
-export type BillingPlan = "free" | "pro";
+import type { BillingPlan, BillingStatusPayload } from "@/lib/entitlements";
 
-export type BillingStatusPayload = {
-  plan: BillingPlan;
-  status: string | null;
-  currentPeriodEnd: string | null;
-  cancelAtPeriodEnd: boolean;
-  canManageBilling: boolean;
-};
+export type { BillingPlan, BillingStatusPayload };
 
-const FREE_BILLING_STATUS: BillingStatusPayload = {
+export const FREE_BILLING_STATUS: BillingStatusPayload = {
   plan: "free",
   status: null,
   currentPeriodEnd: null,

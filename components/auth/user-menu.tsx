@@ -17,7 +17,7 @@ import { resetAllProductOnboarding } from "@/lib/onboarding";
 import { exportUserData, saveSnapshot } from "@/lib/sync";
 import { logDevError, logProdError } from "@/lib/safe-log";
 import { useStore } from "@/lib/store";
-import { useBillingStatus } from "@/lib/use-billing-status";
+import { useBilling } from "@/lib/use-billing";
 import { cn } from "@/lib/utils";
 
 function MenuSection({
@@ -79,15 +79,20 @@ export function UserMenu() {
   const profiles = useStore((state) => state.profiles);
   const categories = useStore((state) => state.categories);
   const events = useStore((state) => state.events);
-  const { billingStatus, isLoading: isBillingLoading } = useBillingStatus(
-    Boolean(session)
-  );
+  const {
+    billingStatus,
+    isPro,
+    isLoading: isBillingLoading,
+    isOpeningCheckout,
+    isOpeningPortal,
+    isPlanActionLoading,
+    openCheckout,
+    openPortal,
+  } = useBilling();
   const [open, setOpen] = useState(false);
   const [brokenAvatar, setBrokenAvatar] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
-  const [isOpeningCheckout, setIsOpeningCheckout] = useState(false);
-  const [isOpeningPortal, setIsOpeningPortal] = useState(false);
 
   const metadata = session?.user.metadata ?? {};
   const fullName =
@@ -110,72 +115,41 @@ export function UserMenu() {
   const avatarUrl = metadataAvatar;
   const fallbackInitial =
     (displayName || session?.user.email || "").trim().charAt(0).toUpperCase() || "?";
-  const isPlanActionLoading =
-    isBillingLoading || isOpeningCheckout || isOpeningPortal;
+  const periodEndDate = billingStatus.currentPeriodEnd
+    ? new Date(billingStatus.currentPeriodEnd)
+    : null;
+  const formattedPeriodEnd =
+    periodEndDate && !Number.isNaN(periodEndDate.getTime())
+      ? new Intl.DateTimeFormat("pt-BR", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      }).format(periodEndDate)
+      : null;
+  const planLabel = isBillingLoading
+    ? "Carregando..."
+    : isPro
+      ? "Doze52 Pro"
+      : "Plano Free";
+  const planDescription = isPro
+    ? billingStatus.cancelAtPeriodEnd && formattedPeriodEnd
+      ? `Pro ativo até ${formattedPeriodEnd}.`
+      : "Perfis e categorias sem limite prático. Calendários ilimitados."
+    : "1 perfil, 3 categorias e 1 calendário.";
   const planActionLabel = isBillingLoading
     ? "Carregando..."
     : isOpeningCheckout || isOpeningPortal
       ? "Abrindo..."
-      : "Gerenciar assinatura";
+      : isPro
+        ? "Gerenciar assinatura"
+        : "Assinar Pro";
 
   if (!session) return null;
 
-  const openBillingRedirect = async (params: {
-    endpoint: "/api/billing/checkout" | "/api/billing/portal";
-    setLoading: (loading: boolean) => void;
-    logKey: string;
-    errorTitle: string;
-    errorDescription: string;
-  }) => {
-    try {
-      params.setLoading(true);
-      const response = await fetch(params.endpoint, { method: "POST" });
-      const payload = (await response.json().catch(() => null)) as {
-        url?: unknown;
-      } | null;
-
-      if (!response.ok || typeof payload?.url !== "string") {
-        throw new Error("Billing redirect URL missing.");
-      }
-
-      setOpen(false);
-      window.location.href = payload.url;
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Falha no redirecionamento.";
-      logDevError(params.logKey, { message });
-      logProdError("Falha ao abrir billing Stripe.");
-      notify({
-        tone: "error",
-        title: params.errorTitle,
-        description: params.errorDescription,
-      });
-    } finally {
-      params.setLoading(false);
-    }
+  const handlePlanAction = async () => {
+    const opened = isPro ? await openPortal() : await openCheckout();
+    if (opened) setOpen(false);
   };
-
-  const handleUpgrade = () =>
-    openBillingRedirect({
-      endpoint: "/api/billing/checkout",
-      setLoading: setIsOpeningCheckout,
-      logKey: "user-menu.billing.checkout",
-      errorTitle: "Nao foi possivel abrir o upgrade",
-      errorDescription: "Tente novamente em instantes.",
-    });
-
-  const handleManageBilling = () =>
-    openBillingRedirect({
-      endpoint: "/api/billing/portal",
-      setLoading: setIsOpeningPortal,
-      logKey: "user-menu.billing.portal",
-      errorTitle: "Nao foi possivel abrir a assinatura",
-      errorDescription: "Tente novamente em instantes.",
-    });
-
-  const handlePlanAction = billingStatus.canManageBilling
-    ? handleManageBilling
-    : handleUpgrade;
 
   const handleSignOut = async () => {
     try {
@@ -252,14 +226,16 @@ export function UserMenu() {
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-semibold leading-5 text-foreground">
-                      Doze52
+                      {planLabel}
                     </p>
-                    <span className="rounded-full border border-emerald-500/20 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold leading-4 text-emerald-800 dark:border-emerald-300/20 dark:bg-emerald-300/10 dark:text-emerald-100">
-                      Pro
-                    </span>
+                    {isPro ? (
+                      <span className="rounded-full border border-emerald-500/20 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold leading-4 text-emerald-800 dark:border-emerald-300/20 dark:bg-emerald-300/10 dark:text-emerald-100">
+                        Pro
+                      </span>
+                    ) : null}
                   </div>
                   <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                    Múltiplos perfis, eventos ilimitados, importar/exportar.
+                    {planDescription}
                   </p>
                 </div>
                 <Sparkles className="mt-0.5 size-4 shrink-0 text-muted-foreground" />

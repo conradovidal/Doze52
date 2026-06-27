@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth";
+import { BillingProvider } from "@/lib/use-billing";
 import {
   FAVICON_URL,
   THEME_CHROME_COLOR_DARK,
@@ -63,12 +64,14 @@ export default function RootLayout({
         <ThemeProvider>
           <FeedbackProvider>
             <AuthProvider>
-              <div className="flex h-dvh flex-col overflow-hidden">
-                <div className="min-h-0 flex-1 overflow-auto">
-                  {children}
+              <BillingProvider>
+                <div className="flex h-dvh flex-col overflow-hidden">
+                  <div className="min-h-0 flex-1 overflow-auto">
+                    {children}
+                  </div>
+                  <SiteFooter />
                 </div>
-                <SiteFooter />
-              </div>
+              </BillingProvider>
             </AuthProvider>
           </FeedbackProvider>
         </ThemeProvider>

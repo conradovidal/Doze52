@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Trash2 } from "lucide-react";
+import { ProUpgradeDialog } from "@/components/billing/pro-upgrade-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -24,7 +25,9 @@ import {
   PROFILE_ICON_OPTIONS,
   type ProfileIconId,
 } from "@/lib/profile-icons";
+import { isLimitReached } from "@/lib/entitlements";
 import { useStore } from "@/lib/store";
+import { useBilling } from "@/lib/use-billing";
 import { ProfileIcon } from "@/components/profile-icon";
 
 const PROFILE_NAME_MAX_LENGTH = 28;
@@ -37,13 +40,16 @@ type ProfileManagerProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   intent?: ProfileManagerIntent;
+  onRequireAuth?: () => void;
 };
 
 export function ProfileManager({
   open,
   onOpenChange,
   intent,
+  onRequireAuth,
 }: ProfileManagerProps) {
+  const { isPro, limits } = useBilling();
   const profiles = useStore((s) => s.profiles);
   const createProfile = useStore((s) => s.createProfile);
   const updateProfile = useStore((s) => s.updateProfile);
@@ -152,6 +158,12 @@ export function ProfileManager({
   }, [open, editorMode, profiles, editingProfileId, startCreate, startEdit]);
 
   const isEditMode = editorMode === "edit";
+  const isCreateIntent = editorMode === "create" || intent?.mode === "create";
+  const isCreateBlocked =
+    open &&
+    isCreateIntent &&
+    !isPro &&
+    isLimitReached(profiles.length, limits.maxProfiles);
   const normalizedName = name.trim().slice(0, PROFILE_NAME_MAX_LENGTH).trim();
   const canSave =
     normalizedName.length > 0 && (editorMode === "create" || Boolean(editingProfile));
@@ -169,6 +181,11 @@ export function ProfileManager({
           icon,
         });
         onOpenChange(false);
+        return;
+      }
+
+      if (!isPro && isLimitReached(profiles.length, limits.maxProfiles)) {
+        setSaveError("Perfis múltiplos fazem parte do Doze52 Pro.");
         return;
       }
 
@@ -225,6 +242,17 @@ export function ProfileManager({
     );
     setConfirmDeleteOpen(true);
   };
+
+  if (isCreateBlocked) {
+    return (
+      <ProUpgradeDialog
+        open={open}
+        onOpenChange={onOpenChange}
+        reason="profiles"
+        onRequireAuth={onRequireAuth}
+      />
+    );
+  }
 
   return (
     <>

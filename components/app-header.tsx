@@ -238,6 +238,7 @@ export function AppHeader({
               <CalendarPackLauncher
                 onFocusYear={onCalendarPackFocusYear}
                 className="shrink-0"
+                onRequireAuth={() => onOpenAuthDialog()}
               />
 
               <Select value={String(year)} onValueChange={(v) => onYearChange(Number(v))}>
@@ -448,6 +449,7 @@ export function AppHeader({
         open={profileManagerOpen}
         onOpenChange={setProfileManagerOpen}
         intent={profileManagerIntent ?? undefined}
+        onRequireAuth={() => onOpenAuthDialog()}
       />
 
       <CategoryManager
@@ -455,6 +457,7 @@ export function AppHeader({
         open={categoryCreateOpen}
         onOpenChange={setCategoryCreateOpen}
         profileId={editingProfileId ?? undefined}
+        onRequireAuth={() => onOpenAuthDialog()}
       />
 
       <CategoryManager

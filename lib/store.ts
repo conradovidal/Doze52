@@ -172,22 +172,24 @@ const getFeatureDefaultProfiles = (): CalendarProfile[] => [
 ];
 
 export const getOnboardingDefaultProfiles = (): CalendarProfile[] => {
-  return getFeatureDefaultProfiles().map((profile) => ({ ...profile }));
+  return getLegacyDefaultProfiles().map((profile) => ({ ...profile }));
 };
 
 export const isOnboardingProfilesSnapshot = (profiles: CalendarProfile[]) => {
-  const expected = getOnboardingDefaultProfiles();
-  if (profiles.length !== expected.length) return false;
-  return expected.every((defaultProfile, index) => {
-    const received = profiles[index];
-    if (!received) return false;
-    return (
-      received.id === defaultProfile.id &&
-      received.name === defaultProfile.name &&
-      received.color.toLowerCase() === defaultProfile.color.toLowerCase() &&
-      received.icon === defaultProfile.icon &&
-      received.position === defaultProfile.position
-    );
+  const candidates = [getOnboardingDefaultProfiles(), getFeatureDefaultProfiles()];
+  return candidates.some((expected) => {
+    if (profiles.length !== expected.length) return false;
+    return expected.every((defaultProfile, index) => {
+      const received = profiles[index];
+      if (!received) return false;
+      return (
+        received.id === defaultProfile.id &&
+        received.name === defaultProfile.name &&
+        received.color.toLowerCase() === defaultProfile.color.toLowerCase() &&
+        received.icon === defaultProfile.icon &&
+        received.position === defaultProfile.position
+      );
+    });
   });
 };
 
@@ -283,7 +285,7 @@ const getFeatureDefaultCategories = (): CategoryItem[] => [
 
 const getTemplateCategories = (options?: { legacyOnly?: boolean }) => {
   if (options?.legacyOnly) return getLegacyDefaultCategories();
-  return getFeatureDefaultCategories();
+  return getLegacyDefaultCategories();
 };
 
 export const ONBOARDING_DEFAULT_CATEGORIES: CategoryItem[] = getTemplateCategories();
@@ -292,18 +294,23 @@ export const getOnboardingDefaultCategories = (): CategoryItem[] =>
   getTemplateCategories().map((category) => ({ ...category }));
 
 export const isOnboardingCategoriesSnapshot = (categories: CategoryItem[]) => {
-  const expected = getOnboardingDefaultCategories();
-  if (categories.length !== expected.length) return false;
-  return expected.every((defaultCategory, index) => {
-    const received = categories[index];
-    if (!received) return false;
-    return (
-      received.id === defaultCategory.id &&
-      received.profileId === defaultCategory.profileId &&
-      received.name === defaultCategory.name &&
-      received.color.toLowerCase() === defaultCategory.color.toLowerCase() &&
-      received.visible === defaultCategory.visible
-    );
+  const candidates = [
+    getOnboardingDefaultCategories(),
+    getFeatureDefaultCategories(),
+  ];
+  return candidates.some((expected) => {
+    if (categories.length !== expected.length) return false;
+    return expected.every((defaultCategory, index) => {
+      const received = categories[index];
+      if (!received) return false;
+      return (
+        received.id === defaultCategory.id &&
+        received.profileId === defaultCategory.profileId &&
+        received.name === defaultCategory.name &&
+        received.color.toLowerCase() === defaultCategory.color.toLowerCase() &&
+        received.visible === defaultCategory.visible
+      );
+    });
   });
 };
 
