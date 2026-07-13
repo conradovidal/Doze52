@@ -6,10 +6,14 @@ the product needs pack-specific lifecycle metadata later.
 
 ## Current packs
 
-- `world-cup-2026-pack.json`: 104 mapped tournament events. The UI exposes this as
-  two subscription options: Jogos do Brasil and Copa de 2026.
+- `world-cup-2026-pack.json`: 104 mapped tournament events, with 100 results through
+  the quarter-finals and both semi-finals defined as of 2026-07-13. The UI exposes
+  this as two subscription options: Jogos do Brasil and Copa de 2026.
 - `formula-1-2026-pack.json`: Formula 1 2026 events listed by the official F1 calendar
   on 2026-06-03, exposed as Corridas F1.
+- `holidays-2026.ts`: official 2026 holidays exposed as three subscriptions:
+  national holidays, the São Paulo state holiday, and the Rio Grande do Sul state
+  holiday. Optional government closure dates are intentionally excluded.
 
 Keep pack `profile.id`, category `id`s, and event `id`s stable. Importing the same pack
 must remain idempotent for users who already added it. Packs are tracked by category and

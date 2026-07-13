@@ -262,12 +262,26 @@ const getWorldCupEventNotes = (event: CalendarPackEvent) => {
     .join("\n");
 };
 
+const getHolidayEventNotes = (event: CalendarPackEvent) =>
+  [
+    event.phase,
+    `Abrangência: ${event.city}`,
+    ...(event.notes ?? []),
+    `Fonte: ${event.source}`,
+    `Verificado em: ${event.lastVerified}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
 export const getCalendarPackEventNotes = (
   event: CalendarPackEvent,
   pack: CalendarPack
 ) => {
   if (pack.id.startsWith("world-cup-2026")) {
     return getWorldCupEventNotes(event);
+  }
+  if (pack.id.startsWith("holidays-")) {
+    return getHolidayEventNotes(event);
   }
 
   const phase = event.group ? `${event.phase} - Grupo ${event.group}` : event.phase;
