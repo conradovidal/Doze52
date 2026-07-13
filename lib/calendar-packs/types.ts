@@ -1,6 +1,14 @@
 import type { ProfileIconId } from "@/lib/profile-icons";
+import type { RecurrenceType } from "@/lib/types";
 
 export type CalendarPackSelection = "brazil" | "all";
+
+export type CalendarPackIconId =
+  | "calendar"
+  | "racing-helmet"
+  | "soccer-ball"
+  | "tree"
+  | "trophy";
 
 export type CalendarPackCategory = {
   id: string;
@@ -30,6 +38,8 @@ export type CalendarPackEvent = {
   result?: string;
   notes?: string[];
   isBrazilMatch: boolean;
+  recurrenceType?: RecurrenceType;
+  recurrenceUntil?: string;
 };
 
 export type CalendarPack = {
@@ -37,6 +47,12 @@ export type CalendarPack = {
   name: string;
   description: string;
   eyebrow?: string;
+  icon: CalendarPackIconId;
+  variantGroup?: {
+    id: string;
+    label: string;
+    optionLabel: string;
+  };
   year: number;
   datasetStatus: "seed" | "complete";
   updateNote: string;

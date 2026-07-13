@@ -1,7 +1,15 @@
 "use client";
 
 import * as React from "react";
-import { Check, Loader2, Plus, Trash2 } from "lucide-react";
+import {
+  CalendarDays,
+  Check,
+  Loader2,
+  Plus,
+  Trash2,
+  TreePine,
+  Trophy,
+} from "lucide-react";
 import { ProUpgradeDialog } from "@/components/billing/pro-upgrade-dialog";
 import { ProfileIcon } from "@/components/profile-icon";
 import { Button } from "@/components/ui/button";
@@ -26,7 +34,10 @@ import {
   importCalendarPack,
   removeCalendarPack,
 } from "@/lib/calendar-packs/import";
-import type { CalendarPack } from "@/lib/calendar-packs/types";
+import type {
+  CalendarPack,
+  CalendarPackIconId,
+} from "@/lib/calendar-packs/types";
 import { isLimitReached } from "@/lib/entitlements";
 import { useStore } from "@/lib/store";
 import { useBilling } from "@/lib/use-billing";
@@ -53,6 +64,83 @@ const statusCopy: Record<PackFlowState, string> = {
   error: "Erro",
 };
 
+function RacingHelmetIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <path d="M4 13a8 8 0 0 1 16 0v4H9a5 5 0 0 1-5-4Z" />
+      <path d="M12 5v8h8" />
+      <path d="M7 13h5" />
+      <path d="M9 17v2h8" />
+    </svg>
+  );
+}
+
+function SoccerBallIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <circle cx="12" cy="12" r="9" />
+      <path d="m9.2 9.2 2.8-2 2.8 2-1.1 3.3h-3.4L9.2 9.2Z" />
+      <path d="m12 7.2-.9-4M9.2 9.2 5.3 8M10.3 12.5 7.8 16M13.7 12.5l2.5 3.5M14.8 9.2 18.7 8M7.8 16l-.2 3.4M16.2 16l.2 3.4" />
+    </svg>
+  );
+}
+
+function CalendarPackIcon({
+  icon,
+  className,
+}: {
+  icon: CalendarPackIconId;
+  className?: string;
+}) {
+  if (icon === "racing-helmet") return <RacingHelmetIcon className={className} />;
+  if (icon === "soccer-ball") return <SoccerBallIcon className={className} />;
+  if (icon === "trophy") return <Trophy aria-hidden="true" className={className} />;
+  if (icon === "tree") return <TreePine aria-hidden="true" className={className} />;
+  return <CalendarDays aria-hidden="true" className={className} />;
+}
+
+const calendarPackCards = (() => {
+  const cards: Array<{ key: string; variants: CalendarPack[] }> = [];
+  const groupedPackIds = new Set<string>();
+
+  calendarPacks.forEach((pack) => {
+    const variantGroupId = pack.variantGroup?.id;
+    if (!variantGroupId) {
+      cards.push({ key: pack.id, variants: [pack] });
+      return;
+    }
+    if (groupedPackIds.has(variantGroupId)) return;
+
+    groupedPackIds.add(variantGroupId);
+    cards.push({
+      key: variantGroupId,
+      variants: calendarPacks.filter(
+        (candidate) => candidate.variantGroup?.id === variantGroupId
+      ),
+    });
+  });
+
+  return cards;
+})();
+
 export function CalendarPackLauncher({
   onFocusYear,
   className,
@@ -76,6 +164,9 @@ export function CalendarPackLauncher({
   const [open, setOpen] = React.useState(false);
   const [flowByPack, setFlowByPack] = React.useState<Record<string, PackFlowState>>({});
   const [targetProfileByPack, setTargetProfileByPack] = React.useState<
+    Record<string, string>
+  >({});
+  const [selectedVariantByGroup, setSelectedVariantByGroup] = React.useState<
     Record<string, string>
   >({});
   const [expandedPackId, setExpandedPackId] = React.useState<string | null>(null);
@@ -326,192 +417,253 @@ export function CalendarPackLauncher({
           ) : null}
 
           <div className="grid gap-2 rounded-[8px] border border-border/75 bg-background p-2.5 shadow-sm sm:p-3">
-            {calendarPacks.map((pack) => {
-                    const availability = availabilityByPack.get(pack.id);
-                    const importedEventCount = availability?.importedEventCount ?? 0;
-                    const totalEventCount = availability?.totalEventCount ?? pack.events.length;
-                    const isComplete =
-                      importedEventCount >= totalEventCount &&
-                      !availability?.hasMismatchedEvents;
-                    const isPresent =
-                      Boolean(availability?.hasAnyCategory) ||
-                      Boolean(availability?.hasImportedEvents);
-                    const currentFlow = flowByPack[pack.id] ?? "idle";
-                    const displayedState =
-                      currentFlow !== "idle"
-                        ? currentFlow
-                        : isPresent
-                          ? isComplete
-                            ? "exists"
-                            : "partial"
-                          : "idle";
-                    const isBusy =
-                      displayedState === "adding" || displayedState === "removing";
-                    const targetProfileId = getTargetProfileId(
-                      pack.id,
-                      availability?.profileId
-                    );
-                    const targetProfileName = targetProfileId
-                      ? profileNameById.get(targetProfileId)
-                      : null;
-                    const showAddDetails = !isPresent && expandedPackId === pack.id;
+            {calendarPackCards.map(({ key, variants }) => {
+              const selectedPackId = selectedVariantByGroup[key];
+              const installedVariant = variants.find((candidate) => {
+                const candidateAvailability = availabilityByPack.get(candidate.id);
+                return (
+                  Boolean(candidateAvailability?.hasAnyCategory) ||
+                  Boolean(candidateAvailability?.hasImportedEvents)
+                );
+              });
+              const pack =
+                variants.find((candidate) => candidate.id === selectedPackId) ??
+                installedVariant ??
+                variants[0];
+              const availability = availabilityByPack.get(pack.id);
+              const importedEventCount = availability?.importedEventCount ?? 0;
+              const totalEventCount =
+                availability?.totalEventCount ?? pack.events.length;
+              const isComplete =
+                importedEventCount >= totalEventCount &&
+                !availability?.hasMismatchedEvents;
+              const isPresent =
+                Boolean(availability?.hasAnyCategory) ||
+                Boolean(availability?.hasImportedEvents);
+              const currentFlow = flowByPack[pack.id] ?? "idle";
+              const displayedState =
+                currentFlow !== "idle"
+                  ? currentFlow
+                  : isPresent
+                    ? isComplete
+                      ? "exists"
+                      : "partial"
+                    : "idle";
+              const isBusy =
+                displayedState === "adding" || displayedState === "removing";
+              const targetProfileId = getTargetProfileId(
+                pack.id,
+                availability?.profileId
+              );
+              const targetProfileName = targetProfileId
+                ? profileNameById.get(targetProfileId)
+                : null;
+              const showAddDetails = !isPresent && expandedPackId === pack.id;
+              const variantGroup = pack.variantGroup;
 
-                    return (
-                      <article
-                        key={pack.id}
-                        className={cn(
-                          "rounded-[8px] border border-border/60 bg-muted/15 px-3 py-2.5 transition-[background-color,border-color,box-shadow]",
-                          showAddDetails &&
-                            "border-foreground/16 bg-background shadow-[0_12px_24px_-24px_rgba(15,23,42,0.28)]"
-                        )}
-                      >
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                          <div className="min-w-0">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <h4 className="text-sm font-medium text-foreground">
-                                {pack.name}
-                              </h4>
-                              <span
-                                className={cn(
-                                  "rounded-full px-2 py-0.5 text-[11px]",
-                                  displayedState === "error"
-                                    ? "bg-destructive/10 text-destructive"
-                                    : displayedState === "partial"
-                                      ? "bg-rose-500/10 text-rose-700 dark:bg-rose-400/10 dark:text-rose-200"
-                                    : "bg-muted text-muted-foreground"
-                                )}
-                              >
-                                {isBusy ? (
-                                  <span className="inline-flex items-center gap-1.5">
-                                    <Loader2 className="size-3 animate-spin" />
-                                    {statusCopy[displayedState]}
-                                  </span>
-                                ) : (
-                                  statusCopy[displayedState]
-                                )}
-                              </span>
-                            </div>
-                            <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                              {pack.description}
-                            </p>
-                          </div>
-
-                          <div className="flex shrink-0 flex-wrap gap-1.5 sm:justify-end sm:gap-2">
-                            {isPresent ? (
-                              <>
-                                {!isComplete ? (
-                                  <Button
-                                    type="button"
-                                    variant="premium"
-                                    size="xs"
-                                    className="rounded-full"
-                                    disabled={isBusy}
-                                    onClick={() =>
-                                      handleImport(
-                                        pack,
-                                        availability?.profileId ?? targetProfileId
-                                      )
-                                    }
-                                  >
-                                    Atualizar
-                                  </Button>
-                                ) : null}
-                                <Button
-                                  type="button"
-                                  variant="dangerSoft"
-                                  size="xs"
-                                  className="rounded-full"
-                                  disabled={isBusy}
-                                  onClick={() => handleRemove(pack)}
-                                >
-                                  <Trash2 className="size-3.5" />
-                                  Remover
-                                </Button>
-                              </>
-                            ) : (
-                              <>
-                                {showAddDetails ? (
-                                  <div className="flex min-w-0 items-center justify-end gap-1.5">
-                                    <Select
-                                      value={targetProfileId ?? ""}
-                                      onValueChange={(profileId) =>
-                                        setTargetProfileByPack((current) => ({
-                                          ...current,
-                                          [pack.id]: profileId,
-                                        }))
-                                      }
-                                    >
-                                      <SelectTrigger
-                                        size="sm"
-                                        className="h-7 w-[8.25rem] rounded-[9px] border-border bg-card px-2.5 text-xs font-semibold shadow-none hover:border-foreground/18 hover:bg-muted sm:w-[9rem]"
-                                        aria-label={`Perfil para ${pack.name}`}
-                                      >
-                                        <SelectValue placeholder="Perfil" />
-                                      </SelectTrigger>
-                                      <SelectContent align="end">
-                                        {profiles.map((profile) => (
-                                          <SelectItem key={profile.id} value={profile.id}>
-                                            <ProfileIcon
-                                              icon={profile.icon}
-                                              size={13}
-                                              className="shrink-0"
-                                            />
-                                            <span>{profile.name}</span>
-                                          </SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                    <Button
-                                      type="button"
-                                      variant="premium"
-                                      size="icon-xs"
-                                      className="rounded-[9px]"
-                                      disabled={isBusy || !targetProfileId}
-                                      onClick={() => handleImport(pack, targetProfileId)}
-                                      aria-label={
-                                        targetProfileName
-                                          ? `Adicionar calendário ${pack.name} ao perfil ${targetProfileName}`
-                                          : `Adicionar calendário ${pack.name}`
-                                      }
-                                      title={
-                                        targetProfileName
-                                          ? `Adicionar em ${targetProfileName}`
-                                          : "Escolha um perfil"
-                                      }
-                                    >
-                                      {displayedState === "adding" ? (
-                                        <Loader2 className="size-3.5 animate-spin" />
-                                      ) : (
-                                        <Check className="size-3.5" />
-                                      )}
-                                      <span className="sr-only">Confirmar</span>
-                                    </Button>
-                                  </div>
-                                ) : (
-                                  <Button
-                                    type="button"
-                                    variant="premium"
-                                    size="xs"
-                                    className="rounded-full"
-                                    disabled={isBusy}
-                                    onClick={() => {
-                                      if (isCalendarSubscriptionLimitReached) {
-                                        setUpgradeDialogOpen(true);
-                                        return;
-                                      }
-                                      setExpandedPackId(pack.id);
-                                    }}
-                                  >
-                                    <Plus className="size-3.5" />
-                                    Adicionar calendário
-                                  </Button>
-                                )}
-                              </>
+              return (
+                <article
+                  key={key}
+                  className={cn(
+                    "rounded-[8px] border border-border/60 bg-muted/15 px-3 py-2.5 transition-[background-color,border-color,box-shadow]",
+                    showAddDetails &&
+                      "border-foreground/16 bg-background shadow-[0_12px_24px_-24px_rgba(15,23,42,0.28)]"
+                  )}
+                >
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex min-w-0 flex-1 gap-2.5">
+                      <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-[8px] border border-border/65 bg-background text-muted-foreground">
+                        <CalendarPackIcon icon={pack.icon} className="size-4" />
+                      </span>
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h4 className="text-sm font-medium text-foreground">
+                            {pack.name}
+                          </h4>
+                          <span
+                            className={cn(
+                              "rounded-full px-2 py-0.5 text-[11px]",
+                              displayedState === "error"
+                                ? "bg-destructive/10 text-destructive"
+                                : displayedState === "partial"
+                                  ? "bg-rose-500/10 text-rose-700 dark:bg-rose-400/10 dark:text-rose-200"
+                                  : "bg-muted text-muted-foreground"
                             )}
-                          </div>
+                          >
+                            {isBusy ? (
+                              <span className="inline-flex items-center gap-1.5">
+                                <Loader2 className="size-3 animate-spin" />
+                                {statusCopy[displayedState]}
+                              </span>
+                            ) : (
+                              statusCopy[displayedState]
+                            )}
+                          </span>
                         </div>
-                      </article>
-                    );
+                        <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                          {pack.description}
+                        </p>
+                        {variantGroup && variants.length > 1 ? (
+                          <div className="mt-2 flex items-center gap-2">
+                            <span className="text-[11px] font-medium text-muted-foreground">
+                              {variantGroup.label}
+                            </span>
+                            <Select
+                              value={pack.id}
+                              onValueChange={(packId) => {
+                                setSelectedVariantByGroup((current) => ({
+                                  ...current,
+                                  [key]: packId,
+                                }));
+                                setExpandedPackId(null);
+                              }}
+                            >
+                              <SelectTrigger
+                                size="sm"
+                                className="h-7 w-[11.5rem] rounded-[8px] border-border bg-card px-2.5 text-xs shadow-none hover:border-foreground/18 hover:bg-muted"
+                                aria-label={`${variantGroup.label} para feriados estaduais`}
+                              >
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent align="start">
+                                {variants.map((variant) => {
+                                  const variantAvailability = availabilityByPack.get(
+                                    variant.id
+                                  );
+                                  const variantIsPresent =
+                                    Boolean(variantAvailability?.hasAnyCategory) ||
+                                    Boolean(variantAvailability?.hasImportedEvents);
+
+                                  return (
+                                    <SelectItem key={variant.id} value={variant.id}>
+                                      <span>{variant.variantGroup?.optionLabel}</span>
+                                      {variantIsPresent ? (
+                                        <span className="text-[10px] text-muted-foreground">
+                                          Adicionado
+                                        </span>
+                                      ) : null}
+                                    </SelectItem>
+                                  );
+                                })}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    <div className="flex shrink-0 flex-wrap gap-1.5 sm:justify-end sm:gap-2">
+                      {isPresent ? (
+                        <>
+                          {!isComplete ? (
+                            <Button
+                              type="button"
+                              variant="premium"
+                              size="xs"
+                              className="rounded-full"
+                              disabled={isBusy}
+                              onClick={() =>
+                                handleImport(
+                                  pack,
+                                  availability?.profileId ?? targetProfileId
+                                )
+                              }
+                            >
+                              Atualizar
+                            </Button>
+                          ) : null}
+                          <Button
+                            type="button"
+                            variant="dangerSoft"
+                            size="xs"
+                            className="rounded-full"
+                            disabled={isBusy}
+                            onClick={() => handleRemove(pack)}
+                          >
+                            <Trash2 className="size-3.5" />
+                            Remover
+                          </Button>
+                        </>
+                      ) : showAddDetails ? (
+                        <div className="flex min-w-0 items-center justify-end gap-1.5">
+                          <Select
+                            value={targetProfileId ?? ""}
+                            onValueChange={(profileId) =>
+                              setTargetProfileByPack((current) => ({
+                                ...current,
+                                [pack.id]: profileId,
+                              }))
+                            }
+                          >
+                            <SelectTrigger
+                              size="sm"
+                              className="h-7 w-[8.25rem] rounded-[9px] border-border bg-card px-2.5 text-xs font-semibold shadow-none hover:border-foreground/18 hover:bg-muted sm:w-[9rem]"
+                              aria-label={`Perfil para ${pack.name}`}
+                            >
+                              <SelectValue placeholder="Perfil" />
+                            </SelectTrigger>
+                            <SelectContent align="end">
+                              {profiles.map((profile) => (
+                                <SelectItem key={profile.id} value={profile.id}>
+                                  <ProfileIcon
+                                    icon={profile.icon}
+                                    size={13}
+                                    className="shrink-0"
+                                  />
+                                  <span>{profile.name}</span>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            type="button"
+                            variant="premium"
+                            size="icon-xs"
+                            className="rounded-[9px]"
+                            disabled={isBusy || !targetProfileId}
+                            onClick={() => handleImport(pack, targetProfileId)}
+                            aria-label={
+                              targetProfileName
+                                ? `Adicionar calendário ${pack.name} ao perfil ${targetProfileName}`
+                                : `Adicionar calendário ${pack.name}`
+                            }
+                            title={
+                              targetProfileName
+                                ? `Adicionar em ${targetProfileName}`
+                                : "Escolha um perfil"
+                            }
+                          >
+                            {displayedState === "adding" ? (
+                              <Loader2 className="size-3.5 animate-spin" />
+                            ) : (
+                              <Check className="size-3.5" />
+                            )}
+                            <span className="sr-only">Confirmar</span>
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="premium"
+                          size="xs"
+                          className="rounded-full"
+                          disabled={isBusy}
+                          onClick={() => {
+                            if (isCalendarSubscriptionLimitReached) {
+                              setUpgradeDialogOpen(true);
+                              return;
+                            }
+                            setExpandedPackId(pack.id);
+                          }}
+                        >
+                          <Plus className="size-3.5" />
+                          Adicionar calendário
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </article>
+              );
             })}
           </div>
         </DialogContent>

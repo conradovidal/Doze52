@@ -101,7 +101,12 @@ const WORLD_CUP_FLAG_BY_TEAM = new Map<string, string>([
 const getWorldCupEventTitle = (event: CalendarPackEvent) => {
   const homeFlag = WORLD_CUP_FLAG_BY_TEAM.get(event.homeTeam);
   const awayFlag = WORLD_CUP_FLAG_BY_TEAM.get(event.awayTeam);
-  return homeFlag && awayFlag ? `${homeFlag} ${awayFlag}` : event.title;
+  if (!homeFlag || !awayFlag) return event.title;
+
+  const score = event.result?.match(/^(\d+)\s*x\s*(\d+)/i);
+  return score
+    ? `${homeFlag} ${score[1]} x ${score[2]} ${awayFlag}`
+    : `${homeFlag} x ${awayFlag}`;
 };
 
 export const getCalendarPackEventTitle = (
@@ -256,7 +261,6 @@ const getWorldCupEventNotes = (event: CalendarPackEvent) => {
     formatBrazilTime(event),
     phase,
     event.venue && event.city ? `${event.venue}, ${event.city}` : null,
-    event.result ? `Resultado ${event.result}` : null,
   ]
     .filter(Boolean)
     .join("\n");
@@ -345,7 +349,11 @@ export const getCalendarPackAvailability = (
     return Boolean(
       legacyEvent ||
         (event && expectedCategoryId && event.categoryId !== expectedCategoryId) ||
-        (event && (event.title !== expectedTitle || event.notes !== expectedNotes))
+        (event &&
+          (event.title !== expectedTitle ||
+            event.notes !== expectedNotes ||
+            event.recurrenceType !== packEvent.recurrenceType ||
+            event.recurrenceUntil !== packEvent.recurrenceUntil))
     );
   });
   const profileId = packCategories[0]?.profileId ?? profile?.id ?? null;
@@ -510,6 +518,8 @@ export const importCalendarPack = (
         startDate: packEvent.date,
         endDate: packEvent.date,
         notes: expectedNotes,
+        recurrenceType: packEvent.recurrenceType,
+        recurrenceUntil: packEvent.recurrenceUntil,
       };
       const changed =
         currentEvent.title !== nextEvent.title ||
@@ -517,7 +527,9 @@ export const importCalendarPack = (
         currentEvent.color !== nextEvent.color ||
         currentEvent.startDate !== nextEvent.startDate ||
         currentEvent.endDate !== nextEvent.endDate ||
-        currentEvent.notes !== nextEvent.notes;
+        currentEvent.notes !== nextEvent.notes ||
+        currentEvent.recurrenceType !== nextEvent.recurrenceType ||
+        currentEvent.recurrenceUntil !== nextEvent.recurrenceUntil;
       if (changed) {
         nextEvents[existingEventIndex] = nextEvent;
         updatedEventCount += 1;
@@ -539,6 +551,8 @@ export const importCalendarPack = (
       startDate: packEvent.date,
       endDate: packEvent.date,
       notes: expectedNotes,
+      recurrenceType: packEvent.recurrenceType,
+      recurrenceUntil: packEvent.recurrenceUntil,
       createdAt: new Date().toISOString(),
       dayOrder: nextDayOrder(orderByDate, packEvent.date),
     });

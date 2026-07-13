@@ -11,9 +11,10 @@ the product needs pack-specific lifecycle metadata later.
   this as two subscription options: Jogos do Brasil and Copa de 2026.
 - `formula-1-2026-pack.json`: Formula 1 2026 events listed by the official F1 calendar
   on 2026-06-03, exposed as Corridas F1.
-- `holidays-2026.ts`: official 2026 holidays exposed as three subscriptions:
-  national holidays, the São Paulo state holiday, and the Rio Grande do Sul state
-  holiday. Optional government closure dates are intentionally excluded.
+- `holidays-2026.ts`: recurring national holidays plus one state-holiday subscription
+  with São Paulo and Rio Grande do Sul variants. Fixed dates recur yearly from 2025;
+  Paixão de Cristo is calculated through 2100. Optional government closure dates are
+  intentionally excluded.
 
 Keep pack `profile.id`, category `id`s, and event `id`s stable. Importing the same pack
 must remain idempotent for users who already added it. Packs are tracked by category and
