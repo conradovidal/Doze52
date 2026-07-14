@@ -56,6 +56,62 @@ type HolidayEventInput = {
   recurrenceUntil?: string;
 };
 
+const HOLIDAY_EXPLANATIONS: Record<string, string> = {
+  "Confraternização Universal": "O primeiro dia do ano foi dedicado à fraternidade e à paz entre os povos. No Brasil, a data abre oficialmente o calendário de feriados nacionais.",
+  Tiradentes: "A data homenageia Joaquim José da Silva Xavier, o Tiradentes, executado em 1792 por sua participação na Inconfidência Mineira.",
+  "Dia Mundial do Trabalho": "O 1º de maio lembra as mobilizações históricas por jornadas e condições de trabalho mais justas, que deram origem ao Dia do Trabalho em diversos países.",
+  "Independência do Brasil": "Recorda a declaração de independência de Portugal, proclamada por Dom Pedro em 7 de setembro de 1822.",
+  "Nossa Senhora Aparecida": "Celebra a padroeira do Brasil, ligada à imagem encontrada por pescadores no rio Paraíba do Sul em 1717.",
+  Finados: "É um dia de memória e homenagem às pessoas falecidas, tradição cristã celebrada em 2 de novembro desde a Idade Média.",
+  "Proclamação da República": "Marca a mudança do Brasil de monarquia para república, ocorrida em 15 de novembro de 1889.",
+  "Dia Nacional de Zumbi e da Consciência Negra": "A data lembra Zumbi dos Palmares e valoriza a história, a resistência e as contribuições da população negra para o Brasil.",
+  Natal: "Celebra o nascimento de Jesus Cristo e se tornou também uma data de encontro, solidariedade e renovação de vínculos.",
+  "Paixão de Cristo": "A sexta-feira anterior à Páscoa recorda a crucificação e a morte de Jesus Cristo na tradição cristã.",
+  "Dia do Católico": "A data reconhece a presença histórica do catolicismo na formação cultural e religiosa do Acre.",
+  "Dia do Evangélico": "A celebração reconhece a contribuição das comunidades evangélicas para a vida religiosa e social local.",
+  "Dia Internacional da Mulher": "O 8 de março simboliza a luta histórica das mulheres por direitos, igualdade e participação plena na sociedade.",
+  "Aniversário do Estado do Acre": "Recorda a elevação do Acre à condição de estado, formalizada em 15 de junho de 1962.",
+  "Início da Revolução Acreana": "Lembra o movimento iniciado em 1902 que levou à incorporação definitiva do território acreano ao Brasil.",
+  "Dia da Amazônia": "A data chama atenção para a importância ambiental, cultural e social da Amazônia e para a necessidade de preservá-la.",
+  "Tratado de Petrópolis": "Recorda o acordo de 1903 pelo qual o Acre foi incorporado ao Brasil após negociação com a Bolívia.",
+  "São João": "Celebra o nascimento de São João Batista e é uma das datas centrais das festas juninas no Nordeste brasileiro.",
+  "São Pedro": "Homenageia São Pedro, considerado o primeiro papa pela tradição católica e também padroeiro dos pescadores.",
+  "Emancipação Política de Alagoas": "Recorda a separação de Alagoas da capitania de Pernambuco e sua elevação a capitania autônoma em 1817.",
+  "São José — Padroeiro do Amapá": "Homenageia São José, padroeiro do Amapá e figura ligada à história da antiga Fortaleza de São José de Macapá.",
+  "Dia de Cabralzinho": "Lembra Francisco Xavier da Veiga Cabral, o Cabralzinho, associado à defesa do território do Amapá no século XIX.",
+  "Criação do ex-Território Federal do Amapá": "Recorda a criação do Território Federal do Amapá em 1943, etapa decisiva antes de sua transformação em estado.",
+  "Elevação do Amazonas à Categoria de Província": "Marca a autonomia administrativa conquistada em 1850, quando a antiga comarca passou a ser a Província do Amazonas.",
+  "Independência da Bahia": "Celebra a vitória de 2 de julho de 1823, que consolidou a expulsão das tropas portuguesas e a independência brasileira na Bahia.",
+  "Data Magna do Ceará": "Recorda a abolição da escravidão no Ceará em 25 de março de 1884, quatro anos antes da Lei Áurea.",
+  "Corpus Christi": "A celebração católica honra a Eucaristia e ocorre sessenta dias após a Páscoa, tradicionalmente com procissões e tapetes nas ruas.",
+  "Nossa Senhora da Penha": "Homenageia a padroeira do Espírito Santo, cuja devoção está ligada ao Convento da Penha desde o século XVI.",
+  "Fundação da Cidade de Goiás": "Recorda a origem da antiga Vila Boa, fundada no ciclo do ouro e primeira capital do estado de Goiás.",
+  "Adesão do Maranhão à Independência do Brasil": "Marca a adesão oficial do Maranhão à independência em 1823, após resistência das forças ligadas a Portugal.",
+  "Criação do Estado de Mato Grosso do Sul": "Lembra a divisão de Mato Grosso e a criação de Mato Grosso do Sul pela lei de 1977.",
+  "Adesão do Pará à Independência do Brasil": "Recorda a adesão do Pará à independência em 1823, encerrando a ligação política formal da província com Portugal.",
+  "Emancipação Política da Paraíba": "Celebra a criação da Capitania da Paraíba em 1585 e sua autonomia política na administração colonial.",
+  "Data Magna de Pernambuco": "Recorda a Revolução Pernambucana de 1817, movimento republicano que contestou o domínio da Coroa portuguesa.",
+  "Dia do Piauí": "Lembra a adesão do Piauí à independência do Brasil, proclamada em Parnaíba em 19 de outubro de 1822.",
+  "São Jorge": "Homenageia São Jorge, santo de forte devoção popular no Rio de Janeiro e símbolo de coragem e proteção.",
+  "Terça-feira de Carnaval": "É o ponto culminante do Carnaval, tradição que antecede a Quaresma e ganhou no Brasil expressões culturais próprias.",
+  "Mártires de Cunhaú e Uruaçu": "Homenageia os fiéis mortos nos massacres de Cunhaú e Uruaçu, ocorridos no Rio Grande do Norte em 1645.",
+  "Revolução Farroupilha": "A data lembra o início da Revolução Farroupilha em 1835 e celebra a identidade e as tradições do Rio Grande do Sul.",
+  "Aniversário de Rondônia": "Recorda a criação do estado de Rondônia em 1982, após décadas como território federal.",
+  "Aniversário de Roraima": "Celebra a criação do estado de Roraima pela Constituição Federal de 1988.",
+  "Data Magna de Santa Catarina": "Homenageia Santa Catarina de Alexandria, figura que deu nome ao estado e integra sua tradição histórica.",
+  "9 de Julho — Data Magna de São Paulo": "Recorda a Revolução Constitucionalista de 1932, movimento paulista que reivindicava uma nova Constituição para o país.",
+  "Emancipação Política de Sergipe": "Celebra a autonomia de Sergipe em relação à Bahia, determinada em 1820.",
+  "Senhor do Bonfim": "A data celebra uma das devoções religiosas mais tradicionais do Tocantins, marcada por romarias e encontros comunitários.",
+  "Nossa Senhora da Natividade — Padroeira do Tocantins": "Homenageia a padroeira do Tocantins, cuja devoção acompanha a história religiosa da antiga região norte de Goiás.",
+  "Criação do Estado do Tocantins": "Recorda a criação do Tocantins pela Constituição de 1988, concretizando um antigo movimento de autonomia regional.",
+};
+
+const getHolidayExplanation = (title: string) => {
+  const explanation = HOLIDAY_EXPLANATIONS[title];
+  if (!explanation) throw new Error(`Missing holiday explanation: ${title}`);
+  return explanation;
+};
+
 const createHolidayEvent = ({
   id,
   legacyIds,
@@ -64,7 +120,6 @@ const createHolidayEvent = ({
   scope,
   location,
   source,
-  notes = [],
   recurrenceType,
   recurrenceUntil,
 }: HolidayEventInput): CalendarPackEvent => ({
@@ -83,7 +138,7 @@ const createHolidayEvent = ({
   source: source.label,
   sourceUrl: source.url,
   lastVerified: source.lastVerified,
-  notes,
+  notes: [getHolidayExplanation(title)],
   isBrazilMatch: false,
   recurrenceType,
   recurrenceUntil,
@@ -386,11 +441,19 @@ const stateDefinitions: StateDefinition[] = [
   },
 ];
 
-const createStateHolidayEvents = (definition: StateDefinition) => {
+const createStateHolidayEvents = (
+  definition: StateDefinition,
+  stateIndex: number
+) => {
   const source = definition.source ?? stateSource(definition.slug, definition.label);
-  const fixedEvents = (definition.fixed ?? []).map((holiday, index) =>
-    createHolidayEvent({
-      id: holiday.existingId ?? `holidays-${definition.uf.toLowerCase()}-fixed-${index + 1}`,
+  const stateCode = String(stateIndex + 1).padStart(4, "0");
+  const fixedEvents = (definition.fixed ?? []).map((holiday, index) => {
+    const legacyId = `holidays-${definition.uf.toLowerCase()}-fixed-${index + 1}`;
+    return createHolidayEvent({
+      id:
+        holiday.existingId ??
+        `2026fe30-${stateCode}-4000-8000-${String(index + 1).padStart(12, "0")}`,
+      legacyIds: holiday.existingId ? undefined : [legacyId],
       title: holiday.title,
       date: `${FIRST_SUPPORTED_YEAR}-${holiday.monthAndDay}`,
       scope: "Feriado estadual",
@@ -398,12 +461,14 @@ const createStateHolidayEvents = (definition: StateDefinition) => {
       source,
       notes: holiday.notes,
       recurrenceType: "yearly",
-    })
-  );
+    });
+  });
   const movableEvents = (definition.movable ?? []).flatMap((holiday, index) =>
-    supportedYears.map((year) =>
-      createHolidayEvent({
-        id: `holidays-${definition.uf.toLowerCase()}-movable-${index + 1}-${year}`,
+    supportedYears.map((year) => {
+      const legacyId = `holidays-${definition.uf.toLowerCase()}-movable-${index + 1}-${year}`;
+      return createHolidayEvent({
+        id: `2026fe31-${stateCode}-4000-8000-${String(index + 1).padStart(2, "0")}${year}000000`,
+        legacyIds: [legacyId],
         title: holiday.title,
         date: getDateFromEaster(year, holiday.easterOffset),
         scope: "Feriado estadual",
@@ -413,8 +478,8 @@ const createStateHolidayEvents = (definition: StateDefinition) => {
           ...(holiday.notes ?? []),
           "Data móvel calculada a partir do domingo de Páscoa.",
         ],
-      })
-    )
+      });
+    })
   );
 
   return [...fixedEvents, ...movableEvents].sort((a, b) => a.date.localeCompare(b.date));
@@ -427,9 +492,9 @@ const HOLIDAY_CATEGORY = {
   color: "#2563EB",
 };
 
-export const holidays2026Packs = stateDefinitions.map((definition): CalendarPack => {
+export const holidays2026Packs = stateDefinitions.map((definition, stateIndex): CalendarPack => {
   const source = definition.source ?? stateSource(definition.slug, definition.label);
-  const stateEvents = createStateHolidayEvents(definition);
+  const stateEvents = createStateHolidayEvents(definition, stateIndex);
 
   return {
     id: `holidays-${definition.slug}`,

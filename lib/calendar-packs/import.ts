@@ -154,7 +154,18 @@ export const findPackCategory = (
 const findPackCategoryAnywhere = (
   categories: CategoryItem[],
   packCategory: CalendarPackCategory
-) => categories.find((category) => category.id === packCategory.id) ?? null;
+) => {
+  const byId = categories.find((category) => category.id === packCategory.id);
+  if (byId) return byId;
+
+  const legacyNames = new Set(
+    (packCategory.legacyNames ?? []).map(normalizeLabel)
+  );
+  return (
+    categories.find((category) => legacyNames.has(normalizeLabel(category.name))) ??
+    null
+  );
+};
 
 const getPackEventIds = (event: CalendarPackEvent) => [
   event.id,
@@ -267,15 +278,7 @@ const getWorldCupEventNotes = (event: CalendarPackEvent) => {
 };
 
 const getHolidayEventNotes = (event: CalendarPackEvent) =>
-  [
-    event.phase,
-    `Abrangência: ${event.city}`,
-    ...(event.notes ?? []),
-    `Fonte: ${event.source}`,
-    `Verificado em: ${event.lastVerified}`,
-  ]
-    .filter(Boolean)
-    .join("\n");
+  (event.notes ?? []).filter(Boolean).join("\n");
 
 export const getCalendarPackEventNotes = (
   event: CalendarPackEvent,
@@ -290,12 +293,10 @@ export const getCalendarPackEventNotes = (
 
   if (pack.id.startsWith("brasileirao-2026")) {
     return [
-      `Horário: ${event.time} (${event.timezone})`,
-      `Local: ${event.venue} - ${event.city}`,
-      `Fase: ${event.phase}`,
+      event.competition,
+      event.phase,
+      `${event.time} · ${event.venue}${event.city ? `, ${event.city}` : ""}`,
       ...(event.notes ?? []),
-      `Fonte: ${event.source}`,
-      `Verificado em: ${event.lastVerified}`,
     ]
       .filter(Boolean)
       .join("\n");
@@ -416,7 +417,25 @@ export const isCalendarPackVariantInstalled = (
     .flatMap(getPackEventIds)
     .filter((eventId) => !siblingEventIds.has(eventId));
 
-  return snapshot.events.some((event) => exclusiveEventIds.includes(event.id));
+  if (exclusiveEventIds.length > 0) {
+    return snapshot.events.some((event) => exclusiveEventIds.includes(event.id));
+  }
+
+  const candidateEventIds = getAllPackEventIds(pack);
+  const siblingOnlyEventIds = new Set(
+    variants
+      .filter((variant) => variant.id !== pack.id)
+      .flatMap((variant) => variant.events.flatMap(getPackEventIds))
+      .filter((eventId) => !candidateEventIds.has(eventId))
+  );
+  const hasCandidateEvent = snapshot.events.some((event) =>
+    candidateEventIds.has(event.id)
+  );
+  const hasSiblingOnlyEvent = snapshot.events.some((event) =>
+    siblingOnlyEventIds.has(event.id)
+  );
+
+  return hasCandidateEvent && !hasSiblingOnlyEvent;
 };
 
 export const importCalendarPackVariant = (
@@ -522,7 +541,10 @@ export const importCalendarPack = (
   );
   const profileId = targetProfile.id;
   const hadExistingPackCategory = selectedPackCategories.some((packCategory) =>
-    Boolean(findPackCategoryAnywhere(snapshot.categories, packCategory))
+    Boolean(findPackCategoryAnywhere(snapshot.categories, packCategory)) ||
+    snapshot.categories.some((category) =>
+      (pack.legacyCategoryIds ?? []).includes(category.id)
+    )
   );
   const packEventIdsBeforeImport = new Set(
     selectedPackEvents.flatMap(getPackEventIds)
@@ -536,41 +558,107 @@ export const importCalendarPack = (
   let addedCategoryCount = 0;
   let updatedCategoryCount = 0;
   let nextCategories = [...snapshot.categories];
+  let nextEvents = [...snapshot.events];
+  const migratedLegacyCategoryIds = new Set<string>();
 
   for (const packCategory of selectedPackCategories) {
-    const existingCategory =
-      findPackCategoryAnywhere(nextCategories, packCategory) ??
-      findPackCategory(nextCategories, profileId, packCategory);
-    if (existingCategory) {
-      categoryIdByKey.set(packCategory.key, existingCategory.id);
-      if (
-        existingCategory.name !== packCategory.name ||
-        existingCategory.color !== packCategory.color
-      ) {
-        nextCategories = nextCategories.map((category) =>
-          category.id === existingCategory.id
-            ? { ...category, name: packCategory.name, color: packCategory.color }
-            : category
-        );
-        updatedCategoryCount += 1;
-      }
+    const packCategoryEventIds = new Set(
+      selectedPackEvents
+        .filter((event) => event.suggestedCategoryKey === packCategory.key)
+        .flatMap(getPackEventIds)
+    );
+    const eventLinkedCategoryIds = new Set(
+      nextEvents
+        .filter((event) => packCategoryEventIds.has(event.id))
+        .map((event) => event.categoryId)
+    );
+    const legacyNames = (packCategory.legacyNames ?? []).map(normalizeLabel);
+    const legacyCategoryIds = pack.legacyCategoryIds ?? [];
+    const legacyCandidates = nextCategories.filter(
+      (category) =>
+        category.id !== packCategory.id &&
+        (legacyCategoryIds.includes(category.id) ||
+          eventLinkedCategoryIds.has(category.id) ||
+          (category.profileId === profileId &&
+            legacyNames.includes(normalizeLabel(category.name))))
+    );
+    const canonicalCategory = nextCategories.find(
+      (category) => category.id === packCategory.id
+    );
+    const preferredLegacyCategory = [...legacyCandidates].sort((left, right) => {
+      const getPriority = (category: CategoryItem) => {
+        const namePriority = legacyNames.indexOf(normalizeLabel(category.name));
+        if (namePriority >= 0) return namePriority;
+        const idPriority = legacyCategoryIds.indexOf(category.id);
+        if (idPriority >= 0) return legacyNames.length + idPriority;
+        return legacyNames.length + legacyCategoryIds.length;
+      };
+      return getPriority(left) - getPriority(right);
+    })[0];
+    const existingCategory = canonicalCategory ?? preferredLegacyCategory;
+
+    if (!existingCategory) {
+      categoryIdByKey.set(packCategory.key, packCategory.id);
+      addedCategoryCount += 1;
+      nextCategories.push({
+        id: packCategory.id,
+        profileId,
+        name: packCategory.name,
+        color: packCategory.color,
+        visible: true,
+      });
       continue;
     }
 
-    categoryIdByKey.set(packCategory.key, packCategory.id);
-    addedCategoryCount += 1;
-    nextCategories.push({
-      id: packCategory.id,
-      profileId,
-      name: packCategory.name,
-      color: packCategory.color,
-      visible: true,
+    const destinationCategoryId = packCategory.id;
+    const sourceCategoryIds = new Set([
+      existingCategory.id,
+      ...legacyCandidates.map((category) => category.id),
+    ]);
+    categoryIdByKey.set(packCategory.key, destinationCategoryId);
+    nextEvents = nextEvents.map((event) =>
+      sourceCategoryIds.has(event.categoryId) &&
+      event.categoryId !== destinationCategoryId
+        ? { ...event, categoryId: destinationCategoryId, color: packCategory.color }
+        : event
+    );
+    sourceCategoryIds.forEach((categoryId) => {
+      if (categoryId !== destinationCategoryId) {
+        migratedLegacyCategoryIds.add(categoryId);
+      }
     });
+    nextCategories = nextCategories
+      .filter(
+        (category) =>
+          category.id === destinationCategoryId ||
+          !sourceCategoryIds.has(category.id)
+      )
+      .map((category) =>
+        category.id === destinationCategoryId
+          ? { ...category, name: packCategory.name, color: packCategory.color }
+          : category
+      );
+
+    if (!canonicalCategory) {
+      nextCategories.push({
+        ...existingCategory,
+        id: destinationCategoryId,
+        name: packCategory.name,
+        color: packCategory.color,
+      });
+    }
+    if (
+      !canonicalCategory ||
+      existingCategory.name !== packCategory.name ||
+      existingCategory.color !== packCategory.color ||
+      sourceCategoryIds.size > 1
+    ) {
+      updatedCategoryCount += 1;
+    }
   }
 
   const categoriesById = new Map(nextCategories.map((category) => [category.id, category]));
-  const orderByDate = buildDayOrderMap(snapshot.events);
-  const nextEvents = [...snapshot.events];
+  const orderByDate = buildDayOrderMap(nextEvents);
   const legacyEventIdsToRemove = new Set<string>();
   let addedEventCount = 0;
   let updatedEventCount = 0;
@@ -645,7 +733,10 @@ export const importCalendarPack = (
     addedEventCount += 1;
   }
 
-  const legacyCategoryIds = new Set(pack.legacyCategoryIds ?? []);
+  const legacyCategoryIds = new Set([
+    ...(pack.legacyCategoryIds ?? []),
+    ...migratedLegacyCategoryIds,
+  ]);
   const eventsAfterLegacyCleanup = legacyEventIdsToRemove.size
     ? nextEvents.filter((event) => !legacyEventIdsToRemove.has(event.id))
     : nextEvents;

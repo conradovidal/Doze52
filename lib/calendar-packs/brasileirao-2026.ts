@@ -1,16 +1,17 @@
 import type { CalendarPack, CalendarPackEvent } from "./types";
 
-const VERIFIED_AT = "2026-07-13";
+const VERIFIED_AT = "2026-07-14";
 const SOURCE = {
   label: "Tabela detalhada oficial da CBF",
   url: "https://www.cbf.com.br/futebol-brasileiro/tabelas/campeonato-brasileiro/serie-a/2026?documento=Tabela%20Detalhada",
   lastVerified: VERIFIED_AT,
 };
 const CATEGORY = {
-  id: "brasileirao-2026-category",
-  key: "brasileirao-2026",
-  name: "Brasileirão 2026",
-  color: "#15803D",
+  id: "2026ba00-0000-4000-8000-000000000002",
+  key: "favorite-team-2026",
+  name: "Jogos do seu time favorito",
+  color: "#2563EB",
+  legacyNames: ["Brasileirão 2026"],
 };
 const GREMIO_ID = "20013";
 const INTERNACIONAL_ID = "20011";
@@ -65,7 +66,7 @@ const matches: MatchTuple[] = [
   ["832058", 17, "2026-05-23", "17:00", "Vitória", "20018", "2", "Internacional", "20011", "0", "Manoel Barradas - Salvador - BA"],
   ["832064", 18, "2026-05-31", "11:00", "Red Bull Bragantino", "20007", "3", "Internacional", "20011", "1", "Cícero de Souza Marques - Bragança Paulista - SP"],
   ["832066", 18, "2026-05-30", "17:30", "Grêmio", "20013", "1", "Corinthians", "20001", "3", "Arena do Grêmio - Porto Alegre - RS"],
-  ["832074", 19, "2026-07-17", "20:00", "Mirassol", "20385", null, "Grêmio", "20013", null, "José Maria de Campos Maia - Mirassol - SP"],
+  ["832074", 19, "2026-07-16", "21:30", "Mirassol", "20385", null, "Grêmio", "20013", null, "José Maria de Campos Maia - Mirassol - SP"],
   ["832076", 19, "2026-07-22", "21:30", "Internacional", "20011", null, "Cruzeiro", "59849", null, "Beira-Rio - Porto Alegre - RS"],
   ["832086", 20, "2026-07-26", "18:30", "Grêmio", "20013", null, "Fluminense", "20014", null, "Arena do Grêmio - Porto Alegre - RS"],
   ["832087", 20, "2026-07-25", "18:30", "Athletico Paranaense", "20052", null, "Internacional", "20011", null, "Arena da Baixada - Curitiba - PR"],
@@ -78,7 +79,99 @@ const matches: MatchTuple[] = [
   ["832126", 24, "2026-08-22", "18:30", "Internacional", "20011", null, "Atlético Mineiro", "62194", null, "Beira-Rio - Porto Alegre - RS"],
 ];
 
-const createEvent = (match: MatchTuple): CalendarPackEvent => {
+type TeamMatchEvent = {
+  event: CalendarPackEvent;
+  teamIds: string[];
+};
+
+type AdditionalMatch = {
+  id: string;
+  competition: string;
+  phase: string;
+  date: string;
+  time: string;
+  home: string;
+  away: string;
+  homeGoals?: string;
+  awayGoals?: string;
+  venue: string;
+  city: string;
+  teamIds: string[];
+  notes?: string[];
+  source: { label: string; url: string; lastVerified: string };
+};
+
+const officialSource = (label: string, url: string) => ({
+  label,
+  url,
+  lastVerified: VERIFIED_AT,
+});
+
+const GREMIO_GAUCHAO_SOURCE = officialSource(
+  "Agenda oficial do Grêmio — Gauchão 2026",
+  "https://gremio.net/futebol/competicoes/profissional/716"
+);
+const INTER_GAUCHAO_SOURCE = officialSource(
+  "Agenda oficial do Internacional — Gauchão 2026",
+  "https://www.internacional.com.br/jogos/masculino/gauchao-2026"
+);
+const GREMIO_SUL_AMERICANA_SOURCE = officialSource(
+  "Agenda oficial do Grêmio — CONMEBOL Sul-Americana 2026",
+  "https://gremio.net/futebol/competicoes/profissional/764"
+);
+const GREMIO_COPA_DO_BRASIL_SOURCE = officialSource(
+  "Agenda oficial do Grêmio — Copa do Brasil 2026",
+  "https://gremio.net/futebol/competicoes/profissional/765"
+);
+const INTER_COPA_DO_BRASIL_SOURCE = officialSource(
+  "Agenda oficial do Internacional e tabela detalhada da CBF",
+  "https://internacional.com.br/noticias/masculino/cbf-divulga-datas-dos-proximos-oito-compromissos-do-colorado"
+);
+const RECOPA_GAUCHA_SOURCE = officialSource(
+  "Tabela oficial da Federação Gaúcha de Futebol",
+  "https://www.fgf.com.br/competicoes/profissional/27"
+);
+
+const additionalMatches: AdditionalMatch[] = [
+  { id: "2026ba01-0000-4000-8000-000000000001", competition: "Campeonato Gaúcho", phase: "1ª rodada", date: "2026-01-10", time: "21:00", home: "Avenida", away: "Grêmio", homeGoals: "0", awayGoals: "4", venue: "Estádio dos Eucaliptos", city: "Santa Cruz do Sul - RS", teamIds: [GREMIO_ID], source: GREMIO_GAUCHAO_SOURCE },
+  { id: "2026ba01-0000-4000-8000-000000000002", competition: "Campeonato Gaúcho", phase: "1ª rodada", date: "2026-01-11", time: "18:00", home: "Internacional", away: "Novo Hamburgo", homeGoals: "2", awayGoals: "1", venue: "Beira-Rio", city: "Porto Alegre - RS", teamIds: [INTERNACIONAL_ID], source: INTER_GAUCHAO_SOURCE },
+  { id: "2026ba01-0000-4000-8000-000000000003", competition: "Campeonato Gaúcho", phase: "2ª rodada", date: "2026-01-14", time: "21:30", home: "Grêmio", away: "São José", homeGoals: "0", awayGoals: "1", venue: "Arena do Grêmio", city: "Porto Alegre - RS", teamIds: [GREMIO_ID], source: GREMIO_GAUCHAO_SOURCE },
+  { id: "2026ba01-0000-4000-8000-000000000004", competition: "Campeonato Gaúcho", phase: "2ª rodada", date: "2026-01-15", time: "19:00", home: "Monsoon", away: "Internacional", homeGoals: "0", awayGoals: "4", venue: "Estádio Francisco Novelletto", city: "Porto Alegre - RS", teamIds: [INTERNACIONAL_ID], source: INTER_GAUCHAO_SOURCE },
+  { id: "2026ba01-0000-4000-8000-000000000005", competition: "Campeonato Gaúcho", phase: "3ª rodada", date: "2026-01-17", time: "19:00", home: "Grêmio", away: "São Luiz", homeGoals: "5", awayGoals: "0", venue: "Arena do Grêmio", city: "Porto Alegre - RS", teamIds: [GREMIO_ID], source: GREMIO_GAUCHAO_SOURCE },
+  { id: "2026ba01-0000-4000-8000-000000000006", competition: "Campeonato Gaúcho", phase: "3ª rodada", date: "2026-01-18", time: "18:00", home: "Ypiranga", away: "Internacional", homeGoals: "2", awayGoals: "1", venue: "Colosso da Lagoa", city: "Erechim - RS", teamIds: [INTERNACIONAL_ID], source: INTER_GAUCHAO_SOURCE },
+  { id: "2026ba01-0000-4000-8000-000000000007", competition: "Campeonato Gaúcho", phase: "4ª rodada", date: "2026-01-21", time: "19:00", home: "Internacional", away: "Inter-SM", homeGoals: "2", awayGoals: "0", venue: "Beira-Rio", city: "Porto Alegre - RS", teamIds: [INTERNACIONAL_ID], source: INTER_GAUCHAO_SOURCE },
+  { id: "2026ba01-0000-4000-8000-000000000008", competition: "Campeonato Gaúcho", phase: "4ª rodada", date: "2026-01-21", time: "21:30", home: "Guarany de Bagé", away: "Grêmio", homeGoals: "0", awayGoals: "2", venue: "Estrela D'Alva", city: "Bagé - RS", teamIds: [GREMIO_ID], source: GREMIO_GAUCHAO_SOURCE },
+  { id: "2026ba01-0000-4000-8000-000000000009", competition: "Campeonato Gaúcho", phase: "5ª rodada", date: "2026-01-25", time: "20:00", home: "Internacional", away: "Grêmio", homeGoals: "4", awayGoals: "2", venue: "Beira-Rio", city: "Porto Alegre - RS", teamIds: [GREMIO_ID, INTERNACIONAL_ID], source: INTER_GAUCHAO_SOURCE },
+  { id: "2026ba01-0000-4000-8000-000000000010", competition: "Campeonato Gaúcho", phase: "6ª rodada", date: "2026-01-31", time: "16:30", home: "Grêmio", away: "Juventude", homeGoals: "1", awayGoals: "1", venue: "Arena do Grêmio", city: "Porto Alegre - RS", teamIds: [GREMIO_ID], source: GREMIO_GAUCHAO_SOURCE },
+  { id: "2026ba01-0000-4000-8000-000000000011", competition: "Campeonato Gaúcho", phase: "6ª rodada", date: "2026-01-31", time: "16:30", home: "Caxias", away: "Internacional", homeGoals: "1", awayGoals: "0", venue: "Estádio Centenário", city: "Caxias do Sul - RS", teamIds: [INTERNACIONAL_ID], source: INTER_GAUCHAO_SOURCE },
+  { id: "2026ba01-0000-4000-8000-000000000012", competition: "Campeonato Gaúcho", phase: "Quartas de final", date: "2026-02-07", time: "18:30", home: "Grêmio", away: "Novo Hamburgo", homeGoals: "1", awayGoals: "0", venue: "Arena do Grêmio", city: "Porto Alegre - RS", teamIds: [GREMIO_ID], source: GREMIO_GAUCHAO_SOURCE },
+  { id: "2026ba01-0000-4000-8000-000000000013", competition: "Campeonato Gaúcho", phase: "Quartas de final", date: "2026-02-08", time: "18:00", home: "Internacional", away: "São Luiz", homeGoals: "3", awayGoals: "1", venue: "Beira-Rio", city: "Porto Alegre - RS", teamIds: [INTERNACIONAL_ID], source: INTER_GAUCHAO_SOURCE },
+  { id: "2026ba01-0000-4000-8000-000000000014", competition: "Campeonato Gaúcho", phase: "Semifinal", date: "2026-02-15", time: "17:30", home: "Grêmio", away: "Juventude", homeGoals: "1", awayGoals: "1", venue: "Arena do Grêmio", city: "Porto Alegre - RS", teamIds: [GREMIO_ID], source: GREMIO_GAUCHAO_SOURCE },
+  { id: "2026ba01-0000-4000-8000-000000000015", competition: "Campeonato Gaúcho", phase: "Semifinal", date: "2026-02-15", time: "20:30", home: "Ypiranga", away: "Internacional", homeGoals: "0", awayGoals: "3", venue: "Colosso da Lagoa", city: "Erechim - RS", teamIds: [INTERNACIONAL_ID], source: INTER_GAUCHAO_SOURCE },
+  { id: "2026ba01-0000-4000-8000-000000000016", competition: "Campeonato Gaúcho", phase: "Semifinal", date: "2026-02-21", time: "18:30", home: "Internacional", away: "Ypiranga", homeGoals: "4", awayGoals: "0", venue: "Beira-Rio", city: "Porto Alegre - RS", teamIds: [INTERNACIONAL_ID], source: INTER_GAUCHAO_SOURCE },
+  { id: "2026ba01-0000-4000-8000-000000000017", competition: "Campeonato Gaúcho", phase: "Semifinal", date: "2026-02-22", time: "18:00", home: "Juventude", away: "Grêmio", homeGoals: "1", awayGoals: "1", venue: "Alfredo Jaconi", city: "Caxias do Sul - RS", teamIds: [GREMIO_ID], notes: ["Grêmio venceu nos pênaltis por 4 x 1."], source: GREMIO_GAUCHAO_SOURCE },
+  { id: "2026ba01-0000-4000-8000-000000000018", competition: "Campeonato Gaúcho", phase: "Final", date: "2026-03-01", time: "18:00", home: "Grêmio", away: "Internacional", homeGoals: "3", awayGoals: "0", venue: "Arena do Grêmio", city: "Porto Alegre - RS", teamIds: [GREMIO_ID, INTERNACIONAL_ID], source: GREMIO_GAUCHAO_SOURCE },
+  { id: "2026ba01-0000-4000-8000-000000000019", competition: "Campeonato Gaúcho", phase: "Final", date: "2026-03-08", time: "18:00", home: "Internacional", away: "Grêmio", homeGoals: "1", awayGoals: "1", venue: "Beira-Rio", city: "Porto Alegre - RS", teamIds: [GREMIO_ID, INTERNACIONAL_ID], source: INTER_GAUCHAO_SOURCE },
+  { id: "2026ba03-0000-4000-8000-000000000001", competition: "CONMEBOL Sul-Americana", phase: "Fase de grupos", date: "2026-04-08", time: "21:30", home: "Montevideo City Torque", away: "Grêmio", homeGoals: "1", awayGoals: "0", venue: "Estádio Centenário", city: "Montevidéu - Uruguai", teamIds: [GREMIO_ID], source: GREMIO_SUL_AMERICANA_SOURCE },
+  { id: "2026ba03-0000-4000-8000-000000000002", competition: "CONMEBOL Sul-Americana", phase: "Fase de grupos", date: "2026-04-14", time: "19:00", home: "Grêmio", away: "Defensa y Justicia", homeGoals: "1", awayGoals: "0", venue: "Arena do Grêmio", city: "Porto Alegre - RS", teamIds: [GREMIO_ID], source: GREMIO_SUL_AMERICANA_SOURCE },
+  { id: "2026ba03-0000-4000-8000-000000000003", competition: "CONMEBOL Sul-Americana", phase: "Fase de grupos", date: "2026-04-29", time: "21:30", home: "Palestino", away: "Grêmio", homeGoals: "0", awayGoals: "0", venue: "Municipal de La Cisterna", city: "Santiago - Chile", teamIds: [GREMIO_ID], source: GREMIO_SUL_AMERICANA_SOURCE },
+  { id: "2026ba02-0000-4000-8000-000000000001", competition: "Copa do Brasil", phase: "5ª fase", date: "2026-04-21", time: "19:30", home: "Grêmio", away: "Confiança", homeGoals: "2", awayGoals: "0", venue: "Arena do Grêmio", city: "Porto Alegre - RS", teamIds: [GREMIO_ID], source: GREMIO_COPA_DO_BRASIL_SOURCE },
+  { id: "2026ba02-0000-4000-8000-000000000002", competition: "Copa do Brasil", phase: "5ª fase", date: "2026-04-22", time: "20:30", home: "Athletic-MG", away: "Internacional", homeGoals: "1", awayGoals: "2", venue: "Orlando Scarpelli", city: "Florianópolis - SC", teamIds: [INTERNACIONAL_ID], source: INTER_COPA_DO_BRASIL_SOURCE },
+  { id: "2026ba03-0000-4000-8000-000000000004", competition: "CONMEBOL Sul-Americana", phase: "Fase de grupos", date: "2026-05-05", time: "19:00", home: "Defensa y Justicia", away: "Grêmio", homeGoals: "0", awayGoals: "3", venue: "Pedro Bidegain", city: "Buenos Aires - Argentina", teamIds: [GREMIO_ID], source: GREMIO_SUL_AMERICANA_SOURCE },
+  { id: "2026ba04-0000-4000-8000-000000000001", competition: "Recopa Gaúcha", phase: "Final", date: "2026-05-06", time: "20:00", home: "Brasil de Pelotas", away: "Internacional", homeGoals: "1", awayGoals: "2", venue: "Bento Freitas", city: "Pelotas - RS", teamIds: [INTERNACIONAL_ID], source: RECOPA_GAUCHA_SOURCE },
+  { id: "2026ba02-0000-4000-8000-000000000003", competition: "Copa do Brasil", phase: "5ª fase", date: "2026-05-12", time: "19:30", home: "Internacional", away: "Athletic-MG", homeGoals: "3", awayGoals: "2", venue: "Beira-Rio", city: "Porto Alegre - RS", teamIds: [INTERNACIONAL_ID], source: INTER_COPA_DO_BRASIL_SOURCE },
+  { id: "2026ba02-0000-4000-8000-000000000004", competition: "Copa do Brasil", phase: "5ª fase", date: "2026-05-14", time: "19:00", home: "Confiança", away: "Grêmio", homeGoals: "0", awayGoals: "3", venue: "Batistão", city: "Aracaju - SE", teamIds: [GREMIO_ID], source: GREMIO_COPA_DO_BRASIL_SOURCE },
+  { id: "2026ba03-0000-4000-8000-000000000005", competition: "CONMEBOL Sul-Americana", phase: "Fase de grupos", date: "2026-05-20", time: "21:00", home: "Grêmio", away: "Palestino", homeGoals: "2", awayGoals: "0", venue: "Arena do Grêmio", city: "Porto Alegre - RS", teamIds: [GREMIO_ID], source: GREMIO_SUL_AMERICANA_SOURCE },
+  { id: "2026ba03-0000-4000-8000-000000000006", competition: "CONMEBOL Sul-Americana", phase: "Fase de grupos", date: "2026-05-26", time: "19:00", home: "Grêmio", away: "Montevideo City Torque", homeGoals: "2", awayGoals: "2", venue: "Arena do Grêmio", city: "Porto Alegre - RS", teamIds: [GREMIO_ID], source: GREMIO_SUL_AMERICANA_SOURCE },
+  { id: "2026ba03-0000-4000-8000-000000000007", competition: "CONMEBOL Sul-Americana", phase: "Playoff das oitavas", date: "2026-07-23", time: "19:00", home: "Bolívar", away: "Grêmio", venue: "Hernando Siles", city: "La Paz - Bolívia", teamIds: [GREMIO_ID], source: GREMIO_SUL_AMERICANA_SOURCE },
+  { id: "2026ba03-0000-4000-8000-000000000008", competition: "CONMEBOL Sul-Americana", phase: "Playoff das oitavas", date: "2026-07-30", time: "19:00", home: "Grêmio", away: "Bolívar", venue: "Arena do Grêmio", city: "Porto Alegre - RS", teamIds: [GREMIO_ID], source: GREMIO_SUL_AMERICANA_SOURCE },
+  { id: "2026ba02-0000-4000-8000-000000000005", competition: "Copa do Brasil", phase: "6ª fase", date: "2026-08-02", time: "18:00", home: "Mirassol", away: "Grêmio", venue: "José Maria de Campos Maia", city: "Mirassol - SP", teamIds: [GREMIO_ID], source: GREMIO_COPA_DO_BRASIL_SOURCE },
+  { id: "2026ba02-0000-4000-8000-000000000006", competition: "Copa do Brasil", phase: "6ª fase", date: "2026-08-02", time: "19:30", home: "Internacional", away: "Corinthians", venue: "Beira-Rio", city: "Porto Alegre - RS", teamIds: [INTERNACIONAL_ID], source: INTER_COPA_DO_BRASIL_SOURCE },
+  { id: "2026ba02-0000-4000-8000-000000000007", competition: "Copa do Brasil", phase: "6ª fase", date: "2026-08-05", time: "19:30", home: "Grêmio", away: "Mirassol", venue: "Arena do Grêmio", city: "Porto Alegre - RS", teamIds: [GREMIO_ID], source: GREMIO_COPA_DO_BRASIL_SOURCE },
+  { id: "2026ba02-0000-4000-8000-000000000008", competition: "Copa do Brasil", phase: "6ª fase", date: "2026-08-06", time: "20:00", home: "Corinthians", away: "Internacional", venue: "Neo Química Arena", city: "São Paulo - SP", teamIds: [INTERNACIONAL_ID], source: INTER_COPA_DO_BRASIL_SOURCE },
+];
+
+const createEvent = (match: MatchTuple): TeamMatchEvent => {
   const [id, round, date, time, home, , homeGoals, away, , awayGoals, location] = match;
   const locationParts = location.split(" - ");
   const venue = locationParts.slice(0, -2).join(" - ");
@@ -88,8 +181,9 @@ const createEvent = (match: MatchTuple): CalendarPackEvent => {
     ? `${home} ${homeGoals} x ${awayGoals} ${away}`
     : `${home} x ${away}`;
 
-  return {
-    id: `brasileirao-2026-${id}`,
+  return { event: {
+    id: `2026ba00-0000-4000-8000-${id.padStart(12, "0")}`,
+    legacyIds: [`brasileirao-2026-${id}`],
     title,
     date,
     time,
@@ -97,6 +191,7 @@ const createEvent = (match: MatchTuple): CalendarPackEvent => {
     city,
     venue,
     phase: `Rodada ${round}`,
+    competition: "Campeonato Brasileiro",
     homeTeam: home,
     awayTeam: away,
     suggestedCategoryKey: CATEGORY.key,
@@ -106,17 +201,55 @@ const createEvent = (match: MatchTuple): CalendarPackEvent => {
     result: hasResult ? `${homeGoals} x ${awayGoals}` : undefined,
     notes: [`Referência oficial da partida: ${id}.`],
     isBrazilMatch: false,
+  }, teamIds: [match[5], match[8]] };
+};
+
+const createAdditionalEvent = (match: AdditionalMatch): TeamMatchEvent => {
+  const hasResult = match.homeGoals !== undefined && match.awayGoals !== undefined;
+  return {
+    teamIds: match.teamIds,
+    event: {
+      id: match.id,
+      title: hasResult
+        ? `${match.home} ${match.homeGoals} x ${match.awayGoals} ${match.away}`
+        : `${match.home} x ${match.away}`,
+      date: match.date,
+      time: match.time,
+      timezone: "America/Sao_Paulo",
+      city: match.city,
+      venue: match.venue,
+      phase: match.phase,
+      competition: match.competition,
+      homeTeam: match.home,
+      awayTeam: match.away,
+      suggestedCategoryKey: CATEGORY.key,
+      source: match.source.label,
+      sourceUrl: match.source.url,
+      lastVerified: match.source.lastVerified,
+      result: hasResult ? `${match.homeGoals} x ${match.awayGoals}` : undefined,
+      notes: match.notes,
+      isBrazilMatch: false,
+    },
   };
 };
 
-const events = matches.map(createEvent);
+const events = [...matches.map(createEvent), ...additionalMatches.map(createAdditionalEvent)]
+  .sort((left, right) =>
+    `${left.event.date}T${left.event.time}`.localeCompare(
+      `${right.event.date}T${right.event.time}`
+    )
+  );
 
-const createPack = (teamId: string, teamName: string): CalendarPack => ({
+const createPack = (
+  teamId: string,
+  teamName: string,
+  color: string
+): CalendarPack => ({
   id: `brasileirao-2026-${teamName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")}`,
-  name: "Jogos do Brasileirão",
+  name: "Jogos do seu time favorito",
   eyebrow: teamName,
   icon: "soccer-ball",
-  description: "Partidas detalhadas pela CBF do time selecionado no Brasileirão 2026.",
+  description: "Jogos oficiais de 2026 do time selecionado, em todas as competições.",
   variantGroup: {
     id: "brasileirao-2026-by-team",
     label: "Time",
@@ -125,21 +258,25 @@ const createPack = (teamId: string, teamName: string): CalendarPack => ({
   },
   year: 2026,
   datasetStatus: "seed",
-  updateNote: "Rodadas com data e horário detalhados pela CBF, atualmente até a 24ª rodada.",
+  updateNote: "Partidas concluídas e próximos jogos com data e horário oficialmente detalhados.",
   source: SOURCE,
   profile: {
-    id: "brasileirao-2026-profile",
-    name: "Brasileirão 2026",
+    id: "2026ba00-0000-4000-8000-000000000001",
+    name: "Jogos do seu time favorito",
     icon: "calendar-days",
   },
-  categories: [CATEGORY],
-  events: events.filter((event) => {
-    const match = matches.find(([id]) => event.id === `brasileirao-2026-${id}`);
-    return match?.[5] === teamId || match?.[8] === teamId;
-  }),
+  categories: [{
+    ...CATEGORY,
+    name: `Jogos do ${teamName}`,
+    color,
+  }],
+  legacyCategoryIds: ["brasileirao-2026-category"],
+  events: events
+    .filter((entry) => entry.teamIds.includes(teamId))
+    .map((entry) => entry.event),
 });
 
 export const brasileirao2026Packs = [
-  createPack(GREMIO_ID, "Grêmio"),
-  createPack(INTERNACIONAL_ID, "Internacional"),
+  createPack(GREMIO_ID, "Grêmio", "#2563EB"),
+  createPack(INTERNACIONAL_ID, "Internacional", "#DC2626"),
 ] as const;

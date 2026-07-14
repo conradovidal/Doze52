@@ -28,6 +28,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { useAuth } from "@/lib/auth";
 import { calendarPacks } from "@/lib/calendar-packs";
 import {
   getCalendarPackAvailability,
@@ -40,6 +42,7 @@ import type {
   CalendarPackIconId,
 } from "@/lib/calendar-packs/types";
 import { isLimitReached } from "@/lib/entitlements";
+import { getSupabaseBrowserClient, hasSupabaseEnv } from "@/lib/supabase";
 import { useStore } from "@/lib/store";
 import { useBilling } from "@/lib/use-billing";
 import { cn } from "@/lib/utils";
@@ -143,6 +146,7 @@ export function CalendarPackLauncher({
   onRequireAuth?: () => void;
 }) {
   const { notify } = useFeedback();
+  const { user, loading: authLoading } = useAuth();
   const { isPro, limits } = useBilling();
   const profiles = useStore((state) => state.profiles);
   const categories = useStore((state) => state.categories);
@@ -161,6 +165,11 @@ export function CalendarPackLauncher({
   >({});
   const [expandedPackId, setExpandedPackId] = React.useState<string | null>(null);
   const [upgradeDialogOpen, setUpgradeDialogOpen] = React.useState(false);
+  const [suggestionDraft, setSuggestionDraft] = React.useState("");
+  const [suggestionStatus, setSuggestionStatus] = React.useState<
+    "idle" | "submitting" | "success" | "error"
+  >("idle");
+  const [suggestionError, setSuggestionError] = React.useState<string | null>(null);
 
   const snapshot = React.useMemo(
     () => ({ profiles, categories, events }),
@@ -376,6 +385,52 @@ export function CalendarPackLauncher({
     [notify, onFocusYear, replaceAllData, setPackFlow, snapshot]
   );
 
+  const handleSuggestionSubmit = React.useCallback(
+    async (event: React.FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      if (!user) {
+        onRequireAuth?.();
+        return;
+      }
+
+      const suggestion = suggestionDraft.trim();
+      if (suggestion.length < 10 || suggestion.length > 500) {
+        setSuggestionStatus("error");
+        setSuggestionError("Escreva uma sugestão entre 10 e 500 caracteres.");
+        return;
+      }
+      if (!hasSupabaseEnv) {
+        setSuggestionStatus("error");
+        setSuggestionError("Não foi possível conectar ao envio de sugestões.");
+        return;
+      }
+
+      setSuggestionStatus("submitting");
+      setSuggestionError(null);
+      try {
+        const { error } = await getSupabaseBrowserClient()
+          .from("product_feedback_submissions")
+          .insert({
+            raw_text: suggestion,
+            proposed_area: "Calendario",
+          });
+        if (error) throw error;
+
+        setSuggestionDraft("");
+        setSuggestionStatus("success");
+        notify({
+          tone: "success",
+          title: "Sugestão enviada",
+          description: "Obrigado — ela entrou na fila de calendários para avaliar.",
+        });
+      } catch {
+        setSuggestionStatus("error");
+        setSuggestionError("Não foi possível enviar agora. Tente novamente.");
+      }
+    },
+    [notify, onRequireAuth, suggestionDraft, user]
+  );
+
   return (
     <>
       <Button
@@ -550,7 +605,9 @@ export function CalendarPackLauncher({
                               {isSwitchingVariant
                                 ? variantGroup?.label === "Estado"
                                   ? "Trocar estado"
-                                  : "Trocar time"
+                                  : variantGroup?.label === "Cobertura"
+                                    ? "Trocar cobertura"
+                                    : "Trocar time"
                                 : "Atualizar"}
                             </Button>
                           ) : null}
@@ -655,6 +712,64 @@ export function CalendarPackLauncher({
               );
             })}
           </div>
+
+          <form
+            className="rounded-[8px] border border-border/75 bg-muted/15 p-3"
+            onSubmit={handleSuggestionSubmit}
+          >
+            <div>
+              <h3 className="text-sm font-medium text-foreground">
+                Que calendário está faltando?
+              </h3>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                Pode ser outro time, Fórmula Truck, Pokémon TCG ou qualquer agenda
+                que deixaria seu ano mais útil.
+              </p>
+            </div>
+            <Textarea
+              className="mt-2.5 min-h-20 resize-none rounded-[8px] bg-background"
+              value={suggestionDraft}
+              maxLength={500}
+              disabled={suggestionStatus === "submitting"}
+              aria-invalid={suggestionStatus === "error"}
+              aria-describedby="calendar-suggestion-help"
+              placeholder="Conte qual calendário você gostaria de adicionar..."
+              onChange={(event) => {
+                setSuggestionDraft(event.target.value);
+                setSuggestionStatus("idle");
+                setSuggestionError(null);
+              }}
+            />
+            <div className="mt-2 flex items-center justify-between gap-3">
+              <div
+                id="calendar-suggestion-help"
+                className={cn(
+                  "text-[11px] text-muted-foreground",
+                  suggestionStatus === "error" && "text-destructive",
+                  suggestionStatus === "success" && "text-emerald-600 dark:text-emerald-400"
+                )}
+                role={suggestionStatus === "error" ? "alert" : undefined}
+                aria-live="polite"
+              >
+                {suggestionError ??
+                  (suggestionStatus === "success"
+                    ? "Sugestão enviada. Obrigado!"
+                    : `${suggestionDraft.length}/500 caracteres`)}
+              </div>
+              <Button
+                type="submit"
+                variant="premium"
+                size="sm"
+                className="rounded-full"
+                disabled={authLoading || suggestionStatus === "submitting"}
+              >
+                {suggestionStatus === "submitting" ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : null}
+                {user ? "Enviar sugestão" : "Entrar para enviar"}
+              </Button>
+            </div>
+          </form>
         </DialogContent>
       </Dialog>
 

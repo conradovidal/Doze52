@@ -15,6 +15,7 @@ export type CalendarPackCategory = {
   key: string;
   name: string;
   color: string;
+  legacyNames?: string[];
 };
 
 export type CalendarPackEvent = {
@@ -27,6 +28,7 @@ export type CalendarPackEvent = {
   city: string;
   venue: string;
   phase: string;
+  competition?: string;
   group?: string;
   homeTeam: string;
   awayTeam: string;
