@@ -52,6 +52,7 @@ export type CalendarPack = {
     id: string;
     label: string;
     optionLabel: string;
+    selectionMode: "replace";
   };
   year: number;
   datasetStatus: "seed" | "complete";

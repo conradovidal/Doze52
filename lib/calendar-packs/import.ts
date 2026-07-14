@@ -105,8 +105,8 @@ const getWorldCupEventTitle = (event: CalendarPackEvent) => {
 
   const score = event.result?.match(/^(\d+)\s*x\s*(\d+)/i);
   return score
-    ? `${homeFlag} ${score[1]} x ${score[2]} ${awayFlag}`
-    : `${homeFlag} x ${awayFlag}`;
+    ? `${homeFlag}${score[1]}x${score[2]}${awayFlag}`
+    : `${homeFlag}x${awayFlag}`;
 };
 
 export const getCalendarPackEventTitle = (
@@ -288,6 +288,19 @@ export const getCalendarPackEventNotes = (
     return getHolidayEventNotes(event);
   }
 
+  if (pack.id.startsWith("brasileirao-2026")) {
+    return [
+      `Horário: ${event.time} (${event.timezone})`,
+      `Local: ${event.venue} - ${event.city}`,
+      `Fase: ${event.phase}`,
+      ...(event.notes ?? []),
+      `Fonte: ${event.source}`,
+      `Verificado em: ${event.lastVerified}`,
+    ]
+      .filter(Boolean)
+      .join("\n");
+  }
+
   const phase = event.group ? `${event.phase} - Grupo ${event.group}` : event.phase;
   return [
     `Horario: ${event.time} (${event.timezone})`,
@@ -332,6 +345,15 @@ export const getCalendarPackAvailability = (
   const packCategories = pack.categories
     .map((packCategory) => findPackCategoryAnywhere(snapshot.categories, packCategory))
     .filter(Boolean) as CategoryItem[];
+  const legacyCategories = (pack.legacyCategoryIds ?? [])
+    .map((categoryId) =>
+      snapshot.categories.find((category) => category.id === categoryId)
+    )
+    .filter(Boolean) as CategoryItem[];
+  const allPackCategories = [...packCategories, ...legacyCategories].filter(
+    (category, index, categories) =>
+      categories.findIndex((candidate) => candidate.id === category.id) === index
+  );
   const eventsById = new Map(snapshot.events.map((event) => [event.id, event]));
   const categoryIdByKey = new Map(pack.categories.map((category) => [category.key, category.id]));
   const importedEvents = pack.events.filter((event) =>
@@ -356,13 +378,13 @@ export const getCalendarPackAvailability = (
             event.recurrenceUntil !== packEvent.recurrenceUntil))
     );
   });
-  const profileId = packCategories[0]?.profileId ?? profile?.id ?? null;
+  const profileId = allPackCategories[0]?.profileId ?? profile?.id ?? null;
 
   return {
     profileId,
     hasProfile: Boolean(profile),
-    categoryIds: packCategories.map((category) => category.id),
-    hasAnyCategory: packCategories.length > 0,
+    categoryIds: allPackCategories.map((category) => category.id),
+    hasAnyCategory: allPackCategories.length > 0,
     hasImportedEvents: importedEvents.length > 0,
     hasMismatchedEvents,
     importedEventCount: importedEvents.length,
@@ -370,6 +392,70 @@ export const getCalendarPackAvailability = (
     brazilEventCount: importedBrazilEvents.length,
     totalBrazilEventCount: pack.events.filter((event) => event.isBrazilMatch).length,
   };
+};
+
+const getAllPackEventIds = (pack: CalendarPack) =>
+  new Set(pack.events.flatMap(getPackEventIds));
+
+export const isCalendarPackVariantInstalled = (
+  snapshot: CalendarSnapshot,
+  pack: CalendarPack,
+  variants: readonly CalendarPack[]
+) => {
+  if (variants.length === 1) {
+    const availability = getCalendarPackAvailability(snapshot, pack);
+    return availability.hasAnyCategory || availability.hasImportedEvents;
+  }
+
+  const siblingEventIds = new Set(
+    variants
+      .filter((variant) => variant.id !== pack.id)
+      .flatMap((variant) => variant.events.flatMap(getPackEventIds))
+  );
+  const exclusiveEventIds = pack.events
+    .flatMap(getPackEventIds)
+    .filter((eventId) => !siblingEventIds.has(eventId));
+
+  return snapshot.events.some((event) => exclusiveEventIds.includes(event.id));
+};
+
+export const importCalendarPackVariant = (
+  snapshot: CalendarSnapshot,
+  pack: CalendarPack,
+  variants: readonly CalendarPack[],
+  selection: CalendarPackSelection,
+  targetProfileId: string
+): CalendarPackImportResult => {
+  if (pack.variantGroup?.selectionMode !== "replace" || variants.length === 1) {
+    return importCalendarPack(snapshot, pack, selection, targetProfileId);
+  }
+
+  const selectedEventIds = getAllPackEventIds(pack);
+  const siblingExclusiveEventIds = new Set(
+    variants
+      .filter((variant) => variant.id !== pack.id)
+      .flatMap((variant) => variant.events.flatMap(getPackEventIds))
+      .filter((eventId) => !selectedEventIds.has(eventId))
+  );
+  const eventsWithoutPreviousVariant = snapshot.events.filter(
+    (event) => !siblingExclusiveEventIds.has(event.id)
+  );
+  const removedEventCount = snapshot.events.length - eventsWithoutPreviousVariant.length;
+  const categoriesWithoutEmptyLegacy = snapshot.categories.filter(
+    (category) =>
+      !(pack.legacyCategoryIds ?? []).includes(category.id) ||
+      eventsWithoutPreviousVariant.some((event) => event.categoryId === category.id)
+  );
+  const cleanedSnapshot = {
+    ...snapshot,
+    categories: categoriesWithoutEmptyLegacy,
+    events: eventsWithoutPreviousVariant,
+  };
+  const result = importCalendarPack(cleanedSnapshot, pack, selection, targetProfileId);
+
+  return removedEventCount > 0 && result.status === "already-exists"
+    ? { ...result, status: "updated" }
+    : result;
 };
 
 export const findCalendarPackByProfileId = (
@@ -609,7 +695,8 @@ export const importCalendarPack = (
 
 export const removeCalendarPack = (
   snapshot: CalendarSnapshot,
-  pack: CalendarPack
+  pack: CalendarPack,
+  relatedPacks: readonly CalendarPack[] = [pack]
 ): CalendarPackRemovalResult => {
   const profile = findPackProfile(snapshot.profiles, pack);
   const categoryIdsToRemove = new Set<string>(
@@ -621,10 +708,16 @@ export const removeCalendarPack = (
       ...(pack.legacyCategoryIds ?? []),
     ]
   );
-  const packEventIds = new Set(pack.events.flatMap(getPackEventIds));
-
+  const packEventIds = new Set(
+    relatedPacks.flatMap((relatedPack) => relatedPack.events.flatMap(getPackEventIds))
+  );
+  const eventsWithoutPack = snapshot.events.filter(
+    (event) => !packEventIds.has(event.id)
+  );
   const nextCategoriesWithoutPack = snapshot.categories.filter(
-    (category) => !categoryIdsToRemove.has(category.id)
+    (category) =>
+      !categoryIdsToRemove.has(category.id) ||
+      eventsWithoutPack.some((event) => event.categoryId === category.id)
   );
   const shouldRemoveProfile = profile
     ? !nextCategoriesWithoutPack.some((category) => category.profileId === profile.id)
@@ -633,9 +726,7 @@ export const removeCalendarPack = (
   const nextProfiles = shouldRemoveProfile
     ? snapshot.profiles.filter((entry) => entry.id !== profileIdToRemove)
     : snapshot.profiles;
-  const nextEvents = snapshot.events.filter(
-    (event) => !packEventIds.has(event.id) && !categoryIdsToRemove.has(event.categoryId)
-  );
+  const nextEvents = eventsWithoutPack;
 
   return {
     snapshot: {

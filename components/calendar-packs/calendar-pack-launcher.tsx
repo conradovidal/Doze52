@@ -31,7 +31,8 @@ import {
 import { calendarPacks } from "@/lib/calendar-packs";
 import {
   getCalendarPackAvailability,
-  importCalendarPack,
+  importCalendarPackVariant,
+  isCalendarPackVariantInstalled,
   removeCalendarPack,
 } from "@/lib/calendar-packs/import";
 import type {
@@ -52,17 +53,6 @@ type PackFlowState =
   | "removing"
   | "removed"
   | "error";
-
-const statusCopy: Record<PackFlowState, string> = {
-  idle: "Disponível",
-  partial: "Atualização",
-  adding: "Adicionando...",
-  added: "Adicionado",
-  exists: "Adicionado",
-  removing: "Removendo...",
-  removed: "Removido",
-  error: "Erro",
-};
 
 function RacingHelmetIcon({ className }: { className?: string }) {
   return (
@@ -189,28 +179,32 @@ export function CalendarPackLauncher({
   );
   const packUpdateCount = React.useMemo(
     () =>
-      calendarPacks.filter((pack) => {
+      calendarPackCards.filter(({ variants }) => {
+        const isPresent = variants.some((pack) => {
+          const availability = availabilityByPack.get(pack.id);
+          return availability?.hasAnyCategory || availability?.hasImportedEvents;
+        });
+        const pack =
+          variants.find((candidate) =>
+            isCalendarPackVariantInstalled(snapshot, candidate, variants)
+          ) ?? variants[0];
         const availability = availabilityByPack.get(pack.id);
         if (!availability) return false;
-        const isPresent =
-          Boolean(availability.hasAnyCategory) ||
-          Boolean(availability.hasImportedEvents);
         const isComplete =
           availability.importedEventCount >= availability.totalEventCount &&
           !availability.hasMismatchedEvents;
         return isPresent && !isComplete;
       }).length,
-    [availabilityByPack]
+    [availabilityByPack, snapshot]
   );
   const hasPackUpdates = packUpdateCount > 0;
   const subscribedPackCount = React.useMemo(
     () =>
-      calendarPacks.filter((pack) => {
-        const availability = availabilityByPack.get(pack.id);
-        return (
-          Boolean(availability?.hasAnyCategory) ||
-          Boolean(availability?.hasImportedEvents)
-        );
+      calendarPackCards.filter(({ variants }) => {
+        return variants.some((pack) => {
+          const availability = availabilityByPack.get(pack.id);
+          return availability?.hasAnyCategory || availability?.hasImportedEvents;
+        });
       }).length,
     [availabilityByPack]
   );
@@ -275,11 +269,15 @@ export function CalendarPackLauncher({
   }, []);
 
   const handleImport = React.useCallback(
-    (pack: CalendarPack, targetProfileId: string | null) => {
-      const availability = availabilityByPack.get(pack.id);
-      const isPresent =
-        Boolean(availability?.hasAnyCategory) ||
-        Boolean(availability?.hasImportedEvents);
+    (
+      pack: CalendarPack,
+      variants: readonly CalendarPack[],
+      targetProfileId: string | null
+    ) => {
+      const isPresent = variants.some((variant) => {
+        const availability = availabilityByPack.get(variant.id);
+        return availability?.hasAnyCategory || availability?.hasImportedEvents;
+      });
 
       if (!isPresent && isCalendarSubscriptionLimitReached) {
         setUpgradeDialogOpen(true);
@@ -298,7 +296,13 @@ export function CalendarPackLauncher({
       setPackFlow(pack.id, "adding");
 
       try {
-        const result = importCalendarPack(snapshot, pack, "all", targetProfileId);
+        const result = importCalendarPackVariant(
+          snapshot,
+          pack,
+          variants,
+          "all",
+          targetProfileId
+        );
         replaceAllData(result.snapshot);
         focusPack(pack, result.profileId);
         setExpandedPackId(null);
@@ -346,11 +350,11 @@ export function CalendarPackLauncher({
   );
 
   const handleRemove = React.useCallback(
-    (pack: CalendarPack) => {
+    (pack: CalendarPack, variants: readonly CalendarPack[]) => {
       setPackFlow(pack.id, "removing");
 
       try {
-        const result = removeCalendarPack(snapshot, pack);
+        const result = removeCalendarPack(snapshot, pack, variants);
         replaceAllData(result.snapshot);
         onFocusYear?.(pack.year);
         setPackFlow(pack.id, "removed");
@@ -402,7 +406,7 @@ export function CalendarPackLauncher({
       </Button>
 
       <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogContent className="max-h-[calc(100dvh-1.5rem)] overflow-y-auto sm:max-w-[600px]">
+        <DialogContent className="max-h-[calc(100dvh-1.5rem)] overflow-y-auto p-4 sm:max-w-[600px] sm:p-6">
           <DialogHeader className="pr-8 text-left">
             <DialogTitle>Calendários</DialogTitle>
             <DialogDescription>
@@ -419,15 +423,22 @@ export function CalendarPackLauncher({
           <div className="grid gap-2 rounded-[8px] border border-border/75 bg-background p-2.5 shadow-sm sm:p-3">
             {calendarPackCards.map(({ key, variants }) => {
               const selectedPackId = selectedVariantByGroup[key];
-              const installedVariant = variants.find((candidate) => {
+              const selectedVariant = variants.find(
+                (candidate) => candidate.id === selectedPackId
+              );
+              const groupIsPresent = variants.some((candidate) => {
                 const candidateAvailability = availabilityByPack.get(candidate.id);
                 return (
                   Boolean(candidateAvailability?.hasAnyCategory) ||
                   Boolean(candidateAvailability?.hasImportedEvents)
                 );
               });
+              const installedVariant =
+                variants.find((candidate) =>
+                  isCalendarPackVariantInstalled(snapshot, candidate, variants)
+                ) ?? (groupIsPresent ? selectedVariant ?? variants[0] : undefined);
               const pack =
-                variants.find((candidate) => candidate.id === selectedPackId) ??
+                selectedVariant ??
                 installedVariant ??
                 variants[0];
               const availability = availabilityByPack.get(pack.id);
@@ -437,23 +448,20 @@ export function CalendarPackLauncher({
               const isComplete =
                 importedEventCount >= totalEventCount &&
                 !availability?.hasMismatchedEvents;
-              const isPresent =
-                Boolean(availability?.hasAnyCategory) ||
-                Boolean(availability?.hasImportedEvents);
+              const isPresent = groupIsPresent;
               const currentFlow = flowByPack[pack.id] ?? "idle";
-              const displayedState =
-                currentFlow !== "idle"
-                  ? currentFlow
-                  : isPresent
-                    ? isComplete
-                      ? "exists"
-                      : "partial"
-                    : "idle";
               const isBusy =
-                displayedState === "adding" || displayedState === "removing";
+                currentFlow === "adding" || currentFlow === "removing";
+              const isSwitchingVariant = Boolean(
+                installedVariant && installedVariant.id !== pack.id
+              );
+              const needsUpdate = isPresent && (!isComplete || isSwitchingVariant);
               const targetProfileId = getTargetProfileId(
                 pack.id,
-                availability?.profileId
+                availability?.profileId ??
+                  (installedVariant
+                    ? availabilityByPack.get(installedVariant.id)?.profileId
+                    : null)
               );
               const targetProfileName = targetProfileId
                 ? profileNameById.get(targetProfileId)
@@ -470,92 +478,60 @@ export function CalendarPackLauncher({
                       "border-foreground/16 bg-background shadow-[0_12px_24px_-24px_rgba(15,23,42,0.28)]"
                   )}
                 >
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex min-w-0 flex-1 gap-2.5">
-                      <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-[8px] border border-border/65 bg-background text-muted-foreground">
-                        <CalendarPackIcon icon={pack.icon} className="size-4" />
-                      </span>
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
+                  <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
+                    <div className="min-w-0">
+                      <div className="flex min-w-0 items-center gap-2.5">
+                        <CalendarPackIcon
+                          icon={pack.icon}
+                          className="size-4 shrink-0 text-muted-foreground"
+                        />
+                        <div className="min-w-0">
                           <h4 className="text-sm font-medium text-foreground">
                             {pack.name}
                           </h4>
-                          <span
-                            className={cn(
-                              "rounded-full px-2 py-0.5 text-[11px]",
-                              displayedState === "error"
-                                ? "bg-destructive/10 text-destructive"
-                                : displayedState === "partial"
-                                  ? "bg-rose-500/10 text-rose-700 dark:bg-rose-400/10 dark:text-rose-200"
-                                  : "bg-muted text-muted-foreground"
-                            )}
-                          >
-                            {isBusy ? (
-                              <span className="inline-flex items-center gap-1.5">
-                                <Loader2 className="size-3 animate-spin" />
-                                {statusCopy[displayedState]}
-                              </span>
-                            ) : (
-                              statusCopy[displayedState]
-                            )}
-                          </span>
                         </div>
-                        <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                          {pack.description}
-                        </p>
-                        {variantGroup && variants.length > 1 ? (
-                          <div className="mt-2 flex items-center gap-2">
-                            <span className="text-[11px] font-medium text-muted-foreground">
-                              {variantGroup.label}
-                            </span>
-                            <Select
-                              value={pack.id}
-                              onValueChange={(packId) => {
-                                setSelectedVariantByGroup((current) => ({
-                                  ...current,
-                                  [key]: packId,
-                                }));
-                                setExpandedPackId(null);
-                              }}
-                            >
-                              <SelectTrigger
-                                size="sm"
-                                className="h-7 w-[11.5rem] rounded-[8px] border-border bg-card px-2.5 text-xs shadow-none hover:border-foreground/18 hover:bg-muted"
-                                aria-label={`${variantGroup.label} para feriados estaduais`}
-                              >
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent align="start">
-                                {variants.map((variant) => {
-                                  const variantAvailability = availabilityByPack.get(
-                                    variant.id
-                                  );
-                                  const variantIsPresent =
-                                    Boolean(variantAvailability?.hasAnyCategory) ||
-                                    Boolean(variantAvailability?.hasImportedEvents);
-
-                                  return (
-                                    <SelectItem key={variant.id} value={variant.id}>
-                                      <span>{variant.variantGroup?.optionLabel}</span>
-                                      {variantIsPresent ? (
-                                        <span className="text-[10px] text-muted-foreground">
-                                          Adicionado
-                                        </span>
-                                      ) : null}
-                                    </SelectItem>
-                                  );
-                                })}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        ) : null}
                       </div>
+                      <p className="mt-1.5 text-xs leading-5 text-muted-foreground">
+                        {pack.description}
+                      </p>
+                      {variantGroup && variants.length > 1 ? (
+                        <div className="mt-2 flex items-center gap-2">
+                          <span className="text-[11px] font-medium text-muted-foreground">
+                            {variantGroup.label}
+                          </span>
+                          <Select
+                            value={pack.id}
+                            onValueChange={(packId) => {
+                              setSelectedVariantByGroup((current) => ({
+                                ...current,
+                                [key]: packId,
+                              }));
+                              setExpandedPackId(null);
+                            }}
+                          >
+                            <SelectTrigger
+                              size="sm"
+                              className="h-7 w-[11.5rem] rounded-[8px] border-border bg-card px-2.5 text-xs shadow-none hover:border-foreground/18 hover:bg-muted"
+                              aria-label={`${variantGroup.label} para ${pack.name}`}
+                            >
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent align="start">
+                              {variants.map((variant) => (
+                                <SelectItem key={variant.id} value={variant.id}>
+                                  {variant.variantGroup?.optionLabel}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      ) : null}
                     </div>
 
-                    <div className="flex shrink-0 flex-wrap gap-1.5 sm:justify-end sm:gap-2">
+                    <div className="flex shrink-0 flex-col items-end gap-1.5 sm:flex-row sm:flex-wrap sm:justify-end sm:gap-2">
                       {isPresent ? (
                         <>
-                          {!isComplete ? (
+                          {needsUpdate ? (
                             <Button
                               type="button"
                               variant="premium"
@@ -565,11 +541,19 @@ export function CalendarPackLauncher({
                               onClick={() =>
                                 handleImport(
                                   pack,
+                                  variants,
                                   availability?.profileId ?? targetProfileId
                                 )
                               }
                             >
-                              Atualizar
+                              {currentFlow === "adding" ? (
+                                <Loader2 className="size-3.5 animate-spin" />
+                              ) : null}
+                              {isSwitchingVariant
+                                ? variantGroup?.label === "Estado"
+                                  ? "Trocar estado"
+                                  : "Trocar time"
+                                : "Atualizar"}
                             </Button>
                           ) : null}
                           <Button
@@ -578,9 +562,13 @@ export function CalendarPackLauncher({
                             size="xs"
                             className="rounded-full"
                             disabled={isBusy}
-                            onClick={() => handleRemove(pack)}
+                            onClick={() => handleRemove(pack, variants)}
                           >
-                            <Trash2 className="size-3.5" />
+                            {currentFlow === "removing" ? (
+                              <Loader2 className="size-3.5 animate-spin" />
+                            ) : (
+                              <Trash2 className="size-3.5" />
+                            )}
                             Remover
                           </Button>
                         </>
@@ -621,7 +609,9 @@ export function CalendarPackLauncher({
                             size="icon-xs"
                             className="rounded-[9px]"
                             disabled={isBusy || !targetProfileId}
-                            onClick={() => handleImport(pack, targetProfileId)}
+                            onClick={() =>
+                              handleImport(pack, variants, targetProfileId)
+                            }
                             aria-label={
                               targetProfileName
                                 ? `Adicionar calendário ${pack.name} ao perfil ${targetProfileName}`
@@ -633,7 +623,7 @@ export function CalendarPackLauncher({
                                 : "Escolha um perfil"
                             }
                           >
-                            {displayedState === "adding" ? (
+                            {currentFlow === "adding" ? (
                               <Loader2 className="size-3.5 animate-spin" />
                             ) : (
                               <Check className="size-3.5" />
@@ -657,7 +647,8 @@ export function CalendarPackLauncher({
                           }}
                         >
                           <Plus className="size-3.5" />
-                          Adicionar calendário
+                          <span className="sm:hidden">Adicionar</span>
+                          <span className="hidden sm:inline">Adicionar calendário</span>
                         </Button>
                       )}
                     </div>
