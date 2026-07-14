@@ -479,53 +479,51 @@ export function CalendarPackLauncher({
                   )}
                 >
                   <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
-                    <div className="min-w-0">
-                      <div className="flex min-w-0 items-center gap-2.5">
-                        <CalendarPackIcon
-                          icon={pack.icon}
-                          className="size-4 shrink-0 text-muted-foreground"
-                        />
-                        <div className="min-w-0">
-                          <h4 className="text-sm font-medium text-foreground">
-                            {pack.name}
-                          </h4>
-                        </div>
-                      </div>
-                      <p className="mt-1.5 text-xs leading-5 text-muted-foreground">
-                        {pack.description}
-                      </p>
-                      {variantGroup && variants.length > 1 ? (
-                        <div className="mt-2 flex items-center gap-2">
-                          <span className="text-[11px] font-medium text-muted-foreground">
-                            {variantGroup.label}
-                          </span>
-                          <Select
-                            value={pack.id}
-                            onValueChange={(packId) => {
-                              setSelectedVariantByGroup((current) => ({
-                                ...current,
-                                [key]: packId,
-                              }));
-                              setExpandedPackId(null);
-                            }}
-                          >
-                            <SelectTrigger
-                              size="sm"
-                              className="h-7 w-[11.5rem] rounded-[8px] border-border bg-card px-2.5 text-xs shadow-none hover:border-foreground/18 hover:bg-muted"
-                              aria-label={`${variantGroup.label} para ${pack.name}`}
+                    <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-x-2.5">
+                      <CalendarPackIcon
+                        icon={pack.icon}
+                        className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+                      />
+                      <div className="min-w-0">
+                        <h4 className="text-sm font-medium text-foreground">
+                          {pack.name}
+                        </h4>
+                        <p className="mt-1.5 text-xs leading-5 text-muted-foreground">
+                          {pack.description}
+                        </p>
+                        {variantGroup && variants.length > 1 ? (
+                          <div className="mt-2 flex items-center gap-2">
+                            <span className="text-[11px] font-medium text-muted-foreground">
+                              {variantGroup.label}
+                            </span>
+                            <Select
+                              value={pack.id}
+                              onValueChange={(packId) => {
+                                setSelectedVariantByGroup((current) => ({
+                                  ...current,
+                                  [key]: packId,
+                                }));
+                                setExpandedPackId(null);
+                              }}
                             >
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent align="start">
-                              {variants.map((variant) => (
-                                <SelectItem key={variant.id} value={variant.id}>
-                                  {variant.variantGroup?.optionLabel}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      ) : null}
+                              <SelectTrigger
+                                size="sm"
+                                className="h-7 w-[11.5rem] rounded-[8px] border-border bg-card px-2.5 text-xs shadow-none hover:border-foreground/18 hover:bg-muted"
+                                aria-label={`${variantGroup.label} para ${pack.name}`}
+                              >
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent align="start">
+                                {variants.map((variant) => (
+                                  <SelectItem key={variant.id} value={variant.id}>
+                                    {variant.variantGroup?.optionLabel}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        ) : null}
+                      </div>
                     </div>
 
                     <div className="flex shrink-0 flex-col items-end gap-1.5 sm:flex-row sm:flex-wrap sm:justify-end sm:gap-2">

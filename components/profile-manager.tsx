@@ -39,7 +39,7 @@ export type ProfileManagerIntent =
 type ProfileManagerProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  intent?: ProfileManagerIntent;
+  intent: ProfileManagerIntent | null;
   onRequireAuth?: () => void;
 };
 
@@ -55,27 +55,21 @@ export function ProfileManager({
   const updateProfile = useStore((s) => s.updateProfile);
   const deleteProfile = useStore((s) => s.deleteProfile);
 
-  const [editorMode, setEditorMode] = React.useState<"create" | "edit">("edit");
-  const [editingProfileId, setEditingProfileId] = React.useState<string | null>(null);
   const [name, setName] = React.useState("");
   const [icon, setIcon] = React.useState<ProfileIconId>(DEFAULT_PROFILE_ICON);
   const [deleteTargetProfileId, setDeleteTargetProfileId] = React.useState<string>("");
   const [confirmDeleteOpen, setConfirmDeleteOpen] = React.useState(false);
   const [isSaving, setIsSaving] = React.useState(false);
   const [saveError, setSaveError] = React.useState<string | null>(null);
-  const initializedRef = React.useRef(false);
-
   const editingProfile = React.useMemo(
     () =>
-      editorMode === "edit"
-        ? profiles.find((profile) => profile.id === editingProfileId) ?? null
+      intent?.mode === "edit"
+        ? profiles.find((profile) => profile.id === intent.profileId) ?? null
         : null,
-    [editorMode, profiles, editingProfileId]
+    [intent, profiles]
   );
 
   const startCreate = React.useCallback(() => {
-    setEditorMode("create");
-    setEditingProfileId(null);
     setName("");
     setIcon(DEFAULT_PROFILE_ICON);
     setDeleteTargetProfileId("");
@@ -84,11 +78,7 @@ export function ProfileManager({
   }, []);
 
   const startEdit = React.useCallback(
-    (profileId: string) => {
-      const profile = profiles.find((entry) => entry.id === profileId);
-      if (!profile) return;
-      setEditorMode("edit");
-      setEditingProfileId(profile.id);
+    (profile: (typeof profiles)[number]) => {
       setName(profile.name);
       setIcon(profile.icon);
       const fallbackReassign = profiles.find((entry) => entry.id !== profile.id)?.id ?? "";
@@ -99,18 +89,16 @@ export function ProfileManager({
     [profiles]
   );
 
-  React.useEffect(() => {
-    if (!open) {
-      initializedRef.current = false;
-      return;
-    }
-    if (initializedRef.current) return;
-    initializedRef.current = true;
+  const showMissingIntentError = React.useCallback((message: string) => {
+    setName("");
+    setIcon(DEFAULT_PROFILE_ICON);
+    setDeleteTargetProfileId("");
+    setConfirmDeleteOpen(false);
+    setSaveError(message);
+  }, []);
 
-    if (profiles.length === 0) {
-      startCreate();
-      return;
-    }
+  React.useEffect(() => {
+    if (!open) return;
 
     if (intent?.mode === "create") {
       startCreate();
@@ -118,47 +106,19 @@ export function ProfileManager({
     }
 
     if (intent?.mode === "edit") {
-      const intendedProfile = profiles.find((profile) => profile.id === intent.profileId);
-      if (intendedProfile) {
-        startEdit(intendedProfile.id);
+      if (editingProfile) {
+        startEdit(editingProfile);
         return;
       }
+      showMissingIntentError("Este perfil não foi encontrado. Feche e tente novamente.");
+      return;
     }
 
-    const preferredId =
-      editingProfileId && profiles.some((profile) => profile.id === editingProfileId)
-        ? editingProfileId
-        : profiles[0]?.id;
-    if (!preferredId) {
-      startCreate();
-      return;
-    }
-    startEdit(preferredId);
-  }, [open, intent, profiles, editingProfileId, startCreate, startEdit]);
+    showMissingIntentError("Não foi possível identificar a ação solicitada.");
+  }, [editingProfile, intent, open, showMissingIntentError, startCreate, startEdit]);
 
-  React.useEffect(() => {
-    if (!open || editorMode !== "edit") return;
-    if (profiles.length === 0) {
-      startCreate();
-      return;
-    }
-    if (!editingProfileId) {
-      startEdit(profiles[0].id);
-      return;
-    }
-    const current = profiles.find((profile) => profile.id === editingProfileId);
-    if (!current) {
-      startEdit(profiles[0].id);
-      return;
-    }
-    const fallbackReassign = profiles.find((entry) => entry.id !== current.id)?.id ?? "";
-    setDeleteTargetProfileId(fallbackReassign);
-    setName(current.name);
-    setIcon(current.icon);
-  }, [open, editorMode, profiles, editingProfileId, startCreate, startEdit]);
-
-  const isEditMode = editorMode === "edit";
-  const isCreateIntent = editorMode === "create" || intent?.mode === "create";
+  const isEditMode = intent?.mode === "edit";
+  const isCreateIntent = intent?.mode === "create";
   const isCreateBlocked =
     open &&
     isCreateIntent &&
@@ -166,15 +126,15 @@ export function ProfileManager({
     isLimitReached(profiles.length, limits.maxProfiles);
   const normalizedName = name.trim().slice(0, PROFILE_NAME_MAX_LENGTH).trim();
   const canSave =
-    normalizedName.length > 0 && (editorMode === "create" || Boolean(editingProfile));
-  const canDelete = isEditMode && profiles.length > 1;
+    normalizedName.length > 0 && (isCreateIntent || Boolean(editingProfile));
+  const canDelete = isEditMode && Boolean(editingProfile) && profiles.length > 1;
 
   const handleSave = async () => {
     if (!canSave) return;
     try {
       setIsSaving(true);
       setSaveError(null);
-      if (editorMode === "edit") {
+      if (isEditMode) {
         if (!editingProfile) return;
         updateProfile(editingProfile.id, {
           name: normalizedName,
