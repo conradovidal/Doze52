@@ -3,6 +3,7 @@ import type { CalendarPack } from "./types";
 
 export const formula12026Pack = {
   ...(packData as CalendarPack),
+  version: 1,
   name: "Corridas F1",
   icon: "racing-helmet",
   description: "Todas as etapas da temporada 2026 em um calendário.",

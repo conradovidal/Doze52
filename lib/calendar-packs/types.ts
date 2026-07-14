@@ -46,6 +46,7 @@ export type CalendarPackEvent = {
 
 export type CalendarPack = {
   id: string;
+  version: number;
   name: string;
   description: string;
   eyebrow?: string;

@@ -74,6 +74,7 @@ export function EventDialog({
   const [recurrenceUntil, setRecurrenceUntil] = React.useState("");
   const [isSaving, setIsSaving] = React.useState(false);
   const [submitError, setSubmitError] = React.useState<string | null>(null);
+  const isManagedEvent = Boolean(initialEvent?.calendarPackGroupId);
 
   const categoryById = React.useMemo(
     () => new Map(categories.map((category) => [category.id, category])),
@@ -89,13 +90,32 @@ export function EventDialog({
     ? categoryById.get(initialEvent.categoryId)?.profileId ?? ""
     : "";
 
-  const profileOptions = profiles;
+  const profileOptions = React.useMemo(
+    () =>
+      profiles.filter(
+        (profile) =>
+          (isManagedEvent && profile.id === initialProfileFromEvent) ||
+          categories.some(
+            (category) =>
+              category.profileId === profile.id &&
+              (!category.calendarPackGroupId ||
+                (!initialEvent?.calendarPackGroupId &&
+                  category.id === initialEvent?.categoryId))
+          )
+      ),
+    [categories, initialEvent, initialProfileFromEvent, isManagedEvent, profiles]
+  );
   const selectedProfileId = selectedProfileIds[0] ?? "";
 
   const categoriesForProfile = React.useMemo(() => {
     if (!profileId) return [];
-    return categories.filter((category) => category.profileId === profileId);
-  }, [categories, profileId]);
+    return categories.filter(
+      (category) =>
+        category.profileId === profileId &&
+        (!category.calendarPackGroupId ||
+          category.id === initialEvent?.categoryId)
+    );
+  }, [categories, initialEvent?.categoryId, profileId]);
 
   const currentCategory = React.useMemo(
     () => categories.find((category) => category.id === categoryId) ?? null,
@@ -125,9 +145,10 @@ export function EventDialog({
 
     const nextProfileId =
       initialProfileFromEvent ||
-      selectedProfileId ||
+      (profileOptions.some((profile) => profile.id === selectedProfileId)
+        ? selectedProfileId
+        : "") ||
       profileOptions[0]?.id ||
-      profiles[0]?.id ||
       "";
     setProfileId(nextProfileId);
 
@@ -173,6 +194,7 @@ export function EventDialog({
 
   const isRecurring = recurrenceType !== "none";
   const canSave =
+    !isManagedEvent &&
     title.trim().length > 0 &&
     startDate.length > 0 &&
     endDate.length > 0 &&
@@ -187,9 +209,17 @@ export function EventDialog({
         className="sm:max-w-[520px] p-5 sm:p-6"
       >
         <DialogHeader>
-          <DialogTitle>{initialEvent ? "Editar evento" : "Novo evento"}</DialogTitle>
+          <DialogTitle>
+            {isManagedEvent
+              ? "Detalhes do evento"
+              : initialEvent
+                ? "Editar evento"
+                : "Novo evento"}
+          </DialogTitle>
           <DialogDescription>
-            Defina o essencial primeiro: título, datas e categoria. Os detalhes entram depois.
+            {isManagedEvent
+              ? "Este evento faz parte de um calendário pronto e é atualizado automaticamente."
+              : "Defina o essencial primeiro: título, datas e categoria. Os detalhes entram depois."}
           </DialogDescription>
         </DialogHeader>
 
@@ -203,6 +233,7 @@ export function EventDialog({
               className="h-10 rounded-xl text-[15px]"
               placeholder="Ex.: Reunião de planejamento"
               value={title}
+              disabled={isManagedEvent}
               onChange={(event) => setTitle(event.target.value)}
             />
           </div>
@@ -217,6 +248,7 @@ export function EventDialog({
                 className="h-10 rounded-xl"
                 type="date"
                 value={startDate}
+                disabled={isManagedEvent}
                 onChange={(event) => {
                   const nextStartDate = event.target.value;
                   setStartDate(nextStartDate);
@@ -237,6 +269,7 @@ export function EventDialog({
                 type="date"
                 min={startDate || undefined}
                 value={endDate}
+                disabled={isManagedEvent}
                 onChange={(event) => setEndDate(event.target.value)}
               />
             </div>
@@ -245,7 +278,11 @@ export function EventDialog({
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-1">
               <label className={FIELD_LABEL_CLASS}>Perfil</label>
-              <Select value={profileId} onValueChange={handleProfileSelect}>
+              <Select
+                value={profileId}
+                onValueChange={handleProfileSelect}
+                disabled={isManagedEvent}
+              >
                 <SelectTrigger
                   size="sm"
                   className={`${CHIP_TRIGGER_CLASS} border-border/80 bg-background text-foreground hover:bg-muted/70`}
@@ -270,7 +307,11 @@ export function EventDialog({
 
             <div className="space-y-1">
               <label className={FIELD_LABEL_CLASS}>Categoria</label>
-              <Select value={categoryId} onValueChange={setCategoryId}>
+              <Select
+                value={categoryId}
+                onValueChange={setCategoryId}
+                disabled={isManagedEvent}
+              >
                 <SelectTrigger
                   size="sm"
                   className={`${CHIP_TRIGGER_CLASS} border-border/80 bg-background text-foreground hover:bg-muted/70`}
@@ -323,6 +364,7 @@ export function EventDialog({
               className="min-h-[4.5rem] w-full resize-y rounded-xl border border-border/80 bg-background px-3 py-2 text-sm outline-none transition focus:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
               placeholder="Adicione detalhes úteis para você se lembrar depois"
               value={notes}
+              disabled={isManagedEvent}
               onChange={(event) => setNotes(event.target.value)}
             />
           </div>
@@ -339,6 +381,7 @@ export function EventDialog({
                 <Select
                   value={recurrenceType}
                   onValueChange={(value) => setRecurrenceType(value as RecurrenceDraft)}
+                  disabled={isManagedEvent}
                 >
                   <SelectTrigger className="h-10 rounded-xl border-border/80 bg-background shadow-sm">
                     <span>
@@ -374,6 +417,7 @@ export function EventDialog({
                     type="date"
                     min={startDate || undefined}
                     value={recurrenceUntil}
+                    disabled={isManagedEvent}
                     onChange={(event) => setRecurrenceUntil(event.target.value)}
                   />
                 </div>
@@ -383,7 +427,9 @@ export function EventDialog({
         </div>
 
         <DialogFooter className="gap-2 sm:justify-between">
-          {onDelete ? (
+          {isManagedEvent ? (
+            <div />
+          ) : onDelete ? (
             <Button
               variant="dangerSoft"
               disabled={isSaving}
@@ -415,10 +461,15 @@ export function EventDialog({
             <div />
           )}
 
-          <Button
-            variant="premium"
-            disabled={!canSave || isSaving}
-            onClick={async () => {
+          {isManagedEvent ? (
+            <Button variant="premium" onClick={() => onOpenChange(false)}>
+              Fechar
+            </Button>
+          ) : (
+            <Button
+              variant="premium"
+              disabled={!canSave || isSaving}
+              onClick={async () => {
               try {
                 setIsSaving(true);
                 setSubmitError(null);
@@ -473,11 +524,18 @@ export function EventDialog({
               } finally {
                 setIsSaving(false);
               }
-            }}
-          >
-            {isSaving ? "Salvando..." : "Salvar"}
-          </Button>
+              }}
+            >
+              {isSaving ? "Salvando..." : "Salvar"}
+            </Button>
+          )}
         </DialogFooter>
+
+        {!isManagedEvent && profileOptions.length === 0 ? (
+          <p className="rounded-xl border border-border/70 bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+            Crie uma categoria pessoal para adicionar novos eventos.
+          </p>
+        ) : null}
 
         {submitError ? (
           <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">

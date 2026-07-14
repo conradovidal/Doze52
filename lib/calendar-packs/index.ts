@@ -14,6 +14,9 @@ const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 for (const pack of calendarPacks) {
+  if (!Number.isInteger(pack.version) || pack.version < 1) {
+    throw new Error(`Calendar pack ${pack.id} has an invalid version.`);
+  }
   const persistedIds = [
     pack.profile.id,
     ...pack.categories.map((category) => category.id),

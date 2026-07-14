@@ -246,10 +246,11 @@ const createPack = (
   color: string
 ): CalendarPack => ({
   id: `brasileirao-2026-${teamName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")}`,
+  version: 1,
   name: "Jogos do seu time favorito",
   eyebrow: teamName,
   icon: "soccer-ball",
-  description: "Jogos oficiais de 2026 do time selecionado, em todas as competições.",
+  description: "Jogos oficiais de 2026 em todas as competições. Selecione seu time abaixo.",
   variantGroup: {
     id: "brasileirao-2026-by-team",
     label: "Time",

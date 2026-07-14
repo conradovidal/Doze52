@@ -33,6 +33,8 @@ import {
   type EventInput,
 } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
+import { calendarPacks } from "@/lib/calendar-packs";
+import { reconcileInstalledCalendarPacks } from "@/lib/calendar-packs/import";
 import {
   loadRemoteData,
   saveSnapshot,
@@ -364,6 +366,7 @@ export default function HomePage() {
   const saveTimerRef = React.useRef<number | null>(null);
   const syncOverlayTimerRef = React.useRef<number | null>(null);
   const previousSessionUserIdRef = React.useRef<string | null>(null);
+  const anonymousReconciliationHashRef = React.useRef("");
   const previousRawSyncStateRef = React.useRef<RawSyncState["state"]>("hidden");
   const shouldHideSyncOverlayAfterCloseRef = React.useRef(false);
   const syncOverlayErrorOpenRef = React.useRef(false);
@@ -743,6 +746,43 @@ export default function HomePage() {
   ]);
 
   React.useEffect(() => {
+    if (windowContext !== "main" || authLoading || session?.user.id) return;
+    if (
+      profiles.some((profile) => Boolean(profile.userId)) ||
+      categories.some((category) => Boolean(category.userId)) ||
+      events.some((event) => Boolean(event.userId))
+    ) {
+      return;
+    }
+
+    const snapshot = { profiles, categories, events };
+    const snapshotHash = toSnapshotHash(snapshot);
+    if (anonymousReconciliationHashRef.current === snapshotHash) return;
+
+    const result = reconcileInstalledCalendarPacks(snapshot, calendarPacks);
+    anonymousReconciliationHashRef.current = toSnapshotHash(result.snapshot);
+    if (anonymousReconciliationHashRef.current === snapshotHash) return;
+
+    replaceAllData(result.snapshot);
+    if (result.updatedPackCount > 0) {
+      notify({
+        tone: "success",
+        title: "Calendários atualizados",
+        description: "Os eventos dos seus calendários prontos foram atualizados automaticamente.",
+      });
+    }
+  }, [
+    authLoading,
+    categories,
+    events,
+    notify,
+    profiles,
+    replaceAllData,
+    session?.user.id,
+    windowContext,
+  ]);
+
+  React.useEffect(() => {
     if (windowContext !== "main") return;
     if (calendarCreateOnboarding !== "pending") return;
     if (events.length === 0) return;
@@ -801,6 +841,11 @@ export default function HomePage() {
           nextSnapshot = ensureSnapshotCoverage(remoteSnapshot);
         }
 
+        const reconciliation = reconcileInstalledCalendarPacks(
+          nextSnapshot,
+          calendarPacks
+        );
+        nextSnapshot = reconciliation.snapshot;
         snapshotToPersistOnFailure = nextSnapshot;
 
         const nextHash = toSnapshotHash(nextSnapshot);
@@ -818,6 +863,14 @@ export default function HomePage() {
         lastSyncedHashRef.current = nextHash;
         setRemoteReady(true);
         setSyncBlocked(false);
+        if (reconciliation.updatedPackCount > 0) {
+          notify({
+            tone: "success",
+            title: "Calendários atualizados",
+            description:
+              "Os eventos dos seus calendários prontos foram atualizados automaticamente.",
+          });
+        }
       } catch (error) {
         if (cancelled) return;
 
@@ -863,6 +916,7 @@ export default function HomePage() {
   }, [
     isLocalImported,
     markLocalImported,
+    notify,
     replaceAllData,
     session?.user.id,
     windowContext,
@@ -1452,7 +1506,11 @@ export default function HomePage() {
         seedRange={seedRange}
         anchorPoint={dialogAnchorPoint}
         onSubmit={handleSubmit}
-        onDelete={editingId ? handleDeleteEvent : undefined}
+        onDelete={
+          editingId && !editingEvent?.calendarPackGroupId
+            ? handleDeleteEvent
+            : undefined
+        }
       />
 
       <AuthDialog

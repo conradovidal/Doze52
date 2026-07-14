@@ -28,8 +28,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { useAuth } from "@/lib/auth";
 import { calendarPacks } from "@/lib/calendar-packs";
 import {
   getCalendarPackAvailability,
@@ -42,7 +40,6 @@ import type {
   CalendarPackIconId,
 } from "@/lib/calendar-packs/types";
 import { isLimitReached } from "@/lib/entitlements";
-import { getSupabaseBrowserClient, hasSupabaseEnv } from "@/lib/supabase";
 import { useStore } from "@/lib/store";
 import { useBilling } from "@/lib/use-billing";
 import { cn } from "@/lib/utils";
@@ -146,7 +143,6 @@ export function CalendarPackLauncher({
   onRequireAuth?: () => void;
 }) {
   const { notify } = useFeedback();
-  const { user, loading: authLoading } = useAuth();
   const { isPro, limits } = useBilling();
   const profiles = useStore((state) => state.profiles);
   const categories = useStore((state) => state.categories);
@@ -165,11 +161,6 @@ export function CalendarPackLauncher({
   >({});
   const [expandedPackId, setExpandedPackId] = React.useState<string | null>(null);
   const [upgradeDialogOpen, setUpgradeDialogOpen] = React.useState(false);
-  const [suggestionDraft, setSuggestionDraft] = React.useState("");
-  const [suggestionStatus, setSuggestionStatus] = React.useState<
-    "idle" | "submitting" | "success" | "error"
-  >("idle");
-  const [suggestionError, setSuggestionError] = React.useState<string | null>(null);
 
   const snapshot = React.useMemo(
     () => ({ profiles, categories, events }),
@@ -186,27 +177,6 @@ export function CalendarPackLauncher({
       ),
     [snapshot]
   );
-  const packUpdateCount = React.useMemo(
-    () =>
-      calendarPackCards.filter(({ variants }) => {
-        const isPresent = variants.some((pack) => {
-          const availability = availabilityByPack.get(pack.id);
-          return availability?.hasAnyCategory || availability?.hasImportedEvents;
-        });
-        const pack =
-          variants.find((candidate) =>
-            isCalendarPackVariantInstalled(snapshot, candidate, variants)
-          ) ?? variants[0];
-        const availability = availabilityByPack.get(pack.id);
-        if (!availability) return false;
-        const isComplete =
-          availability.importedEventCount >= availability.totalEventCount &&
-          !availability.hasMismatchedEvents;
-        return isPresent && !isComplete;
-      }).length,
-    [availabilityByPack, snapshot]
-  );
-  const hasPackUpdates = packUpdateCount > 0;
   const subscribedPackCount = React.useMemo(
     () =>
       calendarPackCards.filter(({ variants }) => {
@@ -220,13 +190,8 @@ export function CalendarPackLauncher({
   const isCalendarSubscriptionLimitReached =
     !isPro &&
     isLimitReached(subscribedPackCount, limits.maxCalendarSubscriptions);
-  const updateAriaCopy =
-    packUpdateCount === 1
-      ? "1 atualização disponível"
-      : `${packUpdateCount} atualizações disponíveis`;
-  const launcherAriaCopy = hasPackUpdates
-    ? `Adicionar ou gerenciar calendários. ${updateAriaCopy}`
-    : "Adicionar ou gerenciar calendários. Novos calendários disponíveis.";
+  const launcherAriaCopy =
+    "Adicionar ou gerenciar calendários. Novos calendários disponíveis.";
   const activeProfileId = React.useMemo(
     () =>
       selectedProfileIds.find((profileId) =>
@@ -385,52 +350,6 @@ export function CalendarPackLauncher({
     [notify, onFocusYear, replaceAllData, setPackFlow, snapshot]
   );
 
-  const handleSuggestionSubmit = React.useCallback(
-    async (event: React.FormEvent<HTMLFormElement>) => {
-      event.preventDefault();
-      if (!user) {
-        onRequireAuth?.();
-        return;
-      }
-
-      const suggestion = suggestionDraft.trim();
-      if (suggestion.length < 10 || suggestion.length > 500) {
-        setSuggestionStatus("error");
-        setSuggestionError("Escreva uma sugestão entre 10 e 500 caracteres.");
-        return;
-      }
-      if (!hasSupabaseEnv) {
-        setSuggestionStatus("error");
-        setSuggestionError("Não foi possível conectar ao envio de sugestões.");
-        return;
-      }
-
-      setSuggestionStatus("submitting");
-      setSuggestionError(null);
-      try {
-        const { error } = await getSupabaseBrowserClient()
-          .from("product_feedback_submissions")
-          .insert({
-            raw_text: suggestion,
-            proposed_area: "Calendario",
-          });
-        if (error) throw error;
-
-        setSuggestionDraft("");
-        setSuggestionStatus("success");
-        notify({
-          tone: "success",
-          title: "Sugestão enviada",
-          description: "Obrigado — ela entrou na fila de calendários para avaliar.",
-        });
-      } catch {
-        setSuggestionStatus("error");
-        setSuggestionError("Não foi possível enviar agora. Tente novamente.");
-      }
-    },
-    [notify, onRequireAuth, suggestionDraft, user]
-  );
-
   return (
     <>
       <Button
@@ -446,11 +365,7 @@ export function CalendarPackLauncher({
         )}
         onClick={() => setOpen(true)}
         aria-label={launcherAriaCopy}
-        title={
-          hasPackUpdates
-            ? "Atualizações disponíveis"
-            : "Calendários disponíveis"
-        }
+        title="Calendários disponíveis"
       >
         <Plus className="size-3.5 text-muted-foreground" />
         <span>Calendários</span>
@@ -468,12 +383,6 @@ export function CalendarPackLauncher({
               Adicione calendários prontos ao seu ano.
             </DialogDescription>
           </DialogHeader>
-
-          {hasPackUpdates ? (
-            <div className="rounded-[8px] border border-rose-500/25 bg-rose-500/10 px-3 py-2 text-xs leading-5 text-rose-700 dark:border-rose-300/25 dark:bg-rose-400/10 dark:text-rose-200">
-              Há atualizações disponíveis para calendários já adicionados.
-            </div>
-          ) : null}
 
           <div className="grid gap-2 rounded-[8px] border border-border/75 bg-background p-2.5 shadow-sm sm:p-3">
             {calendarPackCards.map(({ key, variants }) => {
@@ -497,12 +406,6 @@ export function CalendarPackLauncher({
                 installedVariant ??
                 variants[0];
               const availability = availabilityByPack.get(pack.id);
-              const importedEventCount = availability?.importedEventCount ?? 0;
-              const totalEventCount =
-                availability?.totalEventCount ?? pack.events.length;
-              const isComplete =
-                importedEventCount >= totalEventCount &&
-                !availability?.hasMismatchedEvents;
               const isPresent = groupIsPresent;
               const currentFlow = flowByPack[pack.id] ?? "idle";
               const isBusy =
@@ -510,7 +413,6 @@ export function CalendarPackLauncher({
               const isSwitchingVariant = Boolean(
                 installedVariant && installedVariant.id !== pack.id
               );
-              const needsUpdate = isPresent && (!isComplete || isSwitchingVariant);
               const targetProfileId = getTargetProfileId(
                 pack.id,
                 availability?.profileId ??
@@ -547,10 +449,7 @@ export function CalendarPackLauncher({
                           {pack.description}
                         </p>
                         {variantGroup && variants.length > 1 ? (
-                          <div className="mt-2 flex items-center gap-2">
-                            <span className="text-[11px] font-medium text-muted-foreground">
-                              {variantGroup.label}
-                            </span>
+                          <div className="mt-2">
                             <Select
                               value={pack.id}
                               onValueChange={(packId) => {
@@ -563,7 +462,7 @@ export function CalendarPackLauncher({
                             >
                               <SelectTrigger
                                 size="sm"
-                                className="h-7 w-[11.5rem] rounded-[8px] border-border bg-card px-2.5 text-xs shadow-none hover:border-foreground/18 hover:bg-muted"
+                                className="h-7 w-40 max-w-full rounded-[8px] border-border bg-card px-2.5 text-xs shadow-none hover:border-foreground/18 hover:bg-muted sm:w-72"
                                 aria-label={`${variantGroup.label} para ${pack.name}`}
                               >
                                 <SelectValue />
@@ -584,7 +483,7 @@ export function CalendarPackLauncher({
                     <div className="flex shrink-0 flex-col items-end gap-1.5 sm:flex-row sm:flex-wrap sm:justify-end sm:gap-2">
                       {isPresent ? (
                         <>
-                          {needsUpdate ? (
+                          {isSwitchingVariant ? (
                             <Button
                               type="button"
                               variant="premium"
@@ -602,13 +501,11 @@ export function CalendarPackLauncher({
                               {currentFlow === "adding" ? (
                                 <Loader2 className="size-3.5 animate-spin" />
                               ) : null}
-                              {isSwitchingVariant
-                                ? variantGroup?.label === "Estado"
-                                  ? "Trocar estado"
-                                  : variantGroup?.label === "Cobertura"
-                                    ? "Trocar cobertura"
-                                    : "Trocar time"
-                                : "Atualizar"}
+                              {variantGroup?.label === "Estado"
+                                ? "Trocar estado"
+                                : variantGroup?.label === "Cobertura"
+                                  ? "Trocar cobertura"
+                                  : "Trocar time"}
                             </Button>
                           ) : null}
                           <Button
@@ -713,63 +610,6 @@ export function CalendarPackLauncher({
             })}
           </div>
 
-          <form
-            className="rounded-[8px] border border-border/75 bg-muted/15 p-3"
-            onSubmit={handleSuggestionSubmit}
-          >
-            <div>
-              <h3 className="text-sm font-medium text-foreground">
-                Que calendário está faltando?
-              </h3>
-              <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                Pode ser outro time, Fórmula Truck, Pokémon TCG ou qualquer agenda
-                que deixaria seu ano mais útil.
-              </p>
-            </div>
-            <Textarea
-              className="mt-2.5 min-h-20 resize-none rounded-[8px] bg-background"
-              value={suggestionDraft}
-              maxLength={500}
-              disabled={suggestionStatus === "submitting"}
-              aria-invalid={suggestionStatus === "error"}
-              aria-describedby="calendar-suggestion-help"
-              placeholder="Conte qual calendário você gostaria de adicionar..."
-              onChange={(event) => {
-                setSuggestionDraft(event.target.value);
-                setSuggestionStatus("idle");
-                setSuggestionError(null);
-              }}
-            />
-            <div className="mt-2 flex items-center justify-between gap-3">
-              <div
-                id="calendar-suggestion-help"
-                className={cn(
-                  "text-[11px] text-muted-foreground",
-                  suggestionStatus === "error" && "text-destructive",
-                  suggestionStatus === "success" && "text-emerald-600 dark:text-emerald-400"
-                )}
-                role={suggestionStatus === "error" ? "alert" : undefined}
-                aria-live="polite"
-              >
-                {suggestionError ??
-                  (suggestionStatus === "success"
-                    ? "Sugestão enviada. Obrigado!"
-                    : `${suggestionDraft.length}/500 caracteres`)}
-              </div>
-              <Button
-                type="submit"
-                variant="premium"
-                size="sm"
-                className="rounded-full"
-                disabled={authLoading || suggestionStatus === "submitting"}
-              >
-                {suggestionStatus === "submitting" ? (
-                  <Loader2 className="size-3.5 animate-spin" />
-                ) : null}
-                {user ? "Enviar sugestão" : "Entrar para enviar"}
-              </Button>
-            </div>
-          </form>
         </DialogContent>
       </Dialog>
 

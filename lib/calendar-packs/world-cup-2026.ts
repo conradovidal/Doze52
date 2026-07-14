@@ -19,10 +19,11 @@ const copaCategory = {
 };
 
 const sharedPackProperties = {
+  version: 1,
   name: "Copa do Mundo de 2026",
   icon: "trophy" as const,
   eyebrow: undefined,
-  description: "Escolha entre os jogos do Brasil ou o torneio completo.",
+  description: "Acompanhe apenas o Brasil ou o torneio completo. Escolha a cobertura abaixo.",
   variantGroup: {
     id: "world-cup-2026-coverage",
     label: "Cobertura",

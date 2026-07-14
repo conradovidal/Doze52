@@ -28,7 +28,7 @@ import { calendarPacks } from "@/lib/calendar-packs";
 import { isLimitReached } from "@/lib/entitlements";
 import {
   findCalendarPackByCategoryId,
-  removeCalendarPackCategory,
+  removeCalendarPackByCategory,
 } from "@/lib/calendar-packs/import";
 import { useStore } from "@/lib/store";
 import { useTheme } from "@/lib/theme";
@@ -136,7 +136,8 @@ export function CategoryManager({
     isLimitReached(categories.length, limits.maxCategories);
   const normalizedName = name.trim().slice(0, CATEGORY_NAME_MAX_LENGTH).trim();
   const canSave = normalizedName.length > 0 && Boolean(profileDraftId);
-  const canDelete = Boolean(category) && categories.length > 1;
+  const canDelete =
+    Boolean(category) && (Boolean(calendarPackCategory) || categories.length > 1);
   const normalizedColor = color.toLowerCase();
   const currentColorToken = React.useMemo(
     () => getCategoryColorToken(color, themeMode),
@@ -193,7 +194,11 @@ export function CategoryManager({
       setIsSaving(true);
       setSaveError(null);
       if (calendarPackCategory) {
-        const result = removeCalendarPackCategory(snapshot, categoryId);
+        const result = removeCalendarPackByCategory(
+          snapshot,
+          calendarPacks,
+          categoryId
+        );
         replaceAllData(result.snapshot);
       } else {
         deleteCategory(categoryId);
@@ -340,7 +345,7 @@ export function CategoryManager({
         <DialogFooter className="sm:justify-between">
           {isEdit ? (
             <Button variant="dangerSoft" onClick={handleDelete} disabled={!canDelete || isSaving}>
-              Deletar
+              {calendarPackCategory ? "Remover calendário" : "Deletar"}
             </Button>
           ) : (
             <div />

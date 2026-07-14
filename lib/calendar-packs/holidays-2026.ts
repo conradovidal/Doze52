@@ -498,11 +498,12 @@ export const holidays2026Packs = stateDefinitions.map((definition, stateIndex): 
 
   return {
     id: `holidays-${definition.slug}`,
+    version: 1,
     name: "Feriados nacionais + estaduais",
     eyebrow: definition.label,
     icon: "calendar",
     description:
-      "Feriados nacionais e os estaduais da UF selecionada, juntos em um único calendário.",
+      "Feriados nacionais e estaduais em um único calendário. Selecione seu estado abaixo.",
     variantGroup: {
       id: "holidays-by-state",
       label: "Estado",
