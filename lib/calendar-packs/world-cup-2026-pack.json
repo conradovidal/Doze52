@@ -4,11 +4,11 @@
   "description": "Jogos do Brasil e Copa de 2026 em calendários separados.",
   "year": 2026,
   "datasetStatus": "complete",
-  "updateNote": "Inclui os 104 jogos mapeados, com Jogos do Brasil e Copa de 2026 como calendários separados e confrontos definidos dos 16 avos.",
+  "updateNote": "Placares dos 100 jogos disputados até as quartas de final, mata-mata atualizado e semifinais definidas.",
   "source": {
-    "label": "FIFA / Sports Illustrated",
-    "url": "https://www.si.com/soccer/every-confirmed-round-of-32-match-2026-world-cup",
-    "lastVerified": "2026-06-26"
+    "label": "FIFA / FourFourTwo",
+    "url": "https://www.fourfourtwo.com/competition/all-of-the-world-cup-scores-so-far-at-the-2026-tournament",
+    "lastVerified": "2026-07-13"
   },
   "profile": {
     "id": "20265200-0000-4000-8000-000000000001",
@@ -45,11 +45,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: México x África do Sul"
-      ]
+      ],
+      "result": "2 x 0"
     },
     {
       "id": "20265200-0000-4000-8000-000000000002",
@@ -66,11 +67,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Coreia do Sul x Tchéquia"
-      ]
+      ],
+      "result": "2 x 1"
     },
     {
       "id": "20265200-0000-4000-8000-000000000003",
@@ -87,11 +89,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Canadá x Bósnia e Herzegovina"
-      ]
+      ],
+      "result": "1 x 1"
     },
     {
       "id": "20265200-0000-4000-8000-000000000004",
@@ -108,15 +111,16 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Estados Unidos x Paraguai"
-      ]
+      ],
+      "result": "4 x 1"
     },
     {
       "id": "20265200-0000-4000-8000-000000000005",
-      "title": "🇭🇹 \uD83C\uDFF4\uDB40\uDC67\uDB40\uDC62\uDB40\uDC73\uDB40\uDC63\uDB40\uDC74\uDB40\uDC7F",
+      "title": "🇭🇹 🏴󠁧󠁢󠁳󠁣󠁴󠁿",
       "date": "2026-06-13",
       "time": "21:00",
       "timezone": "America/New_York",
@@ -129,14 +133,15 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Haiti x Escócia"
       ],
       "legacyIds": [
         "20265200-0000-4000-8000-000000000102"
-      ]
+      ],
+      "result": "0 x 1"
     },
     {
       "id": "20265200-0000-4000-8000-000000000006",
@@ -153,11 +158,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Austrália x Turquia"
-      ]
+      ],
+      "result": "2 x 0"
     },
     {
       "id": "20265200-0000-4000-8000-000000000007",
@@ -174,14 +180,15 @@
       "suggestedCategoryKey": "brazil",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": true,
       "notes": [
         "Confronto: Brasil x Marrocos"
       ],
       "legacyIds": [
         "20265200-0000-4000-8000-000000000101"
-      ]
+      ],
+      "result": "1 x 1"
     },
     {
       "id": "20265200-0000-4000-8000-000000000008",
@@ -198,11 +205,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Catar x Suíça"
-      ]
+      ],
+      "result": "1 x 1"
     },
     {
       "id": "20265200-0000-4000-8000-000000000009",
@@ -219,11 +227,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Costa do Marfim x Equador"
-      ]
+      ],
+      "result": "1 x 0"
     },
     {
       "id": "20265200-0000-4000-8000-000000000010",
@@ -240,11 +249,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Alemanha x Curaçao"
-      ]
+      ],
+      "result": "7 x 1"
     },
     {
       "id": "20265200-0000-4000-8000-000000000011",
@@ -261,11 +271,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Países Baixos x Japão"
-      ]
+      ],
+      "result": "2 x 2"
     },
     {
       "id": "20265200-0000-4000-8000-000000000012",
@@ -282,11 +293,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Suécia x Tunísia"
-      ]
+      ],
+      "result": "5 x 1"
     },
     {
       "id": "20265200-0000-4000-8000-000000000013",
@@ -303,11 +315,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Arábia Saudita x Uruguai"
-      ]
+      ],
+      "result": "1 x 1"
     },
     {
       "id": "20265200-0000-4000-8000-000000000014",
@@ -324,11 +337,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Espanha x Cabo Verde"
-      ]
+      ],
+      "result": "0 x 0"
     },
     {
       "id": "20265200-0000-4000-8000-000000000015",
@@ -345,11 +359,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Irã x Nova Zelândia"
-      ]
+      ],
+      "result": "2 x 2"
     },
     {
       "id": "20265200-0000-4000-8000-000000000016",
@@ -366,11 +381,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Bélgica x Egito"
-      ]
+      ],
+      "result": "1 x 1"
     },
     {
       "id": "20265200-0000-4000-8000-000000000017",
@@ -387,11 +403,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: França x Senegal"
-      ]
+      ],
+      "result": "3 x 1"
     },
     {
       "id": "20265200-0000-4000-8000-000000000018",
@@ -408,11 +425,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Iraque x Noruega"
-      ]
+      ],
+      "result": "1 x 4"
     },
     {
       "id": "20265200-0000-4000-8000-000000000019",
@@ -429,11 +447,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Argentina x Argélia"
-      ]
+      ],
+      "result": "3 x 0"
     },
     {
       "id": "20265200-0000-4000-8000-000000000020",
@@ -450,11 +469,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Áustria x Jordânia"
-      ]
+      ],
+      "result": "3 x 1"
     },
     {
       "id": "20265200-0000-4000-8000-000000000021",
@@ -471,15 +491,16 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Gana x Panamá"
-      ]
+      ],
+      "result": "1 x 0"
     },
     {
       "id": "20265200-0000-4000-8000-000000000022",
-      "title": "\uD83C\uDFF4\uDB40\uDC67\uDB40\uDC62\uDB40\uDC65\uDB40\uDC6E\uDB40\uDC67\uDB40\uDC7F 🇭🇷",
+      "title": "🏴󠁧󠁢󠁥󠁮󠁧󠁿 🇭🇷",
       "date": "2026-06-17",
       "time": "15:00",
       "timezone": "America/Chicago",
@@ -492,11 +513,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Inglaterra x Croácia"
-      ]
+      ],
+      "result": "4 x 2"
     },
     {
       "id": "20265200-0000-4000-8000-000000000023",
@@ -513,11 +535,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Portugal x RD Congo"
-      ]
+      ],
+      "result": "1 x 1"
     },
     {
       "id": "20265200-0000-4000-8000-000000000024",
@@ -534,11 +557,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Uzbequistão x Colômbia"
-      ]
+      ],
+      "result": "1 x 3"
     },
     {
       "id": "20265200-0000-4000-8000-000000000025",
@@ -555,11 +579,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Tchéquia x África do Sul"
-      ]
+      ],
+      "result": "1 x 1"
     },
     {
       "id": "20265200-0000-4000-8000-000000000026",
@@ -576,11 +601,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Suíça x Bósnia e Herzegovina"
-      ]
+      ],
+      "result": "4 x 1"
     },
     {
       "id": "20265200-0000-4000-8000-000000000027",
@@ -597,11 +623,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Canadá x Catar"
-      ]
+      ],
+      "result": "6 x 0"
     },
     {
       "id": "20265200-0000-4000-8000-000000000028",
@@ -618,11 +645,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: México x Coreia do Sul"
-      ]
+      ],
+      "result": "1 x 0"
     },
     {
       "id": "20265200-0000-4000-8000-000000000029",
@@ -639,18 +667,19 @@
       "suggestedCategoryKey": "brazil",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": true,
       "notes": [
         "Confronto: Brasil x Haiti"
       ],
       "legacyIds": [
         "20265200-0000-4000-8000-000000000104"
-      ]
+      ],
+      "result": "3 x 0"
     },
     {
       "id": "20265200-0000-4000-8000-000000000030",
-      "title": "\uD83C\uDFF4\uDB40\uDC67\uDB40\uDC62\uDB40\uDC73\uDB40\uDC63\uDB40\uDC74\uDB40\uDC7F 🇲🇦",
+      "title": "🏴󠁧󠁢󠁳󠁣󠁴󠁿 🇲🇦",
       "date": "2026-06-19",
       "time": "18:00",
       "timezone": "America/New_York",
@@ -663,14 +692,15 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Escócia x Marrocos"
       ],
       "legacyIds": [
         "20265200-0000-4000-8000-000000000103"
-      ]
+      ],
+      "result": "0 x 1"
     },
     {
       "id": "20265200-0000-4000-8000-000000000031",
@@ -687,11 +717,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Turquia x Paraguai"
-      ]
+      ],
+      "result": "0 x 1"
     },
     {
       "id": "20265200-0000-4000-8000-000000000032",
@@ -708,11 +739,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Estados Unidos x Austrália"
-      ]
+      ],
+      "result": "2 x 0"
     },
     {
       "id": "20265200-0000-4000-8000-000000000033",
@@ -729,11 +761,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Alemanha x Costa do Marfim"
-      ]
+      ],
+      "result": "2 x 1"
     },
     {
       "id": "20265200-0000-4000-8000-000000000034",
@@ -750,11 +783,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Equador x Curaçao"
-      ]
+      ],
+      "result": "0 x 0"
     },
     {
       "id": "20265200-0000-4000-8000-000000000035",
@@ -771,11 +805,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Países Baixos x Suécia"
-      ]
+      ],
+      "result": "5 x 1"
     },
     {
       "id": "20265200-0000-4000-8000-000000000036",
@@ -792,11 +827,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Tunísia x Japão"
-      ]
+      ],
+      "result": "0 x 4"
     },
     {
       "id": "20265200-0000-4000-8000-000000000037",
@@ -813,11 +849,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Uruguai x Cabo Verde"
-      ]
+      ],
+      "result": "2 x 2"
     },
     {
       "id": "20265200-0000-4000-8000-000000000038",
@@ -834,11 +871,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Espanha x Arábia Saudita"
-      ]
+      ],
+      "result": "4 x 0"
     },
     {
       "id": "20265200-0000-4000-8000-000000000039",
@@ -855,11 +893,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Bélgica x Irã"
-      ]
+      ],
+      "result": "0 x 0"
     },
     {
       "id": "20265200-0000-4000-8000-000000000040",
@@ -876,11 +915,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Nova Zelândia x Egito"
-      ]
+      ],
+      "result": "1 x 3"
     },
     {
       "id": "20265200-0000-4000-8000-000000000041",
@@ -897,11 +937,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Noruega x Senegal"
-      ]
+      ],
+      "result": "3 x 2"
     },
     {
       "id": "20265200-0000-4000-8000-000000000042",
@@ -918,11 +959,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: França x Iraque"
-      ]
+      ],
+      "result": "3 x 0"
     },
     {
       "id": "20265200-0000-4000-8000-000000000043",
@@ -939,11 +981,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Argentina x Áustria"
-      ]
+      ],
+      "result": "2 x 0"
     },
     {
       "id": "20265200-0000-4000-8000-000000000044",
@@ -960,15 +1003,16 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Jordânia x Argélia"
-      ]
+      ],
+      "result": "1 x 2"
     },
     {
       "id": "20265200-0000-4000-8000-000000000045",
-      "title": "\uD83C\uDFF4\uDB40\uDC67\uDB40\uDC62\uDB40\uDC65\uDB40\uDC6E\uDB40\uDC67\uDB40\uDC7F 🇬🇭",
+      "title": "🏴󠁧󠁢󠁥󠁮󠁧󠁿 🇬🇭",
       "date": "2026-06-23",
       "time": "16:00",
       "timezone": "America/New_York",
@@ -981,11 +1025,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Inglaterra x Gana"
-      ]
+      ],
+      "result": "0 x 0"
     },
     {
       "id": "20265200-0000-4000-8000-000000000046",
@@ -1002,11 +1047,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Panamá x Croácia"
-      ]
+      ],
+      "result": "0 x 1"
     },
     {
       "id": "20265200-0000-4000-8000-000000000047",
@@ -1023,11 +1069,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Portugal x Uzbequistão"
-      ]
+      ],
+      "result": "5 x 0"
     },
     {
       "id": "20265200-0000-4000-8000-000000000048",
@@ -1044,15 +1091,16 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Colômbia x RD Congo"
-      ]
+      ],
+      "result": "1 x 0"
     },
     {
       "id": "20265200-0000-4000-8000-000000000049",
-      "title": "\uD83C\uDFF4\uDB40\uDC67\uDB40\uDC62\uDB40\uDC73\uDB40\uDC63\uDB40\uDC74\uDB40\uDC7F 🇧🇷",
+      "title": "🏴󠁧󠁢󠁳󠁣󠁴󠁿 🇧🇷",
       "date": "2026-06-24",
       "time": "18:00",
       "timezone": "America/New_York",
@@ -1065,14 +1113,15 @@
       "suggestedCategoryKey": "brazil",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": true,
       "notes": [
         "Confronto: Escócia x Brasil"
       ],
       "legacyIds": [
         "20265200-0000-4000-8000-000000000105"
-      ]
+      ],
+      "result": "0 x 3"
     },
     {
       "id": "20265200-0000-4000-8000-000000000050",
@@ -1089,14 +1138,15 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Marrocos x Haiti"
       ],
       "legacyIds": [
         "20265200-0000-4000-8000-000000000106"
-      ]
+      ],
+      "result": "4 x 2"
     },
     {
       "id": "20265200-0000-4000-8000-000000000051",
@@ -1113,11 +1163,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Suíça x Canadá"
-      ]
+      ],
+      "result": "2 x 1"
     },
     {
       "id": "20265200-0000-4000-8000-000000000052",
@@ -1134,11 +1185,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Bósnia e Herzegovina x Catar"
-      ]
+      ],
+      "result": "3 x 1"
     },
     {
       "id": "20265200-0000-4000-8000-000000000053",
@@ -1155,11 +1207,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Tchéquia x México"
-      ]
+      ],
+      "result": "0 x 3"
     },
     {
       "id": "20265200-0000-4000-8000-000000000054",
@@ -1176,11 +1229,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: África do Sul x Coreia do Sul"
-      ]
+      ],
+      "result": "1 x 0"
     },
     {
       "id": "20265200-0000-4000-8000-000000000055",
@@ -1197,11 +1251,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Curaçao x Costa do Marfim"
-      ]
+      ],
+      "result": "0 x 2"
     },
     {
       "id": "20265200-0000-4000-8000-000000000056",
@@ -1218,11 +1273,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Equador x Alemanha"
-      ]
+      ],
+      "result": "2 x 1"
     },
     {
       "id": "20265200-0000-4000-8000-000000000057",
@@ -1239,11 +1295,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Japão x Suécia"
-      ]
+      ],
+      "result": "1 x 1"
     },
     {
       "id": "20265200-0000-4000-8000-000000000058",
@@ -1260,11 +1317,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Tunísia x Países Baixos"
-      ]
+      ],
+      "result": "1 x 3"
     },
     {
       "id": "20265200-0000-4000-8000-000000000059",
@@ -1281,11 +1339,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Turquia x Estados Unidos"
-      ]
+      ],
+      "result": "3 x 2"
     },
     {
       "id": "20265200-0000-4000-8000-000000000060",
@@ -1302,11 +1361,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Paraguai x Austrália"
-      ]
+      ],
+      "result": "0 x 0"
     },
     {
       "id": "20265200-0000-4000-8000-000000000061",
@@ -1323,11 +1383,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Noruega x França"
-      ]
+      ],
+      "result": "1 x 4"
     },
     {
       "id": "20265200-0000-4000-8000-000000000062",
@@ -1344,11 +1405,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Senegal x Iraque"
-      ]
+      ],
+      "result": "5 x 0"
     },
     {
       "id": "20265200-0000-4000-8000-000000000063",
@@ -1365,11 +1427,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Egito x Irã"
-      ]
+      ],
+      "result": "1 x 1"
     },
     {
       "id": "20265200-0000-4000-8000-000000000064",
@@ -1386,11 +1449,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Nova Zelândia x Bélgica"
-      ]
+      ],
+      "result": "1 x 5"
     },
     {
       "id": "20265200-0000-4000-8000-000000000065",
@@ -1407,11 +1471,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Cabo Verde x Arábia Saudita"
-      ]
+      ],
+      "result": "0 x 0"
     },
     {
       "id": "20265200-0000-4000-8000-000000000066",
@@ -1428,15 +1493,16 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Uruguai x Espanha"
-      ]
+      ],
+      "result": "0 x 1"
     },
     {
       "id": "20265200-0000-4000-8000-000000000067",
-      "title": "🇵🇦 \uD83C\uDFF4\uDB40\uDC67\uDB40\uDC62\uDB40\uDC65\uDB40\uDC6E\uDB40\uDC67\uDB40\uDC7F",
+      "title": "🇵🇦 🏴󠁧󠁢󠁥󠁮󠁧󠁿",
       "date": "2026-06-27",
       "time": "17:00",
       "timezone": "America/New_York",
@@ -1449,11 +1515,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Panamá x Inglaterra"
-      ]
+      ],
+      "result": "0 x 2"
     },
     {
       "id": "20265200-0000-4000-8000-000000000068",
@@ -1470,11 +1537,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Croácia x Gana"
-      ]
+      ],
+      "result": "2 x 1"
     },
     {
       "id": "20265200-0000-4000-8000-000000000069",
@@ -1491,11 +1559,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Argélia x Áustria"
-      ]
+      ],
+      "result": "3 x 3"
     },
     {
       "id": "20265200-0000-4000-8000-000000000070",
@@ -1512,11 +1581,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Jordânia x Argentina"
-      ]
+      ],
+      "result": "1 x 3"
     },
     {
       "id": "20265200-0000-4000-8000-000000000071",
@@ -1533,11 +1603,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Colômbia x Portugal"
-      ]
+      ],
+      "result": "0 x 0"
     },
     {
       "id": "20265200-0000-4000-8000-000000000072",
@@ -1554,11 +1625,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: RD Congo x Uzbequistão"
-      ]
+      ],
+      "result": "3 x 1"
     },
     {
       "id": "20265200-0000-4000-8000-000000000073",
@@ -1574,31 +1646,33 @@
       "suggestedCategoryKey": "other",
       "source": "Sports Illustrated",
       "sourceUrl": "https://www.si.com/soccer/every-confirmed-round-of-32-match-2026-world-cup",
-      "lastVerified": "2026-06-26",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: África do Sul x Canadá"
-      ]
+      ],
+      "result": "0 x 1"
     },
     {
       "id": "20265200-0000-4000-8000-000000000074",
-      "title": "Fase de 32: 1º Grupo E x 3º melhor (A/B/C/D/F)",
+      "title": "🇩🇪 🇵🇾",
       "date": "2026-06-29",
       "time": "16:30",
       "timezone": "America/New_York",
       "city": "Boston",
       "venue": "Gillette Stadium",
       "phase": "Fase de 32",
-      "homeTeam": "1º colocado do Grupo E",
-      "awayTeam": "3º colocado dos Grupos A/B/C/D/F",
+      "homeTeam": "Alemanha",
+      "awayTeam": "Paraguai",
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
-        "Confronto: 1º colocado do Grupo E x 3º colocado dos Grupos A/B/C/D/F"
-      ]
+        "Confronto: Alemanha x Paraguai"
+      ],
+      "result": "1 x 1 (Paraguai venceu por 4 x 3 nos pênaltis)"
     },
     {
       "id": "20265200-0000-4000-8000-000000000075",
@@ -1614,11 +1688,12 @@
       "suggestedCategoryKey": "other",
       "source": "Sports Illustrated",
       "sourceUrl": "https://www.si.com/soccer/every-confirmed-round-of-32-match-2026-world-cup",
-      "lastVerified": "2026-06-26",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Países Baixos x Marrocos"
-      ]
+      ],
+      "result": "1 x 1 (Marrocos venceu por 3 x 2 nos pênaltis)"
     },
     {
       "id": "20265200-0000-4000-8000-000000000076",
@@ -1634,91 +1709,96 @@
       "suggestedCategoryKey": "brazil",
       "source": "Sports Illustrated",
       "sourceUrl": "https://www.si.com/soccer/every-confirmed-round-of-32-match-2026-world-cup",
-      "lastVerified": "2026-06-26",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": true,
       "notes": [
         "Confronto: Brasil x Japão"
-      ]
+      ],
+      "result": "2 x 1"
     },
     {
       "id": "20265200-0000-4000-8000-000000000077",
-      "title": "Fase de 32: 1º Grupo I x 3º melhor (C/D/F/G/H)",
+      "title": "🇫🇷 🇸🇪",
       "date": "2026-06-30",
       "time": "17:00",
       "timezone": "America/New_York",
       "city": "New York / New Jersey",
       "venue": "MetLife Stadium",
       "phase": "Fase de 32",
-      "homeTeam": "1º colocado do Grupo I",
-      "awayTeam": "3º colocado dos Grupos C/D/F/G/H",
+      "homeTeam": "França",
+      "awayTeam": "Suécia",
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
-        "Confronto: 1º colocado do Grupo I x 3º colocado dos Grupos C/D/F/G/H"
-      ]
+        "Confronto: França x Suécia"
+      ],
+      "result": "3 x 0"
     },
     {
       "id": "20265200-0000-4000-8000-000000000078",
-      "title": "Fase de 32: 2º Grupo E x 2º Grupo I",
+      "title": "🇨🇮 🇳🇴",
       "date": "2026-06-30",
       "time": "12:00",
       "timezone": "America/Chicago",
       "city": "Dallas",
       "venue": "AT&T Stadium",
       "phase": "Fase de 32",
-      "homeTeam": "2º colocado do Grupo E",
-      "awayTeam": "2º colocado do Grupo I",
+      "homeTeam": "Costa do Marfim",
+      "awayTeam": "Noruega",
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
-        "Confronto: 2º colocado do Grupo E x 2º colocado do Grupo I"
-      ]
+        "Confronto: Costa do Marfim x Noruega"
+      ],
+      "result": "1 x 2"
     },
     {
       "id": "20265200-0000-4000-8000-000000000079",
-      "title": "Fase de 32: 1º Grupo A x 3º melhor (C/E/F/H/I)",
+      "title": "🇲🇽 🇪🇨",
       "date": "2026-06-30",
       "time": "19:00",
       "timezone": "America/Mexico_City",
       "city": "Mexico City",
       "venue": "Estadio Azteca",
       "phase": "Fase de 32",
-      "homeTeam": "1º colocado do Grupo A",
-      "awayTeam": "3º colocado dos Grupos C/E/F/H/I",
+      "homeTeam": "México",
+      "awayTeam": "Equador",
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
-        "Confronto: 1º colocado do Grupo A x 3º colocado dos Grupos C/E/F/H/I"
-      ]
+        "Confronto: México x Equador"
+      ],
+      "result": "2 x 0"
     },
     {
       "id": "20265200-0000-4000-8000-000000000080",
-      "title": "Fase de 32: 1º Grupo L x 3º melhor (E/H/I/J/K)",
+      "title": "🏴󠁧󠁢󠁥󠁮󠁧󠁿 🇨🇩",
       "date": "2026-07-01",
       "time": "12:00",
       "timezone": "America/New_York",
       "city": "Atlanta",
       "venue": "Mercedes-Benz Stadium",
       "phase": "Fase de 32",
-      "homeTeam": "1º colocado do Grupo L",
-      "awayTeam": "3º colocado dos Grupos E/H/I/J/K",
+      "homeTeam": "Inglaterra",
+      "awayTeam": "RD Congo",
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
-        "Confronto: 1º colocado do Grupo L x 3º colocado dos Grupos E/H/I/J/K"
-      ]
+        "Confronto: Inglaterra x RD Congo"
+      ],
+      "result": "2 x 1"
     },
     {
       "id": "20265200-0000-4000-8000-000000000081",
@@ -1734,430 +1814,450 @@
       "suggestedCategoryKey": "other",
       "source": "Sports Illustrated",
       "sourceUrl": "https://www.si.com/soccer/every-confirmed-round-of-32-match-2026-world-cup",
-      "lastVerified": "2026-06-26",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Estados Unidos x Bósnia e Herzegovina"
-      ]
+      ],
+      "result": "2 x 0"
     },
     {
       "id": "20265200-0000-4000-8000-000000000082",
-      "title": "Fase de 32: 1º Grupo G x 3º melhor (A/E/H/I/J)",
+      "title": "🇧🇪 🇸🇳",
       "date": "2026-07-01",
       "time": "13:00",
       "timezone": "America/Los_Angeles",
       "city": "Seattle",
       "venue": "Lumen Field",
       "phase": "Fase de 32",
-      "homeTeam": "1º colocado do Grupo G",
-      "awayTeam": "3º colocado dos Grupos A/E/H/I/J",
+      "homeTeam": "Bélgica",
+      "awayTeam": "Senegal",
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
-        "Confronto: 1º colocado do Grupo G x 3º colocado dos Grupos A/E/H/I/J"
-      ]
+        "Confronto: Bélgica x Senegal"
+      ],
+      "result": "3 x 2 (após prorrogação)"
     },
     {
       "id": "20265200-0000-4000-8000-000000000083",
-      "title": "Fase de 32: 2º Grupo K x 2º Grupo L",
+      "title": "🇵🇹 🇭🇷",
       "date": "2026-07-02",
       "time": "19:00",
       "timezone": "America/Toronto",
       "city": "Toronto",
       "venue": "BMO Field",
       "phase": "Fase de 32",
-      "homeTeam": "2º colocado do Grupo K",
-      "awayTeam": "2º colocado do Grupo L",
+      "homeTeam": "Portugal",
+      "awayTeam": "Croácia",
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
-        "Confronto: 2º colocado do Grupo K x 2º colocado do Grupo L"
-      ]
+        "Confronto: Portugal x Croácia"
+      ],
+      "result": "2 x 1"
     },
     {
       "id": "20265200-0000-4000-8000-000000000084",
-      "title": "Fase de 32: 1º Grupo H x 2º Grupo J",
+      "title": "🇪🇸 🇦🇹",
       "date": "2026-07-02",
       "time": "12:00",
       "timezone": "America/Los_Angeles",
       "city": "Los Angeles",
       "venue": "SoFi Stadium",
       "phase": "Fase de 32",
-      "homeTeam": "1º colocado do Grupo H",
-      "awayTeam": "2º colocado do Grupo J",
+      "homeTeam": "Espanha",
+      "awayTeam": "Áustria",
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
-        "Confronto: 1º colocado do Grupo H x 2º colocado do Grupo J"
-      ]
+        "Confronto: Espanha x Áustria"
+      ],
+      "result": "3 x 0"
     },
     {
       "id": "20265200-0000-4000-8000-000000000085",
-      "title": "Fase de 32: 1º Grupo B x 3º melhor (E/F/G/I/J)",
+      "title": "🇨🇭 Argélia",
       "date": "2026-07-02",
       "time": "20:00",
       "timezone": "America/Vancouver",
       "city": "Vancouver",
       "venue": "BC Place",
       "phase": "Fase de 32",
-      "homeTeam": "1º colocado do Grupo B",
-      "awayTeam": "3º colocado dos Grupos E/F/G/I/J",
+      "homeTeam": "Suíça",
+      "awayTeam": "Argélia",
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
-        "Confronto: 1º colocado do Grupo B x 3º colocado dos Grupos E/F/G/I/J"
-      ]
+        "Confronto: Suíça x Argélia"
+      ],
+      "result": "2 x 0"
     },
     {
       "id": "20265200-0000-4000-8000-000000000086",
-      "title": "Fase de 32: 1º Grupo J x 2º Grupo H",
+      "title": "🇦🇷 🇨🇻",
       "date": "2026-07-03",
       "time": "18:00",
       "timezone": "America/New_York",
       "city": "Miami",
       "venue": "Hard Rock Stadium",
       "phase": "Fase de 32",
-      "homeTeam": "1º colocado do Grupo J",
-      "awayTeam": "2º colocado do Grupo H",
+      "homeTeam": "Argentina",
+      "awayTeam": "Cabo Verde",
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
-        "Confronto: 1º colocado do Grupo J x 2º colocado do Grupo H"
-      ]
+        "Confronto: Argentina x Cabo Verde"
+      ],
+      "result": "3 x 2 (após prorrogação)"
     },
     {
       "id": "20265200-0000-4000-8000-000000000087",
-      "title": "Fase de 32: 1º Grupo K x 3º melhor (D/E/I/J/L)",
+      "title": "🇨🇴 🇬🇭",
       "date": "2026-07-03",
       "time": "20:30",
       "timezone": "America/Chicago",
       "city": "Kansas City",
       "venue": "Arrowhead Stadium",
       "phase": "Fase de 32",
-      "homeTeam": "1º colocado do Grupo K",
-      "awayTeam": "3º colocado dos Grupos D/E/I/J/L",
+      "homeTeam": "Colômbia",
+      "awayTeam": "Gana",
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
-        "Confronto: 1º colocado do Grupo K x 3º colocado dos Grupos D/E/I/J/L"
-      ]
+        "Confronto: Colômbia x Gana"
+      ],
+      "result": "1 x 0"
     },
     {
       "id": "20265200-0000-4000-8000-000000000088",
-      "title": "Fase de 32: 2º Grupo D x 2º Grupo G",
+      "title": "🇦🇺 🇪🇬",
       "date": "2026-07-03",
       "time": "13:00",
       "timezone": "America/Chicago",
       "city": "Dallas",
       "venue": "AT&T Stadium",
       "phase": "Fase de 32",
-      "homeTeam": "2º colocado do Grupo D",
-      "awayTeam": "2º colocado do Grupo G",
+      "homeTeam": "Austrália",
+      "awayTeam": "Egito",
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
-        "Confronto: 2º colocado do Grupo D x 2º colocado do Grupo G"
-      ]
+        "Confronto: Austrália x Egito"
+      ],
+      "result": "1 x 1 (Egito venceu por 4 x 2 nos pênaltis)"
     },
     {
       "id": "20265200-0000-4000-8000-000000000089",
-      "title": "Oitavas de final: Venc. J74 x Venc. J77",
+      "title": "🇵🇾 🇫🇷",
       "date": "2026-07-04",
       "time": "17:00",
       "timezone": "America/New_York",
       "city": "Philadelphia",
       "venue": "Lincoln Financial Field",
       "phase": "Oitavas de final",
-      "homeTeam": "Vencedor do Jogo 74",
-      "awayTeam": "Vencedor do Jogo 77",
+      "homeTeam": "Paraguai",
+      "awayTeam": "França",
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
-        "Confronto: Vencedor do Jogo 74 x Vencedor do Jogo 77"
-      ]
+        "Confronto: Paraguai x França"
+      ],
+      "result": "0 x 1"
     },
     {
       "id": "20265200-0000-4000-8000-000000000090",
-      "title": "Oitavas de final: Venc. J73 x Venc. J75",
+      "title": "🇨🇦 🇲🇦",
       "date": "2026-07-04",
       "time": "12:00",
       "timezone": "America/Chicago",
       "city": "Houston",
       "venue": "NRG Stadium",
       "phase": "Oitavas de final",
-      "homeTeam": "Vencedor do Jogo 73",
-      "awayTeam": "Vencedor do Jogo 75",
+      "homeTeam": "Canadá",
+      "awayTeam": "Marrocos",
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
-        "Confronto: Vencedor do Jogo 73 x Vencedor do Jogo 75"
-      ]
+        "Confronto: Canadá x Marrocos"
+      ],
+      "result": "0 x 3"
     },
     {
       "id": "20265200-0000-4000-8000-000000000091",
-      "title": "Oitavas de final: Venc. J76 x Venc. J78",
+      "title": "🇧🇷 🇳🇴",
       "date": "2026-07-05",
       "time": "16:00",
       "timezone": "America/New_York",
       "city": "New York / New Jersey",
       "venue": "MetLife Stadium",
       "phase": "Oitavas de final",
-      "homeTeam": "Vencedor do Jogo 76",
-      "awayTeam": "Vencedor do Jogo 78",
-      "suggestedCategoryKey": "other",
+      "homeTeam": "Brasil",
+      "awayTeam": "Noruega",
+      "suggestedCategoryKey": "brazil",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
-      "isBrazilMatch": false,
+      "lastVerified": "2026-07-13",
+      "isBrazilMatch": true,
       "notes": [
-        "Confronto: Vencedor do Jogo 76 x Vencedor do Jogo 78"
-      ]
+        "Confronto: Brasil x Noruega"
+      ],
+      "result": "1 x 2"
     },
     {
       "id": "20265200-0000-4000-8000-000000000092",
-      "title": "Oitavas de final: Venc. J79 x Venc. J80",
+      "title": "🇲🇽 🏴󠁧󠁢󠁥󠁮󠁧󠁿",
       "date": "2026-07-05",
       "time": "18:00",
       "timezone": "America/Mexico_City",
       "city": "Mexico City",
       "venue": "Estadio Azteca",
       "phase": "Oitavas de final",
-      "homeTeam": "Vencedor do Jogo 79",
-      "awayTeam": "Vencedor do Jogo 80",
+      "homeTeam": "México",
+      "awayTeam": "Inglaterra",
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
-        "Confronto: Vencedor do Jogo 79 x Vencedor do Jogo 80"
-      ]
+        "Confronto: México x Inglaterra"
+      ],
+      "result": "2 x 3"
     },
     {
       "id": "20265200-0000-4000-8000-000000000093",
-      "title": "Oitavas de final: Venc. J83 x Venc. J84",
+      "title": "🇵🇹 🇪🇸",
       "date": "2026-07-06",
       "time": "14:00",
       "timezone": "America/Chicago",
       "city": "Dallas",
       "venue": "AT&T Stadium",
       "phase": "Oitavas de final",
-      "homeTeam": "Vencedor do Jogo 83",
-      "awayTeam": "Vencedor do Jogo 84",
+      "homeTeam": "Portugal",
+      "awayTeam": "Espanha",
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
-        "Confronto: Vencedor do Jogo 83 x Vencedor do Jogo 84"
-      ]
+        "Confronto: Portugal x Espanha"
+      ],
+      "result": "0 x 1"
     },
     {
       "id": "20265200-0000-4000-8000-000000000094",
-      "title": "Oitavas de final: Venc. J81 x Venc. J82",
+      "title": "🇺🇸 🇧🇪",
       "date": "2026-07-06",
       "time": "17:00",
       "timezone": "America/Los_Angeles",
       "city": "Seattle",
       "venue": "Lumen Field",
       "phase": "Oitavas de final",
-      "homeTeam": "Vencedor do Jogo 81",
-      "awayTeam": "Vencedor do Jogo 82",
+      "homeTeam": "Estados Unidos",
+      "awayTeam": "Bélgica",
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
-        "Confronto: Vencedor do Jogo 81 x Vencedor do Jogo 82"
-      ]
+        "Confronto: Estados Unidos x Bélgica"
+      ],
+      "result": "1 x 4"
     },
     {
       "id": "20265200-0000-4000-8000-000000000095",
-      "title": "Oitavas de final: Venc. J86 x Venc. J88",
+      "title": "🇦🇷 🇪🇬",
       "date": "2026-07-07",
       "time": "12:00",
       "timezone": "America/New_York",
       "city": "Atlanta",
       "venue": "Mercedes-Benz Stadium",
       "phase": "Oitavas de final",
-      "homeTeam": "Vencedor do Jogo 86",
-      "awayTeam": "Vencedor do Jogo 88",
+      "homeTeam": "Argentina",
+      "awayTeam": "Egito",
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
-        "Confronto: Vencedor do Jogo 86 x Vencedor do Jogo 88"
-      ]
+        "Confronto: Argentina x Egito"
+      ],
+      "result": "3 x 2"
     },
     {
       "id": "20265200-0000-4000-8000-000000000096",
-      "title": "Oitavas de final: Venc. J85 x Venc. J87",
+      "title": "🇨🇭 🇨🇴",
       "date": "2026-07-07",
       "time": "13:00",
       "timezone": "America/Vancouver",
       "city": "Vancouver",
       "venue": "BC Place",
       "phase": "Oitavas de final",
-      "homeTeam": "Vencedor do Jogo 85",
-      "awayTeam": "Vencedor do Jogo 87",
+      "homeTeam": "Suíça",
+      "awayTeam": "Colômbia",
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
-        "Confronto: Vencedor do Jogo 85 x Vencedor do Jogo 87"
-      ]
+        "Confronto: Suíça x Colômbia"
+      ],
+      "result": "0 x 0 (Suíça venceu por 4 x 3 nos pênaltis)"
     },
     {
       "id": "20265200-0000-4000-8000-000000000097",
-      "title": "Quartas de final: Venc. J89 x Venc. J90",
+      "title": "🇫🇷 🇲🇦",
       "date": "2026-07-09",
       "time": "16:00",
       "timezone": "America/New_York",
       "city": "Boston",
       "venue": "Gillette Stadium",
       "phase": "Quartas de final",
-      "homeTeam": "Vencedor do Jogo 89",
-      "awayTeam": "Vencedor do Jogo 90",
+      "homeTeam": "França",
+      "awayTeam": "Marrocos",
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
-        "Confronto: Vencedor do Jogo 89 x Vencedor do Jogo 90"
-      ]
+        "Confronto: França x Marrocos"
+      ],
+      "result": "2 x 0"
     },
     {
       "id": "20265200-0000-4000-8000-000000000098",
-      "title": "Quartas de final: Venc. J93 x Venc. J94",
+      "title": "🇪🇸 🇧🇪",
       "date": "2026-07-10",
       "time": "12:00",
       "timezone": "America/Los_Angeles",
       "city": "Los Angeles",
       "venue": "SoFi Stadium",
       "phase": "Quartas de final",
-      "homeTeam": "Vencedor do Jogo 93",
-      "awayTeam": "Vencedor do Jogo 94",
+      "homeTeam": "Espanha",
+      "awayTeam": "Bélgica",
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
-        "Confronto: Vencedor do Jogo 93 x Vencedor do Jogo 94"
-      ]
+        "Confronto: Espanha x Bélgica"
+      ],
+      "result": "2 x 1"
     },
     {
       "id": "20265200-0000-4000-8000-000000000099",
-      "title": "Quartas de final: Venc. J91 x Venc. J92",
+      "title": "🇳🇴 🏴󠁧󠁢󠁥󠁮󠁧󠁿",
       "date": "2026-07-11",
       "time": "17:00",
       "timezone": "America/New_York",
       "city": "Miami",
       "venue": "Hard Rock Stadium",
       "phase": "Quartas de final",
-      "homeTeam": "Vencedor do Jogo 91",
-      "awayTeam": "Vencedor do Jogo 92",
+      "homeTeam": "Noruega",
+      "awayTeam": "Inglaterra",
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
-        "Confronto: Vencedor do Jogo 91 x Vencedor do Jogo 92"
-      ]
+        "Confronto: Noruega x Inglaterra"
+      ],
+      "result": "1 x 2 (após prorrogação)"
     },
     {
       "id": "20265200-0000-4000-8000-000000000100",
-      "title": "Quartas de final: Venc. J95 x Venc. J96",
+      "title": "🇦🇷 🇨🇭",
       "date": "2026-07-11",
       "time": "20:00",
       "timezone": "America/Chicago",
       "city": "Kansas City",
       "venue": "Arrowhead Stadium",
       "phase": "Quartas de final",
-      "homeTeam": "Vencedor do Jogo 95",
-      "awayTeam": "Vencedor do Jogo 96",
+      "homeTeam": "Argentina",
+      "awayTeam": "Suíça",
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
-        "Confronto: Vencedor do Jogo 95 x Vencedor do Jogo 96"
-      ]
+        "Confronto: Argentina x Suíça"
+      ],
+      "result": "3 x 1 (após prorrogação)"
     },
     {
       "id": "20265200-0000-4000-8000-000000000201",
-      "title": "Semifinal: Venc. J97 x Venc. J98",
+      "title": "🇫🇷 🇪🇸",
       "date": "2026-07-14",
       "time": "14:00",
       "timezone": "America/Chicago",
       "city": "Dallas",
       "venue": "AT&T Stadium",
       "phase": "Semifinal",
-      "homeTeam": "Vencedor do Jogo 97",
-      "awayTeam": "Vencedor do Jogo 98",
+      "homeTeam": "França",
+      "awayTeam": "Espanha",
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
-        "Confronto: Vencedor do Jogo 97 x Vencedor do Jogo 98"
+        "Confronto: França x Espanha"
       ]
     },
     {
       "id": "20265200-0000-4000-8000-000000000202",
-      "title": "Semifinal: Venc. J99 x Venc. J100",
+      "title": "🏴󠁧󠁢󠁥󠁮󠁧󠁿 🇦🇷",
       "date": "2026-07-15",
       "time": "15:00",
       "timezone": "America/New_York",
       "city": "Atlanta",
       "venue": "Mercedes-Benz Stadium",
       "phase": "Semifinal",
-      "homeTeam": "Vencedor do Jogo 99",
-      "awayTeam": "Vencedor do Jogo 100",
+      "homeTeam": "Inglaterra",
+      "awayTeam": "Argentina",
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
-        "Confronto: Vencedor do Jogo 99 x Vencedor do Jogo 100"
+        "Confronto: Inglaterra x Argentina"
       ]
     },
     {
@@ -2174,7 +2274,7 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Perdedor do Jogo 101 x Perdedor do Jogo 102"
@@ -2194,7 +2294,7 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-06-04",
+      "lastVerified": "2026-07-13",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Vencedor do Jogo 101 x Vencedor do Jogo 102"

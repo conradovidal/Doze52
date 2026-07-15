@@ -60,6 +60,29 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
+## Testar paywalls em local
+
+Para testar estados de UX de billing sem criar, cancelar ou gravar assinaturas
+reais no Stripe, use no `.env.local`:
+
+```bash
+NEXT_PUBLIC_BILLING_TEST_MODE=true
+NEXT_PUBLIC_BILLING_TEST_PLAN=free
+```
+
+Planos possiveis:
+
+- `free`
+- `pro`
+- `loading`
+- `error`
+- `canceled_active`
+- `expired`
+
+Esse modo so e respeitado com `NODE_ENV=development`. Em production, essas
+variaveis sao ignoradas. Ele serve apenas para testar paywalls e estados de UX;
+checkout, portal e webhooks Stripe ainda devem ser validados com o fluxo real.
+
 ## Product and repo contact
 
 - Product repo: [github.com/conradovidal/Doze52](https://github.com/conradovidal/Doze52)

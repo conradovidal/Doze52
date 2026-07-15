@@ -28,7 +28,7 @@ import { calendarPacks } from "@/lib/calendar-packs";
 import { isLimitReached } from "@/lib/entitlements";
 import {
   findCalendarPackByCategoryId,
-  removeCalendarPackCategory,
+  removeCalendarPackByCategory,
 } from "@/lib/calendar-packs/import";
 import { useStore } from "@/lib/store";
 import { useTheme } from "@/lib/theme";
@@ -80,11 +80,9 @@ export function CategoryManager({
   const [profileDraftId, setProfileDraftId] = React.useState("");
   const [isSaving, setIsSaving] = React.useState(false);
   const [saveError, setSaveError] = React.useState<string | null>(null);
-  const effectiveCreateProfileId = profileId ?? profiles[0]?.id ?? "";
-  const effectiveProfileId = category?.profileId ?? effectiveCreateProfileId;
   const currentProfile = React.useMemo(
-    () => profiles.find((profile) => profile.id === profileDraftId || profile.id === effectiveProfileId) ?? null,
-    [effectiveProfileId, profileDraftId, profiles]
+    () => profiles.find((profile) => profile.id === profileDraftId) ?? null,
+    [profileDraftId, profiles]
   );
   const snapshot = React.useMemo(
     () => ({ profiles, categories, events }),
@@ -101,20 +99,34 @@ export function CategoryManager({
   React.useEffect(() => {
     if (!open) return;
     if (mode === "edit") {
-      setName(category?.name ?? "");
-      const initial = getNearestCategoryColor(category?.color ?? DEFAULT_CATEGORY_COLOR);
+      if (!category) {
+        setName("");
+        setColor(DEFAULT_CATEGORY_COLOR);
+        setProfileDraftId("");
+        setIsSaving(false);
+        setSaveError("Esta categoria não foi encontrada. Feche e tente novamente.");
+        return;
+      }
+      setName(category.name);
+      const initial = getNearestCategoryColor(category.color);
       setColor(initial);
-      setProfileDraftId(category?.profileId ?? effectiveCreateProfileId);
+      setProfileDraftId(category.profileId);
       setIsSaving(false);
       setSaveError(null);
       return;
     }
     setName("");
     setColor(DEFAULT_CATEGORY_COLOR);
-    setProfileDraftId(effectiveCreateProfileId);
+    setProfileDraftId(
+      profileId && profiles.some((profile) => profile.id === profileId) ? profileId : ""
+    );
     setIsSaving(false);
-    setSaveError(null);
-  }, [open, mode, category, effectiveCreateProfileId]);
+    setSaveError(
+      profileId && profiles.some((profile) => profile.id === profileId)
+        ? null
+        : "Selecione um perfil válido antes de criar a categoria."
+    );
+  }, [open, mode, category, profileId, profiles]);
 
   const isEdit = mode === "edit";
   const isCreateBlocked =
@@ -124,7 +136,8 @@ export function CategoryManager({
     isLimitReached(categories.length, limits.maxCategories);
   const normalizedName = name.trim().slice(0, CATEGORY_NAME_MAX_LENGTH).trim();
   const canSave = normalizedName.length > 0 && Boolean(profileDraftId);
-  const canDelete = categories.length > 1;
+  const canDelete =
+    Boolean(category) && (Boolean(calendarPackCategory) || categories.length > 1);
   const normalizedColor = color.toLowerCase();
   const currentColorToken = React.useMemo(
     () => getCategoryColorToken(color, themeMode),
@@ -137,7 +150,10 @@ export function CategoryManager({
       setIsSaving(true);
       setSaveError(null);
       if (isEdit) {
-        if (!categoryId) return;
+        if (!categoryId || !category) {
+          setSaveError("Esta categoria não foi encontrada. Feche e tente novamente.");
+          return;
+        }
         updateCategory(categoryId, {
           name: normalizedName,
           color,
@@ -178,7 +194,11 @@ export function CategoryManager({
       setIsSaving(true);
       setSaveError(null);
       if (calendarPackCategory) {
-        const result = removeCalendarPackCategory(snapshot, categoryId);
+        const result = removeCalendarPackByCategory(
+          snapshot,
+          calendarPacks,
+          categoryId
+        );
         replaceAllData(result.snapshot);
       } else {
         deleteCategory(categoryId);
@@ -231,7 +251,13 @@ export function CategoryManager({
           />
 
           <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center">
-            <Select value={profileDraftId} onValueChange={setProfileDraftId}>
+            <Select
+              value={profileDraftId}
+              onValueChange={(nextProfileId) => {
+                setProfileDraftId(nextProfileId);
+                setSaveError(null);
+              }}
+            >
               <SelectTrigger
                 size="sm"
                 aria-label="Perfil da categoria"
@@ -319,7 +345,7 @@ export function CategoryManager({
         <DialogFooter className="sm:justify-between">
           {isEdit ? (
             <Button variant="dangerSoft" onClick={handleDelete} disabled={!canDelete || isSaving}>
-              Deletar
+              {calendarPackCategory ? "Remover calendário" : "Deletar"}
             </Button>
           ) : (
             <div />
