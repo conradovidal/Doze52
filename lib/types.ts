@@ -16,6 +16,10 @@ export type CategoryItem = {
   name: string;
   color: string;
   visible: boolean;
+  calendarPackGroupId?: string;
+  calendarPackVariantId?: string;
+  calendarPackCategoryKey?: string;
+  calendarPackVersion?: number;
 };
 
 export type RecurrenceType = "weekly" | "biweekly" | "monthly" | "yearly";
@@ -33,6 +37,8 @@ export type CalendarEvent = {
   recurrenceUntil?: string; // ISO yyyy-MM-dd
   createdAt: string; // ISO datetime
   dayOrder: number; // manual tie-break order for same-day events (0-based)
+  calendarPackGroupId?: string;
+  calendarPackEventKey?: string;
 };
 
 export type CalendarRenderEvent = CalendarEvent & {

@@ -1,20 +1,25 @@
 # Calendar Packs
 
-Calendar Packs are structured seeds that import into the existing Doze 52 data model:
-profiles, categories, and events. They should not create a parallel calendar model unless
-the product needs pack-specific lifecycle metadata later.
+Calendar Packs are structured, versioned seeds that import into the existing Doze 52
+data model. Categories remain customizable, while imported events are managed and
+read-only. Provenance fields on categories and events drive automatic reconciliation.
 
 ## Current packs
 
-- `world-cup-2026-pack.json`: 104 mapped tournament events. The UI exposes this as
-  two subscription options: Jogos do Brasil and Copa de 2026.
+- `world-cup-2026-pack.json`: tournament events exposed as two exclusive coverage
+  options: only Brazil or the full World Cup.
 - `formula-1-2026-pack.json`: Formula 1 2026 events listed by the official F1 calendar
   on 2026-06-03, exposed as Corridas F1.
+- `holidays-2026.ts`: recurring national holidays plus all Brazilian state and Federal
+  District variants. Fixed dates recur yearly from 2025 and mobile dates are calculated
+  through 2100. Optional government closure dates are intentionally excluded.
+- `brasileirao-2026.ts`: official 2026 matches for Grêmio and Internacional across the
+  supported competitions, exposed as exclusive team variants.
 
 Keep pack `profile.id`, category `id`s, and event `id`s stable. Importing the same pack
-must remain idempotent for users who already added it. Packs are tracked by category and
-event IDs, not by the profile where the category currently lives; users can move imported
-categories between profiles without losing add/remove detection.
+must remain idempotent for users who already added it. Packs are tracked by stable IDs and
+persisted provenance, not by category name, color, or profile. Those three fields belong
+to the user and must survive imports, variant changes, and automatic updates.
 
 The app UI must present this as a Doze 52 feature and must not use official tournament
 marks, emblems, mascots, or wording that suggests official association, partnership, or
@@ -23,11 +28,13 @@ licensing.
 ## Update policy
 
 - Keep pack category and event IDs stable. Update event fields in place so users can
-  refresh a pack without duplicating events.
-- Pack updates must preserve the user's current profile organization. Categories are
-  matched by pack category IDs even after a user moves them to another profile.
+  receive changes without duplicating events.
+- Increment `version` only for material user-visible changes. Updating only
+  `lastVerified` must not create a new version.
+- Pack updates must preserve category name, color, profile, visibility, and ordering.
 - When source data changes, update `source.lastVerified`, event `lastVerified`, and the
-  relevant event fields. The launcher will surface an update indicator for already-added
-  packs whose local events no longer match the current seed.
+  relevant event fields. Installed packs reconcile automatically on the next app load.
+- Imported events are read-only. Personal events cannot be created or moved into a pack
+  category, but legacy personal events found there must be preserved.
 - For knockout rounds, keep the placeholder event IDs and replace titles/notes as teams
   advance. Results can be added later through `result` or notes without changing IDs.

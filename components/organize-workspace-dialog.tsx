@@ -1122,7 +1122,7 @@ export function OrganizeWorkspaceDialog({
             setProfileManagerIntent(null);
           }
         }}
-        intent={profileManagerIntent ?? undefined}
+        intent={profileManagerIntent}
       />
 
       <CategoryManager

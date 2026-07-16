@@ -1,0 +1,110 @@
+name: QA Preview
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: URL raiz do Vercel Preview a validar
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qa-preview-doze52
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    name: Smoke E2E no DEV
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CI: "true"
+      QA_BASE_URL: ${{ inputs.base_url }}
+      QA_ALLOWED_ORIGIN_PATTERN: ${{ vars.QA_ALLOWED_ORIGIN_PATTERN }}
+      QA_SUPABASE_PROJECT_REF: ${{ vars.QA_SUPABASE_PROJECT_REF }}
+      QA_E2E_EMAIL: ${{ vars.QA_E2E_EMAIL }}
+      QA_E2E_PASSWORD: ${{ secrets.QA_E2E_PASSWORD }}
+      SUPABASE_DEV_URL: ${{ vars.SUPABASE_DEV_URL }}
+      SUPABASE_DEV_ANON_KEY: ${{ vars.SUPABASE_DEV_ANON_KEY }}
+      VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+
+    steps:
+      - name: Baixar o codigo
+        uses: actions/checkout@v4
+
+      - name: Validar configuracao obrigatoria
+        shell: bash
+        run: |
+          set -euo pipefail
+          required=(
+            QA_BASE_URL
+            QA_ALLOWED_ORIGIN_PATTERN
+            QA_SUPABASE_PROJECT_REF
+            QA_E2E_EMAIL
+            QA_E2E_PASSWORD
+            SUPABASE_DEV_URL
+            SUPABASE_DEV_ANON_KEY
+            VERCEL_AUTOMATION_BYPASS_SECRET
+          )
+          for name in "${required[@]}"; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "Configuracao obrigatoria ausente: ${name}." >&2
+              exit 1
+            fi
+          done
+
+      - name: Preparar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Instalar Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Confirmar Preview e Supabase DEV
+        run: npm run qa:validate:dev
+
+      - name: Limpar conta E2E antes do smoke
+        run: npm run qa:reset:dev
+
+      - name: Executar smoke
+        id: smoke
+        continue-on-error: true
+        run: npm run qa:smoke
+
+      - name: Limpar conta E2E depois do smoke
+        id: cleanup
+        if: always()
+        continue-on-error: true
+        run: npm run qa:reset:dev
+
+      - name: Publicar evidencias da falha
+        if: steps.smoke.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-preview-failure-${{ github.run_id }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Consolidar resultado
+        if: always()
+        shell: bash
+        run: |
+          if [[ "${{ steps.smoke.outcome }}" != "success" ]]; then
+            echo "O smoke E2E falhou." >&2
+            exit 1
+          fi
+          if [[ "${{ steps.cleanup.outcome }}" != "success" ]]; then
+            echo "A limpeza final da conta E2E falhou." >&2
+            exit 1
+          fi

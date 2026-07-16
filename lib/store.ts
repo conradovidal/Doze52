@@ -677,6 +677,10 @@ export const useStore = create<StoreState>()(
         }),
       addEvent: (input) =>
         set((state) => {
+          const targetCategory = state.categories.find(
+            (category) => category.id === input.categoryId
+          );
+          if (!targetCategory || targetCategory.calendarPackGroupId) return state;
           const isSingleDay = input.startDate === input.endDate;
           const dayOrder = isSingleDay
             ? nextSingleDayOrder(state.events, input.startDate)
@@ -709,8 +713,22 @@ export const useStore = create<StoreState>()(
           };
         }),
       updateEvent: (id, input) =>
-        set((state) => ({
-          events: state.events.map((evt) => {
+        set((state) => {
+          const currentEvent = state.events.find((event) => event.id === id);
+          const targetCategory = state.categories.find(
+            (category) => category.id === input.categoryId
+          );
+          if (
+            !currentEvent ||
+            currentEvent.calendarPackGroupId ||
+            !targetCategory ||
+            (targetCategory.calendarPackGroupId &&
+              targetCategory.id !== currentEvent.categoryId)
+          ) {
+            return state;
+          }
+          return {
+            events: state.events.map((evt) => {
             if (evt.id !== id) return evt;
             const prevIsSingleDay = isSingleDayEvent(evt);
             const nextIsSingleDay = input.startDate === input.endDate;
@@ -744,11 +762,15 @@ export const useStore = create<StoreState>()(
               createdAt: evt.createdAt,
               dayOrder: nextOrder,
             };
-          }),
-        })),
+            }),
+          };
+        }),
       moveEventByDelta: (id, deltaDays) =>
         set((state) => {
           if (deltaDays === 0) return state;
+          if (state.events.find((event) => event.id === id)?.calendarPackGroupId) {
+            return state;
+          }
           return {
             events: state.events.map((evt) => {
               if (evt.id !== id) return evt;
@@ -768,6 +790,11 @@ export const useStore = create<StoreState>()(
       reorderEventInDay: ({ eventId, dayIso: _dayIso, toIndex }) =>
         set((state) => {
           void _dayIso;
+          if (
+            state.events.find((event) => event.id === eventId)?.calendarPackGroupId
+          ) {
+            return state;
+          }
           return {
             events: state.events.map((evt) =>
               evt.id === eventId
@@ -789,6 +816,7 @@ export const useStore = create<StoreState>()(
           return {
             events: state.events.map((evt) => {
               if (!eventSet.has(evt.id)) return evt;
+              if (evt.calendarPackGroupId) return evt;
               return {
                 ...evt,
                 dayOrder: normalized.get(evt.id) ?? 0,
@@ -797,9 +825,12 @@ export const useStore = create<StoreState>()(
           };
         }),
       deleteEvent: (id) =>
-        set((state) => ({
-          events: state.events.filter((evt) => evt.id !== id),
-        })),
+        set((state) => {
+          if (state.events.find((event) => event.id === id)?.calendarPackGroupId) {
+            return state;
+          }
+          return { events: state.events.filter((evt) => evt.id !== id) };
+        }),
       getEventById: (id) => get().events.find((evt) => evt.id === id),
       setCalendarViewMode: (mode) =>
         set(() => ({
@@ -958,7 +989,7 @@ export const useStore = create<StoreState>()(
     }),
     {
       name: "yiv-store",
-      version: 8,
+      version: 9,
       partialize: (state): PersistedState => ({
         profiles: state.profiles,
         selectedProfileIds: state.selectedProfileIds,

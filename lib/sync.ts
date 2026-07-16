@@ -35,6 +35,10 @@ type DbCategory = {
   name: string;
   color: string;
   visible: boolean;
+  calendar_pack_group_id: string | null;
+  calendar_pack_variant_id: string | null;
+  calendar_pack_category_key: string | null;
+  calendar_pack_version: number | null;
   position: number;
   created_at: string;
   updated_at: string;
@@ -53,6 +57,8 @@ type DbEvent = {
   created_at: string;
   updated_at: string;
   day_order: unknown;
+  calendar_pack_group_id: string | null;
+  calendar_pack_event_key: string | null;
 };
 
 export type CalendarSnapshot = {
@@ -444,6 +450,10 @@ const toLocalCategory = (row: DbCategory): CategoryItem => ({
   name: row.name,
   color: row.color,
   visible: row.visible,
+  calendarPackGroupId: row.calendar_pack_group_id ?? undefined,
+  calendarPackVariantId: row.calendar_pack_variant_id ?? undefined,
+  calendarPackCategoryKey: row.calendar_pack_category_key ?? undefined,
+  calendarPackVersion: row.calendar_pack_version ?? undefined,
 });
 
 const toLocalEvent = (row: DbEvent, categories: CategoryItem[]): CalendarEvent => {
@@ -465,6 +475,8 @@ const toLocalEvent = (row: DbEvent, categories: CategoryItem[]): CalendarEvent =
     }),
     createdAt: row.created_at,
     dayOrder: normalizeDayOrderFromDb(row.day_order),
+    calendarPackGroupId: row.calendar_pack_group_id ?? undefined,
+    calendarPackEventKey: row.calendar_pack_event_key ?? undefined,
   };
 };
 
@@ -635,6 +647,10 @@ const saveSnapshotInternal = async (snapshot: CalendarSnapshot): Promise<void> =
         name: category.name.trim(),
         color: category.color,
         visible: category.visible,
+        calendar_pack_group_id: category.calendarPackGroupId ?? null,
+        calendar_pack_variant_id: category.calendarPackVariantId ?? null,
+        calendar_pack_category_key: category.calendarPackCategoryKey ?? null,
+        calendar_pack_version: category.calendarPackVersion ?? null,
         position: sanitizeIntegerField({
           table: "categories",
           action: "insert/update",
@@ -663,6 +679,8 @@ const saveSnapshotInternal = async (snapshot: CalendarSnapshot): Promise<void> =
           fallback: 0,
         }),
         created_at: event.createdAt || nowIso(),
+        calendar_pack_group_id: event.calendarPackGroupId ?? null,
+        calendar_pack_event_key: event.calendarPackEventKey ?? null,
       }));
 
       const [currentProfiles, currentCategories, currentEvents] = await Promise.all([
@@ -837,6 +855,10 @@ export const exportUserData = async () => {
       name: category.name,
       color: category.color,
       visible: category.visible,
+      calendar_pack_group_id: category.calendarPackGroupId ?? "",
+      calendar_pack_variant_id: category.calendarPackVariantId ?? "",
+      calendar_pack_category_key: category.calendarPackCategoryKey ?? "",
+      calendar_pack_version: category.calendarPackVersion ?? "",
       position: index,
     }))
   );
@@ -858,6 +880,8 @@ export const exportUserData = async () => {
       recurrence_until: event.recurrenceUntil ?? "",
       created_at: event.createdAt,
       day_order: event.dayOrder,
+      calendar_pack_group_id: event.calendarPackGroupId ?? "",
+      calendar_pack_event_key: event.calendarPackEventKey ?? "",
     }))
   );
   downloadFile(`doze52-events-${stamp}.csv`, eventsCsv, "text/csv;charset=utf-8");

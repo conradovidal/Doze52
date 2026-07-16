@@ -83,6 +83,7 @@ export function UserMenu() {
     billingStatus,
     isPro,
     isLoading: isBillingLoading,
+    error: billingError,
     isOpeningCheckout,
     isOpeningPortal,
     isPlanActionLoading,
@@ -126,23 +127,31 @@ export function UserMenu() {
         year: "numeric",
       }).format(periodEndDate)
       : null;
+  const hasBillingError = Boolean(billingError);
   const planLabel = isBillingLoading
     ? "Carregando..."
+    : hasBillingError
+      ? "Plano indisponivel"
+      : isPro
+        ? "Doze52 Pro"
+        : "Plano Free";
+  const planDescription = hasBillingError
+    ? "Nao foi possivel carregar o status do plano."
     : isPro
-      ? "Doze52 Pro"
-      : "Plano Free";
-  const planDescription = isPro
-    ? billingStatus.cancelAtPeriodEnd && formattedPeriodEnd
-      ? `Pro ativo até ${formattedPeriodEnd}.`
-      : "Perfis e categorias sem limite prático. Calendários ilimitados."
-    : "1 perfil, 3 categorias e 1 calendário.";
+      ? billingStatus.cancelAtPeriodEnd && formattedPeriodEnd
+        ? `Pro ativo até ${formattedPeriodEnd}.`
+        : "Perfis e categorias sem limite prático. Calendários ilimitados."
+      : "1 perfil, 3 categorias e 1 calendário.";
   const planActionLabel = isBillingLoading
     ? "Carregando..."
-    : isOpeningCheckout || isOpeningPortal
-      ? "Abrindo..."
-      : isPro
-        ? "Gerenciar assinatura"
-        : "Assinar Pro";
+    : hasBillingError
+      ? "Indisponivel"
+      : isOpeningCheckout || isOpeningPortal
+        ? "Abrindo..."
+        : isPro
+          ? "Gerenciar assinatura"
+          : "Assinar Pro";
+  const isPlanActionDisabled = isPlanActionLoading || hasBillingError;
 
   if (!session) return null;
 
@@ -245,7 +254,7 @@ export function UserMenu() {
                 variant="outline"
                 size="sm"
                 className="mt-3 h-8 w-full rounded-[10px] border-border bg-background px-2.5 text-xs font-semibold text-foreground shadow-none hover:border-foreground/18 hover:bg-muted"
-                disabled={isPlanActionLoading}
+                disabled={isPlanActionDisabled}
                 onClick={handlePlanAction}
               >
                 <CreditCard className="size-4 text-muted-foreground" />

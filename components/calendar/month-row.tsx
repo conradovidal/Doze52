@@ -717,7 +717,7 @@ export function MonthRow({
                       anchorPoint,
                     })
                   }
-                  draggable
+                  draggable={!seg.event.calendarPackGroupId}
                   isDragging={dragState.draggingEventId === seg.event.id}
                   className={
                     isDraggingAny && dragState.draggingEventId !== seg.event.id
@@ -725,6 +725,10 @@ export function MonthRow({
                       : ""
                   }
                   onDragStart={(e) => {
+                    if (seg.event.calendarPackGroupId) {
+                      e.preventDefault();
+                      return;
+                    }
                     const pointerDate = resolveTargetDateFromPointer(e.clientX);
                     const eventStart = parseISO(seg.event.startDate);
                     const rawOffset = pointerDate
@@ -953,7 +957,7 @@ export function MonthRow({
                                   anchorPoint,
                                 })
                               }
-                              draggable
+                              draggable={!event.calendarPackGroupId}
                               isDragging={isDragged}
                               className={
                                 isDragged
@@ -963,6 +967,10 @@ export function MonthRow({
                                     : ""
                               }
                               onDragStart={(e) => {
+                                if (event.calendarPackGroupId) {
+                                  e.preventDefault();
+                                  return;
+                                }
                                 writeCalendarEventDndPayload(e.dataTransfer, {
                                   eventId: event.id,
                                   sourceEventId: event.sourceEventId,

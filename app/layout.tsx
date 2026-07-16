@@ -14,7 +14,7 @@ import { SiteFooter } from "@/components/site-footer";
 
 export const metadata: Metadata = {
   applicationName: "Doze 52",
-  title: "Doze 52 | Sistema de estruturação de foco",
+  title: "Doze 52 | Seu ano em uma página",
   description: "Planejamento visual anual com revisao mensal e habitos.",
   manifest: "/manifest.webmanifest",
   appleWebApp: {

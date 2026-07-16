@@ -183,6 +183,13 @@ export function AppHeader({
     setProfileManagerOpen(true);
   }, []);
 
+  const handleProfileManagerOpenChange = React.useCallback((nextOpen: boolean) => {
+    setProfileManagerOpen(nextOpen);
+    if (!nextOpen) {
+      setProfileManagerIntent(null);
+    }
+  }, []);
+
   const openCreateCategory = React.useCallback(() => {
     if (!editingProfileId) return;
     setCategoryCreateOpen(true);
@@ -447,8 +454,8 @@ export function AppHeader({
 
       <ProfileManager
         open={profileManagerOpen}
-        onOpenChange={setProfileManagerOpen}
-        intent={profileManagerIntent ?? undefined}
+        onOpenChange={handleProfileManagerOpenChange}
+        intent={profileManagerIntent}
         onRequireAuth={() => onOpenAuthDialog()}
       />
 

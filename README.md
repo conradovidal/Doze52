@@ -60,6 +60,29 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
+## Testar paywalls em local
+
+Para testar estados de UX de billing sem criar, cancelar ou gravar assinaturas
+reais no Stripe, use no `.env.local`:
+
+```bash
+NEXT_PUBLIC_BILLING_TEST_MODE=true
+NEXT_PUBLIC_BILLING_TEST_PLAN=free
+```
+
+Planos possiveis:
+
+- `free`
+- `pro`
+- `loading`
+- `error`
+- `canceled_active`
+- `expired`
+
+Esse modo so e respeitado com `NODE_ENV=development`. Em production, essas
+variaveis sao ignoradas. Ele serve apenas para testar paywalls e estados de UX;
+checkout, portal e webhooks Stripe ainda devem ser validados com o fluxo real.
+
 ## Product and repo contact
 
 - Product repo: [github.com/conradovidal/Doze52](https://github.com/conradovidal/Doze52)
@@ -122,6 +145,41 @@ Environment badge:
    - Supabase `/auth/v1/authorize` must send `redirect_to=<current-origin>/auth/callback/popup`
    - Never allow preview or production to send `redirect_to=http://localhost:3000/...`
 5. Stage and preview `NEXT_PUBLIC_SUPABASE_URL` must point to the same Supabase project where these redirect URLs were configured.
+</details>
+
+<details>
+<summary><strong>QA recorrente no DEV</strong></summary>
+
+O fluxo de QA usa duas contas exclusivas no Supabase DEV:
+
+- `qa.browser@doze52.test` para validacao exploratoria no navegador interno do Codex;
+- `qa.e2e@doze52.test` para o smoke Playwright, com dados resetados antes e depois da execucao.
+
+As senhas devem ter pelo menos 24 caracteres e nunca podem ser versionadas ou expostas como `NEXT_PUBLIC_*`. Para provisionar as contas, carregue as variaveis do DEV e execute:
+
+```bash
+npm run qa:provision:dev
+```
+
+O provisionamento e idempotente: contas existentes preservam suas senhas. A conta E2E recebe um registro Pro ficticio somente no Supabase DEV, sem cliente Stripe, para validar perfis e calendarios sem alterar a integracao de pagamentos.
+
+Para executar localmente contra um Preview protegido:
+
+```bash
+npm run qa:validate:dev
+npm run qa:reset:dev
+npm run qa:smoke
+npm run qa:reset:dev
+```
+
+Configure no GitHub:
+
+- Secrets: `QA_E2E_PASSWORD`, `VERCEL_AUTOMATION_BYPASS_SECRET`;
+- Variables: `QA_E2E_EMAIL`, `SUPABASE_DEV_URL`, `SUPABASE_DEV_ANON_KEY`, `QA_ALLOWED_ORIGIN_PATTERN`, `QA_SUPABASE_PROJECT_REF`.
+
+O workflow `QA Preview` e manual e exige a URL raiz do deployment. Ele recusa producao e qualquer Supabase diferente de `jbdukjmbtffcgklsxjml`. O bypass da Vercel e enviado somente ao dominio do Preview; requisicoes ao Supabase nunca recebem esse segredo.
+
+O login Google permanece em um checklist manual separado. Execute-o quando houver mudanca no fluxo de autenticacao, nas URLs de callback ou antes de uma publicacao relevante.
 </details>
 
 <details>
