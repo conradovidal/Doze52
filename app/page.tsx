@@ -175,6 +175,44 @@ const ensureSnapshotCoverage = (
   return { profiles, categories: normalizedCategories, events };
 };
 
+const materializeUserOwnedSnapshot = (
+  snapshot: CalendarSnapshot
+): CalendarSnapshot => {
+  const covered = ensureSnapshotCoverage(snapshot);
+  const profileIdMap = new Map(
+    covered.profiles.map((profile) => [profile.id, crypto.randomUUID()])
+  );
+  const categoryIdMap = new Map(
+    covered.categories.map((category) => [category.id, crypto.randomUUID()])
+  );
+
+  return {
+    profiles: covered.profiles.map((profile) => ({
+      ...profile,
+      id: profileIdMap.get(profile.id) ?? crypto.randomUUID(),
+      userId: undefined,
+    })),
+    categories: covered.categories.map((category) => ({
+      ...category,
+      id: categoryIdMap.get(category.id) ?? crypto.randomUUID(),
+      profileId:
+        profileIdMap.get(category.profileId) ??
+        profileIdMap.values().next().value ??
+        crypto.randomUUID(),
+      userId: undefined,
+    })),
+    events: covered.events.map((event) => ({
+      ...event,
+      id: crypto.randomUUID(),
+      categoryId:
+        categoryIdMap.get(event.categoryId) ??
+        categoryIdMap.values().next().value ??
+        crypto.randomUUID(),
+      userId: undefined,
+    })),
+  };
+};
+
 const readPendingSyncSnapshot = (userId: string): CalendarSnapshot | null => {
   if (typeof window === "undefined") return null;
 
@@ -816,7 +854,9 @@ export default function HomePage() {
         );
 
         const pendingSnapshot = readPendingSyncSnapshot(userId);
-        const localDraftIsRelevant = hasRelevantLocalDraft(localSnapshot);
+        const alreadyImported = isLocalImported(userId);
+        const localDraftIsRelevant =
+          !alreadyImported && hasRelevantLocalDraft(localSnapshot);
         const remoteSnapshot = await loadRemoteData();
 
         if (cancelled) return;
@@ -826,7 +866,6 @@ export default function HomePage() {
           remoteSnapshot.categories.length === 0 &&
           remoteSnapshot.events.length === 0;
 
-        const alreadyImported = isLocalImported(userId);
         const remoteHash = toSnapshotHash(remoteSnapshot);
 
         let nextSnapshot: CalendarSnapshot = remoteSnapshot;
@@ -836,9 +875,12 @@ export default function HomePage() {
           nextSnapshot = pendingSnapshot;
           shouldForceSave = true;
         } else if (localDraftIsRelevant) {
-          nextSnapshot = mergeSnapshots(remoteSnapshot, localSnapshot);
+          nextSnapshot = mergeSnapshots(
+            remoteSnapshot,
+            materializeUserOwnedSnapshot(localSnapshot)
+          );
         } else if (remoteIsEmpty && !alreadyImported) {
-          nextSnapshot = ensureSnapshotCoverage(remoteSnapshot);
+          nextSnapshot = materializeUserOwnedSnapshot(remoteSnapshot);
         }
 
         const reconciliation = reconcileInstalledCalendarPacks(

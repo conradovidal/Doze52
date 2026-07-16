@@ -148,6 +148,41 @@ Environment badge:
 </details>
 
 <details>
+<summary><strong>QA recorrente no DEV</strong></summary>
+
+O fluxo de QA usa duas contas exclusivas no Supabase DEV:
+
+- `qa.browser@doze52.test` para validacao exploratoria no navegador interno do Codex;
+- `qa.e2e@doze52.test` para o smoke Playwright, com dados resetados antes e depois da execucao.
+
+As senhas devem ter pelo menos 24 caracteres e nunca podem ser versionadas ou expostas como `NEXT_PUBLIC_*`. Para provisionar as contas, carregue as variaveis do DEV e execute:
+
+```bash
+npm run qa:provision:dev
+```
+
+O provisionamento e idempotente: contas existentes preservam suas senhas. A conta E2E recebe um registro Pro ficticio somente no Supabase DEV, sem cliente Stripe, para validar perfis e calendarios sem alterar a integracao de pagamentos.
+
+Para executar localmente contra um Preview protegido:
+
+```bash
+npm run qa:validate:dev
+npm run qa:reset:dev
+npm run qa:smoke
+npm run qa:reset:dev
+```
+
+Configure no GitHub:
+
+- Secrets: `QA_E2E_PASSWORD`, `VERCEL_AUTOMATION_BYPASS_SECRET`;
+- Variables: `QA_E2E_EMAIL`, `SUPABASE_DEV_URL`, `SUPABASE_DEV_ANON_KEY`, `QA_ALLOWED_ORIGIN_PATTERN`, `QA_SUPABASE_PROJECT_REF`.
+
+O workflow `QA Preview` e manual e exige a URL raiz do deployment. Ele recusa producao e qualquer Supabase diferente de `jbdukjmbtffcgklsxjml`. O bypass da Vercel e enviado somente ao dominio do Preview; requisicoes ao Supabase nunca recebem esse segredo.
+
+O login Google permanece em um checklist manual separado. Execute-o quando houver mudanca no fluxo de autenticacao, nas URLs de callback ou antes de uma publicacao relevante.
+</details>
+
+<details>
 <summary><strong>Migrations, backups, and audits</strong></summary>
 
 Before changing schema in production, create backup dumps:
