@@ -1,9 +1,3 @@
-<p align="center">
-  <img src="public/doze52-logo-light.svg" alt="Doze 52 logo para tema claro" width="300" />
-  &nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="public/doze52-logo-dark.svg" alt="Doze 52 logo para tema escuro" width="300" />
-</p>
-
 # Doze 52
 
 **Visual year planning for focus, routines, and long-range organization.**
