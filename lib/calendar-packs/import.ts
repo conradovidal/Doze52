@@ -643,7 +643,10 @@ export const importCalendarPack = (
     selectedPackEvents.flatMap(getPackEventIds)
   );
   const hadExistingPackEvent = snapshot.events.some((event) =>
-    packEventIdsBeforeImport.has(event.id)
+    packEventIdsBeforeImport.has(event.id) ||
+    (event.calendarPackGroupId === groupId &&
+      Boolean(event.calendarPackEventKey) &&
+      packEventIdsBeforeImport.has(event.calendarPackEventKey ?? ""))
   );
   const nextProfiles = [...snapshot.profiles];
 
@@ -704,10 +707,11 @@ export const importCalendarPack = (
     const existingCategory = canonicalCategory ?? preferredLegacyCategory;
 
     if (!existingCategory) {
-      categoryIdByKey.set(packCategory.key, packCategory.id);
+      const categoryId = crypto.randomUUID();
+      categoryIdByKey.set(packCategory.key, categoryId);
       addedCategoryCount += 1;
       nextCategories.push({
-        id: packCategory.id,
+        id: categoryId,
         profileId,
         name: packCategory.name,
         color: packCategory.color,
@@ -728,7 +732,7 @@ export const importCalendarPack = (
     const nextCategoryColor = existingCategory.color;
     const nextCategoryProfileId = existingCategory.profileId;
 
-    const destinationCategoryId = packCategory.id;
+    const destinationCategoryId = existingCategory.id;
     const sourceCategoryIds = new Set([
       existingCategory.id,
       ...legacyCandidates.map((category) => category.id),
@@ -770,21 +774,7 @@ export const importCalendarPack = (
           : category
       );
 
-    if (!canonicalCategory) {
-      nextCategories.push({
-        ...existingCategory,
-        id: destinationCategoryId,
-        profileId: nextCategoryProfileId,
-        name: nextCategoryName,
-        color: nextCategoryColor,
-        calendarPackGroupId: groupId,
-        calendarPackVariantId: pack.id,
-        calendarPackCategoryKey: packCategory.key,
-        calendarPackVersion: pack.version,
-      });
-    }
     if (
-      !canonicalCategory ||
       existingCategory.name !== nextCategoryName ||
       existingCategory.color !== nextCategoryColor ||
       existingCategory.calendarPackGroupId !== groupId ||
@@ -814,10 +804,19 @@ export const importCalendarPack = (
     const expectedTitle = getCalendarPackEventTitle(packEvent, pack);
     const expectedNotes = getCalendarPackEventNotes(packEvent, pack);
     const legacyIds = new Set(packEvent.legacyIds ?? []);
+    const managedEventIndex = nextEvents.findIndex(
+      (event) =>
+        event.calendarPackGroupId === groupId &&
+        event.calendarPackEventKey === packEvent.id
+    );
     const currentEventIndex = nextEvents.findIndex((event) => event.id === packEvent.id);
     const legacyEventIndex = nextEvents.findIndex((event) => legacyIds.has(event.id));
     const existingEventIndex =
-      currentEventIndex >= 0 ? currentEventIndex : legacyEventIndex;
+      managedEventIndex >= 0
+        ? managedEventIndex
+        : currentEventIndex >= 0
+          ? currentEventIndex
+          : legacyEventIndex;
     for (const legacyId of legacyIds) {
       legacyEventIdsToRemove.add(legacyId);
     }
@@ -825,7 +824,7 @@ export const importCalendarPack = (
       const currentEvent = nextEvents[existingEventIndex];
       const nextEvent = {
         ...currentEvent,
-        id: packEvent.id,
+        id: currentEvent.id,
         title: expectedTitle,
         categoryId,
         color: category.color,
@@ -862,7 +861,7 @@ export const importCalendarPack = (
     }
 
     nextEvents.push({
-      id: packEvent.id,
+      id: crypto.randomUUID(),
       title: expectedTitle,
       categoryId,
       color: category?.color ?? pack.categories[0]?.color ?? "#2563EB",
