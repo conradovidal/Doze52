@@ -4,11 +4,11 @@
   "description": "Corridas da temporada 2026 em um único calendário.",
   "year": 2026,
   "datasetStatus": "complete",
-  "updateNote": "Inclui as etapas listadas pela Fórmula 1 em 2026-06-03, sem separar resultados e próximas corridas.",
+  "updateNote": "Calendário oficial completo e vencedores das dez etapas disputadas até o GP da Bélgica.",
   "source": {
     "label": "Calendário oficial da Fórmula 1 2026",
     "url": "https://www.formula1.com/en/racing/2026",
-    "lastVerified": "2026-06-03"
+    "lastVerified": "2026-07-20"
   },
   "profile": {
     "id": "2026f100-0000-4000-8000-000000000001",
@@ -38,11 +38,12 @@
       "suggestedCategoryKey": "races",
       "source": "Calendário oficial da Fórmula 1 2026",
       "sourceUrl": "https://www.formula1.com/en/racing/2026",
-      "lastVerified": "2026-06-03",
+      "lastVerified": "2026-07-20",
       "weekend": "06-08 Mar",
       "notes": [
         "FORMULA 1 QATAR AIRWAYS AUSTRALIAN GRAND PRIX 2026"
       ],
+      "result": "George Russell",
       "isBrazilMatch": false
     },
     {
@@ -59,11 +60,12 @@
       "suggestedCategoryKey": "races",
       "source": "Calendário oficial da Fórmula 1 2026",
       "sourceUrl": "https://www.formula1.com/en/racing/2026",
-      "lastVerified": "2026-06-03",
+      "lastVerified": "2026-07-20",
       "weekend": "13-15 Mar",
       "notes": [
         "FORMULA 1 HEINEKEN CHINESE GRAND PRIX 2026"
       ],
+      "result": "Kimi Antonelli",
       "isBrazilMatch": false
     },
     {
@@ -80,11 +82,12 @@
       "suggestedCategoryKey": "races",
       "source": "Calendário oficial da Fórmula 1 2026",
       "sourceUrl": "https://www.formula1.com/en/racing/2026",
-      "lastVerified": "2026-06-03",
+      "lastVerified": "2026-07-20",
       "weekend": "27-29 Mar",
       "notes": [
         "FORMULA 1 ARAMCO JAPANESE GRAND PRIX 2026"
       ],
+      "result": "Kimi Antonelli",
       "isBrazilMatch": false
     },
     {
@@ -101,11 +104,12 @@
       "suggestedCategoryKey": "races",
       "source": "Calendário oficial da Fórmula 1 2026",
       "sourceUrl": "https://www.formula1.com/en/racing/2026",
-      "lastVerified": "2026-06-03",
+      "lastVerified": "2026-07-20",
       "weekend": "01-03 May",
       "notes": [
         "FORMULA 1 CRYPTO.COM MIAMI GRAND PRIX 2026"
       ],
+      "result": "Kimi Antonelli",
       "isBrazilMatch": false
     },
     {
@@ -122,11 +126,12 @@
       "suggestedCategoryKey": "races",
       "source": "Calendário oficial da Fórmula 1 2026",
       "sourceUrl": "https://www.formula1.com/en/racing/2026",
-      "lastVerified": "2026-06-03",
+      "lastVerified": "2026-07-20",
       "weekend": "22-24 May",
       "notes": [
         "FORMULA 1 LENOVO GRAND PRIX DU CANADA 2026"
       ],
+      "result": "Kimi Antonelli",
       "isBrazilMatch": false
     },
     {
@@ -143,11 +148,12 @@
       "suggestedCategoryKey": "races",
       "source": "Calendário oficial da Fórmula 1 2026",
       "sourceUrl": "https://www.formula1.com/en/racing/2026",
-      "lastVerified": "2026-06-03",
+      "lastVerified": "2026-07-20",
       "weekend": "05-07 Jun",
       "notes": [
         "FORMULA 1 LOUIS VUITTON GRAND PRIX DE MONACO 2026"
       ],
+      "result": "Kimi Antonelli",
       "isBrazilMatch": false
     },
     {
@@ -164,11 +170,12 @@
       "suggestedCategoryKey": "races",
       "source": "Calendário oficial da Fórmula 1 2026",
       "sourceUrl": "https://www.formula1.com/en/racing/2026",
-      "lastVerified": "2026-06-03",
+      "lastVerified": "2026-07-20",
       "weekend": "12-14 Jun",
       "notes": [
         "FORMULA 1 MSC CRUISES GRAN PREMIO DE BARCELONA-CATALUNYA 2026"
       ],
+      "result": "Lewis Hamilton",
       "isBrazilMatch": false
     },
     {
@@ -185,11 +192,12 @@
       "suggestedCategoryKey": "races",
       "source": "Calendário oficial da Fórmula 1 2026",
       "sourceUrl": "https://www.formula1.com/en/racing/2026",
-      "lastVerified": "2026-06-03",
+      "lastVerified": "2026-07-20",
       "weekend": "26-28 Jun",
       "notes": [
         "FORMULA 1 LENOVO AUSTRIAN GRAND PRIX 2026"
       ],
+      "result": "George Russell",
       "isBrazilMatch": false
     },
     {
@@ -206,11 +214,12 @@
       "suggestedCategoryKey": "races",
       "source": "Calendário oficial da Fórmula 1 2026",
       "sourceUrl": "https://www.formula1.com/en/racing/2026",
-      "lastVerified": "2026-06-03",
+      "lastVerified": "2026-07-20",
       "weekend": "03-05 Jul",
       "notes": [
         "FORMULA 1 PIRELLI BRITISH GRAND PRIX 2026"
       ],
+      "result": "Charles Leclerc",
       "isBrazilMatch": false
     },
     {
@@ -227,11 +236,12 @@
       "suggestedCategoryKey": "races",
       "source": "Calendário oficial da Fórmula 1 2026",
       "sourceUrl": "https://www.formula1.com/en/racing/2026",
-      "lastVerified": "2026-06-03",
+      "lastVerified": "2026-07-20",
       "weekend": "17-19 Jul",
       "notes": [
         "FORMULA 1 MOET & CHANDON BELGIAN GRAND PRIX 2026"
       ],
+      "result": "Kimi Antonelli",
       "isBrazilMatch": false
     },
     {

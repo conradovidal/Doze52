@@ -4,7 +4,7 @@
   "description": "Jogos do Brasil e Copa de 2026 em calendários separados.",
   "year": 2026,
   "datasetStatus": "complete",
-  "updateNote": "Placares dos 100 jogos disputados até as quartas de final, mata-mata atualizado e semifinais definidas.",
+  "updateNote": "Torneio concluído com os 104 placares, Espanha campeã e Inglaterra em terceiro lugar.",
   "source": {
     "label": "FIFA / FourFourTwo",
     "url": "https://www.fourfourtwo.com/competition/all-of-the-world-cup-scores-so-far-at-the-2026-tournament",
@@ -2234,11 +2234,12 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-07-13",
+      "lastVerified": "2026-07-20",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: França x Espanha"
-      ]
+      ],
+      "result": "0 x 2"
     },
     {
       "id": "20265200-0000-4000-8000-000000000202",
@@ -2254,51 +2255,54 @@
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-07-13",
+      "lastVerified": "2026-07-20",
       "isBrazilMatch": false,
       "notes": [
         "Confronto: Inglaterra x Argentina"
-      ]
+      ],
+      "result": "1 x 2"
     },
     {
       "id": "20265200-0000-4000-8000-000000000203",
-      "title": "Disputa de terceiro lugar: Perd. J101 x Perd. J102",
+      "title": "🇫🇷 🏴󠁧󠁢󠁥󠁮󠁧󠁿",
       "date": "2026-07-18",
       "time": "17:00",
       "timezone": "America/New_York",
       "city": "Miami",
       "venue": "Hard Rock Stadium",
       "phase": "Disputa de terceiro lugar",
-      "homeTeam": "Perdedor do Jogo 101",
-      "awayTeam": "Perdedor do Jogo 102",
+      "homeTeam": "França",
+      "awayTeam": "Inglaterra",
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-07-13",
+      "lastVerified": "2026-07-20",
       "isBrazilMatch": false,
       "notes": [
-        "Confronto: Perdedor do Jogo 101 x Perdedor do Jogo 102"
-      ]
+        "Confronto: França x Inglaterra"
+      ],
+      "result": "4 x 6"
     },
     {
       "id": "20265200-0000-4000-8000-000000000204",
-      "title": "Final: Venc. J101 x Venc. J102",
+      "title": "🇪🇸 🇦🇷",
       "date": "2026-07-19",
       "time": "15:00",
       "timezone": "America/New_York",
       "city": "New York / New Jersey",
       "venue": "MetLife Stadium",
       "phase": "Final",
-      "homeTeam": "Vencedor do Jogo 101",
-      "awayTeam": "Vencedor do Jogo 102",
+      "homeTeam": "Espanha",
+      "awayTeam": "Argentina",
       "suggestedCategoryKey": "other",
       "source": "FIFA",
       "sourceUrl": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums",
-      "lastVerified": "2026-07-13",
+      "lastVerified": "2026-07-20",
       "isBrazilMatch": false,
       "notes": [
-        "Confronto: Vencedor do Jogo 101 x Vencedor do Jogo 102"
-      ]
+        "Confronto: Espanha x Argentina"
+      ],
+      "result": "1 x 0 (após prorrogação)"
     }
   ]
 }
