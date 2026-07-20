@@ -12,23 +12,12 @@ import {
   type SyncOverlayStatus,
 } from "@/components/sync-status-overlay";
 import { AuthDialog } from "@/components/auth/auth-dialog";
+import { GuidedOnboardingPanel } from "@/components/onboarding/guided-onboarding-panel";
 import { Button } from "@/components/ui/button";
-import {
-  Popover,
-  PopoverAnchor,
-  PopoverContent,
-  PopoverDescription,
-  PopoverHeader,
-  PopoverTitle,
-} from "@/components/ui/popover";
 import { useFeedback } from "@/components/ui/feedback-provider";
 import {
-  getOnboardingDefaultProfiles,
-  getOnboardingDefaultCategories,
   isOnboardingProfilesSnapshot,
   isOnboardingCategoriesSnapshot,
-  ONBOARDING_DEFAULT_CATEGORY_ID,
-  ONBOARDING_DEFAULT_PROFILE_ID,
   useStore,
   type EventInput,
 } from "@/lib/store";
@@ -43,14 +32,27 @@ import {
 } from "@/lib/sync";
 import { getTodayIsoInTimeZone } from "@/lib/date";
 import {
+  GUIDED_ONBOARDING_CHANGE_EVENT,
   PRODUCT_ONBOARDING_RESET_EVENT,
+  dispatchGuidedOnboarding,
+  hasAuthorCalendarEvents,
+  isGuidedOnboardingInProgress,
+  readGuidedOnboardingState,
   readProductOnboardingState,
-  setProductOnboardingState,
+  shouldShowGuidedOnboarding,
+  type GuidedCreationIntent,
+  type GuidedOnboardingAction,
+  type GuidedOnboardingState,
+  type GuidedReflection,
   type ProductOnboardingState,
 } from "@/lib/onboarding";
 import { logDevError, logProdError } from "@/lib/safe-log";
 import { getSupabaseBrowserClient, hasSupabaseEnv } from "@/lib/supabase";
 import { expandEventsForYear } from "@/lib/recurrence";
+import {
+  ensureSnapshotCoverage,
+  materializeUserOwnedSnapshot,
+} from "@/lib/snapshot-ownership";
 import { cn } from "@/lib/utils";
 import type { AnchorPoint } from "@/lib/types";
 
@@ -119,98 +121,6 @@ const isCalendarSnapshotLike = (value: unknown): value is CalendarSnapshot => {
     Array.isArray(record.categories) &&
     Array.isArray(record.events)
   );
-};
-
-const ensureSnapshotCoverage = (
-  snapshot: CalendarSnapshot
-): CalendarSnapshot => {
-  const profiles =
-    snapshot.profiles.length > 0
-      ? snapshot.profiles
-      : getOnboardingDefaultProfiles();
-
-  const profileIds = new Set(profiles.map((profile) => profile.id));
-  const fallbackProfileId = profileIds.has(ONBOARDING_DEFAULT_PROFILE_ID)
-    ? ONBOARDING_DEFAULT_PROFILE_ID
-    : profiles[0]?.id ?? ONBOARDING_DEFAULT_PROFILE_ID;
-
-  const categories =
-    snapshot.categories.length > 0
-      ? snapshot.categories
-      : getOnboardingDefaultCategories();
-
-  const normalizedCategories = categories.map((category) => ({
-    ...category,
-    profileId: profileIds.has(category.profileId)
-      ? category.profileId
-      : fallbackProfileId,
-  }));
-
-  const categoryIds = new Set(
-    normalizedCategories.map((category) => category.id)
-  );
-
-  const fallbackCategoryId = categoryIds.has(ONBOARDING_DEFAULT_CATEGORY_ID)
-    ? ONBOARDING_DEFAULT_CATEGORY_ID
-    : normalizedCategories[0]?.id ?? ONBOARDING_DEFAULT_CATEGORY_ID;
-
-  const colorByCategoryId = new Map(
-    normalizedCategories.map((category) => [category.id, category.color])
-  );
-
-  const events = snapshot.events.map((event) => {
-    const categoryId = categoryIds.has(event.categoryId)
-      ? event.categoryId
-      : fallbackCategoryId;
-
-    const color = colorByCategoryId.get(categoryId) ?? event.color;
-
-    if (categoryId === event.categoryId && color === event.color) {
-      return event;
-    }
-
-    return { ...event, categoryId, color };
-  });
-
-  return { profiles, categories: normalizedCategories, events };
-};
-
-const materializeUserOwnedSnapshot = (
-  snapshot: CalendarSnapshot
-): CalendarSnapshot => {
-  const covered = ensureSnapshotCoverage(snapshot);
-  const profileIdMap = new Map(
-    covered.profiles.map((profile) => [profile.id, crypto.randomUUID()])
-  );
-  const categoryIdMap = new Map(
-    covered.categories.map((category) => [category.id, crypto.randomUUID()])
-  );
-
-  return {
-    profiles: covered.profiles.map((profile) => ({
-      ...profile,
-      id: profileIdMap.get(profile.id) ?? crypto.randomUUID(),
-      userId: undefined,
-    })),
-    categories: covered.categories.map((category) => ({
-      ...category,
-      id: categoryIdMap.get(category.id) ?? crypto.randomUUID(),
-      profileId:
-        profileIdMap.get(category.profileId) ??
-        profileIdMap.values().next().value ??
-        crypto.randomUUID(),
-      userId: undefined,
-    })),
-    events: covered.events.map((event) => ({
-      ...event,
-      id: crypto.randomUUID(),
-      categoryId:
-        categoryIdMap.get(event.categoryId) ??
-        categoryIdMap.values().next().value ??
-        crypto.randomUUID(),
-      userId: undefined,
-    })),
-  };
 };
 
 const readPendingSyncSnapshot = (userId: string): CalendarSnapshot | null => {
@@ -353,6 +263,9 @@ export default function HomePage() {
 
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [authDialogOpen, setAuthDialogOpen] = React.useState(false);
+  const [authDialogInitialMode, setAuthDialogInitialMode] = React.useState<
+    "login" | "signup"
+  >("login");
   const [dialogAnchorPoint, setDialogAnchorPoint] = React.useState<
     AnchorPoint | undefined
   >(undefined);
@@ -383,6 +296,14 @@ export default function HomePage() {
   const [syncBlocked, setSyncBlocked] = React.useState(false);
   const [calendarCreateOnboarding, setCalendarCreateOnboarding] =
     React.useState<ProductOnboardingState | null>(null);
+  const [guidedOnboarding, setGuidedOnboarding] =
+    React.useState<GuidedOnboardingState | null>(null);
+  const [guidedPanelHidden, setGuidedPanelHidden] = React.useState(false);
+  const [guidedCreationIntent, setGuidedCreationIntent] =
+    React.useState<GuidedCreationIntent | null>(null);
+  const [highlightedEventId, setHighlightedEventId] = React.useState<
+    string | null
+  >(null);
   const [isMobileCalendarUi, setIsMobileCalendarUi] = React.useState<
     boolean | null
   >(null);
@@ -646,22 +567,38 @@ export default function HomePage() {
   React.useEffect(() => {
     if (windowContext !== "main") return;
 
-    const syncCreateOnboarding = () => {
+    const syncOnboarding = () => {
       setCalendarCreateOnboarding(readProductOnboardingState("create-event"));
+      setGuidedOnboarding(readGuidedOnboardingState());
+      setGuidedPanelHidden(false);
     };
 
-    syncCreateOnboarding();
+    const syncGuidedOnboarding = (event: Event) => {
+      const nextState = (event as CustomEvent<GuidedOnboardingState>).detail;
+      setGuidedOnboarding(nextState ?? readGuidedOnboardingState());
+    };
+
+    syncOnboarding();
 
     window.addEventListener(
       PRODUCT_ONBOARDING_RESET_EVENT,
-      syncCreateOnboarding
+      syncOnboarding
+    );
+    window.addEventListener(
+      GUIDED_ONBOARDING_CHANGE_EVENT,
+      syncGuidedOnboarding
     );
 
-    return () =>
+    return () => {
       window.removeEventListener(
         PRODUCT_ONBOARDING_RESET_EVENT,
-        syncCreateOnboarding
+        syncOnboarding
       );
+      window.removeEventListener(
+        GUIDED_ONBOARDING_CHANGE_EVENT,
+        syncGuidedOnboarding
+      );
+    };
   }, [windowContext]);
 
   React.useLayoutEffect(() => {
@@ -819,15 +756,6 @@ export default function HomePage() {
     session?.user.id,
     windowContext,
   ]);
-
-  React.useEffect(() => {
-    if (windowContext !== "main") return;
-    if (calendarCreateOnboarding !== "pending") return;
-    if (events.length === 0) return;
-
-    setProductOnboardingState("create-event", "completed");
-    setCalendarCreateOnboarding("completed");
-  }, [calendarCreateOnboarding, events.length, windowContext]);
 
   const bootstrapRemote = React.useCallback(() => {
     if (windowContext !== "main") return () => {};
@@ -1060,18 +988,49 @@ export default function HomePage() {
     setDialogAnchorPoint(payload.anchorPoint);
     setSeedRange(null);
     setCreatingRange(null);
+    setGuidedCreationIntent(null);
     setDialogOpen(true);
   };
 
-  const dismissCalendarCreateOnboarding = React.useCallback(() => {
-    setProductOnboardingState("create-event", "dismissed");
-    setCalendarCreateOnboarding("dismissed");
-  }, []);
+  const updateGuidedOnboarding = React.useCallback(
+    (action: GuidedOnboardingAction) => {
+      const next = dispatchGuidedOnboarding(action);
+      setGuidedOnboarding(next);
+      return next;
+    },
+    []
+  );
 
-  const completeCalendarCreateOnboarding = React.useCallback(() => {
-    setProductOnboardingState("create-event", "completed");
-    setCalendarCreateOnboarding("completed");
-  }, []);
+  const openGuidedEventDialog = React.useCallback(
+    (intent: GuidedCreationIntent) => {
+      updateGuidedOnboarding({ type: "start" });
+      setGuidedCreationIntent(intent);
+      setEditingId(null);
+      setDialogAnchorPoint(undefined);
+      setCreatingRange(null);
+      const fallbackDate = todayIso || format(new Date(), "yyyy-MM-dd");
+      setSeedRange({ startDate: fallbackDate, endDate: fallbackDate });
+      setDialogOpen(true);
+    },
+    [todayIso, updateGuidedOnboarding]
+  );
+
+  const completeGuidedOnboarding = React.useCallback(() => {
+    const current = readGuidedOnboardingState();
+    if (current.step === "completed") return;
+    updateGuidedOnboarding({ type: "complete" });
+    notify({
+      tone: "success",
+      title: "Teu ano já começou a ganhar forma",
+      description: "Volte quando algo mudar.",
+      durationMs: 3200,
+    });
+  }, [notify, updateGuidedOnboarding]);
+
+  const dismissGuidedOnboarding = React.useCallback(() => {
+    updateGuidedOnboarding({ type: "dismiss" });
+    setGuidedPanelHidden(true);
+  }, [updateGuidedOnboarding]);
 
   const handleSubmit = async (payload: EventInput) => {
     if (editingId) {
@@ -1086,8 +1045,27 @@ export default function HomePage() {
       return;
     }
 
-    addEvent(payload);
-    completeCalendarCreateOnboarding();
+    const eventId = addEvent(payload);
+    if (!eventId) {
+      throw new Error("Não foi possível adicionar este evento à categoria escolhida.");
+    }
+
+    setHighlightedEventId(eventId);
+
+    const currentGuided = guidedOnboarding ?? readGuidedOnboardingState();
+    const shouldAdvanceGuided =
+      currentGuided.step !== "completed" &&
+      currentGuided.step !== "dismissed" &&
+      (isGuidedOnboardingInProgress(currentGuided) ||
+        calendarCreateOnboarding === "pending");
+
+    if (shouldAdvanceGuided) {
+      updateGuidedOnboarding({
+        type: "item_created",
+        isPeriod: payload.startDate !== payload.endDate,
+      });
+      setGuidedPanelHidden(false);
+    }
 
     notify({
       tone: "success",
@@ -1102,6 +1080,7 @@ export default function HomePage() {
     setEditingId(null);
     setDialogAnchorPoint(undefined);
     setCreatingRange(null);
+    setGuidedCreationIntent(null);
     setSeedRange({
       startDate: fallbackTodayIso,
       endDate: fallbackTodayIso,
@@ -1155,6 +1134,7 @@ export default function HomePage() {
 
         setEditingId(null);
         setDialogAnchorPoint(anchorPoint);
+        setGuidedCreationIntent(null);
         setDialogOpen(true);
 
         return null;
@@ -1321,11 +1301,65 @@ export default function HomePage() {
     };
   }, [clearSyncOverlayTimer]);
 
-  const showDesktopCreateCoachmark =
-    calendarCreateOnboarding === "pending" && isMobileCalendarUi === false;
+  React.useEffect(() => {
+    if (!highlightedEventId) return;
 
-  const showMobileCreateCoachmark =
-    calendarCreateOnboarding === "pending" && isMobileCalendarUi === true;
+    const highlightTimer = window.setTimeout(() => {
+      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      const nodes = document.querySelectorAll<HTMLElement>(
+        `[data-calendar-event-id="${highlightedEventId}"]`
+      );
+      nodes.forEach((node) => {
+        node.animate(
+          [
+            { transform: "scale(1)", boxShadow: "0 0 0 0 rgba(37, 99, 235, 0)" },
+            {
+              transform: "scale(1.035)",
+              boxShadow: "0 0 0 4px rgba(37, 99, 235, 0.2)",
+            },
+            { transform: "scale(1)", boxShadow: "0 0 0 0 rgba(37, 99, 235, 0)" },
+          ],
+          { duration: 900, easing: "ease-out" }
+        );
+      });
+    }, 50);
+
+    const cleanupTimer = window.setTimeout(() => {
+      setHighlightedEventId(null);
+    }, 1200);
+
+    return () => {
+      window.clearTimeout(highlightTimer);
+      window.clearTimeout(cleanupTimer);
+    };
+  }, [highlightedEventId]);
+
+  React.useEffect(() => {
+    if (guidedOnboarding?.step !== "save") return;
+    if (!session?.user.id || !remoteReady) return;
+    completeGuidedOnboarding();
+  }, [
+    completeGuidedOnboarding,
+    guidedOnboarding?.step,
+    remoteReady,
+    session?.user.id,
+  ]);
+
+  const hasAuthorEvents = hasAuthorCalendarEvents(events);
+  const showGuidedOnboarding = Boolean(
+    guidedOnboarding &&
+      calendarCreateOnboarding &&
+      isMobileCalendarUi !== null &&
+      !guidedPanelHidden &&
+      shouldShowGuidedOnboarding({
+        state: guidedOnboarding,
+        legacyState: calendarCreateOnboarding,
+        hasAuthorEvents,
+        authLoading,
+        isAuthenticated: Boolean(session?.user.id),
+        remoteReady,
+      })
+  );
 
   const handleYearChange = React.useCallback(
     (nextYear: number) => {
@@ -1384,6 +1418,7 @@ export default function HomePage() {
           isMobileCalendarUi={isMobileCalendarUi === true}
           onCalendarPackFocusYear={handleYearChange}
           onOpenAuthDialog={(anchorPoint) => {
+            setAuthDialogInitialMode("login");
             setAuthDialogAnchorPoint(anchorPoint);
             setAuthDialogOpen(true);
           }}
@@ -1424,106 +1459,57 @@ export default function HomePage() {
               }}
               isMobileInteractionMode={false}
             />
-
-            {showDesktopCreateCoachmark ? (
-              <Popover
-                open={showDesktopCreateCoachmark}
-                onOpenChange={(open) => {
-                  if (!open) dismissCalendarCreateOnboarding();
-                }}
-              >
-                <PopoverAnchor asChild>
-                  <div
-                    aria-hidden="true"
-                    className="pointer-events-none absolute top-4 left-[5.5rem] h-px w-px"
-                  />
-                </PopoverAnchor>
-
-                <PopoverContent
-                  align="start"
-                  side="bottom"
-                  sideOffset={14}
-                  className="w-[18.5rem] rounded-[1.4rem] p-4"
-                >
-                  <PopoverHeader className="space-y-1.5">
-                    <PopoverTitle>Crie direto no calendario</PopoverTitle>
-                    <PopoverDescription className="text-sm leading-5">
-                      Clique ou arraste no calendario para criar um evento. Toque
-                      num evento existente para editar.
-                    </PopoverDescription>
-                  </PopoverHeader>
-
-                  <div className="mt-4 flex justify-end">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      className="rounded-full"
-                      onClick={dismissCalendarCreateOnboarding}
-                    >
-                      Entendi
-                    </Button>
-                  </div>
-                </PopoverContent>
-              </Popover>
-            ) : null}
           </div>
         </div>
       )}
+
+      {showGuidedOnboarding && guidedOnboarding ? (
+        <GuidedOnboardingPanel
+          state={guidedOnboarding}
+          isAuthenticated={Boolean(session?.user.id)}
+          isSyncReady={remoteReady}
+          onClose={() => setGuidedPanelHidden(true)}
+          onDismiss={dismissGuidedOnboarding}
+          onAddItem={openGuidedEventDialog}
+          onSkipPeriod={() =>
+            updateGuidedOnboarding({ type: "skip_period" })
+          }
+          onContinueToReflection={() =>
+            updateGuidedOnboarding({ type: "continue_to_reflection" })
+          }
+          onReflectionChange={(reflection: GuidedReflection) =>
+            updateGuidedOnboarding({ type: "set_reflection", reflection })
+          }
+          onContinueReflection={() =>
+            updateGuidedOnboarding({ type: "continue_reflection" })
+          }
+          onSkipReflection={() =>
+            updateGuidedOnboarding({ type: "skip_reflection" })
+          }
+          onOpenAuth={() => {
+            setAuthDialogInitialMode("signup");
+            setAuthDialogAnchorPoint(undefined);
+            setAuthDialogOpen(true);
+          }}
+          onContinueLocal={completeGuidedOnboarding}
+        />
+      ) : null}
 
       {isMobileCalendarUi ? (
         <div
           className="fixed right-4 z-40"
           style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 2.75rem)" }}
         >
-          <Popover
-            open={showMobileCreateCoachmark}
-            onOpenChange={(open) => {
-              if (!open) dismissCalendarCreateOnboarding();
-            }}
+          <Button
+            type="button"
+            size="icon-lg"
+            variant="premium"
+            className="rounded-full shadow-[0_20px_40px_-24px_rgba(15,23,42,0.55)]"
+            aria-label="Novo evento"
+            onClick={() => handleMobileFabCreate(mobileActiveDateIso)}
           >
-            <PopoverAnchor asChild>
-              <Button
-                type="button"
-                size="icon-lg"
-                variant="premium"
-                className="rounded-full shadow-[0_20px_40px_-24px_rgba(15,23,42,0.55)]"
-                aria-label="Novo evento"
-                onClick={() => handleMobileFabCreate(mobileActiveDateIso)}
-              >
-                <Plus className="size-5" />
-              </Button>
-            </PopoverAnchor>
-
-            {showMobileCreateCoachmark ? (
-              <PopoverContent
-                align="end"
-                side="top"
-                sideOffset={14}
-                className="w-[17rem] rounded-[1.4rem] p-4"
-              >
-                <PopoverHeader className="space-y-1.5">
-                  <PopoverTitle>Crie pelo botão +</PopoverTitle>
-                  <PopoverDescription className="text-sm leading-5">
-                    Use o + para criar no dia ativo. Toque no calendario para
-                    escolher o dia ou nos meses para saltar rapidamente.
-                  </PopoverDescription>
-                </PopoverHeader>
-
-                <div className="mt-4 flex justify-end">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="rounded-full"
-                    onClick={dismissCalendarCreateOnboarding}
-                  >
-                    Entendi
-                  </Button>
-                </div>
-              </PopoverContent>
-            ) : null}
-          </Popover>
+            <Plus className="size-5" />
+          </Button>
         </div>
       ) : null}
 
@@ -1542,11 +1528,13 @@ export default function HomePage() {
             setDialogAnchorPoint(undefined);
             setSeedRange(null);
             setCreatingRange(null);
+            setGuidedCreationIntent(null);
           }
         }}
         initialEvent={editingEvent}
         seedRange={seedRange}
         anchorPoint={dialogAnchorPoint}
+        guidedIntent={guidedCreationIntent}
         onSubmit={handleSubmit}
         onDelete={
           editingId && !editingEvent?.calendarPackGroupId
@@ -1557,6 +1545,7 @@ export default function HomePage() {
 
       <AuthDialog
         open={authDialogOpen}
+        initialMode={authDialogInitialMode}
         onOpenChange={(open) => {
           setAuthDialogOpen(open);
 

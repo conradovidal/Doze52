@@ -119,6 +119,7 @@ function MobileEventButton({
   return (
     <button
       type="button"
+      data-calendar-event-id={event.sourceEventId}
       aria-label={getEventAriaLabel(event, dayIso)}
       className="block h-7 w-full overflow-hidden rounded-[8px] border text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.52)] transition-[transform,box-shadow,filter] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 hover:-translate-y-px hover:brightness-[0.99] hover:shadow-[0_10px_18px_-16px_rgba(15,23,42,0.32),inset_0_1px_0_rgba(255,255,255,0.62)]"
       style={{

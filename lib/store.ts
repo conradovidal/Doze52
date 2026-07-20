@@ -66,7 +66,7 @@ type StoreState = {
   ) => void;
   deleteProfile: (input: { profileId: string; reassignToProfileId: string }) => void;
   setProfilesOrder: (orderedIds: string[]) => void;
-  addEvent: (input: EventInput) => void;
+  addEvent: (input: EventInput) => string | null;
   updateEvent: (id: string, input: EventInput) => void;
   moveEventByDelta: (id: string, deltaDays: number) => void;
   reorderEventInDay: (params: { eventId: string; dayIso: string; toIndex: number }) => void;
@@ -147,6 +147,16 @@ const getLegacyDefaultProfiles = (): CalendarProfile[] => [
   },
 ];
 
+const getNeutralDefaultProfiles = (): CalendarProfile[] => [
+  {
+    id: ONBOARDING_PROFILE_IDS.personal,
+    name: "Meu ano",
+    color: DEFAULT_PROFILE_COLOR,
+    icon: "calendar-days",
+    position: 0,
+  },
+];
+
 const getFeatureDefaultProfiles = (): CalendarProfile[] => [
   {
     id: ONBOARDING_PROFILE_IDS.professional,
@@ -172,11 +182,15 @@ const getFeatureDefaultProfiles = (): CalendarProfile[] => [
 ];
 
 export const getOnboardingDefaultProfiles = (): CalendarProfile[] => {
-  return getLegacyDefaultProfiles().map((profile) => ({ ...profile }));
+  return getNeutralDefaultProfiles().map((profile) => ({ ...profile }));
 };
 
 export const isOnboardingProfilesSnapshot = (profiles: CalendarProfile[]) => {
-  const candidates = [getOnboardingDefaultProfiles(), getFeatureDefaultProfiles()];
+  const candidates = [
+    getOnboardingDefaultProfiles(),
+    getLegacyDefaultProfiles(),
+    getFeatureDefaultProfiles(),
+  ];
   return candidates.some((expected) => {
     if (profiles.length !== expected.length) return false;
     return expected.every((defaultProfile, index) => {
@@ -675,12 +689,15 @@ export const useStore = create<StoreState>()(
             ),
           };
         }),
-      addEvent: (input) =>
+      addEvent: (input) => {
+        const id = uid();
+        let didAdd = false;
         set((state) => {
           const targetCategory = state.categories.find(
             (category) => category.id === input.categoryId
           );
           if (!targetCategory || targetCategory.calendarPackGroupId) return state;
+          didAdd = true;
           const isSingleDay = input.startDate === input.endDate;
           const dayOrder = isSingleDay
             ? nextSingleDayOrder(state.events, input.startDate)
@@ -695,7 +712,7 @@ export const useStore = create<StoreState>()(
             events: [
               ...state.events,
               {
-                id: uid(),
+                id,
                 title: input.title.trim(),
                 categoryId: input.categoryId,
                 color:
@@ -711,7 +728,9 @@ export const useStore = create<StoreState>()(
               },
             ],
           };
-        }),
+        });
+        return didAdd ? id : null;
+      },
       updateEvent: (id, input) =>
         set((state) => {
           const currentEvent = state.events.find((event) => event.id === id);
