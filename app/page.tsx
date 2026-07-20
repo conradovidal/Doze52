@@ -16,6 +16,7 @@ import {
   GuidedOnboardingPanel,
   type GuidedCalendarDraft,
 } from "@/components/onboarding/guided-onboarding-panel";
+import { AccountNudge } from "@/components/onboarding/account-nudge";
 import { Button } from "@/components/ui/button";
 import { useFeedback } from "@/components/ui/feedback-provider";
 import {
@@ -304,6 +305,7 @@ export default function HomePage() {
   const [guidedOnboarding, setGuidedOnboarding] =
     React.useState<GuidedOnboardingState | null>(null);
   const [guidedPanelHidden, setGuidedPanelHidden] = React.useState(false);
+  const [accountNudgeVisible, setAccountNudgeVisible] = React.useState(false);
   const [guidedDraft, setGuidedDraft] =
     React.useState<GuidedCalendarDraft | null>(null);
   const [guidedDialogIntent, setGuidedDialogIntent] = React.useState<
@@ -1038,13 +1040,15 @@ export default function HomePage() {
     const current = readGuidedOnboardingState();
     if (current.step === "completed") return;
     updateGuidedOnboarding({ type: "complete" });
+    setGuidedPanelHidden(true);
+    if (!session?.user.id) setAccountNudgeVisible(true);
     notify({
       tone: "success",
       title: "Teu ano já começou a ganhar forma",
       description: "Volte quando algo mudar.",
       durationMs: 3200,
     });
-  }, [notify, updateGuidedOnboarding]);
+  }, [notify, session?.user.id, updateGuidedOnboarding]);
 
   const dismissGuidedOnboarding = React.useCallback(() => {
     updateGuidedOnboarding({ type: "dismiss" });
@@ -1467,17 +1471,6 @@ export default function HomePage() {
     };
   }, [highlightedEventId]);
 
-  React.useEffect(() => {
-    if (guidedOnboarding?.step !== "save") return;
-    if (!session?.user.id || !remoteReady) return;
-    completeGuidedOnboarding();
-  }, [
-    completeGuidedOnboarding,
-    guidedOnboarding?.step,
-    remoteReady,
-    session?.user.id,
-  ]);
-
   const hasAuthorEvents = hasAuthorCalendarEvents(events);
   const showGuidedOnboarding = Boolean(
     guidedOnboarding &&
@@ -1615,8 +1608,6 @@ export default function HomePage() {
         <GuidedOnboardingPanel
           state={guidedOnboarding}
           draft={guidedDraft}
-          isAuthenticated={Boolean(session?.user.id)}
-          isSyncReady={remoteReady}
           isMobile={isMobileCalendarUi === true}
           mobileRangeStart={mobileGuidedRangeStart}
           onClose={() => setGuidedPanelHidden(true)}
@@ -1626,20 +1617,25 @@ export default function HomePage() {
           onChangeDraft={setGuidedDraft}
           onSaveDraft={saveGuidedDraft}
           onOpenMoreOptions={openGuidedMoreOptions}
-          onAddAnotherDate={() => {
-            setGuidedDraft(null);
-            setMobileGuidedRangeStart(null);
-            updateGuidedOnboarding({ type: "add_another_date" });
-          }}
-          onContinueFromPreview={() =>
-            updateGuidedOnboarding({ type: "continue_from_preview" })
+          onContinueToPeriods={() =>
+            updateGuidedOnboarding({ type: "continue_to_periods" })
           }
-          onOpenAuth={() => {
+          onContinueToPreview={() =>
+            updateGuidedOnboarding({ type: "continue_to_preview" })
+          }
+          onComplete={completeGuidedOnboarding}
+        />
+      ) : null}
+
+      {accountNudgeVisible && !session?.user.id ? (
+        <AccountNudge
+          onDismiss={() => setAccountNudgeVisible(false)}
+          onCreateAccount={() => {
+            setAccountNudgeVisible(false);
             setAuthDialogInitialMode("signup");
             setAuthDialogAnchorPoint(undefined);
             setAuthDialogOpen(true);
           }}
-          onContinueLocal={completeGuidedOnboarding}
         />
       ) : null}
 

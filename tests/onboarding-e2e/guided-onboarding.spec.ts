@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
@@ -6,6 +6,38 @@ test.beforeEach(async ({ page }) => {
     window.sessionStorage.clear();
   });
 });
+
+const selectGuidedDate = async (page: Page, mobile: boolean, dateIso: string) => {
+  if (mobile) {
+    await page
+      .getByRole("button", { name: `Selecionar ${dateIso} para o onboarding` })
+      .click({ force: true });
+    return;
+  }
+  await page.locator(`[data-day-cell][data-day-iso="${dateIso}"]`).click();
+};
+
+const selectGuidedPeriod = async (
+  page: Page,
+  mobile: boolean,
+  startIso: string,
+  endIso: string
+) => {
+  if (mobile) {
+    await selectGuidedDate(page, true, startIso);
+    await selectGuidedDate(page, true, endIso);
+    return;
+  }
+  const start = page.locator(`[data-day-cell][data-day-iso="${startIso}"]`);
+  const end = page.locator(`[data-day-cell][data-day-iso="${endIso}"]`);
+  const startBox = await start.boundingBox();
+  const endBox = await end.boundingBox();
+  if (!startBox || !endBox) throw new Error("Datas não renderizadas");
+  await page.mouse.move(startBox.x + startBox.width / 2, startBox.y + startBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(endBox.x + endBox.width / 2, endBox.y + endBox.height / 2, { steps: 8 });
+  await page.mouse.up();
+};
 
 test("configura Pessoal e ensina uma data e um período no calendário", async ({
   page,
@@ -27,13 +59,7 @@ test("configura Pessoal e ensina uma data e um período no calendário", async (
     "date_instruction"
   );
 
-  if (mobile) {
-    await page
-      .getByRole("button", { name: "Selecionar 2026-08-10 para o onboarding" })
-      .click({ force: true });
-  } else {
-    await page.locator('[data-day-cell][data-day-iso="2026-08-10"]').click();
-  }
+  await selectGuidedDate(page, mobile, "2026-08-10");
 
   await expect(panel).toHaveAttribute(
     "data-guided-onboarding-step",
@@ -44,28 +70,20 @@ test("configura Pessoal e ensina uma data e um período no calendário", async (
 
   await expect(panel).toHaveAttribute(
     "data-guided-onboarding-step",
+    "date_instruction"
+  );
+  await expect(panel).toContainText("mais um aniversário");
+  await selectGuidedDate(page, mobile, "2026-09-12");
+  await panel.getByLabel("Nome da data").fill("Aniversário do pai");
+  await panel.getByRole("button", { name: "Salvar no meu ano" }).click();
+
+  await expect(panel).toHaveAttribute(
+    "data-guided-onboarding-step",
     "period_instruction"
   );
   await expect(page.locator("[data-calendar-event-id]")).not.toHaveCount(0);
 
-  if (mobile) {
-    await page
-      .getByRole("button", { name: "Selecionar 2026-08-15 para o onboarding" })
-      .click({ force: true });
-    await page
-      .getByRole("button", { name: "Selecionar 2026-08-22 para o onboarding" })
-      .click({ force: true });
-  } else {
-    const start = page.locator('[data-day-cell][data-day-iso="2026-08-15"]');
-    const end = page.locator('[data-day-cell][data-day-iso="2026-08-22"]');
-    const startBox = await start.boundingBox();
-    const endBox = await end.boundingBox();
-    if (!startBox || !endBox) throw new Error("Datas não renderizadas");
-    await page.mouse.move(startBox.x + startBox.width / 2, startBox.y + startBox.height / 2);
-    await page.mouse.down();
-    await page.mouse.move(endBox.x + endBox.width / 2, endBox.y + endBox.height / 2, { steps: 8 });
-    await page.mouse.up();
-  }
+  await selectGuidedPeriod(page, mobile, "2026-08-15", "2026-08-22");
 
   await expect(panel).toHaveAttribute(
     "data-guided-onboarding-step",
@@ -76,15 +94,21 @@ test("configura Pessoal e ensina uma data e um período no calendário", async (
 
   await expect(panel).toHaveAttribute(
     "data-guided-onboarding-step",
+    "period_instruction"
+  );
+  await expect(panel).toContainText("próxima viagem");
+  await selectGuidedPeriod(page, mobile, "2026-11-10", "2026-11-20");
+  await panel.getByLabel("Nome do período").fill("Próximas férias");
+  await panel.getByRole("button", { name: "Salvar no meu ano" }).click();
+
+  await expect(panel).toHaveAttribute(
+    "data-guided-onboarding-step",
     "use_case_preview"
   );
   await expect(panel.getByLabel("Prévia de um ano preenchido")).toBeVisible();
-  await panel.getByRole("button", { name: /Voltar para o meu ano/ }).click();
-  await expect(panel).toHaveAttribute("data-guided-onboarding-step", "save");
-  await panel
-    .getByRole("button", { name: "Continuar neste dispositivo" })
-    .click();
+  await panel.getByRole("button", { name: /Continuar explorando meu ano/ }).click();
   await expect(panel).toBeHidden();
+  await expect(page.getByRole("complementary", { name: "Convite para guardar o ano" })).toBeVisible();
 
   const stored = await page.evaluate(() => ({
     onboarding: JSON.parse(
@@ -110,7 +134,7 @@ test("configura Pessoal e ensina uma data e um período no calendário", async (
     "Férias e viagens",
     "Eventos",
   ]);
-  expect(stored.store?.state?.events).toHaveLength(2);
+  expect(stored.store?.state?.events).toHaveLength(4);
 });
 
 test("configura Trabalho com Entregas, Projetos e Reuniões", async ({

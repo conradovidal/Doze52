@@ -35,22 +35,67 @@ test("configura contexto, data, período e chega à prévia sem reflexão", () =
   const dateDetails = reduceGuidedOnboardingState(configured, {
     type: "select_date",
   });
-  const dateSaved = reduceGuidedOnboardingState(dateDetails, {
+  const firstDateSaved = reduceGuidedOnboardingState(dateDetails, {
     type: "date_saved",
     at: "2026-07-20T10:01:00.000Z",
   });
+  expect(firstDateSaved.step).toBe("date_instruction");
+  expect(firstDateSaved.dateItemsCreated).toBe(1);
+
+  const secondDateDetails = reduceGuidedOnboardingState(firstDateSaved, {
+    type: "select_date",
+  });
+  const dateSaved = reduceGuidedOnboardingState(secondDateDetails, {
+    type: "date_saved",
+    at: "2026-07-20T10:01:30.000Z",
+  });
   expect(dateSaved.step).toBe("period_instruction");
   expect(dateSaved.firstDateCreatedAt).toBe("2026-07-20T10:01:00.000Z");
+  expect(dateSaved.dateItemsCreated).toBe(2);
 
   const periodDetails = reduceGuidedOnboardingState(dateSaved, {
     type: "select_period",
   });
-  const preview = reduceGuidedOnboardingState(periodDetails, {
+  const firstPeriodSaved = reduceGuidedOnboardingState(periodDetails, {
     type: "period_saved",
     at: "2026-07-20T10:02:00.000Z",
   });
+  expect(firstPeriodSaved.step).toBe("period_instruction");
+  expect(firstPeriodSaved.periodItemsCreated).toBe(1);
+
+  const secondPeriodDetails = reduceGuidedOnboardingState(firstPeriodSaved, {
+    type: "select_period",
+  });
+  const preview = reduceGuidedOnboardingState(secondPeriodDetails, {
+    type: "period_saved",
+    at: "2026-07-20T10:03:00.000Z",
+  });
   expect(preview.step).toBe("use_case_preview");
   expect(preview.firstPeriodCreatedAt).toBe("2026-07-20T10:02:00.000Z");
+  expect(preview.periodItemsCreated).toBe(2);
+});
+
+test("permite seguir após uma data e um período", () => {
+  const datePrompt: GuidedOnboardingState = {
+    version: 3,
+    step: "date_instruction",
+    context: "personal",
+    dateItemsCreated: 1,
+  };
+  const periods = reduceGuidedOnboardingState(datePrompt, {
+    type: "continue_to_periods",
+  });
+  expect(periods.step).toBe("period_instruction");
+
+  const periodPrompt: GuidedOnboardingState = {
+    ...periods,
+    periodItemsCreated: 1,
+  };
+  expect(
+    reduceGuidedOnboardingState(periodPrompt, {
+      type: "continue_to_preview",
+    }).step
+  ).toBe("use_case_preview");
 });
 
 test("Outro pede nome antes de configurar o perfil", () => {

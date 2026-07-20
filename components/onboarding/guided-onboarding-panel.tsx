@@ -27,8 +27,6 @@ export type GuidedCalendarDraft = {
 type GuidedOnboardingPanelProps = {
   state: GuidedOnboardingState;
   draft: GuidedCalendarDraft | null;
-  isAuthenticated: boolean;
-  isSyncReady: boolean;
   isMobile: boolean;
   mobileRangeStart?: string | null;
   onClose: () => void;
@@ -38,10 +36,9 @@ type GuidedOnboardingPanelProps = {
   onChangeDraft: (draft: GuidedCalendarDraft) => void;
   onSaveDraft: (title: string) => void;
   onOpenMoreOptions: () => void;
-  onAddAnotherDate: () => void;
-  onContinueFromPreview: () => void;
-  onOpenAuth: () => void;
-  onContinueLocal: () => void;
+  onContinueToPeriods: () => void;
+  onContinueToPreview: () => void;
+  onComplete: () => void;
 };
 
 const CONTEXT_OPTIONS = [
@@ -65,38 +62,91 @@ const CONTEXT_OPTIONS = [
   },
 ];
 
-const CONTEXT_COPY = {
-  personal: {
-    dateTitle: "Comece por uma data que você não quer esquecer.",
-    dateDescription: "Clique no dia do próximo aniversário importante para você.",
-    datePrompt: "De quem é esse aniversário?",
-    datePlaceholder: "Ex.: Aniversário da mãe",
-    periodTitle: "Agora desenhe algo que ocupa mais de um dia.",
-    periodDescription: "Clique no primeiro dia e arraste até o último de uma viagem ou férias.",
-    periodPrompt: "Qual é essa viagem ou período de descanso?",
-    periodPlaceholder: "Ex.: Férias em família",
-  },
-  work: {
-    dateTitle: "Comece olhando para algo que você já realizou.",
-    dateDescription: "Clique no dia da sua última entrega importante neste ano — ou da próxima já planejada.",
-    datePrompt: "O que você entregou?",
-    datePlaceholder: "Ex.: Lançamento do novo produto",
-    periodTitle: "Agora coloque no ano o projeto em que você está trabalhando.",
-    periodDescription: "Clique no dia em que ele começou e arraste até quando espera concluí-lo.",
-    periodPrompt: "Qual é o nome desse projeto?",
-    periodPlaceholder: "Ex.: Reestruturação comercial",
-  },
-  custom: {
+const getContextCopy = (
+  context: OnboardingContext,
+  dateItemsCreated: number,
+  periodItemsCreated: number
+) => {
+  if (context === "personal") {
+    return {
+      dateTitle:
+        dateItemsCreated > 0
+          ? "Adicione mais um aniversário importante."
+          : "Comece pelos aniversários da sua família.",
+      dateDescription:
+        dateItemsCreated > 0
+          ? "Pode ser do seu pai, mãe, irmãos, filhos ou de outra pessoa próxima."
+          : "Clique no dia do aniversário de alguém importante para você.",
+      datePrompt: "De quem é esse aniversário?",
+      datePlaceholder:
+        dateItemsCreated > 0
+          ? "Ex.: Aniversário do pai"
+          : "Ex.: Aniversário da mãe",
+      periodTitle:
+        periodItemsCreated > 0
+          ? "Agora cadastre uma próxima viagem ou férias."
+          : "Cadastre um período maior no seu ano.",
+      periodDescription:
+        periodItemsCreated > 0
+          ? "Selecione do primeiro ao último dia da próxima viagem ou período de descanso."
+          : "Selecione do primeiro ao último dia das suas últimas férias ou viagem.",
+      periodPrompt:
+        periodItemsCreated > 0
+          ? "Qual é essa próxima viagem ou férias?"
+          : "Quais foram essas férias ou viagem?",
+      periodPlaceholder:
+        periodItemsCreated > 0 ? "Ex.: Próximas férias" : "Ex.: Viagem em família",
+    };
+  }
+
+  if (context === "work") {
+    return {
+      dateTitle:
+        dateItemsCreated > 0
+          ? "Agora adicione a próxima entrega importante."
+          : "Comece pela sua última entrega importante.",
+      dateDescription:
+        dateItemsCreated > 0
+          ? "Clique no dia em que essa próxima entrega deve acontecer."
+          : "Clique no dia em que essa entrega foi concluída.",
+      datePrompt:
+        dateItemsCreated > 0
+          ? "O que você vai entregar?"
+          : "O que você entregou?",
+      datePlaceholder:
+        dateItemsCreated > 0
+          ? "Ex.: Próximo lançamento"
+          : "Ex.: Lançamento do produto",
+      periodTitle:
+        periodItemsCreated > 0
+          ? "Agora cadastre seu projeto atual ou o próximo."
+          : "Cadastre o período do seu último projeto.",
+      periodDescription:
+        periodItemsCreated > 0
+          ? "Selecione desde o início até a data prevista de conclusão."
+          : "Selecione desde quando ele começou até quando terminou.",
+      periodPrompt:
+        periodItemsCreated > 0
+          ? "Qual é o projeto atual ou próximo?"
+          : "Qual foi esse projeto?",
+      periodPlaceholder:
+        periodItemsCreated > 0
+          ? "Ex.: Reestruturação comercial"
+          : "Ex.: Projeto concluído",
+    };
+  }
+
+  return {
     dateTitle: "Comece por uma data importante para esse contexto.",
     dateDescription: "Clique no dia em que algo importante acontece.",
     datePrompt: "O que acontece nessa data?",
     datePlaceholder: "Ex.: Um marco importante",
-    periodTitle: "Agora desenhe um período importante para esse contexto.",
-    periodDescription: "Clique no primeiro dia e arraste até o último.",
+    periodTitle: "Agora cadastre um período importante para esse contexto.",
+    periodDescription: "Selecione o primeiro e o último dia desse período.",
     periodPrompt: "O que ocupa esse período?",
     periodPlaceholder: "Ex.: Período de preparação",
-  },
-} as const;
+  };
+};
 
 const formatDate = (value: string) => {
   if (!value) return "";
@@ -168,8 +218,6 @@ function UseCasePreview({ context }: { context: OnboardingContext }) {
 export function GuidedOnboardingPanel({
   state,
   draft,
-  isAuthenticated,
-  isSyncReady,
   isMobile,
   mobileRangeStart,
   onClose,
@@ -179,10 +227,9 @@ export function GuidedOnboardingPanel({
   onChangeDraft,
   onSaveDraft,
   onOpenMoreOptions,
-  onAddAnotherDate,
-  onContinueFromPreview,
-  onOpenAuth,
-  onContinueLocal,
+  onContinueToPeriods,
+  onContinueToPreview,
+  onComplete,
 }: GuidedOnboardingPanelProps) {
   const [customName, setCustomName] = React.useState("");
   const [title, setTitle] = React.useState("");
@@ -191,7 +238,9 @@ export function GuidedOnboardingPanel({
     "personal" | "work"
   >("personal");
   const context = state.context ?? "personal";
-  const copy = CONTEXT_COPY[context];
+  const dateItemsCreated = state.dateItemsCreated ?? 0;
+  const periodItemsCreated = state.periodItemsCreated ?? 0;
+  const copy = getContextCopy(context, dateItemsCreated, periodItemsCreated);
 
   React.useEffect(() => {
     setTitle("");
@@ -204,7 +253,7 @@ export function GuidedOnboardingPanel({
         <CalendarDays className="size-4" aria-hidden="true" />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">Desenhe o seu ano</p>
+        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">Monte o seu ano</p>
         <p className="mt-0.5 text-xs text-muted-foreground">Passo {state.step === "context_selection" || state.step === "custom_profile" ? "1" : state.step.startsWith("date") ? "2" : state.step.startsWith("period") ? "3" : "4"} de 4</p>
       </div>
       <Button type="button" variant="ghost" size="icon-xs" className="rounded-full" aria-label="Fechar ajuda por agora" onClick={onClose}>
@@ -255,7 +304,28 @@ export function GuidedOnboardingPanel({
           <h2 className="mt-4 text-lg font-semibold tracking-[-0.02em]">{period ? copy.periodTitle : copy.dateTitle}</h2>
           <p className="mt-1 text-sm leading-5 text-muted-foreground">{period ? copy.periodDescription : copy.dateDescription}</p>
           {mobileRangeStart && period ? <p className="mt-3 rounded-xl bg-primary/8 px-3 py-2 text-xs font-medium text-primary">Início escolhido em {formatDate(mobileRangeStart)}. Agora toque no dia final.</p> : <InteractionHint period={period} isMobile={isMobile} />}
-          {period && state.firstDateCreatedAt ? <button type="button" className="mt-3 text-xs text-muted-foreground underline-offset-4 hover:underline" onClick={onAddAnotherDate}>Adicionar outra data antes</button> : null}
+          {!period && dateItemsCreated > 0 ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="mt-2 -ml-2 h-8 px-2 text-xs text-muted-foreground"
+              onClick={onContinueToPeriods}
+            >
+              Continuar para períodos
+            </Button>
+          ) : null}
+          {period && periodItemsCreated > 0 ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="mt-2 -ml-2 h-8 px-2 text-xs text-muted-foreground"
+              onClick={onContinueToPreview}
+            >
+              Continuar com este período
+            </Button>
+          ) : null}
         </>
       );
     }
@@ -287,7 +357,7 @@ export function GuidedOnboardingPanel({
     if (state.step === "use_case_preview") {
       return (
         <>
-          <h2 className="mt-4 text-lg font-semibold">Você já sabe desenhar momentos e períodos no seu ano.</h2>
+          <h2 className="mt-4 text-lg font-semibold">Seu ano já começou a ganhar contexto.</h2>
           <p className="mt-1 text-sm text-muted-foreground">Veja como esse contexto pode ganhar forma quando mais coisas aparecem.</p>
           {context === "custom" ? (
             <div className="mt-3 flex gap-1 rounded-xl bg-muted/55 p-1" role="group" aria-label="Escolher exemplo de ano">
@@ -299,17 +369,7 @@ export function GuidedOnboardingPanel({
             </div>
           ) : null}
           <div className="mt-3"><UseCasePreview context={context === "custom" ? customPreviewContext : context} /></div>
-          <Button type="button" variant="premium" className="mt-4 w-full" onClick={onContinueFromPreview}>Voltar para o meu ano <ArrowRight /></Button>
-        </>
-      );
-    }
-
-    if (state.step === "save") {
-      return (
-        <>
-          <h2 className="mt-4 text-lg font-semibold">{isAuthenticated ? "Seu ano já está ganhando forma." : "Quer guardar esta visão em outros dispositivos?"}</h2>
-          <p className="mt-1 text-sm text-muted-foreground">{isAuthenticated ? (isSyncReady ? "Sua visão está guardada." : "Estamos sincronizando sua visão...") : "Você também pode continuar usando somente neste dispositivo."}</p>
-          {!isAuthenticated ? <div className="mt-4 flex flex-col gap-2 sm:flex-row"><Button type="button" variant="premium" className="flex-1" onClick={onOpenAuth}>Criar minha conta</Button><Button type="button" variant="outline" onClick={onContinueLocal}>Continuar neste dispositivo</Button></div> : null}
+          <Button type="button" variant="premium" className="mt-4 w-full" onClick={onComplete}>Continuar explorando meu ano <ArrowRight /></Button>
         </>
       );
     }
@@ -319,10 +379,18 @@ export function GuidedOnboardingPanel({
 
   if (!content) return null;
   return (
-    <section data-guided-onboarding-step={state.step} aria-label="Guia inicial do Doze52" aria-live="polite" className="fixed top-[calc(env(safe-area-inset-top,0px)+4.6rem)] left-1/2 z-50 w-[min(42rem,calc(100vw-1.5rem))] -translate-x-1/2 rounded-[1.5rem] border border-foreground/15 bg-card/98 p-4.5 text-card-foreground shadow-[0_28px_90px_-28px_rgba(15,23,42,0.68)] backdrop-blur-xl animate-in fade-in-0 slide-in-from-top-2 duration-200 motion-reduce:animate-none sm:p-5">
+    <section data-guided-onboarding-step={state.step} aria-label="Guia inicial do Doze52" aria-live="polite" className="fixed top-[calc(env(safe-area-inset-top,0px)+4.6rem)] left-1/2 z-50 w-[min(42rem,calc(100vw-1.5rem))] -translate-x-1/2 rounded-[1.5rem] border border-foreground/15 bg-card/98 p-4.5 text-card-foreground shadow-[0_28px_90px_-28px_rgba(15,23,42,0.68)] backdrop-blur-xl animate-in fade-in-0 slide-in-from-top-2 duration-200 motion-reduce:animate-none sm:p-5 md:left-4 md:w-[31rem] md:translate-x-0">
       {header}
       {content}
-      <button type="button" className="mt-4 text-[11px] text-muted-foreground underline-offset-4 hover:text-foreground hover:underline" onClick={onDismiss}>Dispensar ajuda</button>
+      <div className="mt-4 border-t border-border/65 pt-3">
+        <button
+          type="button"
+          className="block text-[11px] text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+          onClick={onDismiss}
+        >
+          Dispensar ajuda
+        </button>
+      </div>
     </section>
   );
 }

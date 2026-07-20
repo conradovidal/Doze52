@@ -28,6 +28,8 @@ export type GuidedOnboardingState = {
   context?: OnboardingContext;
   startedAt?: string;
   profileConfiguredAt?: string;
+  dateItemsCreated?: number;
+  periodItemsCreated?: number;
   firstDateCreatedAt?: string;
   firstPeriodCreatedAt?: string;
   completedAt?: string;
@@ -41,10 +43,11 @@ export type GuidedOnboardingAction =
   | { type: "select_date" }
   | { type: "cancel_date" }
   | { type: "date_saved"; at?: string }
-  | { type: "add_another_date" }
+  | { type: "continue_to_periods" }
   | { type: "select_period" }
   | { type: "cancel_period" }
   | { type: "period_saved"; at?: string }
+  | { type: "continue_to_preview" }
   | { type: "continue_from_preview" }
   | { type: "complete"; at?: string }
   | { type: "dismiss"; at?: string };
@@ -128,15 +131,30 @@ export const migrateGuidedOnboardingState = (
     context?: unknown;
     profileConfiguredAt?: string;
     firstDateCreatedAt?: string;
+    dateItemsCreated?: number;
+    periodItemsCreated?: number;
   };
 
   if (candidate.version === 3 && isGuidedStep(candidate.step)) {
     return {
       version: 3,
-      step: candidate.step,
+      step:
+        candidate.step === "save" ? "use_case_preview" : candidate.step,
       context: isContext(candidate.context) ? candidate.context : undefined,
       startedAt: candidate.startedAt,
       profileConfiguredAt: candidate.profileConfiguredAt,
+      dateItemsCreated:
+        typeof candidate.dateItemsCreated === "number"
+          ? Math.max(0, candidate.dateItemsCreated)
+          : candidate.firstDateCreatedAt
+            ? 1
+            : 0,
+      periodItemsCreated:
+        typeof candidate.periodItemsCreated === "number"
+          ? Math.max(0, candidate.periodItemsCreated)
+          : candidate.firstPeriodCreatedAt
+            ? 1
+            : 0,
       firstDateCreatedAt: candidate.firstDateCreatedAt,
       firstPeriodCreatedAt: candidate.firstPeriodCreatedAt,
       completedAt: candidate.completedAt,
@@ -151,6 +169,8 @@ export const migrateGuidedOnboardingState = (
         step: candidate.step,
         startedAt: candidate.startedAt,
         firstDateCreatedAt: candidate.firstItemCreatedAt,
+        dateItemsCreated: candidate.firstItemCreatedAt ? 1 : 0,
+        periodItemsCreated: candidate.firstPeriodCreatedAt ? 1 : 0,
         firstPeriodCreatedAt: candidate.firstPeriodCreatedAt,
         completedAt: candidate.completedAt,
         dismissedAt: candidate.dismissedAt,
@@ -171,6 +191,8 @@ export const migrateGuidedOnboardingState = (
         : undefined,
       firstDateCreatedAt: candidate.firstItemCreatedAt,
       firstPeriodCreatedAt: candidate.firstPeriodCreatedAt,
+      dateItemsCreated: candidate.firstItemCreatedAt ? 1 : 0,
+      periodItemsCreated: candidate.firstPeriodCreatedAt ? 1 : 0,
     };
   }
 
@@ -212,16 +234,18 @@ export const reduceGuidedOnboardingState = (
         ? { ...state, step: "date_instruction" }
         : state;
     case "date_saved":
-      return state.step === "date_details"
-        ? {
-            ...state,
-            step: "period_instruction",
-            firstDateCreatedAt: state.firstDateCreatedAt ?? action.at ?? nowIso(),
-          }
-        : state;
-    case "add_another_date":
-      return state.step === "period_instruction"
-        ? { ...state, step: "date_instruction" }
+      if (state.step !== "date_details") return state;
+      const nextDateCount = (state.dateItemsCreated ?? 0) + 1;
+      const dateTarget = state.context === "custom" ? 1 : 2;
+      return {
+        ...state,
+        step: nextDateCount >= dateTarget ? "period_instruction" : "date_instruction",
+        dateItemsCreated: nextDateCount,
+        firstDateCreatedAt: state.firstDateCreatedAt ?? action.at ?? nowIso(),
+      };
+    case "continue_to_periods":
+      return state.step === "date_instruction" && (state.dateItemsCreated ?? 0) > 0
+        ? { ...state, step: "period_instruction" }
         : state;
     case "select_period":
       return state.step === "period_instruction"
@@ -232,13 +256,23 @@ export const reduceGuidedOnboardingState = (
         ? { ...state, step: "period_instruction" }
         : state;
     case "period_saved":
-      return state.step === "period_details"
-        ? {
-            ...state,
-            step: "use_case_preview",
-            firstPeriodCreatedAt:
-              state.firstPeriodCreatedAt ?? action.at ?? nowIso(),
-          }
+      if (state.step !== "period_details") return state;
+      const nextPeriodCount = (state.periodItemsCreated ?? 0) + 1;
+      const periodTarget = state.context === "custom" ? 1 : 2;
+      return {
+        ...state,
+        step:
+          nextPeriodCount >= periodTarget
+            ? "use_case_preview"
+            : "period_instruction",
+        periodItemsCreated: nextPeriodCount,
+        firstPeriodCreatedAt:
+          state.firstPeriodCreatedAt ?? action.at ?? nowIso(),
+      };
+    case "continue_to_preview":
+      return state.step === "period_instruction" &&
+        (state.periodItemsCreated ?? 0) > 0
+        ? { ...state, step: "use_case_preview" }
         : state;
     case "continue_from_preview":
       return state.step === "use_case_preview"
