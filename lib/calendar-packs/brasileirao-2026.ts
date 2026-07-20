@@ -1,6 +1,6 @@
 import type { CalendarPack, CalendarPackEvent } from "./types";
 
-const VERIFIED_AT = "2026-07-14";
+const VERIFIED_AT = "2026-07-20";
 const SOURCE = {
   label: "Tabela detalhada oficial da CBF",
   url: "https://www.cbf.com.br/futebol-brasileiro/tabelas/campeonato-brasileiro/serie-a/2026?documento=Tabela%20Detalhada",
@@ -66,7 +66,7 @@ const matches: MatchTuple[] = [
   ["832058", 17, "2026-05-23", "17:00", "Vitória", "20018", "2", "Internacional", "20011", "0", "Manoel Barradas - Salvador - BA"],
   ["832064", 18, "2026-05-31", "11:00", "Red Bull Bragantino", "20007", "3", "Internacional", "20011", "1", "Cícero de Souza Marques - Bragança Paulista - SP"],
   ["832066", 18, "2026-05-30", "17:30", "Grêmio", "20013", "1", "Corinthians", "20001", "3", "Arena do Grêmio - Porto Alegre - RS"],
-  ["832074", 19, "2026-07-16", "21:30", "Mirassol", "20385", null, "Grêmio", "20013", null, "José Maria de Campos Maia - Mirassol - SP"],
+  ["832074", 19, "2026-07-17", "20:00", "Mirassol", "20385", "2", "Grêmio", "20013", "1", "José Maria de Campos Maia - Mirassol - SP"],
   ["832076", 19, "2026-07-22", "21:30", "Internacional", "20011", null, "Cruzeiro", "59849", null, "Beira-Rio - Porto Alegre - RS"],
   ["832086", 20, "2026-07-26", "18:30", "Grêmio", "20013", null, "Fluminense", "20014", null, "Arena do Grêmio - Porto Alegre - RS"],
   ["832087", 20, "2026-07-25", "18:30", "Athletico Paranaense", "20052", null, "Internacional", "20011", null, "Arena da Baixada - Curitiba - PR"],
@@ -246,7 +246,7 @@ const createPack = (
   color: string
 ): CalendarPack => ({
   id: `brasileirao-2026-${teamName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")}`,
-  version: 1,
+  version: 2,
   name: "Jogos do seu time favorito",
   eyebrow: teamName,
   icon: "soccer-ball",
