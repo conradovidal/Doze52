@@ -52,12 +52,51 @@ test("configura Pessoal e ensina uma data e um período no calendário", async (
     "context_selection"
   );
   await expect(panel).toContainText("Onde uma visão do ano inteiro");
+
+  if (!mobile) {
+    const contextOptions = await panel
+      .getByRole("button", { name: /Pessoal|Trabalho|Outro/ })
+      .all();
+    const boxes = await Promise.all(contextOptions.map((option) => option.boundingBox()));
+    expect(boxes).toHaveLength(3);
+    expect(boxes.every(Boolean)).toBe(true);
+    expect(boxes[1]!.y).toBeGreaterThan(boxes[0]!.y);
+    expect(boxes[2]!.y).toBeGreaterThan(boxes[1]!.y);
+  }
+
   await panel.getByRole("button", { name: /Pessoal/ }).click();
 
   await expect(panel).toHaveAttribute(
     "data-guided-onboarding-step",
+    "profile_reveal"
+  );
+  const highlightedProfile = page.locator(
+    '[data-onboarding-profile-id][data-onboarding-highlighted="true"]'
+  );
+  await expect(highlightedProfile.first()).toBeVisible();
+  await expect(page.locator("[data-onboarding-connector]")).toBeVisible();
+
+  if (!mobile) {
+    const panelBox = await panel.boundingBox();
+    const profileBox = await highlightedProfile.first().boundingBox();
+    if (!panelBox || !profileBox) throw new Error("Onboarding sem âncoras visíveis");
+    const overlaps = !(
+      panelBox.x + panelBox.width <= profileBox.x ||
+      profileBox.x + profileBox.width <= panelBox.x ||
+      panelBox.y + panelBox.height <= profileBox.y ||
+      profileBox.y + profileBox.height <= panelBox.y
+    );
+    expect(overlaps).toBe(false);
+  }
+
+  await panel.getByRole("button", { name: "Adicionar datas importantes" }).click();
+  await expect(panel).toHaveAttribute(
+    "data-guided-onboarding-step",
     "date_instruction"
   );
+  await expect(
+    page.locator('[data-onboarding-category-id][data-onboarding-highlighted="true"]').first()
+  ).toHaveAttribute("title", "Aniversários");
 
   await selectGuidedDate(page, mobile, "2026-08-10");
 
@@ -81,6 +120,9 @@ test("configura Pessoal e ensina uma data e um período no calendário", async (
     "data-guided-onboarding-step",
     "period_instruction"
   );
+  await expect(
+    page.locator('[data-onboarding-category-id][data-onboarding-highlighted="true"]').first()
+  ).toHaveAttribute("title", "Férias e viagens");
   await expect(page.locator("[data-calendar-event-id]")).not.toHaveCount(0);
 
   await selectGuidedPeriod(page, mobile, "2026-08-15", "2026-08-22");
@@ -109,6 +151,10 @@ test("configura Pessoal e ensina uma data e um período no calendário", async (
   await panel.getByRole("button", { name: /Continuar explorando meu ano/ }).click();
   await expect(panel).toBeHidden();
   await expect(page.getByRole("complementary", { name: "Convite para guardar o ano" })).toBeVisible();
+  await expect(
+    page.locator('[data-onboarding-auth-entry][data-onboarding-highlighted="true"]')
+  ).toBeVisible();
+  await expect(page.locator("[data-onboarding-connector]")).toBeVisible();
 
   const stored = await page.evaluate(() => ({
     onboarding: JSON.parse(
@@ -144,8 +190,13 @@ test("configura Trabalho com Entregas, Projetos e Reuniões", async ({
   await page.goto("/?mobileUi=0");
   const panel = page.getByRole("region", { name: "Guia inicial do Doze52" });
   await panel.getByRole("button", { name: /Trabalho/ }).click();
+  await expect(panel).toHaveAttribute("data-guided-onboarding-step", "profile_reveal");
+  await panel.getByRole("button", { name: "Adicionar datas importantes" }).click();
   await expect(panel).toHaveAttribute("data-guided-onboarding-step", "date_instruction");
   await expect(panel).toContainText("última entrega importante");
+  await expect(
+    page.locator('[data-onboarding-category-id][data-onboarding-highlighted="true"]').first()
+  ).toHaveAttribute("title", "Entregas");
 
   const configured = await page.evaluate(() => {
     const store = JSON.parse(window.localStorage.getItem("yiv-store") ?? "null") as {
@@ -169,6 +220,10 @@ test("Outro pede um nome e cria categorias neutras", async ({ page }, testInfo) 
   await expect(panel).toHaveAttribute("data-guided-onboarding-step", "custom_profile");
   await panel.getByLabel("Nome do perfil").fill("Estudos");
   await panel.getByRole("button", { name: /Continuar/ }).click();
+  await expect(panel).toHaveAttribute("data-guided-onboarding-step", "profile_reveal");
+  await expect(
+    page.locator('[data-onboarding-profile-id][data-onboarding-highlighted="true"]').first()
+  ).toHaveAttribute("title", "Estudos");
 
   const configured = await page.evaluate(() => {
     const store = JSON.parse(window.localStorage.getItem("yiv-store") ?? "null") as {

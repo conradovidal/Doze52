@@ -17,6 +17,7 @@ import {
   type GuidedCalendarDraft,
 } from "@/components/onboarding/guided-onboarding-panel";
 import { AccountNudge } from "@/components/onboarding/account-nudge";
+import { OnboardingConnector } from "@/components/onboarding/onboarding-connector";
 import { Button } from "@/components/ui/button";
 import { useFeedback } from "@/components/ui/feedback-provider";
 import {
@@ -46,6 +47,7 @@ import {
   shouldShowGuidedOnboarding,
   type GuidedOnboardingAction,
   type GuidedOnboardingState,
+  type OnboardingFocusTarget,
   type OnboardingContext,
   type ProductOnboardingState,
 } from "@/lib/onboarding";
@@ -245,6 +247,7 @@ export default function HomePage() {
   const [year, setYear] = React.useState<number>(initialYear);
 
   const profiles = useStore((s) => s.profiles);
+  const selectedProfileIds = useStore((s) => s.selectedProfileIds);
   const events = useStore((s) => s.events);
   const categories = useStore((s) => s.categories);
   const ensureEventMetadata = useStore((s) => s.ensureEventMetadata);
@@ -1486,6 +1489,50 @@ export default function HomePage() {
         remoteReady,
       })
   );
+  const onboardingFocusTarget = React.useMemo<OnboardingFocusTarget>(() => {
+    if (!showGuidedOnboarding || !guidedOnboarding) return null;
+    if (guidedOnboarding.step === "profile_reveal") {
+      const profileId = selectedProfileIds[0] ?? profiles[0]?.id;
+      return profileId ? { kind: "profile", id: profileId } : null;
+    }
+    if (!guidedOnboarding.context) return null;
+    if (
+      guidedOnboarding.step === "date_instruction" ||
+      guidedOnboarding.step === "date_details"
+    ) {
+      return {
+        kind: "category",
+        id: getOnboardingCategoryIdForIntent(guidedOnboarding.context, "date"),
+      };
+    }
+    if (
+      guidedOnboarding.step === "period_instruction" ||
+      guidedOnboarding.step === "period_details"
+    ) {
+      return {
+        kind: "category",
+        id: getOnboardingCategoryIdForIntent(guidedOnboarding.context, "period"),
+      };
+    }
+    return null;
+  }, [guidedOnboarding, profiles, selectedProfileIds, showGuidedOnboarding]);
+  const onboardingTargetSelector = React.useMemo(() => {
+    if (!onboardingFocusTarget) return null;
+    if (onboardingFocusTarget.kind === "profile") {
+      return `[data-onboarding-profile-id="${onboardingFocusTarget.id}"]`;
+    }
+    if (onboardingFocusTarget.kind === "category") {
+      return `[data-onboarding-category-id="${onboardingFocusTarget.id}"]`;
+    }
+    return "[data-onboarding-auth-entry]";
+  }, [onboardingFocusTarget]);
+  const headerOnboardingFocusTarget = React.useMemo<OnboardingFocusTarget>(
+    () =>
+      accountNudgeVisible && !session?.user.id
+        ? { kind: "auth" }
+        : onboardingFocusTarget,
+    [accountNudgeVisible, onboardingFocusTarget, session?.user.id]
+  );
 
   const handleYearChange = React.useCallback(
     (nextYear: number) => {
@@ -1543,6 +1590,7 @@ export default function HomePage() {
           isAuthenticated={Boolean(session)}
           isMobileCalendarUi={isMobileCalendarUi === true}
           onCalendarPackFocusYear={handleYearChange}
+          onboardingFocusTarget={headerOnboardingFocusTarget}
           onOpenAuthDialog={(anchorPoint) => {
             setAuthDialogInitialMode("login");
             setAuthDialogAnchorPoint(anchorPoint);
@@ -1613,6 +1661,9 @@ export default function HomePage() {
           onClose={() => setGuidedPanelHidden(true)}
           onDismiss={dismissGuidedOnboarding}
           onConfigureContext={handleConfigureGuidedContext}
+          onContinueFromProfile={() =>
+            updateGuidedOnboarding({ type: "continue_from_profile" })
+          }
           onCancelDraft={cancelGuidedDraft}
           onChangeDraft={setGuidedDraft}
           onSaveDraft={saveGuidedDraft}
@@ -1627,16 +1678,29 @@ export default function HomePage() {
         />
       ) : null}
 
-      {accountNudgeVisible && !session?.user.id ? (
-        <AccountNudge
-          onDismiss={() => setAccountNudgeVisible(false)}
-          onCreateAccount={() => {
-            setAccountNudgeVisible(false);
-            setAuthDialogInitialMode("signup");
-            setAuthDialogAnchorPoint(undefined);
-            setAuthDialogOpen(true);
-          }}
+      {showGuidedOnboarding && onboardingTargetSelector ? (
+        <OnboardingConnector
+          sourceSelector="[data-onboarding-panel]"
+          targetSelector={onboardingTargetSelector}
         />
+      ) : null}
+
+      {accountNudgeVisible && !session?.user.id ? (
+        <>
+          <AccountNudge
+            onDismiss={() => setAccountNudgeVisible(false)}
+            onCreateAccount={() => {
+              setAccountNudgeVisible(false);
+              setAuthDialogInitialMode("signup");
+              setAuthDialogAnchorPoint(undefined);
+              setAuthDialogOpen(true);
+            }}
+          />
+          <OnboardingConnector
+            sourceSelector="[data-onboarding-account-nudge]"
+            targetSelector="[data-onboarding-auth-entry]"
+          />
+        </>
       ) : null}
 
       {isMobileCalendarUi ? (

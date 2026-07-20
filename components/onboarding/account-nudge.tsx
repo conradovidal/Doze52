@@ -14,8 +14,9 @@ export function AccountNudge({
 }: AccountNudgeProps) {
   return (
     <aside
+      data-onboarding-account-nudge
       aria-label="Convite para guardar o ano"
-      className="fixed top-[4.5rem] right-3 z-40 w-[min(20rem,calc(100vw-1.5rem))] rounded-2xl border border-foreground/15 bg-card/98 p-3.5 text-card-foreground shadow-[0_22px_65px_-30px_rgba(15,23,42,0.62)] backdrop-blur-xl animate-in fade-in-0 slide-in-from-top-2 duration-200 motion-reduce:animate-none sm:right-4"
+      className="fixed top-[5.25rem] right-3 z-40 w-[min(20rem,calc(100vw-1.5rem))] rounded-2xl border border-foreground/15 bg-card/98 p-3.5 text-card-foreground shadow-[0_22px_65px_-30px_rgba(15,23,42,0.62)] backdrop-blur-xl animate-in fade-in-0 slide-in-from-top-2 duration-200 motion-reduce:animate-none sm:right-4"
     >
       <div className="flex items-start gap-2.5">
         <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">

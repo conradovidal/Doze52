@@ -23,6 +23,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useStore } from "@/lib/store";
+import type { OnboardingFocusTarget } from "@/lib/onboarding";
 import type { AnchorPoint } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -36,6 +37,7 @@ type AppHeaderProps = {
   isMobileCalendarUi?: boolean;
   onOpenAuthDialog: (anchorPoint?: AnchorPoint) => void;
   onCalendarPackFocusYear: (year: number) => void;
+  onboardingFocusTarget?: OnboardingFocusTarget;
 };
 
 const getPreferredEditingProfileId = (
@@ -51,10 +53,13 @@ export function AppHeader({
   isMobileCalendarUi = false,
   onOpenAuthDialog,
   onCalendarPackFocusYear,
+  onboardingFocusTarget = null,
 }: AppHeaderProps) {
   const profiles = useStore((s) => s.profiles);
+  const categories = useStore((s) => s.categories);
   const selectedProfileIds = useStore((s) => s.selectedProfileIds);
   const setSelectedProfiles = useStore((s) => s.setSelectedProfiles);
+  const setCategoriesVisibility = useStore((s) => s.setCategoriesVisibility);
 
   const [isInlineEditMode, setIsInlineEditMode] = React.useState(false);
   const [editingProfileId, setEditingProfileId] = React.useState<string | null>(null);
@@ -84,11 +89,23 @@ export function AppHeader({
     "h-8 min-w-[82px] rounded-[10px] border-border bg-card px-2.5 text-[0.9rem] font-semibold text-foreground shadow-none hover:border-foreground/18 hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/60 md:h-9 md:min-w-[90px] md:px-3.5 md:text-[1rem] [&_svg]:opacity-70 [&_svg]:text-muted-foreground";
   const categoryToggleClass =
     "inline-flex h-8 w-8 items-center justify-center rounded-[10px] border border-border bg-card text-foreground/70 shadow-none transition-[background-color,border-color,color,box-shadow,transform] duration-150 ease-out hover:border-foreground/18 hover:bg-muted hover:text-foreground active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45";
-  const effectiveCategoriesExpanded = categoriesExpanded || isInlineEditMode;
+  const highlightedProfileId =
+    onboardingFocusTarget?.kind === "profile" ? onboardingFocusTarget.id : null;
+  const highlightedCategoryId =
+    onboardingFocusTarget?.kind === "category" ? onboardingFocusTarget.id : null;
+  const hasOnboardingFilterFocus = Boolean(
+    highlightedProfileId || highlightedCategoryId
+  );
+  const highlightAuthEntry = onboardingFocusTarget?.kind === "auth";
+  const effectiveCategoriesExpanded =
+    categoriesExpanded || isInlineEditMode || Boolean(highlightedCategoryId);
   const isMobileMode = isMobileCalendarUi === true;
   const filterPanelId = React.useId();
   const showMobileFilterPanel =
-    !isMobileMode || !areMobileFiltersCollapsed || isInlineEditMode;
+    !isMobileMode ||
+    !areMobileFiltersCollapsed ||
+    isInlineEditMode ||
+    hasOnboardingFilterFocus;
   const selectedProfile = React.useMemo(
     () =>
       profiles.find((profile) => selectedProfileIds.includes(profile.id)) ??
@@ -148,6 +165,30 @@ export function AppHeader({
       setAreMobileFiltersCollapsed(false);
     }
   }, [isInlineEditMode]);
+
+  React.useEffect(() => {
+    if (!highlightedCategoryId) return;
+    const highlightedCategory = useStore
+      .getState()
+      .categories.find((category) => category.id === highlightedCategoryId);
+    if (!highlightedCategory) return;
+    const wasVisible = highlightedCategory.visible;
+    if (!wasVisible) setCategoriesVisibility([highlightedCategoryId], true);
+
+    return () => {
+      if (!wasVisible) setCategoriesVisibility([highlightedCategoryId], false);
+    };
+  }, [highlightedCategoryId, setCategoriesVisibility]);
+
+  React.useEffect(() => {
+    if (!highlightedCategoryId) return;
+    const highlightedCategory = categories.find(
+      (category) => category.id === highlightedCategoryId
+    );
+    if (highlightedCategory && !highlightedCategory.visible) {
+      setCategoriesVisibility([highlightedCategoryId], true);
+    }
+  }, [categories, highlightedCategoryId, setCategoriesVisibility]);
 
   const setPersistedCategoriesExpanded = React.useCallback((expanded: boolean) => {
     setCategoriesExpanded(expanded);
@@ -266,9 +307,17 @@ export function AppHeader({
                   <UserMenu />
                 ) : (
                   <Button
+                    data-onboarding-auth-entry
+                    data-onboarding-highlighted={
+                      highlightAuthEntry ? "true" : undefined
+                    }
                     size="sm"
                     variant="outline"
-                    className={utilityButtonClass}
+                    className={cn(
+                      utilityButtonClass,
+                      highlightAuthEntry &&
+                        "relative z-[46] ring-2 ring-primary ring-offset-2 ring-offset-background shadow-[0_0_0_7px_hsl(var(--primary)/0.12)] motion-safe:animate-[pulse_700ms_ease-in-out_2]"
+                    )}
                     onClick={(event) => {
                       const rect = event.currentTarget.getBoundingClientRect();
                       onOpenAuthDialog({ x: rect.right, y: rect.bottom });
@@ -352,6 +401,7 @@ export function AppHeader({
                       onEditingProfileChange={setEditingProfileId}
                       onCreateProfile={openCreateProfile}
                       onEditProfile={openEditProfile}
+                      highlightedProfileId={highlightedProfileId}
                     />
                   </div>
 
@@ -363,6 +413,7 @@ export function AppHeader({
                       editingProfileId={editingProfileId}
                       onCreateCategory={openCreateCategory}
                       onEditCategory={openEditCategory}
+                      highlightedCategoryId={highlightedCategoryId}
                     />
                   </div>
                 </div>
@@ -381,6 +432,7 @@ export function AppHeader({
                       onEditingProfileChange={setEditingProfileId}
                       onCreateProfile={openCreateProfile}
                       onEditProfile={openEditProfile}
+                      highlightedProfileId={highlightedProfileId}
                     />
 
                     <button
@@ -439,6 +491,7 @@ export function AppHeader({
                       editingProfileId={editingProfileId}
                       onCreateCategory={openCreateCategory}
                       onEditCategory={openEditCategory}
+                      highlightedCategoryId={highlightedCategoryId}
                     />
                   </div>
                 </div>

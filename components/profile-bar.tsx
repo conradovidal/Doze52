@@ -71,6 +71,7 @@ type ProfileBarProps = {
   onEditingProfileChange?: (profileId: string) => void;
   onCreateProfile?: () => void;
   onEditProfile?: (profileId: string) => void;
+  highlightedProfileId?: string | null;
 };
 
 type DragState = {
@@ -312,6 +313,7 @@ export function ProfileBar({
   onEditingProfileChange,
   onCreateProfile,
   onEditProfile,
+  highlightedProfileId,
 }: ProfileBarProps) {
   const profiles = useStore((s) => s.profiles);
   const selectedProfileIds = useStore((s) => s.selectedProfileIds);
@@ -437,6 +439,10 @@ export function ProfileBar({
             <button
               key={profile.id}
               type="button"
+              data-onboarding-profile-id={profile.id}
+              data-onboarding-highlighted={
+                highlightedProfileId === profile.id ? "true" : undefined
+              }
               aria-pressed={selected}
               onClick={() => toggleSelectedProfile(profile.id)}
               title={profile.name}
@@ -448,7 +454,9 @@ export function ProfileBar({
                   : "h-8 rounded-[10px]",
                 selected
                   ? "border-primary bg-primary text-primary-foreground hover:bg-primary/90"
-                  : "border-border bg-card text-foreground/72 hover:border-foreground/18 hover:bg-muted hover:text-foreground"
+                  : "border-border bg-card text-foreground/72 hover:border-foreground/18 hover:bg-muted hover:text-foreground",
+                highlightedProfileId === profile.id &&
+                  "relative z-[46] ring-2 ring-primary ring-offset-2 ring-offset-background shadow-[0_0_0_7px_hsl(var(--primary)/0.12)] motion-safe:animate-[pulse_700ms_ease-in-out_2]"
               )}
             >
               <span

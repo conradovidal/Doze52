@@ -32,6 +32,7 @@ type GuidedOnboardingPanelProps = {
   onClose: () => void;
   onDismiss: () => void;
   onConfigureContext: (context: OnboardingContext, customName?: string) => void;
+  onContinueFromProfile: () => void;
   onCancelDraft: () => void;
   onChangeDraft: (draft: GuidedCalendarDraft) => void;
   onSaveDraft: (title: string) => void;
@@ -223,6 +224,7 @@ export function GuidedOnboardingPanel({
   onClose,
   onDismiss,
   onConfigureContext,
+  onContinueFromProfile,
   onCancelDraft,
   onChangeDraft,
   onSaveDraft,
@@ -241,6 +243,16 @@ export function GuidedOnboardingPanel({
   const dateItemsCreated = state.dateItemsCreated ?? 0;
   const periodItemsCreated = state.periodItemsCreated ?? 0;
   const copy = getContextCopy(context, dateItemsCreated, periodItemsCreated);
+  const progressStep =
+    state.step === "context_selection" || state.step === "custom_profile"
+      ? 1
+      : state.step === "profile_reveal"
+        ? 2
+        : state.step.startsWith("date")
+          ? 3
+          : state.step.startsWith("period")
+            ? 4
+            : 5;
 
   React.useEffect(() => {
     setTitle("");
@@ -254,7 +266,7 @@ export function GuidedOnboardingPanel({
       </div>
       <div className="min-w-0 flex-1">
         <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">Monte o seu ano</p>
-        <p className="mt-0.5 text-xs text-muted-foreground">Passo {state.step === "context_selection" || state.step === "custom_profile" ? "1" : state.step.startsWith("date") ? "2" : state.step.startsWith("period") ? "3" : "4"} de 4</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">Passo {progressStep} de 5</p>
       </div>
       <Button type="button" variant="ghost" size="icon-xs" className="rounded-full" aria-label="Fechar ajuda por agora" onClick={onClose}>
         <X />
@@ -268,14 +280,14 @@ export function GuidedOnboardingPanel({
         <>
           <h2 className="mt-4 text-xl font-semibold tracking-[-0.025em]">Onde uma visão do ano inteiro te ajudaria mais?</h2>
           <p className="mt-1 text-sm text-muted-foreground">Escolha um contexto para começar. Você poderá criar outros perfis depois.</p>
-          <div className="mt-4 grid gap-2 sm:grid-cols-3">
+          <div className="mt-4 grid gap-2">
             {CONTEXT_OPTIONS.map((option) => {
               const Icon = option.icon;
               return (
-                <button key={option.value} type="button" className="rounded-2xl border border-border bg-background/80 p-3 text-left transition hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50" onClick={() => onConfigureContext(option.value)}>
-                  <Icon className="size-4 text-primary" aria-hidden="true" />
-                  <span className="mt-2 block text-sm font-semibold">{option.title}</span>
-                  <span className="mt-1 block text-[11px] leading-4 text-muted-foreground">{option.description}</span>
+                <button key={option.value} type="button" className="group flex items-center gap-3 rounded-2xl border border-border bg-background/80 p-3 text-left transition hover:translate-x-0.5 hover:border-primary/35 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50" onClick={() => onConfigureContext(option.value)}>
+                  <span className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-primary/8 text-primary"><Icon className="size-4" aria-hidden="true" /></span>
+                  <span className="min-w-0 flex-1"><span className="block text-sm font-semibold">{option.title}</span><span className="mt-0.5 block text-[11px] leading-4 text-muted-foreground">{option.description}</span></span>
+                  <ArrowRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary" aria-hidden="true" />
                 </button>
               );
             })}
@@ -297,12 +309,23 @@ export function GuidedOnboardingPanel({
       );
     }
 
+    if (state.step === "profile_reveal") {
+      return (
+        <>
+          <h2 className="mt-4 text-lg font-semibold tracking-[-0.02em]">Este é o perfil que vai organizar essa parte do seu ano.</h2>
+          <p className="mt-1 text-sm leading-5 text-muted-foreground">Tudo o que você adicionar neste fluxo ficará reunido nele.</p>
+          <Button type="button" variant="premium" className="mt-4 w-full" onClick={onContinueFromProfile}>Adicionar datas importantes <ArrowRight /></Button>
+        </>
+      );
+    }
+
     if (state.step === "date_instruction" || state.step === "period_instruction") {
       const period = state.step === "period_instruction";
       return (
         <>
           <h2 className="mt-4 text-lg font-semibold tracking-[-0.02em]">{period ? copy.periodTitle : copy.dateTitle}</h2>
           <p className="mt-1 text-sm leading-5 text-muted-foreground">{period ? copy.periodDescription : copy.dateDescription}</p>
+          <p className="mt-2 text-xs font-medium text-primary/90">{period ? "Períodos maiores ficam agrupados nesta categoria." : "As datas que você adicionar agora ficarão organizadas aqui."}</p>
           {mobileRangeStart && period ? <p className="mt-3 rounded-xl bg-primary/8 px-3 py-2 text-xs font-medium text-primary">Início escolhido em {formatDate(mobileRangeStart)}. Agora toque no dia final.</p> : <InteractionHint period={period} isMobile={isMobile} />}
           {!period && dateItemsCreated > 0 ? (
             <Button
@@ -379,7 +402,7 @@ export function GuidedOnboardingPanel({
 
   if (!content) return null;
   return (
-    <section data-guided-onboarding-step={state.step} aria-label="Guia inicial do Doze52" aria-live="polite" className="fixed top-[calc(env(safe-area-inset-top,0px)+4.6rem)] left-1/2 z-50 w-[min(42rem,calc(100vw-1.5rem))] -translate-x-1/2 rounded-[1.5rem] border border-foreground/15 bg-card/98 p-4.5 text-card-foreground shadow-[0_28px_90px_-28px_rgba(15,23,42,0.68)] backdrop-blur-xl animate-in fade-in-0 slide-in-from-top-2 duration-200 motion-reduce:animate-none sm:p-5 md:left-4 md:w-[31rem] md:translate-x-0">
+    <section data-onboarding-panel data-guided-onboarding-step={state.step} aria-label="Guia inicial do Doze52" aria-live="polite" className="fixed top-[calc(env(safe-area-inset-top,0px)+4.6rem)] left-1/2 z-50 w-[min(42rem,calc(100vw-1.5rem))] -translate-x-1/2 rounded-[1.5rem] border border-foreground/15 bg-card/98 p-4.5 text-card-foreground shadow-[0_28px_90px_-28px_rgba(15,23,42,0.68)] backdrop-blur-xl animate-in fade-in-0 slide-in-from-top-2 duration-200 motion-reduce:animate-none sm:p-5 md:left-4 md:w-[23rem] md:translate-x-0">
       {header}
       {content}
       <div className="mt-4 border-t border-border/65 pt-3">

@@ -28,11 +28,16 @@ test("configura contexto, data, período e chega à prévia sem reflexão", () =
     at: "2026-07-20T10:00:00.000Z",
   });
   expect(configured).toMatchObject({
-    step: "date_instruction",
+    step: "profile_reveal",
     context: "work",
   });
 
-  const dateDetails = reduceGuidedOnboardingState(configured, {
+  const dateInstruction = reduceGuidedOnboardingState(configured, {
+    type: "continue_from_profile",
+  });
+  expect(dateInstruction.step).toBe("date_instruction");
+
+  const dateDetails = reduceGuidedOnboardingState(dateInstruction, {
     type: "select_date",
   });
   const firstDateSaved = reduceGuidedOnboardingState(dateDetails, {

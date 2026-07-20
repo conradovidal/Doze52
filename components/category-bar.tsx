@@ -83,6 +83,7 @@ type CategoryBarProps = {
   editingProfileId?: string | null;
   onCreateCategory?: () => void;
   onEditCategory?: (categoryId: string) => void;
+  highlightedCategoryId?: string | null;
 };
 
 type DragState = {
@@ -327,6 +328,7 @@ export function CategoryBar({
   editingProfileId,
   onCreateCategory,
   onEditCategory,
+  highlightedCategoryId,
 }: CategoryBarProps) {
   const { mode: themeMode } = useTheme();
   const selectedProfileIds = useStore((s) => s.selectedProfileIds);
@@ -495,6 +497,10 @@ export function CategoryBar({
             <button
               key={category.id}
               type="button"
+              data-onboarding-category-id={category.id}
+              data-onboarding-highlighted={
+                highlightedCategoryId === category.id ? "true" : undefined
+              }
               aria-pressed={category.visible}
               onClick={() => toggleCategoryVisibility(category.id)}
               title={category.name}
@@ -505,7 +511,9 @@ export function CategoryBar({
                   : "h-8 rounded-[10px]",
                 category.visible
                   ? "hover:brightness-[0.985]"
-                  : "border-dashed bg-card/80 text-muted-foreground/75 hover:border-foreground/18 hover:bg-muted hover:text-foreground"
+                  : "border-dashed bg-card/80 text-muted-foreground/75 hover:border-foreground/18 hover:bg-muted hover:text-foreground",
+                highlightedCategoryId === category.id &&
+                  "relative z-[46] ring-2 ring-primary ring-offset-2 ring-offset-background shadow-[0_0_0_7px_hsl(var(--primary)/0.12)] motion-safe:animate-[pulse_700ms_ease-in-out_2]"
               )}
               style={{
                 ...(mobileDense ? MOBILE_CHIP_BUTTON_STYLE : {}),

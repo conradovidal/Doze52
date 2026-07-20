@@ -5,6 +5,11 @@ import type { CalendarEvent } from "@/lib/types";
 export type ProductOnboardingState = "pending" | "dismissed" | "completed";
 export type ProductOnboardingKey = "create-event";
 export type OnboardingContext = "personal" | "work" | "custom";
+export type OnboardingFocusTarget =
+  | { kind: "profile"; id: string }
+  | { kind: "category"; id: string }
+  | { kind: "auth" }
+  | null;
 export type GuidedCreationIntent =
   | "dated_item"
   | "period"
@@ -13,6 +18,7 @@ export type GuidedCreationIntent =
 export type GuidedOnboardingStep =
   | "context_selection"
   | "custom_profile"
+  | "profile_reveal"
   | "date_instruction"
   | "date_details"
   | "period_instruction"
@@ -40,6 +46,7 @@ export type GuidedOnboardingAction =
   | { type: "start"; at?: string }
   | { type: "choose_context"; context: OnboardingContext; at?: string }
   | { type: "configure_profile"; context: OnboardingContext; at?: string }
+  | { type: "continue_from_profile" }
   | { type: "select_date" }
   | { type: "cancel_date" }
   | { type: "date_saved"; at?: string }
@@ -111,6 +118,7 @@ const writePayload = (payload: ProductOnboardingPayload) => {
 const isGuidedStep = (value: unknown): value is GuidedOnboardingStep =>
   value === "context_selection" ||
   value === "custom_profile" ||
+  value === "profile_reveal" ||
   value === "date_instruction" ||
   value === "date_details" ||
   value === "period_instruction" ||
@@ -220,10 +228,14 @@ export const reduceGuidedOnboardingState = (
         ? {
             ...state,
             context: action.context,
-            step: "date_instruction",
+            step: "profile_reveal",
             startedAt: state.startedAt ?? action.at ?? nowIso(),
             profileConfiguredAt: action.at ?? nowIso(),
           }
+        : state;
+    case "continue_from_profile":
+      return state.step === "profile_reveal"
+        ? { ...state, step: "date_instruction" }
         : state;
     case "select_date":
       return state.step === "date_instruction"
