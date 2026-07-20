@@ -19,7 +19,7 @@ const copaCategory = {
 };
 
 const sharedPackProperties = {
-  version: 1,
+  version: 2,
   name: "Copa do Mundo de 2026",
   icon: "trophy" as const,
   eyebrow: undefined,
