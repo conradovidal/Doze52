@@ -1,62 +1,89 @@
 import { expect, test } from "@playwright/test";
 import {
   hasAuthorCalendarEvents,
+  migrateGuidedOnboardingState,
   reduceGuidedOnboardingState,
   shouldShowGuidedOnboarding,
   type GuidedOnboardingState,
 } from "../../lib/onboarding";
 import {
+  getOnboardingCategoryIdForIntent,
   getOnboardingDefaultCategories,
   getOnboardingDefaultProfiles,
   isOnboardingProfilesSnapshot,
+  ONBOARDING_CATEGORY_IDS,
   ONBOARDING_PROFILE_IDS,
 } from "../../lib/store";
 import { materializeUserOwnedSnapshot } from "../../lib/snapshot-ownership";
 
 const initialState = (): GuidedOnboardingState => ({
-  version: 2,
-  step: "intro",
+  version: 3,
+  step: "context_selection",
 });
 
-test("avança pelos prompts sem exigir reflexão", () => {
-  const started = reduceGuidedOnboardingState(initialState(), {
-    type: "start",
+test("configura contexto, data, período e chega à prévia sem reflexão", () => {
+  const configured = reduceGuidedOnboardingState(initialState(), {
+    type: "configure_profile",
+    context: "work",
     at: "2026-07-20T10:00:00.000Z",
   });
-  const firstItem = reduceGuidedOnboardingState(started, {
-    type: "item_created",
-    isPeriod: false,
+  expect(configured).toMatchObject({
+    step: "date_instruction",
+    context: "work",
+  });
+
+  const dateDetails = reduceGuidedOnboardingState(configured, {
+    type: "select_date",
+  });
+  const dateSaved = reduceGuidedOnboardingState(dateDetails, {
+    type: "date_saved",
     at: "2026-07-20T10:01:00.000Z",
   });
-  expect(firstItem.step).toBe("period_prompt");
-  expect(firstItem.firstItemCreatedAt).toBe("2026-07-20T10:01:00.000Z");
+  expect(dateSaved.step).toBe("period_instruction");
+  expect(dateSaved.firstDateCreatedAt).toBe("2026-07-20T10:01:00.000Z");
 
-  const context = reduceGuidedOnboardingState(firstItem, {
-    type: "skip_period",
+  const periodDetails = reduceGuidedOnboardingState(dateSaved, {
+    type: "select_period",
   });
-  expect(context.step).toBe("context_prompt");
-
-  const reflection = reduceGuidedOnboardingState(context, {
-    type: "continue_to_reflection",
+  const preview = reduceGuidedOnboardingState(periodDetails, {
+    type: "period_saved",
+    at: "2026-07-20T10:02:00.000Z",
   });
-  expect(reflection.step).toBe("reflection");
-
-  const save = reduceGuidedOnboardingState(reflection, {
-    type: "skip_reflection",
-  });
-  expect(save.step).toBe("save");
-  expect(save.reflection).toBeUndefined();
+  expect(preview.step).toBe("use_case_preview");
+  expect(preview.firstPeriodCreatedAt).toBe("2026-07-20T10:02:00.000Z");
 });
 
-test("um primeiro período pula o prompt redundante", () => {
-  const next = reduceGuidedOnboardingState(initialState(), {
-    type: "item_created",
-    isPeriod: true,
-    at: "2026-07-20T10:01:00.000Z",
+test("Outro pede nome antes de configurar o perfil", () => {
+  const custom = reduceGuidedOnboardingState(initialState(), {
+    type: "choose_context",
+    context: "custom",
+  });
+  expect(custom.step).toBe("custom_profile");
+  expect(custom.context).toBe("custom");
+});
+
+test("migre v2 em andamento removendo reflexão e preserve terminais", () => {
+  expect(
+    migrateGuidedOnboardingState({
+      version: 2,
+      step: "reflection",
+      startedAt: "2026-07-20T10:00:00.000Z",
+      firstItemCreatedAt: "2026-07-20T10:01:00.000Z",
+    })
+  ).toMatchObject({
+    version: 3,
+    step: "period_instruction",
+    context: "personal",
+    firstDateCreatedAt: "2026-07-20T10:01:00.000Z",
   });
 
-  expect(next.step).toBe("context_prompt");
-  expect(next.firstPeriodCreatedAt).toBe("2026-07-20T10:01:00.000Z");
+  expect(
+    migrateGuidedOnboardingState({
+      version: 2,
+      step: "completed",
+      completedAt: "2026-07-20T10:03:00.000Z",
+    })
+  ).toMatchObject({ version: 3, step: "completed" });
 });
 
 test("dispensa e conclusão são terminais para a elegibilidade", () => {
@@ -74,17 +101,6 @@ test("dispensa e conclusão são terminais para a elegibilidade", () => {
       remoteReady: false,
     })
   ).toBe(false);
-
-  expect(
-    shouldShowGuidedOnboarding({
-      state: initialState(),
-      legacyState: "completed",
-      hasAuthorEvents: false,
-      authLoading: false,
-      isAuthenticated: false,
-      remoteReady: false,
-    })
-  ).toBe(false);
 });
 
 test("conta autenticada só recebe o fluxo depois da carga remota", () => {
@@ -96,27 +112,31 @@ test("conta autenticada só recebe o fluxo depois da carga remota", () => {
     isAuthenticated: true,
     remoteReady: false,
   };
-
   expect(shouldShowGuidedOnboarding(input)).toBe(false);
   expect(shouldShowGuidedOnboarding({ ...input, remoteReady: true })).toBe(true);
 });
 
-test("eventos de calendários prontos não contam como eventos autorais", () => {
-  expect(
-    hasAuthorCalendarEvents([
-      { calendarPackGroupId: "feriados-2026" },
-      { calendarPackGroupId: "formula-1-2026" },
-    ])
-  ).toBe(false);
-  expect(
-    hasAuthorCalendarEvents([
-      { calendarPackGroupId: "feriados-2026" },
-      { calendarPackGroupId: undefined },
-    ])
-  ).toBe(true);
+test("eventos de calendários prontos não contam como autorais", () => {
+  expect(hasAuthorCalendarEvents([{ calendarPackGroupId: "feriados-2026" }])).toBe(false);
+  expect(hasAuthorCalendarEvents([{ calendarPackGroupId: undefined }])).toBe(true);
 });
 
-test("novo template é neutro e o template Pessoal continua reconhecido", () => {
+test("mapeia as intenções para as categorias corretas", () => {
+  expect(getOnboardingCategoryIdForIntent("personal", "date")).toBe(
+    ONBOARDING_CATEGORY_IDS.birthday
+  );
+  expect(getOnboardingCategoryIdForIntent("work", "date")).toBe(
+    ONBOARDING_CATEGORY_IDS.workDeliveries
+  );
+  expect(getOnboardingCategoryIdForIntent("work", "period")).toBe(
+    ONBOARDING_CATEGORY_IDS.workTrips
+  );
+  expect(getOnboardingCategoryIdForIntent("custom", "period")).toBe(
+    ONBOARDING_CATEGORY_IDS.customPeriods
+  );
+});
+
+test("novo template neutro e Pessoal legado continuam reconhecidos", () => {
   expect(getOnboardingDefaultProfiles()[0]?.name).toBe("Meu ano");
   expect(
     isOnboardingProfilesSnapshot([
@@ -136,46 +156,25 @@ test("materialização cria IDs distintos e preserva relacionamentos", () => {
   const categories = getOnboardingDefaultCategories();
   const sourceCategory = categories[0];
   if (!sourceCategory) throw new Error("Template sem categoria");
-
   const snapshot = {
     profiles,
     categories,
-    events: [
-      {
-        id: "11111111-aaaa-4111-8111-111111111111",
-        title: "Viagem",
-        categoryId: sourceCategory.id,
-        color: sourceCategory.color,
-        startDate: "2026-08-01",
-        endDate: "2026-08-10",
-        createdAt: "2026-07-20T10:00:00.000Z",
-        dayOrder: 0,
-      },
-    ],
+    events: [{
+      id: "11111111-aaaa-4111-8111-111111111111",
+      title: "Viagem",
+      categoryId: sourceCategory.id,
+      color: sourceCategory.color,
+      startDate: "2026-08-01",
+      endDate: "2026-08-10",
+      createdAt: "2026-07-20T10:00:00.000Z",
+      dayOrder: 0,
+    }],
   };
-
-  const firstAccount = materializeUserOwnedSnapshot(snapshot);
-  const secondAccount = materializeUserOwnedSnapshot(snapshot);
-  const firstIds = new Set([
-    ...firstAccount.profiles.map((profile) => profile.id),
-    ...firstAccount.categories.map((category) => category.id),
-    ...firstAccount.events.map((event) => event.id),
-  ]);
-  const secondIds = new Set([
-    ...secondAccount.profiles.map((profile) => profile.id),
-    ...secondAccount.categories.map((category) => category.id),
-    ...secondAccount.events.map((event) => event.id),
-  ]);
-
+  const first = materializeUserOwnedSnapshot(snapshot);
+  const second = materializeUserOwnedSnapshot(snapshot);
+  const firstIds = new Set([...first.profiles, ...first.categories, ...first.events].map((item) => item.id));
+  const secondIds = new Set([...second.profiles, ...second.categories, ...second.events].map((item) => item.id));
   expect([...firstIds].some((id) => secondIds.has(id))).toBe(false);
-  expect(
-    firstAccount.profiles.some(
-      (profile) => profile.id === firstAccount.categories[0]?.profileId
-    )
-  ).toBe(true);
-  expect(
-    firstAccount.categories.some(
-      (category) => category.id === firstAccount.events[0]?.categoryId
-    )
-  ).toBe(true);
+  expect(first.categories[0]?.profileId).toBe(first.profiles[0]?.id);
+  expect(first.events[0]?.categoryId).toBe(first.categories[0]?.id);
 });

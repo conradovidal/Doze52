@@ -12,12 +12,16 @@ import {
   type SyncOverlayStatus,
 } from "@/components/sync-status-overlay";
 import { AuthDialog } from "@/components/auth/auth-dialog";
-import { GuidedOnboardingPanel } from "@/components/onboarding/guided-onboarding-panel";
+import {
+  GuidedOnboardingPanel,
+  type GuidedCalendarDraft,
+} from "@/components/onboarding/guided-onboarding-panel";
 import { Button } from "@/components/ui/button";
 import { useFeedback } from "@/components/ui/feedback-provider";
 import {
   isOnboardingProfilesSnapshot,
   isOnboardingCategoriesSnapshot,
+  getOnboardingCategoryIdForIntent,
   useStore,
   type EventInput,
 } from "@/lib/store";
@@ -36,14 +40,12 @@ import {
   PRODUCT_ONBOARDING_RESET_EVENT,
   dispatchGuidedOnboarding,
   hasAuthorCalendarEvents,
-  isGuidedOnboardingInProgress,
   readGuidedOnboardingState,
   readProductOnboardingState,
   shouldShowGuidedOnboarding,
-  type GuidedCreationIntent,
   type GuidedOnboardingAction,
   type GuidedOnboardingState,
-  type GuidedReflection,
+  type OnboardingContext,
   type ProductOnboardingState,
 } from "@/lib/onboarding";
 import { logDevError, logProdError } from "@/lib/safe-log";
@@ -247,6 +249,9 @@ export default function HomePage() {
   const ensureEventMetadata = useStore((s) => s.ensureEventMetadata);
   const replaceAllData = useStore((s) => s.replaceAllData);
   const resetToOnboardingData = useStore((s) => s.resetToOnboardingData);
+  const configureOnboardingContext = useStore(
+    (s) => s.configureOnboardingContext
+  );
   const markLocalImported = useStore((s) => s.markLocalImported);
   const isLocalImported = useStore((s) => s.isLocalImported);
   const addEvent = useStore((s) => s.addEvent);
@@ -299,8 +304,14 @@ export default function HomePage() {
   const [guidedOnboarding, setGuidedOnboarding] =
     React.useState<GuidedOnboardingState | null>(null);
   const [guidedPanelHidden, setGuidedPanelHidden] = React.useState(false);
-  const [guidedCreationIntent, setGuidedCreationIntent] =
-    React.useState<GuidedCreationIntent | null>(null);
+  const [guidedDraft, setGuidedDraft] =
+    React.useState<GuidedCalendarDraft | null>(null);
+  const [guidedDialogIntent, setGuidedDialogIntent] = React.useState<
+    "date" | "period" | null
+  >(null);
+  const [mobileGuidedRangeStart, setMobileGuidedRangeStart] = React.useState<
+    string | null
+  >(null);
   const [highlightedEventId, setHighlightedEventId] = React.useState<
     string | null
   >(null);
@@ -988,7 +999,7 @@ export default function HomePage() {
     setDialogAnchorPoint(payload.anchorPoint);
     setSeedRange(null);
     setCreatingRange(null);
-    setGuidedCreationIntent(null);
+    setGuidedDialogIntent(null);
     setDialogOpen(true);
   };
 
@@ -1001,18 +1012,26 @@ export default function HomePage() {
     []
   );
 
-  const openGuidedEventDialog = React.useCallback(
-    (intent: GuidedCreationIntent) => {
-      updateGuidedOnboarding({ type: "start" });
-      setGuidedCreationIntent(intent);
-      setEditingId(null);
-      setDialogAnchorPoint(undefined);
-      setCreatingRange(null);
-      const fallbackDate = todayIso || format(new Date(), "yyyy-MM-dd");
-      setSeedRange({ startDate: fallbackDate, endDate: fallbackDate });
-      setDialogOpen(true);
+  const handleConfigureGuidedContext = React.useCallback(
+    (context: OnboardingContext, customName?: string) => {
+      if (context === "custom" && customName === undefined) {
+        updateGuidedOnboarding({ type: "choose_context", context });
+        return;
+      }
+      const configured = configureOnboardingContext({ context, customName });
+      if (!configured) {
+        notify({
+          tone: "error",
+          title: "Não foi possível configurar este perfil",
+          description: "Confira o nome ou continue usando o calendário atual.",
+        });
+        return;
+      }
+      updateGuidedOnboarding({ type: "configure_profile", context });
+      setGuidedDraft(null);
+      setMobileGuidedRangeStart(null);
     },
-    [todayIso, updateGuidedOnboarding]
+    [configureOnboardingContext, notify, updateGuidedOnboarding]
   );
 
   const completeGuidedOnboarding = React.useCallback(() => {
@@ -1052,18 +1071,12 @@ export default function HomePage() {
 
     setHighlightedEventId(eventId);
 
-    const currentGuided = guidedOnboarding ?? readGuidedOnboardingState();
-    const shouldAdvanceGuided =
-      currentGuided.step !== "completed" &&
-      currentGuided.step !== "dismissed" &&
-      (isGuidedOnboardingInProgress(currentGuided) ||
-        calendarCreateOnboarding === "pending");
-
-    if (shouldAdvanceGuided) {
+    if (guidedDialogIntent) {
       updateGuidedOnboarding({
-        type: "item_created",
-        isPeriod: payload.startDate !== payload.endDate,
+        type: guidedDialogIntent === "period" ? "period_saved" : "date_saved",
       });
+      setGuidedDialogIntent(null);
+      setGuidedDraft(null);
       setGuidedPanelHidden(false);
     }
 
@@ -1080,7 +1093,7 @@ export default function HomePage() {
     setEditingId(null);
     setDialogAnchorPoint(undefined);
     setCreatingRange(null);
-    setGuidedCreationIntent(null);
+    setGuidedDialogIntent(null);
     setSeedRange({
       startDate: fallbackTodayIso,
       endDate: fallbackTodayIso,
@@ -1127,20 +1140,140 @@ export default function HomePage() {
         const normalizedStart = start <= end ? start : end;
         const normalizedEnd = start <= end ? end : start;
 
-        setSeedRange({
+        const nextDraft = {
           startDate: format(normalizedStart, "yyyy-MM-dd"),
           endDate: format(normalizedEnd, "yyyy-MM-dd"),
-        });
+        };
+
+        const currentStep = guidedOnboarding?.step;
+        if (currentStep === "date_instruction") {
+          setGuidedDraft({
+            startDate: nextDraft.startDate,
+            endDate: nextDraft.startDate,
+          });
+          updateGuidedOnboarding({ type: "select_date" });
+          return null;
+        }
+        if (currentStep === "period_instruction") {
+          if (nextDraft.startDate === nextDraft.endDate) {
+            notify({
+              tone: "info",
+              title: "Desenhe um período",
+              description: "Arraste até outro dia para mostrar quanto tempo isso ocupa.",
+            });
+            return null;
+          }
+          setGuidedDraft(nextDraft);
+          updateGuidedOnboarding({ type: "select_period" });
+          return null;
+        }
+
+        setSeedRange(nextDraft);
 
         setEditingId(null);
         setDialogAnchorPoint(anchorPoint);
-        setGuidedCreationIntent(null);
+        setGuidedDialogIntent(null);
         setDialogOpen(true);
 
         return null;
       });
     },
-    []
+    [guidedOnboarding?.step, notify, updateGuidedOnboarding]
+  );
+
+  const cancelGuidedDraft = React.useCallback(() => {
+    const step = guidedOnboarding?.step;
+    if (step === "date_details") {
+      updateGuidedOnboarding({ type: "cancel_date" });
+    } else if (step === "period_details") {
+      updateGuidedOnboarding({ type: "cancel_period" });
+    }
+    setGuidedDraft(null);
+    setMobileGuidedRangeStart(null);
+  }, [guidedOnboarding?.step, updateGuidedOnboarding]);
+
+  const saveGuidedDraft = React.useCallback(
+    (title: string) => {
+      if (!guidedDraft || !guidedOnboarding?.context || !title.trim()) return;
+      const intent =
+        guidedOnboarding.step === "period_details" ? "period" : "date";
+      if (
+        guidedDraft.startDate > guidedDraft.endDate ||
+        (intent === "period" && guidedDraft.startDate === guidedDraft.endDate)
+      ) {
+        notify({
+          tone: "error",
+          title: "Confira o período",
+          description: "A data final precisa vir depois da data inicial.",
+        });
+        return;
+      }
+      const eventId = addEvent({
+        title: title.trim(),
+        categoryId: getOnboardingCategoryIdForIntent(
+          guidedOnboarding.context,
+          intent
+        ),
+        startDate: guidedDraft.startDate,
+        endDate: guidedDraft.endDate,
+      });
+      if (!eventId) {
+        notify({
+          tone: "error",
+          title: "Não foi possível salvar",
+          description: "Tente selecionar a data novamente.",
+        });
+        return;
+      }
+      setHighlightedEventId(eventId);
+      updateGuidedOnboarding({
+        type: intent === "period" ? "period_saved" : "date_saved",
+      });
+      setGuidedDraft(null);
+      setMobileGuidedRangeStart(null);
+      notify({
+        tone: "success",
+        title: intent === "period" ? "Período adicionado" : "Data adicionada",
+        description: "Já dá para ver isso ocupando espaço no seu ano.",
+      });
+    },
+    [addEvent, guidedDraft, guidedOnboarding, notify, updateGuidedOnboarding]
+  );
+
+  const openGuidedMoreOptions = React.useCallback(() => {
+    if (!guidedDraft) return;
+    const intent =
+      guidedOnboarding?.step === "period_details" ? "period" : "date";
+    setSeedRange(guidedDraft);
+    setGuidedDialogIntent(intent);
+    setEditingId(null);
+    setDialogAnchorPoint(undefined);
+    setDialogOpen(true);
+  }, [guidedDraft, guidedOnboarding?.step]);
+
+  const handleMobileGuidedDaySelect = React.useCallback(
+    (dateIso: string) => {
+      const step = guidedOnboarding?.step;
+      if (step === "date_instruction") {
+        setGuidedDraft({ startDate: dateIso, endDate: dateIso });
+        updateGuidedOnboarding({ type: "select_date" });
+        return;
+      }
+      if (step !== "period_instruction") return;
+      if (!mobileGuidedRangeStart) {
+        setMobileGuidedRangeStart(dateIso);
+        return;
+      }
+      const [startDate, endDate] =
+        mobileGuidedRangeStart <= dateIso
+          ? [mobileGuidedRangeStart, dateIso]
+          : [dateIso, mobileGuidedRangeStart];
+      if (startDate === endDate) return;
+      setGuidedDraft({ startDate, endDate });
+      setMobileGuidedRangeStart(null);
+      updateGuidedOnboarding({ type: "select_period" });
+    },
+    [guidedOnboarding?.step, mobileGuidedRangeStart, updateGuidedOnboarding]
   );
 
   React.useEffect(() => {
@@ -1434,13 +1567,28 @@ export default function HomePage() {
           onActiveDateChange={setMobileActiveDateIso}
           onYearChange={handleYearChange}
           onEditEvent={handleEditEvent}
+          guidedSelectionMode={
+            guidedOnboarding?.step === "date_instruction"
+              ? "date"
+              : guidedOnboarding?.step === "period_instruction"
+                ? "period"
+                : null
+          }
+          guidedRangeStart={mobileGuidedRangeStart}
+          onGuidedDaySelect={handleMobileGuidedDaySelect}
         />
       ) : (
         <div className="overflow-x-auto pb-1 md:overflow-visible">
           <div
             data-calendar-focus-root
             data-calendar-ui-mode="desktop"
-            className="relative doze52-calendar-mode-transition"
+            className={cn(
+              "relative rounded-xl doze52-calendar-mode-transition",
+              guidedOnboarding?.step === "date_instruction" ||
+                guidedOnboarding?.step === "period_instruction"
+                ? "ring-2 ring-primary/35 ring-offset-4 ring-offset-background shadow-[0_22px_70px_-42px_rgba(37,99,235,0.72)]"
+                : null
+            )}
           >
             <YearGrid
               year={year}
@@ -1466,25 +1614,25 @@ export default function HomePage() {
       {showGuidedOnboarding && guidedOnboarding ? (
         <GuidedOnboardingPanel
           state={guidedOnboarding}
+          draft={guidedDraft}
           isAuthenticated={Boolean(session?.user.id)}
           isSyncReady={remoteReady}
+          isMobile={isMobileCalendarUi === true}
+          mobileRangeStart={mobileGuidedRangeStart}
           onClose={() => setGuidedPanelHidden(true)}
           onDismiss={dismissGuidedOnboarding}
-          onAddItem={openGuidedEventDialog}
-          onSkipPeriod={() =>
-            updateGuidedOnboarding({ type: "skip_period" })
-          }
-          onContinueToReflection={() =>
-            updateGuidedOnboarding({ type: "continue_to_reflection" })
-          }
-          onReflectionChange={(reflection: GuidedReflection) =>
-            updateGuidedOnboarding({ type: "set_reflection", reflection })
-          }
-          onContinueReflection={() =>
-            updateGuidedOnboarding({ type: "continue_reflection" })
-          }
-          onSkipReflection={() =>
-            updateGuidedOnboarding({ type: "skip_reflection" })
+          onConfigureContext={handleConfigureGuidedContext}
+          onCancelDraft={cancelGuidedDraft}
+          onChangeDraft={setGuidedDraft}
+          onSaveDraft={saveGuidedDraft}
+          onOpenMoreOptions={openGuidedMoreOptions}
+          onAddAnotherDate={() => {
+            setGuidedDraft(null);
+            setMobileGuidedRangeStart(null);
+            updateGuidedOnboarding({ type: "add_another_date" });
+          }}
+          onContinueFromPreview={() =>
+            updateGuidedOnboarding({ type: "continue_from_preview" })
           }
           onOpenAuth={() => {
             setAuthDialogInitialMode("signup");
@@ -1521,20 +1669,26 @@ export default function HomePage() {
 
       <EventDialog
         open={dialogOpen}
-        onOpenChange={(open) => {
+          onOpenChange={(open) => {
           setDialogOpen(open);
 
           if (!open) {
             setDialogAnchorPoint(undefined);
             setSeedRange(null);
             setCreatingRange(null);
-            setGuidedCreationIntent(null);
+            if (!open) setGuidedDialogIntent(null);
           }
         }}
         initialEvent={editingEvent}
         seedRange={seedRange}
         anchorPoint={dialogAnchorPoint}
-        guidedIntent={guidedCreationIntent}
+        guidedIntent={
+          guidedDialogIntent === "period"
+            ? "period"
+            : guidedDialogIntent === "date"
+              ? "dated_item"
+              : null
+        }
         onSubmit={handleSubmit}
         onDelete={
           editingId && !editingEvent?.calendarPackGroupId

@@ -4,46 +4,48 @@ import type { CalendarEvent } from "@/lib/types";
 
 export type ProductOnboardingState = "pending" | "dismissed" | "completed";
 export type ProductOnboardingKey = "create-event";
-
-export type GuidedOnboardingStep =
-  | "intro"
-  | "period_prompt"
-  | "context_prompt"
-  | "reflection"
-  | "save"
-  | "completed"
-  | "dismissed";
-
-export type GuidedReflection =
-  | "busy_period"
-  | "missing_priority"
-  | "needs_context"
-  | "too_early";
-
+export type OnboardingContext = "personal" | "work" | "custom";
 export type GuidedCreationIntent =
   | "dated_item"
   | "period"
   | "additional_context";
 
+export type GuidedOnboardingStep =
+  | "context_selection"
+  | "custom_profile"
+  | "date_instruction"
+  | "date_details"
+  | "period_instruction"
+  | "period_details"
+  | "use_case_preview"
+  | "save"
+  | "completed"
+  | "dismissed";
+
 export type GuidedOnboardingState = {
-  version: 2;
+  version: 3;
   step: GuidedOnboardingStep;
+  context?: OnboardingContext;
   startedAt?: string;
-  firstItemCreatedAt?: string;
+  profileConfiguredAt?: string;
+  firstDateCreatedAt?: string;
   firstPeriodCreatedAt?: string;
-  reflection?: GuidedReflection;
   completedAt?: string;
   dismissedAt?: string;
 };
 
 export type GuidedOnboardingAction =
   | { type: "start"; at?: string }
-  | { type: "item_created"; isPeriod: boolean; at?: string }
-  | { type: "skip_period" }
-  | { type: "continue_to_reflection" }
-  | { type: "set_reflection"; reflection: GuidedReflection }
-  | { type: "continue_reflection" }
-  | { type: "skip_reflection" }
+  | { type: "choose_context"; context: OnboardingContext; at?: string }
+  | { type: "configure_profile"; context: OnboardingContext; at?: string }
+  | { type: "select_date" }
+  | { type: "cancel_date" }
+  | { type: "date_saved"; at?: string }
+  | { type: "add_another_date" }
+  | { type: "select_period" }
+  | { type: "cancel_period" }
+  | { type: "period_saved"; at?: string }
+  | { type: "continue_from_preview" }
   | { type: "complete"; at?: string }
   | { type: "dismiss"; at?: string };
 
@@ -57,14 +59,24 @@ type ProductOnboardingPayload = Partial<
   >
 >;
 
+type LegacyGuidedOnboardingState = {
+  version?: number;
+  step?: string;
+  startedAt?: string;
+  firstItemCreatedAt?: string;
+  firstPeriodCreatedAt?: string;
+  completedAt?: string;
+  dismissedAt?: string;
+};
+
 export const PRODUCT_ONBOARDING_STORAGE_KEY = "doze52:onboarding:v1";
 export const GUIDED_ONBOARDING_STORAGE_KEY = "doze52:onboarding:v2";
 export const PRODUCT_ONBOARDING_RESET_EVENT = "doze52:onboarding-reset";
 export const GUIDED_ONBOARDING_CHANGE_EVENT = "doze52:onboarding-change";
 
 const initialGuidedState = (): GuidedOnboardingState => ({
-  version: 2,
-  step: "intro",
+  version: 3,
+  step: "context_selection",
 });
 
 const nowIso = () => new Date().toISOString();
@@ -89,53 +101,80 @@ const writePayload = (payload: ProductOnboardingPayload) => {
       JSON.stringify(payload)
     );
   } catch {
-    // Ignore persistence issues; onboarding will simply not persist.
+    // Onboarding remains available for the current session.
   }
 };
 
 const isGuidedStep = (value: unknown): value is GuidedOnboardingStep =>
-  value === "intro" ||
-  value === "period_prompt" ||
-  value === "context_prompt" ||
-  value === "reflection" ||
+  value === "context_selection" ||
+  value === "custom_profile" ||
+  value === "date_instruction" ||
+  value === "date_details" ||
+  value === "period_instruction" ||
+  value === "period_details" ||
+  value === "use_case_preview" ||
   value === "save" ||
   value === "completed" ||
   value === "dismissed";
 
-const isGuidedReflection = (value: unknown): value is GuidedReflection =>
-  value === "busy_period" ||
-  value === "missing_priority" ||
-  value === "needs_context" ||
-  value === "too_early";
+const isContext = (value: unknown): value is OnboardingContext =>
+  value === "personal" || value === "work" || value === "custom";
 
-const normalizeGuidedState = (value: unknown): GuidedOnboardingState => {
+export const migrateGuidedOnboardingState = (
+  value: unknown
+): GuidedOnboardingState => {
   if (typeof value !== "object" || value === null) return initialGuidedState();
-  const candidate = value as Partial<GuidedOnboardingState>;
-  if (candidate.version !== 2 || !isGuidedStep(candidate.step)) {
-    return initialGuidedState();
+  const candidate = value as LegacyGuidedOnboardingState & {
+    context?: unknown;
+    profileConfiguredAt?: string;
+    firstDateCreatedAt?: string;
+  };
+
+  if (candidate.version === 3 && isGuidedStep(candidate.step)) {
+    return {
+      version: 3,
+      step: candidate.step,
+      context: isContext(candidate.context) ? candidate.context : undefined,
+      startedAt: candidate.startedAt,
+      profileConfiguredAt: candidate.profileConfiguredAt,
+      firstDateCreatedAt: candidate.firstDateCreatedAt,
+      firstPeriodCreatedAt: candidate.firstPeriodCreatedAt,
+      completedAt: candidate.completedAt,
+      dismissedAt: candidate.dismissedAt,
+    };
   }
 
-  return {
-    version: 2,
-    step: candidate.step,
-    startedAt:
-      typeof candidate.startedAt === "string" ? candidate.startedAt : undefined,
-    firstItemCreatedAt:
-      typeof candidate.firstItemCreatedAt === "string"
-        ? candidate.firstItemCreatedAt
+  if (candidate.version === 2) {
+    if (candidate.step === "completed" || candidate.step === "dismissed") {
+      return {
+        version: 3,
+        step: candidate.step,
+        startedAt: candidate.startedAt,
+        firstDateCreatedAt: candidate.firstItemCreatedAt,
+        firstPeriodCreatedAt: candidate.firstPeriodCreatedAt,
+        completedAt: candidate.completedAt,
+        dismissedAt: candidate.dismissedAt,
+      };
+    }
+    const migratedStep = candidate.firstPeriodCreatedAt
+      ? "use_case_preview"
+      : candidate.firstItemCreatedAt
+        ? "period_instruction"
+        : "context_selection";
+    return {
+      version: 3,
+      step: migratedStep,
+      context: candidate.firstItemCreatedAt ? "personal" : undefined,
+      startedAt: candidate.startedAt,
+      profileConfiguredAt: candidate.firstItemCreatedAt
+        ? candidate.startedAt ?? candidate.firstItemCreatedAt
         : undefined,
-    firstPeriodCreatedAt:
-      typeof candidate.firstPeriodCreatedAt === "string"
-        ? candidate.firstPeriodCreatedAt
-        : undefined,
-    reflection: isGuidedReflection(candidate.reflection)
-      ? candidate.reflection
-      : undefined,
-    completedAt:
-      typeof candidate.completedAt === "string" ? candidate.completedAt : undefined,
-    dismissedAt:
-      typeof candidate.dismissedAt === "string" ? candidate.dismissedAt : undefined,
-  };
+      firstDateCreatedAt: candidate.firstItemCreatedAt,
+      firstPeriodCreatedAt: candidate.firstPeriodCreatedAt,
+    };
+  }
+
+  return initialGuidedState();
 };
 
 export const reduceGuidedOnboardingState = (
@@ -144,65 +183,81 @@ export const reduceGuidedOnboardingState = (
 ): GuidedOnboardingState => {
   switch (action.type) {
     case "start":
-      return {
-        ...state,
-        startedAt: state.startedAt ?? action.at ?? nowIso(),
-      };
-    case "item_created": {
-      const createdAt = action.at ?? nowIso();
-      const nextStep =
-        state.step === "intro"
-          ? action.isPeriod
-            ? "context_prompt"
-            : "period_prompt"
-          : state.step === "period_prompt" && action.isPeriod
-            ? "context_prompt"
-            : state.step === "context_prompt"
-              ? "reflection"
-              : state.step;
-
-      return {
-        ...state,
-        step: nextStep,
-        startedAt: state.startedAt ?? createdAt,
-        firstItemCreatedAt: state.firstItemCreatedAt ?? createdAt,
-        firstPeriodCreatedAt:
-          state.firstPeriodCreatedAt ?? (action.isPeriod ? createdAt : undefined),
-      };
-    }
-    case "skip_period":
-      return state.step === "period_prompt"
-        ? { ...state, step: "context_prompt" }
+      return { ...state, startedAt: state.startedAt ?? action.at ?? nowIso() };
+    case "choose_context":
+      return state.step === "context_selection"
+        ? {
+            ...state,
+            context: action.context,
+            startedAt: state.startedAt ?? action.at ?? nowIso(),
+            step: action.context === "custom" ? "custom_profile" : state.step,
+          }
         : state;
-    case "continue_to_reflection":
-      return state.step === "context_prompt"
-        ? { ...state, step: "reflection" }
+    case "configure_profile":
+      return state.step === "context_selection" || state.step === "custom_profile"
+        ? {
+            ...state,
+            context: action.context,
+            step: "date_instruction",
+            startedAt: state.startedAt ?? action.at ?? nowIso(),
+            profileConfiguredAt: action.at ?? nowIso(),
+          }
         : state;
-    case "set_reflection":
-      return state.step === "reflection"
-        ? { ...state, reflection: action.reflection }
+    case "select_date":
+      return state.step === "date_instruction"
+        ? { ...state, step: "date_details" }
         : state;
-    case "continue_reflection":
-    case "skip_reflection":
-      return state.step === "reflection" ? { ...state, step: "save" } : state;
-    case "complete": {
-      const completedAt = action.at ?? nowIso();
+    case "cancel_date":
+      return state.step === "date_details"
+        ? { ...state, step: "date_instruction" }
+        : state;
+    case "date_saved":
+      return state.step === "date_details"
+        ? {
+            ...state,
+            step: "period_instruction",
+            firstDateCreatedAt: state.firstDateCreatedAt ?? action.at ?? nowIso(),
+          }
+        : state;
+    case "add_another_date":
+      return state.step === "period_instruction"
+        ? { ...state, step: "date_instruction" }
+        : state;
+    case "select_period":
+      return state.step === "period_instruction"
+        ? { ...state, step: "period_details" }
+        : state;
+    case "cancel_period":
+      return state.step === "period_details"
+        ? { ...state, step: "period_instruction" }
+        : state;
+    case "period_saved":
+      return state.step === "period_details"
+        ? {
+            ...state,
+            step: "use_case_preview",
+            firstPeriodCreatedAt:
+              state.firstPeriodCreatedAt ?? action.at ?? nowIso(),
+          }
+        : state;
+    case "continue_from_preview":
+      return state.step === "use_case_preview"
+        ? { ...state, step: "save" }
+        : state;
+    case "complete":
       return {
         ...state,
         step: "completed",
-        completedAt,
+        completedAt: action.at ?? nowIso(),
         dismissedAt: undefined,
       };
-    }
-    case "dismiss": {
-      const dismissedAt = action.at ?? nowIso();
+    case "dismiss":
       return {
         ...state,
         step: "dismissed",
-        dismissedAt,
+        dismissedAt: action.at ?? nowIso(),
         completedAt: undefined,
       };
-    }
   }
 };
 
@@ -210,8 +265,7 @@ export const readGuidedOnboardingState = (): GuidedOnboardingState => {
   if (typeof window === "undefined") return initialGuidedState();
   try {
     const raw = window.localStorage.getItem(GUIDED_ONBOARDING_STORAGE_KEY);
-    if (!raw) return initialGuidedState();
-    return normalizeGuidedState(JSON.parse(raw) as unknown);
+    return raw ? migrateGuidedOnboardingState(JSON.parse(raw) as unknown) : initialGuidedState();
   } catch {
     return initialGuidedState();
   }
@@ -225,7 +279,7 @@ const writeGuidedOnboardingState = (state: GuidedOnboardingState) => {
       JSON.stringify(state)
     );
   } catch {
-    // The flow remains usable for the current session when storage is unavailable.
+    // The flow remains usable for the current session.
   }
 };
 
@@ -264,7 +318,6 @@ export const shouldShowGuidedOnboarding = (input: {
   if (input.state.step === "completed" || input.state.step === "dismissed") {
     return false;
   }
-
   const inProgress = isGuidedOnboardingInProgress(input.state);
   if (!inProgress && input.legacyState !== "pending") return false;
   if (!inProgress && input.hasAuthorEvents) return false;

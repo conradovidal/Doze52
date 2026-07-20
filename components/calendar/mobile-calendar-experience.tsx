@@ -30,6 +30,9 @@ type MobileCalendarExperienceProps = {
     sourceEventId: string;
     anchorPoint: AnchorPoint;
   }) => void;
+  guidedSelectionMode?: "date" | "period" | null;
+  guidedRangeStart?: string | null;
+  onGuidedDaySelect?: (dateIso: string) => void;
 };
 
 const MONTH_LABELS = [
@@ -154,6 +157,9 @@ export function MobileCalendarExperience({
   onActiveDateChange,
   onYearChange,
   onEditEvent,
+  guidedSelectionMode = null,
+  guidedRangeStart = null,
+  onGuidedDaySelect,
 }: MobileCalendarExperienceProps) {
   const categories = useStore((s) => s.categories as CategoryItem[]);
   const selectedProfileIds = useStore((s) => s.selectedProfileIds);
@@ -540,6 +546,8 @@ export function MobileCalendarExperience({
             const isPast = Boolean(todayIso) && dayIso < todayIso;
             const isWeekend = day.getDay() === 0 || day.getDay() === 6;
             const weekday = WEEKDAY_SHORT_LABELS[day.getDay()];
+            const guidedSelectable = Boolean(guidedSelectionMode && onGuidedDaySelect);
+            const guidedStart = guidedRangeStart === dayIso;
 
             return (
               <article
@@ -559,13 +567,23 @@ export function MobileCalendarExperience({
                       : "bg-card",
                   active
                     ? "border-foreground/70 shadow-[0_12px_24px_-22px_rgba(15,23,42,0.55)]"
-                    : "border-border"
+                    : "border-border",
+                  guidedSelectable && "ring-1 ring-primary/15",
+                  guidedStart && "border-primary bg-primary/8 ring-2 ring-primary/30"
                 )}
               >
                 <button
                   type="button"
                   className="grid h-full place-items-center rounded-[9px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45"
-                  onClick={() => setActiveFromDate(day)}
+                  aria-label={
+                    guidedSelectable
+                      ? `Selecionar ${dayIso} para o onboarding`
+                      : undefined
+                  }
+                  onClick={() => {
+                    setActiveFromDate(day);
+                    if (guidedSelectable) onGuidedDaySelect?.(dayIso);
+                  }}
                 >
                   <span
                     className={cn(

@@ -18,6 +18,7 @@ import {
   type ProfileIconId,
 } from "./profile-icons";
 import type { CalendarEvent, CalendarProfile, CategoryItem } from "./types";
+import type { OnboardingContext } from "./onboarding";
 
 export type EventInput = {
   title: string;
@@ -54,6 +55,10 @@ type StoreState = {
     events: CalendarEvent[];
   }) => void;
   resetToOnboardingData: () => void;
+  configureOnboardingContext: (input: {
+    context: OnboardingContext;
+    customName?: string;
+  }) => boolean;
   markLocalImported: (userId: string) => void;
   isLocalImported: (userId: string) => boolean;
   ensureEventMetadata: () => void;
@@ -129,6 +134,9 @@ export const ONBOARDING_CATEGORY_IDS = {
   familySchool: "66666666-6666-4666-8666-666666666661",
   familyHealth: "66666666-6666-4666-8666-666666666662",
   familyMoments: "66666666-6666-4666-8666-666666666663",
+  customImportantDates: "77777777-7777-4777-8777-777777777771",
+  customPeriods: "77777777-7777-4777-8777-777777777772",
+  customOther: "77777777-7777-4777-8777-777777777773",
 } as const;
 
 export const ONBOARDING_DEFAULT_CATEGORY_ID = ONBOARDING_CATEGORY_IDS.events;
@@ -296,6 +304,57 @@ const getFeatureDefaultCategories = (): CategoryItem[] => [
     visible: true,
   },
 ];
+
+const getContextCategories = (
+  context: OnboardingContext,
+  profileId: string
+): CategoryItem[] => {
+  const definitions =
+    context === "personal"
+      ? [
+          [ONBOARDING_CATEGORY_IDS.birthday, "Aniversários", CATEGORY_COLOR_BASE_AMBER],
+          [ONBOARDING_CATEGORY_IDS.travel, "Férias e viagens", CATEGORY_COLOR_BASE_CYAN],
+          [ONBOARDING_CATEGORY_IDS.events, "Eventos", CATEGORY_COLOR_BASE_VIOLET],
+        ]
+      : context === "work"
+        ? [
+            [ONBOARDING_CATEGORY_IDS.workDeliveries, "Entregas", CATEGORY_COLOR_BASE_VIOLET],
+            [ONBOARDING_CATEGORY_IDS.workTrips, "Projetos", CATEGORY_COLOR_BASE_BLUE],
+            [ONBOARDING_CATEGORY_IDS.workMeetings, "Reuniões", CATEGORY_COLOR_BASE_CYAN],
+          ]
+        : [
+            [ONBOARDING_CATEGORY_IDS.customImportantDates, "Datas importantes", CATEGORY_COLOR_BASE_AMBER],
+            [ONBOARDING_CATEGORY_IDS.customPeriods, "Períodos importantes", CATEGORY_COLOR_BASE_BLUE],
+            [ONBOARDING_CATEGORY_IDS.customOther, "Outros", CATEGORY_COLOR_BASE_VIOLET],
+          ];
+
+  return definitions.map(([id, name, color]) => ({
+    id,
+    profileId,
+    name,
+    color,
+    visible: true,
+  }));
+};
+
+export const getOnboardingCategoryIdForIntent = (
+  context: OnboardingContext,
+  intent: "date" | "period"
+) => {
+  if (context === "personal") {
+    return intent === "date"
+      ? ONBOARDING_CATEGORY_IDS.birthday
+      : ONBOARDING_CATEGORY_IDS.travel;
+  }
+  if (context === "work") {
+    return intent === "date"
+      ? ONBOARDING_CATEGORY_IDS.workDeliveries
+      : ONBOARDING_CATEGORY_IDS.workTrips;
+  }
+  return intent === "date"
+    ? ONBOARDING_CATEGORY_IDS.customImportantDates
+    : ONBOARDING_CATEGORY_IDS.customPeriods;
+};
 
 const getTemplateCategories = (options?: { legacyOnly?: boolean }) => {
   if (options?.legacyOnly) return getLegacyDefaultCategories();
@@ -549,6 +608,48 @@ export const useStore = create<StoreState>()(
             events: [],
           };
         }),
+      configureOnboardingContext: ({ context, customName }) => {
+        let configured = false;
+        set((state) => {
+          if (state.events.some((event) => !event.calendarPackGroupId)) return state;
+
+          const profile = state.profiles[0];
+          if (!profile) return state;
+          const requestedName = customName?.trim() ?? "";
+          if (context === "custom" && (requestedName.length < 1 || requestedName.length > 40)) {
+            return state;
+          }
+
+          const name =
+            context === "personal"
+              ? "Pessoal"
+              : context === "work"
+                ? "Trabalho"
+                : requestedName;
+          const icon =
+            context === "personal"
+              ? "user"
+              : context === "work"
+                ? "briefcase"
+                : "calendar-days";
+          const authoredCategories = getContextCategories(context, profile.id);
+          const managedCategories = state.categories.filter(
+            (category) => Boolean(category.calendarPackGroupId)
+          );
+
+          configured = true;
+          return {
+            profiles: state.profiles.map((entry, index) =>
+              index === 0
+                ? { ...entry, name, icon, position: 0 }
+                : entry
+            ),
+            selectedProfileIds: [profile.id],
+            categories: [...authoredCategories, ...managedCategories],
+          };
+        });
+        return configured;
+      },
       markLocalImported: (userId) => {
         if (typeof window === "undefined") return;
         window.localStorage.setItem(`imported:${userId}`, "1");

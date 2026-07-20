@@ -2,13 +2,12 @@ import { expect, test } from "@playwright/test";
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
-    if (window.sessionStorage.getItem("doze52:onboarding:e2e-ready")) return;
     window.localStorage.clear();
-    window.sessionStorage.setItem("doze52:onboarding:e2e-ready", "1");
+    window.sessionStorage.clear();
   });
 });
 
-test("leva do primeiro item até a visão salva sem bloquear etapas", async ({
+test("configura Pessoal e ensina uma data e um período no calendário", async ({
   page,
 }, testInfo) => {
   const mobile = testInfo.project.name === "mobile-chromium";
@@ -16,76 +15,147 @@ test("leva do primeiro item até a visão salva sem bloquear etapas", async ({
   await expect(page).toHaveTitle("Doze 52 | Seu ano em uma página");
 
   const panel = page.getByRole("region", { name: "Guia inicial do Doze52" });
-  await expect(panel).toHaveAttribute("data-guided-onboarding-step", "intro");
-  await expect(panel).toContainText("O Doze52 mostra o ano inteiro");
-
-  await panel.getByRole("button", { name: "Adicionar algo importante" }).click();
-  const firstDialog = page.getByRole("dialog", { name: "Algo que já importa" });
-  await expect(firstDialog).toBeVisible();
-  await firstDialog.getByLabel("Título do evento").fill("Viagem em família");
-  await firstDialog.getByLabel("Data de início").fill("2026-08-10");
-  await firstDialog.getByLabel("Data final").fill("2026-08-10");
-  await expect(firstDialog.getByText("Organização e detalhes")).toBeVisible();
-  await expect(firstDialog.getByText("Perfil", { exact: true })).toBeHidden();
-  await firstDialog.getByRole("button", { name: "Salvar" }).click();
+  await expect(panel).toHaveAttribute(
+    "data-guided-onboarding-step",
+    "context_selection"
+  );
+  await expect(panel).toContainText("Onde uma visão do ano inteiro");
+  await panel.getByRole("button", { name: /Pessoal/ }).click();
 
   await expect(panel).toHaveAttribute(
     "data-guided-onboarding-step",
-    "period_prompt"
+    "date_instruction"
+  );
+
+  if (mobile) {
+    await page
+      .getByRole("button", { name: "Selecionar 2026-08-10 para o onboarding" })
+      .click({ force: true });
+  } else {
+    await page.locator('[data-day-cell][data-day-iso="2026-08-10"]').click();
+  }
+
+  await expect(panel).toHaveAttribute(
+    "data-guided-onboarding-step",
+    "date_details"
+  );
+  await panel.getByLabel("Nome da data").fill("Aniversário da mãe");
+  await panel.getByRole("button", { name: "Salvar no meu ano" }).click();
+
+  await expect(panel).toHaveAttribute(
+    "data-guided-onboarding-step",
+    "period_instruction"
   );
   await expect(page.locator("[data-calendar-event-id]")).not.toHaveCount(0);
-  await panel.getByRole("button", { name: "Fechar ajuda por agora" }).click();
-  await expect(panel).toBeHidden();
 
-  await page.reload();
+  if (mobile) {
+    await page
+      .getByRole("button", { name: "Selecionar 2026-08-15 para o onboarding" })
+      .click({ force: true });
+    await page
+      .getByRole("button", { name: "Selecionar 2026-08-22 para o onboarding" })
+      .click({ force: true });
+  } else {
+    const start = page.locator('[data-day-cell][data-day-iso="2026-08-15"]');
+    const end = page.locator('[data-day-cell][data-day-iso="2026-08-22"]');
+    const startBox = await start.boundingBox();
+    const endBox = await end.boundingBox();
+    if (!startBox || !endBox) throw new Error("Datas não renderizadas");
+    await page.mouse.move(startBox.x + startBox.width / 2, startBox.y + startBox.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(endBox.x + endBox.width / 2, endBox.y + endBox.height / 2, { steps: 8 });
+    await page.mouse.up();
+  }
+
   await expect(panel).toHaveAttribute(
     "data-guided-onboarding-step",
-    "period_prompt"
+    "period_details"
   );
-  await panel.getByRole("button", { name: "Adicionar um período" }).click();
-
-  const periodDialog = page.getByRole("dialog", { name: "Adicionar um período" });
-  await periodDialog.getByLabel("Título do evento").fill("Curso de especialização");
-  await periodDialog.getByLabel("Data de início").fill("2026-09-01");
-  await periodDialog.getByLabel("Data final").fill("2026-10-15");
-  await periodDialog.getByRole("button", { name: "Salvar" }).click();
+  await panel.getByLabel("Nome do período").fill("Férias em família");
+  await panel.getByRole("button", { name: "Salvar no meu ano" }).click();
 
   await expect(panel).toHaveAttribute(
     "data-guided-onboarding-step",
-    "context_prompt"
+    "use_case_preview"
   );
-  await panel.getByRole("button", { name: "Ver meu ano" }).click();
-  await expect(panel).toHaveAttribute("data-guided-onboarding-step", "reflection");
-  await panel
-    .getByRole("button", { name: "Algo importante ainda está sem espaço." })
-    .click();
-  await panel.getByRole("button", { name: "Continuar usando" }).click();
-
-  await expect(panel).toHaveAttribute("data-guided-onboarding-step", "save");
-  await panel.getByRole("button", { name: "Criar minha conta" }).click();
-  const authDialog = page.getByRole("dialog", { name: "Criar conta" });
-  await expect(authDialog).toBeVisible();
-  await authDialog.getByRole("button", { name: "Cancelar" }).click();
+  await expect(panel.getByLabel("Prévia de um ano preenchido")).toBeVisible();
+  await panel.getByRole("button", { name: /Voltar para o meu ano/ }).click();
   await expect(panel).toHaveAttribute("data-guided-onboarding-step", "save");
   await panel
     .getByRole("button", { name: "Continuar neste dispositivo" })
     .click();
   await expect(panel).toBeHidden();
-  await expect(page.getByText("Teu ano já começou a ganhar forma")).toBeVisible();
 
   const stored = await page.evaluate(() => ({
     onboarding: JSON.parse(
       window.localStorage.getItem("doze52:onboarding:v2") ?? "null"
-    ) as { step?: string; reflection?: string } | null,
+    ) as { version?: number; step?: string; context?: string } | null,
     store: JSON.parse(window.localStorage.getItem("yiv-store") ?? "null") as {
-      state?: { profiles?: Array<{ name: string }>; events?: unknown[] };
+      state?: {
+        profiles?: Array<{ name: string }>;
+        categories?: Array<{ name: string }>;
+        events?: unknown[];
+      };
     } | null,
   }));
 
   expect(stored.onboarding).toMatchObject({
+    version: 3,
     step: "completed",
-    reflection: "missing_priority",
+    context: "personal",
   });
-  expect(stored.store?.state?.profiles?.[0]?.name).toBe("Meu ano");
+  expect(stored.store?.state?.profiles?.[0]?.name).toBe("Pessoal");
+  expect(stored.store?.state?.categories?.slice(0, 3).map((item) => item.name)).toEqual([
+    "Aniversários",
+    "Férias e viagens",
+    "Eventos",
+  ]);
   expect(stored.store?.state?.events).toHaveLength(2);
+});
+
+test("configura Trabalho com Entregas, Projetos e Reuniões", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name === "mobile-chromium", "Coberto no fluxo desktop");
+  await page.goto("/?mobileUi=0");
+  const panel = page.getByRole("region", { name: "Guia inicial do Doze52" });
+  await panel.getByRole("button", { name: /Trabalho/ }).click();
+  await expect(panel).toHaveAttribute("data-guided-onboarding-step", "date_instruction");
+  await expect(panel).toContainText("última entrega importante");
+
+  const configured = await page.evaluate(() => {
+    const store = JSON.parse(window.localStorage.getItem("yiv-store") ?? "null") as {
+      state?: { profiles?: Array<{ name: string }>; categories?: Array<{ name: string }> };
+    } | null;
+    return store?.state;
+  });
+  expect(configured?.profiles?.[0]?.name).toBe("Trabalho");
+  expect(configured?.categories?.slice(0, 3).map((item) => item.name)).toEqual([
+    "Entregas",
+    "Projetos",
+    "Reuniões",
+  ]);
+});
+
+test("Outro pede um nome e cria categorias neutras", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === "mobile-chromium", "Coberto no fluxo desktop");
+  await page.goto("/?mobileUi=0");
+  const panel = page.getByRole("region", { name: "Guia inicial do Doze52" });
+  await panel.getByRole("button", { name: /Outro/ }).click();
+  await expect(panel).toHaveAttribute("data-guided-onboarding-step", "custom_profile");
+  await panel.getByLabel("Nome do perfil").fill("Estudos");
+  await panel.getByRole("button", { name: /Continuar/ }).click();
+
+  const configured = await page.evaluate(() => {
+    const store = JSON.parse(window.localStorage.getItem("yiv-store") ?? "null") as {
+      state?: { profiles?: Array<{ name: string }>; categories?: Array<{ name: string }> };
+    } | null;
+    return store?.state;
+  });
+  expect(configured?.profiles?.[0]?.name).toBe("Estudos");
+  expect(configured?.categories?.slice(0, 3).map((item) => item.name)).toEqual([
+    "Datas importantes",
+    "Períodos importantes",
+    "Outros",
+  ]);
 });
