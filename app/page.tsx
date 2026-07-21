@@ -52,6 +52,11 @@ import {
   type ProductOnboardingState,
 } from "@/lib/onboarding";
 import { logDevError, logProdError } from "@/lib/safe-log";
+import {
+  captureFirstTouchAttribution,
+  recordProductActivityDay,
+  syncProductFunnelState,
+} from "@/lib/product-metrics";
 import { getSupabaseBrowserClient, hasSupabaseEnv } from "@/lib/supabase";
 import { expandEventsForYear } from "@/lib/recurrence";
 import {
@@ -354,6 +359,15 @@ export default function HomePage() {
     categoriesRef.current = categories;
     eventsRef.current = events;
   }, [profiles, categories, events]);
+
+  React.useEffect(() => {
+    captureFirstTouchAttribution();
+  }, []);
+
+  React.useEffect(() => {
+    if (!session?.user.id || !guidedOnboarding) return;
+    void syncProductFunnelState(session.user.id, guidedOnboarding);
+  }, [guidedOnboarding, session?.user.id]);
 
   const editingEvent = editingId ? getEventById(editingId) : null;
 
@@ -1017,6 +1031,11 @@ export default function HomePage() {
     []
   );
 
+  const recordMeaningfulActivity = React.useCallback(() => {
+    if (!session?.user.id) return;
+    void recordProductActivityDay(session.user.id);
+  }, [session?.user.id]);
+
   const handleConfigureGuidedContext = React.useCallback(
     (context: OnboardingContext, customName?: string) => {
       if (context === "custom" && customName === undefined) {
@@ -1033,10 +1052,16 @@ export default function HomePage() {
         return;
       }
       updateGuidedOnboarding({ type: "configure_profile", context });
+      recordMeaningfulActivity();
       setGuidedDraft(null);
       setMobileGuidedRangeStart(null);
     },
-    [configureOnboardingContext, notify, updateGuidedOnboarding]
+    [
+      configureOnboardingContext,
+      notify,
+      recordMeaningfulActivity,
+      updateGuidedOnboarding,
+    ]
   );
 
   const completeGuidedOnboarding = React.useCallback(() => {
@@ -1061,6 +1086,7 @@ export default function HomePage() {
   const handleSubmit = async (payload: EventInput) => {
     if (editingId) {
       updateEvent(editingId, payload);
+      recordMeaningfulActivity();
 
       notify({
         tone: "success",
@@ -1077,6 +1103,7 @@ export default function HomePage() {
     }
 
     setHighlightedEventId(eventId);
+    recordMeaningfulActivity();
 
     if (guidedDialogIntent) {
       updateGuidedOnboarding({
@@ -1112,6 +1139,7 @@ export default function HomePage() {
     if (!editingId) return;
 
     deleteEvent(editingId);
+    recordMeaningfulActivity();
 
     notify({
       tone: "success",
@@ -1121,7 +1149,7 @@ export default function HomePage() {
 
     setDialogAnchorPoint(undefined);
     setDialogOpen(false);
-  }, [deleteEvent, editingId, notify]);
+  }, [deleteEvent, editingId, notify, recordMeaningfulActivity]);
 
   const handleStartCreateRange = (startIso: string) => {
     setCreatingRange({ startIso, hoverIso: startIso, isDragging: false });
@@ -1233,6 +1261,7 @@ export default function HomePage() {
         return;
       }
       setHighlightedEventId(eventId);
+      recordMeaningfulActivity();
       updateGuidedOnboarding({
         type: intent === "period" ? "period_saved" : "date_saved",
       });
@@ -1244,7 +1273,14 @@ export default function HomePage() {
         description: "Já dá para ver isso ocupando espaço no seu ano.",
       });
     },
-    [addEvent, guidedDraft, guidedOnboarding, notify, updateGuidedOnboarding]
+    [
+      addEvent,
+      guidedDraft,
+      guidedOnboarding,
+      notify,
+      recordMeaningfulActivity,
+      updateGuidedOnboarding,
+    ]
   );
 
   const openGuidedMoreOptions = React.useCallback(() => {
