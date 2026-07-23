@@ -23,10 +23,10 @@ export function AccountNudge({
           <Cloud className="size-4" aria-hidden="true" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold">Seu ano já começou.</p>
+          <p className="text-sm font-semibold">Vale a pena guardar este ano.</p>
           <p className="mt-0.5 text-xs leading-4 text-muted-foreground">
-            Quando quiser guardar esta visão e continuar em outros dispositivos,
-            crie sua conta.
+            Você continuou construindo depois do onboarding. Crie sua conta
+            para acessar esta visão em outros dispositivos.
           </p>
         </div>
         <Button

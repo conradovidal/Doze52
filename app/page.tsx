@@ -17,13 +17,12 @@ import {
   type GuidedCalendarDraft,
 } from "@/components/onboarding/guided-onboarding-panel";
 import { AccountNudge } from "@/components/onboarding/account-nudge";
-import { OnboardingConnector } from "@/components/onboarding/onboarding-connector";
 import { Button } from "@/components/ui/button";
 import { useFeedback } from "@/components/ui/feedback-provider";
 import {
   isOnboardingProfilesSnapshot,
   isOnboardingCategoriesSnapshot,
-  getOnboardingCategoryIdForIntent,
+  ONBOARDING_CATEGORY_IDS,
   useStore,
   type EventInput,
 } from "@/lib/store";
@@ -47,6 +46,7 @@ import {
   shouldShowGuidedOnboarding,
   type GuidedOnboardingAction,
   type GuidedOnboardingState,
+  type OnboardingCategoryChoice,
   type OnboardingFocusTarget,
   type OnboardingContext,
   type ProductOnboardingState,
@@ -256,6 +256,9 @@ export default function HomePage() {
   const configureOnboardingContext = useStore(
     (s) => s.configureOnboardingContext
   );
+  const createOnboardingCategory = useStore(
+    (s) => s.createOnboardingCategory
+  );
   const markLocalImported = useStore((s) => s.markLocalImported);
   const isLocalImported = useStore((s) => s.isLocalImported);
   const addEvent = useStore((s) => s.addEvent);
@@ -309,11 +312,10 @@ export default function HomePage() {
     React.useState<GuidedOnboardingState | null>(null);
   const [guidedPanelHidden, setGuidedPanelHidden] = React.useState(false);
   const [accountNudgeVisible, setAccountNudgeVisible] = React.useState(false);
+  const [categoryCreateRequestKey, setCategoryCreateRequestKey] =
+    React.useState(0);
   const [guidedDraft, setGuidedDraft] =
     React.useState<GuidedCalendarDraft | null>(null);
-  const [guidedDialogIntent, setGuidedDialogIntent] = React.useState<
-    "date" | "period" | null
-  >(null);
   const [mobileGuidedRangeStart, setMobileGuidedRangeStart] = React.useState<
     string | null
   >(null);
@@ -994,17 +996,33 @@ export default function HomePage() {
     windowContext,
   ]);
 
+  const hasAuthorEvents = hasAuthorCalendarEvents(events);
+  const showGuidedOnboarding = Boolean(
+    guidedOnboarding &&
+      calendarCreateOnboarding &&
+      isMobileCalendarUi !== null &&
+      !guidedPanelHidden &&
+      shouldShowGuidedOnboarding({
+        state: guidedOnboarding,
+        legacyState: calendarCreateOnboarding,
+        hasAuthorEvents,
+        authLoading,
+        isAuthenticated: Boolean(session?.user.id),
+        remoteReady,
+      })
+  );
+
   const handleEditEvent = (payload: {
     eventId: string;
     sourceEventId: string;
     anchorPoint: AnchorPoint;
   }) => {
+    if (showGuidedOnboarding) return;
     void payload.eventId;
     setEditingId(payload.sourceEventId);
     setDialogAnchorPoint(payload.anchorPoint);
     setSeedRange(null);
     setCreatingRange(null);
-    setGuidedDialogIntent(null);
     setDialogOpen(true);
   };
 
@@ -1018,12 +1036,8 @@ export default function HomePage() {
   );
 
   const handleConfigureGuidedContext = React.useCallback(
-    (context: OnboardingContext, customName?: string) => {
-      if (context === "custom" && customName === undefined) {
-        updateGuidedOnboarding({ type: "choose_context", context });
-        return;
-      }
-      const configured = configureOnboardingContext({ context, customName });
+    (context: OnboardingContext) => {
+      const configured = configureOnboardingContext({ context });
       if (!configured) {
         notify({
           tone: "error",
@@ -1039,24 +1053,85 @@ export default function HomePage() {
     [configureOnboardingContext, notify, updateGuidedOnboarding]
   );
 
-  const completeGuidedOnboarding = React.useCallback(() => {
-    const current = readGuidedOnboardingState();
-    if (current.step === "completed") return;
-    updateGuidedOnboarding({ type: "complete" });
-    setGuidedPanelHidden(true);
-    if (!session?.user.id) setAccountNudgeVisible(true);
-    notify({
-      tone: "success",
-      title: "Teu ano já começou a ganhar forma",
-      description: "Volte quando algo mudar.",
-      durationMs: 3200,
-    });
-  }, [notify, session?.user.id, updateGuidedOnboarding]);
+  const handleChooseGuidedCategory = React.useCallback(
+    (
+      intent: "date" | "period",
+      choice: OnboardingCategoryChoice
+    ) => {
+      const current = readGuidedOnboardingState();
+      if (!current.context) return;
+      const categoryId = createOnboardingCategory({
+        context: current.context,
+        intent,
+        choice,
+      });
+      if (!categoryId) {
+        notify({
+          tone: "error",
+          title: "Não foi possível criar esta categoria",
+          description: "Tente novamente ou dispense a ajuda para continuar.",
+        });
+        return;
+      }
+      updateGuidedOnboarding({
+        type:
+          intent === "date"
+            ? "choose_date_category"
+            : "choose_period_category",
+        categoryId,
+      });
+      setGuidedDraft(null);
+      setMobileGuidedRangeStart(null);
+    },
+    [
+      createOnboardingCategory,
+      notify,
+      updateGuidedOnboarding,
+    ]
+  );
+
+  const completeGuidedOnboarding = React.useCallback(
+    (next: "explore" | "category") => {
+      const current = readGuidedOnboardingState();
+      if (current.step === "completed") return;
+      const completed = updateGuidedOnboarding({ type: "complete" });
+      if (completed.step !== "completed") return;
+      setGuidedPanelHidden(true);
+      if (next === "category") {
+        setCategoryCreateRequestKey((value) => value + 1);
+      }
+      notify({
+        tone: "success",
+        title: "Teu ano já começou a ganhar forma",
+        description: "Continue adicionando contexto quando algo mudar.",
+        durationMs: 3200,
+      });
+    },
+    [notify, updateGuidedOnboarding]
+  );
 
   const dismissGuidedOnboarding = React.useCallback(() => {
     updateGuidedOnboarding({ type: "dismiss" });
     setGuidedPanelHidden(true);
   }, [updateGuidedOnboarding]);
+
+  const trackPostOnboardingElement = React.useCallback(
+    (kind: "event" | "category") => {
+      if (session?.user.id) return;
+      const current = readGuidedOnboardingState();
+      if (current.step !== "completed" || current.accountNudgeShownAt) return;
+      const next = updateGuidedOnboarding({
+        type:
+          kind === "event"
+            ? "record_post_onboarding_event"
+            : "record_post_onboarding_category",
+      });
+      if (!current.accountNudgeShownAt && next.accountNudgeShownAt) {
+        setAccountNudgeVisible(true);
+      }
+    },
+    [session?.user.id, updateGuidedOnboarding]
+  );
 
   const handleSubmit = async (payload: EventInput) => {
     if (editingId) {
@@ -1077,15 +1152,7 @@ export default function HomePage() {
     }
 
     setHighlightedEventId(eventId);
-
-    if (guidedDialogIntent) {
-      updateGuidedOnboarding({
-        type: guidedDialogIntent === "period" ? "period_saved" : "date_saved",
-      });
-      setGuidedDialogIntent(null);
-      setGuidedDraft(null);
-      setGuidedPanelHidden(false);
-    }
+    trackPostOnboardingElement("event");
 
     notify({
       tone: "success",
@@ -1100,7 +1167,6 @@ export default function HomePage() {
     setEditingId(null);
     setDialogAnchorPoint(undefined);
     setCreatingRange(null);
-    setGuidedDialogIntent(null);
     setSeedRange({
       startDate: fallbackTodayIso,
       endDate: fallbackTodayIso,
@@ -1124,6 +1190,15 @@ export default function HomePage() {
   }, [deleteEvent, editingId, notify]);
 
   const handleStartCreateRange = (startIso: string) => {
+    if (
+      showGuidedOnboarding &&
+      guidedOnboarding?.step !== "date_instruction" &&
+      guidedOnboarding?.step !== "date_details" &&
+      guidedOnboarding?.step !== "period_instruction" &&
+      guidedOnboarding?.step !== "period_details"
+    ) {
+      return;
+    }
     setCreatingRange({ startIso, hoverIso: startIso, isDragging: false });
   };
 
@@ -1153,57 +1228,68 @@ export default function HomePage() {
         };
 
         const currentStep = guidedOnboarding?.step;
-        if (currentStep === "date_instruction") {
+        if (
+          showGuidedOnboarding &&
+          (currentStep === "date_instruction" ||
+            currentStep === "date_details")
+        ) {
           setGuidedDraft({
             startDate: nextDraft.startDate,
             endDate: nextDraft.startDate,
           });
-          updateGuidedOnboarding({ type: "select_date" });
+          if (currentStep === "date_instruction") {
+            updateGuidedOnboarding({ type: "select_date" });
+          }
           return null;
         }
-        if (currentStep === "period_instruction") {
+        if (
+          showGuidedOnboarding &&
+          (currentStep === "period_instruction" ||
+            currentStep === "period_details")
+        ) {
           if (nextDraft.startDate === nextDraft.endDate) {
             notify({
               tone: "info",
-              title: "Desenhe um período",
-              description: "Arraste até outro dia para mostrar quanto tempo isso ocupa.",
+              title: "Selecione um período",
+              description: "Arraste até outro dia para definir o início e o fim.",
             });
             return null;
           }
           setGuidedDraft(nextDraft);
-          updateGuidedOnboarding({ type: "select_period" });
+          if (currentStep === "period_instruction") {
+            updateGuidedOnboarding({ type: "select_period" });
+          }
           return null;
         }
+        if (showGuidedOnboarding) return null;
 
         setSeedRange(nextDraft);
 
         setEditingId(null);
         setDialogAnchorPoint(anchorPoint);
-        setGuidedDialogIntent(null);
         setDialogOpen(true);
 
         return null;
       });
     },
-    [guidedOnboarding?.step, notify, updateGuidedOnboarding]
+    [
+      guidedOnboarding?.step,
+      notify,
+      showGuidedOnboarding,
+      updateGuidedOnboarding,
+    ]
   );
-
-  const cancelGuidedDraft = React.useCallback(() => {
-    const step = guidedOnboarding?.step;
-    if (step === "date_details") {
-      updateGuidedOnboarding({ type: "cancel_date" });
-    } else if (step === "period_details") {
-      updateGuidedOnboarding({ type: "cancel_period" });
-    }
-    setGuidedDraft(null);
-    setMobileGuidedRangeStart(null);
-  }, [guidedOnboarding?.step, updateGuidedOnboarding]);
 
   const saveGuidedDraft = React.useCallback(
     (title: string) => {
       if (!guidedDraft || !guidedOnboarding?.context || !title.trim()) return;
       const intent =
         guidedOnboarding.step === "period_details" ? "period" : "date";
+      const categoryId =
+        intent === "period"
+          ? guidedOnboarding.periodCategoryId
+          : guidedOnboarding.dateCategoryId;
+      if (!categoryId) return;
       if (
         guidedDraft.startDate > guidedDraft.endDate ||
         (intent === "period" && guidedDraft.startDate === guidedDraft.endDate)
@@ -1217,12 +1303,13 @@ export default function HomePage() {
       }
       const eventId = addEvent({
         title: title.trim(),
-        categoryId: getOnboardingCategoryIdForIntent(
-          guidedOnboarding.context,
-          intent
-        ),
+        categoryId,
         startDate: guidedDraft.startDate,
         endDate: guidedDraft.endDate,
+        recurrenceType:
+          categoryId === ONBOARDING_CATEGORY_IDS.birthday
+            ? "yearly"
+            : undefined,
       });
       if (!eventId) {
         notify({
@@ -1247,26 +1334,17 @@ export default function HomePage() {
     [addEvent, guidedDraft, guidedOnboarding, notify, updateGuidedOnboarding]
   );
 
-  const openGuidedMoreOptions = React.useCallback(() => {
-    if (!guidedDraft) return;
-    const intent =
-      guidedOnboarding?.step === "period_details" ? "period" : "date";
-    setSeedRange(guidedDraft);
-    setGuidedDialogIntent(intent);
-    setEditingId(null);
-    setDialogAnchorPoint(undefined);
-    setDialogOpen(true);
-  }, [guidedDraft, guidedOnboarding?.step]);
-
   const handleMobileGuidedDaySelect = React.useCallback(
     (dateIso: string) => {
       const step = guidedOnboarding?.step;
-      if (step === "date_instruction") {
+      if (step === "date_instruction" || step === "date_details") {
         setGuidedDraft({ startDate: dateIso, endDate: dateIso });
-        updateGuidedOnboarding({ type: "select_date" });
+        if (step === "date_instruction") {
+          updateGuidedOnboarding({ type: "select_date" });
+        }
         return;
       }
-      if (step !== "period_instruction") return;
+      if (step !== "period_instruction" && step !== "period_details") return;
       if (!mobileGuidedRangeStart) {
         setMobileGuidedRangeStart(dateIso);
         return;
@@ -1278,7 +1356,9 @@ export default function HomePage() {
       if (startDate === endDate) return;
       setGuidedDraft({ startDate, endDate });
       setMobileGuidedRangeStart(null);
-      updateGuidedOnboarding({ type: "select_period" });
+      if (step === "period_instruction") {
+        updateGuidedOnboarding({ type: "select_period" });
+      }
     },
     [guidedOnboarding?.step, mobileGuidedRangeStart, updateGuidedOnboarding]
   );
@@ -1474,21 +1554,6 @@ export default function HomePage() {
     };
   }, [highlightedEventId]);
 
-  const hasAuthorEvents = hasAuthorCalendarEvents(events);
-  const showGuidedOnboarding = Boolean(
-    guidedOnboarding &&
-      calendarCreateOnboarding &&
-      isMobileCalendarUi !== null &&
-      !guidedPanelHidden &&
-      shouldShowGuidedOnboarding({
-        state: guidedOnboarding,
-        legacyState: calendarCreateOnboarding,
-        hasAuthorEvents,
-        authLoading,
-        isAuthenticated: Boolean(session?.user.id),
-        remoteReady,
-      })
-  );
   const onboardingFocusTarget = React.useMemo<OnboardingFocusTarget>(() => {
     if (!showGuidedOnboarding || !guidedOnboarding) return null;
     if (guidedOnboarding.step === "profile_reveal") {
@@ -1500,39 +1565,20 @@ export default function HomePage() {
       guidedOnboarding.step === "date_instruction" ||
       guidedOnboarding.step === "date_details"
     ) {
-      return {
-        kind: "category",
-        id: getOnboardingCategoryIdForIntent(guidedOnboarding.context, "date"),
-      };
+      return guidedOnboarding.dateCategoryId
+        ? { kind: "category", id: guidedOnboarding.dateCategoryId }
+        : null;
     }
     if (
       guidedOnboarding.step === "period_instruction" ||
       guidedOnboarding.step === "period_details"
     ) {
-      return {
-        kind: "category",
-        id: getOnboardingCategoryIdForIntent(guidedOnboarding.context, "period"),
-      };
+      return guidedOnboarding.periodCategoryId
+        ? { kind: "category", id: guidedOnboarding.periodCategoryId }
+        : null;
     }
     return null;
   }, [guidedOnboarding, profiles, selectedProfileIds, showGuidedOnboarding]);
-  const onboardingTargetSelector = React.useMemo(() => {
-    if (!onboardingFocusTarget) return null;
-    if (onboardingFocusTarget.kind === "profile") {
-      return `[data-onboarding-profile-id="${onboardingFocusTarget.id}"]`;
-    }
-    if (onboardingFocusTarget.kind === "category") {
-      return `[data-onboarding-category-id="${onboardingFocusTarget.id}"]`;
-    }
-    return "[data-onboarding-auth-entry]";
-  }, [onboardingFocusTarget]);
-  const headerOnboardingFocusTarget = React.useMemo<OnboardingFocusTarget>(
-    () =>
-      accountNudgeVisible && !session?.user.id
-        ? { kind: "auth" }
-        : onboardingFocusTarget,
-    [accountNudgeVisible, onboardingFocusTarget, session?.user.id]
-  );
 
   const handleYearChange = React.useCallback(
     (nextYear: number) => {
@@ -1590,7 +1636,11 @@ export default function HomePage() {
           isAuthenticated={Boolean(session)}
           isMobileCalendarUi={isMobileCalendarUi === true}
           onCalendarPackFocusYear={handleYearChange}
-          onboardingFocusTarget={headerOnboardingFocusTarget}
+          onboardingFocusTarget={onboardingFocusTarget}
+          categoryCreateRequestKey={categoryCreateRequestKey}
+          onCategoryCreated={() =>
+            trackPostOnboardingElement("category")
+          }
           onOpenAuthDialog={(anchorPoint) => {
             setAuthDialogInitialMode("login");
             setAuthDialogAnchorPoint(anchorPoint);
@@ -1609,9 +1659,13 @@ export default function HomePage() {
           onYearChange={handleYearChange}
           onEditEvent={handleEditEvent}
           guidedSelectionMode={
-            guidedOnboarding?.step === "date_instruction"
+            showGuidedOnboarding &&
+            (guidedOnboarding?.step === "date_instruction" ||
+              guidedOnboarding?.step === "date_details")
               ? "date"
-              : guidedOnboarding?.step === "period_instruction"
+              : showGuidedOnboarding &&
+                  (guidedOnboarding?.step === "period_instruction" ||
+                    guidedOnboarding?.step === "period_details")
                 ? "period"
                 : null
           }
@@ -1625,8 +1679,11 @@ export default function HomePage() {
             data-calendar-ui-mode="desktop"
             className={cn(
               "relative rounded-xl doze52-calendar-mode-transition",
-              guidedOnboarding?.step === "date_instruction" ||
-                guidedOnboarding?.step === "period_instruction"
+              showGuidedOnboarding &&
+                (guidedOnboarding?.step === "date_instruction" ||
+                  guidedOnboarding?.step === "date_details" ||
+                  guidedOnboarding?.step === "period_instruction" ||
+                  guidedOnboarding?.step === "period_details")
                 ? "ring-2 ring-primary/35 ring-offset-4 ring-offset-background shadow-[0_22px_70px_-42px_rgba(37,99,235,0.72)]"
                 : null
             )}
@@ -1664,46 +1721,26 @@ export default function HomePage() {
           onContinueFromProfile={() =>
             updateGuidedOnboarding({ type: "continue_from_profile" })
           }
-          onCancelDraft={cancelGuidedDraft}
+          onChooseCategory={handleChooseGuidedCategory}
           onChangeDraft={setGuidedDraft}
           onSaveDraft={saveGuidedDraft}
-          onOpenMoreOptions={openGuidedMoreOptions}
-          onContinueToPeriods={() =>
-            updateGuidedOnboarding({ type: "continue_to_periods" })
-          }
-          onContinueToPreview={() =>
-            updateGuidedOnboarding({ type: "continue_to_preview" })
-          }
           onComplete={completeGuidedOnboarding}
         />
       ) : null}
 
-      {showGuidedOnboarding && onboardingTargetSelector ? (
-        <OnboardingConnector
-          sourceSelector="[data-onboarding-panel]"
-          targetSelector={onboardingTargetSelector}
+      {accountNudgeVisible && !session?.user.id ? (
+        <AccountNudge
+          onDismiss={() => setAccountNudgeVisible(false)}
+          onCreateAccount={() => {
+            setAccountNudgeVisible(false);
+            setAuthDialogInitialMode("signup");
+            setAuthDialogAnchorPoint(undefined);
+            setAuthDialogOpen(true);
+          }}
         />
       ) : null}
 
-      {accountNudgeVisible && !session?.user.id ? (
-        <>
-          <AccountNudge
-            onDismiss={() => setAccountNudgeVisible(false)}
-            onCreateAccount={() => {
-              setAccountNudgeVisible(false);
-              setAuthDialogInitialMode("signup");
-              setAuthDialogAnchorPoint(undefined);
-              setAuthDialogOpen(true);
-            }}
-          />
-          <OnboardingConnector
-            sourceSelector="[data-onboarding-account-nudge]"
-            targetSelector="[data-onboarding-auth-entry]"
-          />
-        </>
-      ) : null}
-
-      {isMobileCalendarUi ? (
+      {isMobileCalendarUi && !showGuidedOnboarding ? (
         <div
           className="fixed right-4 z-40"
           style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 2.75rem)" }}
@@ -1736,19 +1773,12 @@ export default function HomePage() {
             setDialogAnchorPoint(undefined);
             setSeedRange(null);
             setCreatingRange(null);
-            if (!open) setGuidedDialogIntent(null);
           }
         }}
         initialEvent={editingEvent}
         seedRange={seedRange}
         anchorPoint={dialogAnchorPoint}
-        guidedIntent={
-          guidedDialogIntent === "period"
-            ? "period"
-            : guidedDialogIntent === "date"
-              ? "dated_item"
-              : null
-        }
+        guidedIntent={null}
         onSubmit={handleSubmit}
         onDelete={
           editingId && !editingEvent?.calendarPackGroupId

@@ -18,7 +18,10 @@ import {
   type ProfileIconId,
 } from "./profile-icons";
 import type { CalendarEvent, CalendarProfile, CategoryItem } from "./types";
-import type { OnboardingContext } from "./onboarding";
+import type {
+  OnboardingCategoryChoice,
+  OnboardingContext,
+} from "./onboarding";
 
 export type EventInput = {
   title: string;
@@ -57,8 +60,12 @@ type StoreState = {
   resetToOnboardingData: () => void;
   configureOnboardingContext: (input: {
     context: OnboardingContext;
-    customName?: string;
   }) => boolean;
+  createOnboardingCategory: (input: {
+    context: OnboardingContext;
+    intent: "date" | "period";
+    choice: OnboardingCategoryChoice;
+  }) => string | null;
   markLocalImported: (userId: string) => void;
   isLocalImported: (userId: string) => boolean;
   ensureEventMetadata: () => void;
@@ -305,60 +312,53 @@ const getFeatureDefaultCategories = (): CategoryItem[] => [
   },
 ];
 
-const getContextCategories = (
+export const getOnboardingCategoryDefinition = (
   context: OnboardingContext,
-  profileId: string
-): CategoryItem[] => {
-  const definitions =
-    context === "personal"
-      ? [
-          [ONBOARDING_CATEGORY_IDS.birthday, "Aniversários", CATEGORY_COLOR_BASE_AMBER],
-          [ONBOARDING_CATEGORY_IDS.travel, "Férias e viagens", CATEGORY_COLOR_BASE_CYAN],
-          [ONBOARDING_CATEGORY_IDS.events, "Eventos", CATEGORY_COLOR_BASE_VIOLET],
-        ]
-      : context === "work"
-        ? [
-            [ONBOARDING_CATEGORY_IDS.workDeliveries, "Entregas", CATEGORY_COLOR_BASE_VIOLET],
-            [ONBOARDING_CATEGORY_IDS.workTrips, "Projetos", CATEGORY_COLOR_BASE_BLUE],
-            [ONBOARDING_CATEGORY_IDS.workMeetings, "Reuniões", CATEGORY_COLOR_BASE_CYAN],
-          ]
-        : [
-            [ONBOARDING_CATEGORY_IDS.customImportantDates, "Datas importantes", CATEGORY_COLOR_BASE_AMBER],
-            [ONBOARDING_CATEGORY_IDS.customPeriods, "Períodos importantes", CATEGORY_COLOR_BASE_BLUE],
-            [ONBOARDING_CATEGORY_IDS.customOther, "Outros", CATEGORY_COLOR_BASE_VIOLET],
-          ];
-
-  return definitions.map(([id, name, color]) => ({
-    id,
-    profileId,
-    name,
-    color,
-    visible: true,
-  }));
-};
-
-export const getOnboardingCategoryIdForIntent = (
-  context: OnboardingContext,
-  intent: "date" | "period"
+  intent: "date" | "period",
+  choice: OnboardingCategoryChoice
 ) => {
+  if (choice === "generic") {
+    return intent === "date"
+      ? {
+          id: ONBOARDING_CATEGORY_IDS.customImportantDates,
+          name: "Datas importantes",
+          color: CATEGORY_COLOR_BASE_AMBER,
+        }
+      : {
+          id: ONBOARDING_CATEGORY_IDS.customPeriods,
+          name: "Períodos importantes",
+          color: CATEGORY_COLOR_BASE_BLUE,
+        };
+  }
   if (context === "personal") {
     return intent === "date"
-      ? ONBOARDING_CATEGORY_IDS.birthday
-      : ONBOARDING_CATEGORY_IDS.travel;
-  }
-  if (context === "work") {
-    return intent === "date"
-      ? ONBOARDING_CATEGORY_IDS.workDeliveries
-      : ONBOARDING_CATEGORY_IDS.workTrips;
+      ? {
+          id: ONBOARDING_CATEGORY_IDS.birthday,
+          name: "Aniversários",
+          color: CATEGORY_COLOR_BASE_AMBER,
+        }
+      : {
+          id: ONBOARDING_CATEGORY_IDS.travel,
+          name: "Férias e viagens",
+          color: CATEGORY_COLOR_BASE_CYAN,
+        };
   }
   return intent === "date"
-    ? ONBOARDING_CATEGORY_IDS.customImportantDates
-    : ONBOARDING_CATEGORY_IDS.customPeriods;
+    ? {
+        id: ONBOARDING_CATEGORY_IDS.workDeliveries,
+        name: "Entregas",
+        color: CATEGORY_COLOR_BASE_VIOLET,
+      }
+    : {
+        id: ONBOARDING_CATEGORY_IDS.workTrips,
+        name: "Projetos",
+        color: CATEGORY_COLOR_BASE_BLUE,
+      };
 };
 
 const getTemplateCategories = (options?: { legacyOnly?: boolean }) => {
   if (options?.legacyOnly) return getLegacyDefaultCategories();
-  return getLegacyDefaultCategories();
+  return [];
 };
 
 export const ONBOARDING_DEFAULT_CATEGORIES: CategoryItem[] = getTemplateCategories();
@@ -369,6 +369,7 @@ export const getOnboardingDefaultCategories = (): CategoryItem[] =>
 export const isOnboardingCategoriesSnapshot = (categories: CategoryItem[]) => {
   const candidates = [
     getOnboardingDefaultCategories(),
+    getLegacyDefaultCategories(),
     getFeatureDefaultCategories(),
   ];
   return candidates.some((expected) => {
@@ -608,31 +609,22 @@ export const useStore = create<StoreState>()(
             events: [],
           };
         }),
-      configureOnboardingContext: ({ context, customName }) => {
+      configureOnboardingContext: ({ context }) => {
         let configured = false;
         set((state) => {
           if (state.events.some((event) => !event.calendarPackGroupId)) return state;
 
           const profile = state.profiles[0];
           if (!profile) return state;
-          const requestedName = customName?.trim() ?? "";
-          if (context === "custom" && (requestedName.length < 1 || requestedName.length > 40)) {
-            return state;
-          }
 
           const name =
             context === "personal"
               ? "Pessoal"
-              : context === "work"
-                ? "Trabalho"
-                : requestedName;
+              : "Profissional";
           const icon =
             context === "personal"
               ? "user"
-              : context === "work"
-                ? "briefcase"
-                : "calendar-days";
-          const authoredCategories = getContextCategories(context, profile.id);
+              : "briefcase";
           const managedCategories = state.categories.filter(
             (category) => Boolean(category.calendarPackGroupId)
           );
@@ -645,10 +637,42 @@ export const useStore = create<StoreState>()(
                 : entry
             ),
             selectedProfileIds: [profile.id],
-            categories: [...authoredCategories, ...managedCategories],
+            categories: managedCategories,
           };
         });
         return configured;
+      },
+      createOnboardingCategory: ({ context, intent, choice }) => {
+        const definition = getOnboardingCategoryDefinition(
+          context,
+          intent,
+          choice
+        );
+        let createdId: string | null = null;
+        set((state) => {
+          const profileId =
+            state.selectedProfileIds[0] ?? state.profiles[0]?.id ?? null;
+          if (!profileId) return state;
+          const existing = state.categories.find(
+            (category) => category.id === definition.id
+          );
+          if (existing) {
+            createdId = existing.id;
+            return state;
+          }
+          createdId = definition.id;
+          return {
+            categories: [
+              ...state.categories,
+              {
+                ...definition,
+                profileId,
+                visible: true,
+              },
+            ],
+          };
+        });
+        return createdId;
       },
       markLocalImported: (userId) => {
         if (typeof window === "undefined") return;

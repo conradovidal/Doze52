@@ -38,6 +38,8 @@ type AppHeaderProps = {
   onOpenAuthDialog: (anchorPoint?: AnchorPoint) => void;
   onCalendarPackFocusYear: (year: number) => void;
   onboardingFocusTarget?: OnboardingFocusTarget;
+  categoryCreateRequestKey?: number;
+  onCategoryCreated?: (categoryId: string) => void;
 };
 
 const getPreferredEditingProfileId = (
@@ -54,6 +56,8 @@ export function AppHeader({
   onOpenAuthDialog,
   onCalendarPackFocusYear,
   onboardingFocusTarget = null,
+  categoryCreateRequestKey = 0,
+  onCategoryCreated,
 }: AppHeaderProps) {
   const profiles = useStore((s) => s.profiles);
   const categories = useStore((s) => s.categories);
@@ -78,6 +82,7 @@ export function AppHeader({
     selectedProfileIds: string[];
   } | null>(null);
   const previousProfileManagerOpenRef = React.useRef(false);
+  const handledCategoryCreateRequestRef = React.useRef(0);
 
   const utilityIconClass =
     "h-8 w-8 rounded-[10px] border-border bg-card text-muted-foreground shadow-none transition-colors hover:border-foreground/18 hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 md:h-9 md:w-9";
@@ -96,7 +101,6 @@ export function AppHeader({
   const hasOnboardingFilterFocus = Boolean(
     highlightedProfileId || highlightedCategoryId
   );
-  const highlightAuthEntry = onboardingFocusTarget?.kind === "auth";
   const effectiveCategoriesExpanded =
     categoriesExpanded || isInlineEditMode || Boolean(highlightedCategoryId);
   const isMobileMode = isMobileCalendarUi === true;
@@ -165,6 +169,21 @@ export function AppHeader({
       setAreMobileFiltersCollapsed(false);
     }
   }, [isInlineEditMode]);
+
+  React.useEffect(() => {
+    if (
+      categoryCreateRequestKey <= 0 ||
+      categoryCreateRequestKey === handledCategoryCreateRequestRef.current
+    ) {
+      return;
+    }
+    handledCategoryCreateRequestRef.current = categoryCreateRequestKey;
+    const profileId =
+      selectedProfileIds[0] ?? profiles[0]?.id ?? null;
+    if (!profileId) return;
+    setEditingProfileId(profileId);
+    setCategoryCreateOpen(true);
+  }, [categoryCreateRequestKey, profiles, selectedProfileIds]);
 
   React.useEffect(() => {
     if (!highlightedCategoryId) return;
@@ -308,16 +327,9 @@ export function AppHeader({
                 ) : (
                   <Button
                     data-onboarding-auth-entry
-                    data-onboarding-highlighted={
-                      highlightAuthEntry ? "true" : undefined
-                    }
                     size="sm"
                     variant="outline"
-                    className={cn(
-                      utilityButtonClass,
-                      highlightAuthEntry &&
-                        "relative z-[46] ring-2 ring-primary ring-offset-2 ring-offset-background shadow-[0_0_0_7px_hsl(var(--primary)/0.12)] motion-safe:animate-[pulse_700ms_ease-in-out_2]"
-                    )}
+                    className={utilityButtonClass}
                     onClick={(event) => {
                       const rect = event.currentTarget.getBoundingClientRect();
                       onOpenAuthDialog({ x: rect.right, y: rect.bottom });
@@ -517,6 +529,7 @@ export function AppHeader({
         open={categoryCreateOpen}
         onOpenChange={setCategoryCreateOpen}
         profileId={editingProfileId ?? undefined}
+        onCreated={onCategoryCreated}
         onRequireAuth={() => onOpenAuthDialog()}
       />
 
