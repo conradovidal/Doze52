@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import type { GuidedSelectionNotice } from "@/components/onboarding/guided-selection-notice";
 import {
   ONBOARDING_CATEGORY_IDS,
   getOnboardingCategoryDefinition,
@@ -49,13 +50,13 @@ const CONTEXT_OPTIONS = [
   {
     value: "personal" as const,
     title: "Pessoal",
-    description: "Família, viagens e momentos importantes.",
+    description: "Família, viagens e momentos que fazem o ano ser seu.",
     icon: UserRound,
   },
   {
     value: "work" as const,
     title: "Profissional",
-    description: "Entregas, projetos e marcos de trabalho.",
+    description: "Projetos, entregas e conquistas que movem o seu trabalho.",
     icon: BriefcaseBusiness,
   },
 ];
@@ -70,11 +71,7 @@ const formatDate = (value: string) => {
   }).format(new Date(year, month - 1, day));
 };
 
-export type GuidedSelectionNotice = {
-  mode: "date" | "period";
-  title: string;
-  instruction: string;
-};
+export type { GuidedSelectionNotice } from "@/components/onboarding/guided-selection-notice";
 
 const getDateCopy = (
   context: OnboardingContext,
@@ -87,10 +84,10 @@ const getDateCopy = (
   if (itemCount === 0) {
     if (isBirthday) {
       return {
-        title: "Comece por um aniversário importante que já passou.",
+        title: "Pense em alguém que faz parte da sua história.",
         description:
-          "Clique no dia do aniversário de alguém da sua família ou de uma pessoa próxima.",
-        prompt: "De quem é esse aniversário?",
+          "Escolha no calendário um aniversário que já passou neste ano.",
+        prompt: "De quem é esse dia?",
         placeholder: "Ex.: Aniversário da mãe",
       };
     }
@@ -105,9 +102,9 @@ const getDateCopy = (
     return {
       title:
         context === "personal"
-          ? "Comece por uma data importante que já passou."
+          ? "Comece por um dia que merece ser lembrado."
           : "Comece por uma data profissional importante que já passou.",
-      description: "Clique no dia em que isso aconteceu.",
+      description: "Escolha no calendário quando isso aconteceu.",
       prompt: "O que aconteceu nessa data?",
       placeholder: "Ex.: Uma conquista importante",
     };
@@ -115,10 +112,10 @@ const getDateCopy = (
 
   if (isBirthday) {
     return {
-      title: "Agora marque o próximo aniversário importante.",
+      title: "Agora celebre alguém que ainda vai completar o ano.",
       description:
-        "Pode ser de um familiar ou de outra pessoa que você não quer esquecer.",
-      prompt: "De quem é esse aniversário?",
+        "Escolha um próximo aniversário que você não quer deixar passar.",
+      prompt: "De quem é esse dia?",
       placeholder: "Ex.: Aniversário do pai",
     };
   }
@@ -131,10 +128,10 @@ const getDateCopy = (
     };
   }
   return {
-    title:
-      context === "personal"
-        ? "Agora marque a próxima data importante."
-        : "Agora marque a próxima data profissional importante.",
+      title:
+        context === "personal"
+          ? "Agora escolha algo bom que ainda está por vir."
+          : "Agora marque a próxima data profissional importante.",
     description: "Clique no dia em que isso deve acontecer.",
     prompt: "O que vai acontecer nessa data?",
     placeholder: "Ex.: Um próximo marco",
@@ -152,9 +149,9 @@ const getPeriodCopy = (
   if (itemCount === 0) {
     if (isTravel) {
       return {
-        title: "Agora adicione suas últimas férias ou viagem.",
-        description: "Selecione do primeiro ao último dia desse período.",
-        prompt: "Que período foi esse?",
+        title: "Que viagem ainda mora na sua memória?",
+        description: "Marque do primeiro ao último dia dessa história.",
+        prompt: "Que viagem foi essa?",
         placeholder: "Ex.: Viagem em família",
       };
     }
@@ -169,7 +166,7 @@ const getPeriodCopy = (
     return {
       title:
         context === "personal"
-          ? "Adicione um período importante que já passou."
+          ? "Escolha um período que deixou marca no seu ano."
           : "Adicione um período profissional que já passou.",
       description: "Selecione o primeiro e o último dia desse período.",
       prompt: "O que ocupou esse período?",
@@ -179,9 +176,9 @@ const getPeriodCopy = (
 
   if (isTravel) {
     return {
-      title: "Agora adicione suas próximas férias ou viagem.",
-      description: "Selecione do primeiro ao último dia planejado.",
-      prompt: "Que período será esse?",
+      title: "Que próxima viagem já merece espaço?",
+      description: "Marque do primeiro ao último dia que você está planejando.",
+      prompt: "Para onde você vai?",
       placeholder: "Ex.: Próximas férias",
     };
   }
@@ -196,7 +193,7 @@ const getPeriodCopy = (
   return {
     title:
       context === "personal"
-        ? "Agora adicione o próximo período importante."
+        ? "Agora abra espaço para algo que você espera viver."
         : "Agora adicione o próximo período profissional importante.",
     description: "Selecione o primeiro e o último dia planejado.",
     prompt: "O que vai ocupar esse período?",
@@ -223,7 +220,7 @@ export const getGuidedSelectionNotice = ({
     return {
       mode: "date",
       title: copy.title,
-      instruction: "Selecione uma data diretamente no calendário.",
+      instruction: copy.description,
     };
   }
   if (state.step !== "period_instruction") return null;
@@ -239,48 +236,10 @@ export const getGuidedSelectionNotice = ({
       isMobile && mobileRangeStart
         ? `Início selecionado em ${formatDate(mobileRangeStart)}. Agora selecione o último dia.`
         : isMobile
-          ? "Toque no primeiro e depois no último dia do período."
-          : "Clique, segure e arraste do início ao fim do período.",
+          ? `${copy.description} Toque no primeiro e depois no último dia.`
+          : `${copy.description} Clique, segure e arraste do início ao fim.`,
   };
 };
-
-export function GuidedCalendarNotice({
-  notice,
-  onClose,
-}: {
-  notice: GuidedSelectionNotice;
-  onClose: () => void;
-}) {
-  return (
-    <aside
-      data-guided-calendar-notice
-      data-guided-selection-mode={notice.mode}
-      aria-label="Instrução do guia inicial"
-      aria-live="polite"
-      className="flex items-start gap-3 border-b border-border bg-primary/6 px-3 py-3 text-card-foreground sm:px-4"
-    >
-      <div className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-        <CalendarDays className="size-4" aria-hidden="true" />
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold leading-5">{notice.title}</p>
-        <p className="mt-0.5 text-xs leading-4 text-muted-foreground">
-          {notice.instruction}
-        </p>
-      </div>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-xs"
-        className="-mt-0.5 -mr-1 rounded-full"
-        aria-label="Encerrar guia inicial"
-        onClick={onClose}
-      >
-        <X />
-      </Button>
-    </aside>
-  );
-}
 
 export function GuidedOnboardingPanel({
   state,
@@ -401,8 +360,10 @@ export function GuidedOnboardingPanel({
                 </span>
                 <span className="mt-0.5 block text-[11px] leading-4 text-muted-foreground">
                   {option.choice === "specific"
-                    ? "Nossa sugestão para começar."
-                    : "Uma opção mais aberta para o seu contexto."}
+                    ? intent === "date"
+                      ? "Um jeito afetivo de começar a contar o seu ano."
+                      : "Para enxergar o espaço que descanso e descobertas ocupam."
+                    : "Para tudo que importa e merece um nome só seu."}
                 </span>
               </span>
             </button>
@@ -417,11 +378,12 @@ export function GuidedOnboardingPanel({
       return (
         <>
           <h2 className="mt-4 text-xl font-semibold tracking-[-0.025em]">
-            Qual contexto você quer enxergar primeiro?
+            Por onde o seu ano começa?
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Comece pela parte da vida ou do trabalho que você quer observar
-            separadamente.
+            O ano da Marina está ao fundo só para mostrar o que ganha forma
+            quando tudo importante ocupa o mesmo lugar. Escolha seu primeiro
+            contexto para começar o seu.
           </p>
           <div className="mt-4 grid gap-2">
             {CONTEXT_OPTIONS.map((option) => {
@@ -456,11 +418,11 @@ export function GuidedOnboardingPanel({
       return (
         <>
           <h2 className="mt-4 text-lg font-semibold tracking-[-0.02em]">
-            Seu primeiro contexto está pronto.
+            Pronto. Agora este ano é seu.
           </h2>
           <p className="mt-1 text-sm leading-5 text-muted-foreground">
-            Agora adicione uma categoria para organizar o que você quer
-            enxergar nessa parte do ano.
+            Seu primeiro contexto já está no lugar. Vamos dar uma primeira cor
+            ao que importa?
           </p>
           <Button
             type="button"
@@ -468,7 +430,7 @@ export function GuidedOnboardingPanel({
             className="mt-4 w-full"
             onClick={onContinueFromProfile}
           >
-            Adicionar primeira categoria
+            Escolher primeira categoria
           </Button>
         </>
       );
@@ -478,10 +440,11 @@ export function GuidedOnboardingPanel({
       return (
         <>
           <h2 className="mt-4 text-lg font-semibold tracking-[-0.02em]">
-            Qual categoria de datas você quer adicionar primeiro?
+            Que tipo de dia merece aparecer primeiro?
           </h2>
           <p className="mt-1 text-sm leading-5 text-muted-foreground">
-            Uma data acontece em um único dia.
+            Comece por uma categoria que ajude você a reconhecer esses momentos
+            num olhar.
           </p>
           {renderCategoryChoices("date")}
         </>
@@ -492,10 +455,11 @@ export function GuidedOnboardingPanel({
       return (
         <>
           <h2 className="mt-4 text-lg font-semibold tracking-[-0.02em]">
-            Agora adicione uma categoria de períodos.
+            Agora reserve espaço para algo que dura mais de um dia.
           </h2>
           <p className="mt-1 text-sm leading-5 text-muted-foreground">
-            Um período tem início e fim e ocupa mais de um dia.
+            Férias, viagens e projetos contam outra história quando você
+            enxerga o começo e o fim.
           </p>
           {renderCategoryChoices("period")}
         </>
@@ -598,11 +562,11 @@ export function GuidedOnboardingPanel({
       return (
         <>
           <h2 className="mt-4 text-lg font-semibold tracking-[-0.02em]">
-            Seu ano começou a ficar visível.
+            Agora o seu ano começa a contar uma história.
           </h2>
           <p className="mt-1 text-sm leading-5 text-muted-foreground">
-            Você adicionou duas categorias e aprendeu a marcar datas e definir
-            períodos.
+            Datas e períodos ganharam cor, espaço e significado. Daqui em
+            diante, cada escolha deixa essa visão mais sua.
           </p>
           <div className="mt-4 grid gap-2">
             <Button
@@ -610,14 +574,14 @@ export function GuidedOnboardingPanel({
               variant="premium"
               onClick={() => onComplete("explore")}
             >
-              Continuar no meu ano
+              Explorar meu ano
             </Button>
             <Button
               type="button"
               variant="outline"
               onClick={() => onComplete("category")}
             >
-              <Plus /> Adicionar outra categoria
+              <Plus /> Continuar personalizando
             </Button>
           </div>
         </>
@@ -634,7 +598,7 @@ export function GuidedOnboardingPanel({
       data-guided-onboarding-step={state.step}
       aria-label="Guia inicial do Doze 52"
       aria-live="polite"
-      className="fixed top-[calc(env(safe-area-inset-top,0px)+4.6rem)] left-1/2 z-50 w-[min(42rem,calc(100vw-1.5rem))] -translate-x-1/2 rounded-[1.5rem] border border-foreground/15 bg-card/98 p-4.5 text-card-foreground shadow-[0_28px_90px_-28px_rgba(15,23,42,0.68)] backdrop-blur-xl animate-in fade-in-0 slide-in-from-top-2 duration-200 motion-reduce:animate-none sm:p-5 md:top-1/2 md:w-[23rem] md:-translate-y-1/2"
+      className="fixed top-[calc(env(safe-area-inset-top,0px)+4.6rem)] left-1/2 z-50 w-[min(42rem,calc(100vw-1.5rem))] -translate-x-1/2 rounded-[1.5rem] border border-foreground/15 bg-card/98 p-4.5 text-card-foreground shadow-[0_28px_90px_-28px_rgba(15,23,42,0.68)] backdrop-blur-xl animate-in fade-in-0 duration-200 motion-reduce:animate-none sm:p-5 md:top-1/2 md:w-[23rem] md:-translate-y-1/2"
     >
       {header}
       {content}

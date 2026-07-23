@@ -3,6 +3,10 @@
 import * as React from "react";
 import { Check, ChevronDown, PencilLine } from "lucide-react";
 import { BrandLogo } from "@/components/brand-logo";
+import {
+  GuidedCalendarNotice,
+  type GuidedSelectionNotice,
+} from "@/components/onboarding/guided-selection-notice";
 import { CategoryBar } from "@/components/category-bar";
 import { CategoryManager } from "@/components/category-manager";
 import { CalendarPackLauncher } from "@/components/calendar-packs/calendar-pack-launcher";
@@ -36,6 +40,9 @@ type AppHeaderProps = {
   onOpenAuthDialog: (anchorPoint?: AnchorPoint) => void;
   onCalendarPackFocusYear: (year: number) => void;
   onboardingFocusTarget?: OnboardingFocusTarget;
+  guidedSelectionNotice?: GuidedSelectionNotice | null;
+  onDismissGuidedSelection?: () => void;
+  onboardingLayoutLocked?: boolean;
   categoryCreateRequestKey?: number;
   onCategoryCreated?: (categoryId: string) => void;
 };
@@ -54,6 +61,9 @@ export function AppHeader({
   onOpenAuthDialog,
   onCalendarPackFocusYear,
   onboardingFocusTarget = null,
+  guidedSelectionNotice = null,
+  onDismissGuidedSelection,
+  onboardingLayoutLocked = false,
   categoryCreateRequestKey = 0,
   onCategoryCreated,
 }: AppHeaderProps) {
@@ -319,14 +329,24 @@ export function AppHeader({
 
         <div
           className={cn(
-            "mx-auto flex w-full flex-col items-center gap-1.5 md:gap-2",
+            "relative mx-auto flex w-full flex-col items-center gap-1.5 md:gap-2",
             isMobileMode
               ? "max-w-[31rem]"
-              : "max-w-[62rem] border-t border-border/45 pt-2.5 md:pt-3"
+              : "max-w-[62rem] border-t border-border/45 pt-2.5 md:pt-3",
+            onboardingLayoutLocked &&
+              (isMobileMode ? "min-h-[10.25rem]" : "min-h-[5rem]")
           )}
         >
-          {isMobileMode ? (
-            <div className="w-full overflow-hidden rounded-[10px] border border-border bg-card">
+          <div
+            className={cn(
+              "w-full transition-opacity duration-150",
+              guidedSelectionNotice && "opacity-20"
+            )}
+            inert={onboardingLayoutLocked ? true : undefined}
+            aria-hidden={guidedSelectionNotice ? true : undefined}
+          >
+            {isMobileMode ? (
+              <div className="w-full overflow-hidden rounded-[10px] border border-border bg-card">
               <button
                 type="button"
                 className="m-[3px] flex h-10 w-[calc(100%-6px)] items-center justify-between gap-3 rounded-[8px] bg-transparent px-2.5 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/45"
@@ -409,9 +429,9 @@ export function AppHeader({
                   </div>
                 </div>
               </div>
-            </div>
-          ) : (
-            <>
+              </div>
+            ) : (
+              <>
               <div className="-mx-4 w-[calc(100%+2rem)] overflow-x-auto px-4 pb-0.5 doze52-scrollbar-none sm:mx-0 sm:w-full sm:px-0 md:overflow-visible">
                 <div className="flex w-max min-w-full flex-nowrap items-center justify-start gap-x-1.5 gap-y-1.5 sm:w-full sm:flex-wrap sm:justify-center sm:gap-x-2">
                   <div className="flex shrink-0 flex-nowrap items-center justify-center gap-1.5 sm:flex-wrap sm:gap-2">
@@ -487,8 +507,20 @@ export function AppHeader({
                   </div>
                 </div>
               ) : null}
-            </>
-          )}
+              </>
+            )}
+          </div>
+
+          {guidedSelectionNotice && onDismissGuidedSelection ? (
+            <div className="absolute inset-0 z-40 flex items-center justify-center">
+              <div className="w-full overflow-hidden rounded-2xl border border-primary/20 bg-card/98 shadow-[0_20px_50px_-30px_rgba(15,23,42,0.72)] backdrop-blur-xl">
+                <GuidedCalendarNotice
+                  notice={guidedSelectionNotice}
+                  onClose={onDismissGuidedSelection}
+                />
+              </div>
+            </div>
+          ) : null}
         </div>
 
         {isMobileMode ? null : (

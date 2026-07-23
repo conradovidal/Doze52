@@ -30,10 +30,6 @@ import {
   LATERAL_KEY_BASE_CLASS,
   LATERAL_KEY_REST_CLASS,
 } from "./lateral-key-styles";
-import {
-  GuidedCalendarNotice,
-  type GuidedSelectionNotice,
-} from "@/components/onboarding/guided-onboarding-panel";
 import { MonthRow } from "./month-row";
 
 type ReorderTarget = {
@@ -116,8 +112,6 @@ export function YearGrid({
   onMoveEventByDelta,
   onApplyDayReorder,
   isMobileInteractionMode = false,
-  guidedSelectionNotice = null,
-  onDismissGuidedSelection,
 }: {
   year: number;
   todayIso: string;
@@ -139,8 +133,6 @@ export function YearGrid({
     orderedIds: string[];
   }) => void;
   isMobileInteractionMode?: boolean;
-  guidedSelectionNotice?: GuidedSelectionNotice | null;
-  onDismissGuidedSelection?: () => void;
 }) {
   const profiles = useStore((s) => s.profiles as CalendarProfile[]);
   const categories = useStore((s) => s.categories as CategoryItem[]);
@@ -668,12 +660,6 @@ export function YearGrid({
         canvasWidthClass
       )}
     >
-      {guidedSelectionNotice && onDismissGuidedSelection ? (
-        <GuidedCalendarNotice
-          notice={guidedSelectionNotice}
-          onClose={onDismissGuidedSelection}
-        />
-      ) : null}
       <div
         ref={zoomViewportRef}
         className={cn(

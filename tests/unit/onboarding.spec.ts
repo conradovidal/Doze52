@@ -10,9 +10,13 @@ import {
   getOnboardingCategoryDefinition,
   getOnboardingDefaultCategories,
   getOnboardingDefaultProfiles,
+  getOnboardingPersonalDemoSnapshot,
+  isOnboardingPersonalDemoSnapshot,
   isOnboardingProfilesSnapshot,
   ONBOARDING_CATEGORY_IDS,
+  ONBOARDING_PERSONAL_DEMO_GROUP_ID,
   ONBOARDING_PROFILE_IDS,
+  stripOnboardingPersonalDemo,
 } from "../../lib/store";
 import { materializeUserOwnedSnapshot } from "../../lib/snapshot-ownership";
 
@@ -245,6 +249,43 @@ test("novo template começa com contexto neutro e nenhuma categoria", () => {
       },
     ])
   ).toBe(true);
+});
+
+test("demonstração pessoal monta um ano completo e identificável", () => {
+  const snapshot = getOnboardingPersonalDemoSnapshot(2026);
+  expect(snapshot.profiles.map((profile) => profile.name)).toEqual([
+    "Pessoal",
+    "Família",
+    "Profissional",
+  ]);
+  expect(snapshot.categories.map((category) => category.name)).toEqual([
+    "Aniversários",
+    "Férias e viagens",
+    "Família e escola",
+    "Saúde e bem-estar",
+    "Celebrações",
+    "Projetos pessoais",
+  ]);
+  expect(snapshot.events).toHaveLength(22);
+  expect(isOnboardingPersonalDemoSnapshot(snapshot)).toBe(true);
+  expect(
+    snapshot.events.every(
+      (event) =>
+        event.calendarPackGroupId === ONBOARDING_PERSONAL_DEMO_GROUP_ID
+    )
+  ).toBe(true);
+  expect(
+    snapshot.events.filter((event) => event.recurrenceType === "yearly")
+  ).toHaveLength(4);
+});
+
+test("demonstração é removida antes de qualquer importação", () => {
+  const stripped = stripOnboardingPersonalDemo(
+    getOnboardingPersonalDemoSnapshot(2026)
+  );
+  expect(stripped.profiles.map((profile) => profile.name)).toEqual(["Meu ano"]);
+  expect(stripped.categories).toEqual([]);
+  expect(stripped.events).toEqual([]);
 });
 
 test("materialização cria IDs distintos e preserva relacionamentos", () => {

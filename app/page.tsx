@@ -23,7 +23,10 @@ import { useFeedback } from "@/components/ui/feedback-provider";
 import {
   isOnboardingProfilesSnapshot,
   isOnboardingCategoriesSnapshot,
+  isOnboardingPersonalDemoSnapshot,
   ONBOARDING_CATEGORY_IDS,
+  ONBOARDING_PERSONAL_DEMO_GROUP_ID,
+  stripOnboardingPersonalDemo,
   useStore,
   type EventInput,
 } from "@/lib/store";
@@ -188,11 +191,12 @@ const formatSyncDebugDetail = (error: SyncUiError) => {
   return detail.length > 180 ? `${detail.slice(0, 177)}...` : detail;
 };
 
-const filterAnonymousDraft = (snapshot: CalendarSnapshot): CalendarSnapshot => ({
-  profiles: snapshot.profiles.filter((profile) => !profile.userId),
-  categories: snapshot.categories.filter((category) => !category.userId),
-  events: snapshot.events.filter((event) => !event.userId),
-});
+const filterAnonymousDraft = (snapshot: CalendarSnapshot): CalendarSnapshot =>
+  stripOnboardingPersonalDemo({
+    profiles: snapshot.profiles.filter((profile) => !profile.userId),
+    categories: snapshot.categories.filter((category) => !category.userId),
+    events: snapshot.events.filter((event) => !event.userId),
+  });
 
 const hasRelevantLocalDraft = (snapshot: CalendarSnapshot) =>
   snapshot.events.length > 0 ||
@@ -254,6 +258,12 @@ export default function HomePage() {
   const ensureEventMetadata = useStore((s) => s.ensureEventMetadata);
   const replaceAllData = useStore((s) => s.replaceAllData);
   const resetToOnboardingData = useStore((s) => s.resetToOnboardingData);
+  const loadOnboardingPersonalDemo = useStore(
+    (s) => s.loadOnboardingPersonalDemo
+  );
+  const clearOnboardingPersonalDemo = useStore(
+    (s) => s.clearOnboardingPersonalDemo
+  );
   const configureOnboardingContext = useStore(
     (s) => s.configureOnboardingContext
   );
@@ -740,6 +750,48 @@ export default function HomePage() {
   React.useEffect(() => {
     if (windowContext !== "main" || authLoading || session?.user.id) return;
     if (
+      guidedOnboarding?.step !== "context_selection" ||
+      calendarCreateOnboarding !== "pending"
+    ) {
+      return;
+    }
+
+    const snapshot = { profiles, categories, events };
+    const hasDemo = isOnboardingPersonalDemoSnapshot(snapshot);
+    const isInitialTemplate =
+      events.length === 0 &&
+      isOnboardingProfilesSnapshot(profiles) &&
+      isOnboardingCategoriesSnapshot(categories);
+
+    if (!hasDemo && !isInitialTemplate) return;
+    if (
+      hasDemo &&
+      events.some(
+        (event) =>
+          event.calendarPackGroupId === ONBOARDING_PERSONAL_DEMO_GROUP_ID &&
+          event.startDate.startsWith(`${year}-`)
+      )
+    ) {
+      return;
+    }
+
+    loadOnboardingPersonalDemo(year);
+  }, [
+    authLoading,
+    calendarCreateOnboarding,
+    categories,
+    events,
+    guidedOnboarding?.step,
+    loadOnboardingPersonalDemo,
+    profiles,
+    session?.user.id,
+    windowContext,
+    year,
+  ]);
+
+  React.useEffect(() => {
+    if (windowContext !== "main" || authLoading || session?.user.id) return;
+    if (
       profiles.some((profile) => Boolean(profile.userId)) ||
       categories.some((category) => Boolean(category.userId)) ||
       events.some((event) => Boolean(event.userId))
@@ -1099,8 +1151,8 @@ export default function HomePage() {
       }
       notify({
         tone: "success",
-        title: "Seu ano começou a ficar visível",
-        description: "Continue adicionando contexto quando algo mudar.",
+        title: "Agora o seu ano conta uma história",
+        description: "Continue dando espaço ao que importa para você.",
         durationMs: 3200,
       });
     },
@@ -1108,8 +1160,9 @@ export default function HomePage() {
   );
 
   const dismissGuidedOnboarding = React.useCallback(() => {
+    clearOnboardingPersonalDemo();
     updateGuidedOnboarding({ type: "dismiss" });
-  }, [updateGuidedOnboarding]);
+  }, [clearOnboardingPersonalDemo, updateGuidedOnboarding]);
 
   const trackPostOnboardingElement = React.useCallback(
     (kind: "event" | "category") => {
@@ -1650,6 +1703,9 @@ export default function HomePage() {
           isMobileCalendarUi={isMobileCalendarUi === true}
           onCalendarPackFocusYear={handleYearChange}
           onboardingFocusTarget={onboardingFocusTarget}
+          guidedSelectionNotice={guidedSelectionNotice}
+          onDismissGuidedSelection={dismissGuidedOnboarding}
+          onboardingLayoutLocked={showGuidedOnboarding}
           categoryCreateRequestKey={categoryCreateRequestKey}
           onCategoryCreated={() =>
             trackPostOnboardingElement("category")
@@ -1684,8 +1740,6 @@ export default function HomePage() {
           }
           guidedRangeStart={mobileGuidedRangeStart}
           onGuidedDaySelect={handleMobileGuidedDaySelect}
-          guidedSelectionNotice={guidedSelectionNotice}
-          onDismissGuidedSelection={dismissGuidedOnboarding}
         />
       ) : (
         <div className="overflow-x-auto pb-1 md:overflow-visible">
@@ -1719,8 +1773,6 @@ export default function HomePage() {
                 normalizeDayOrder(dayIso, orderedIds);
               }}
               isMobileInteractionMode={false}
-              guidedSelectionNotice={guidedSelectionNotice}
-              onDismissGuidedSelection={dismissGuidedOnboarding}
             />
           </div>
         </div>

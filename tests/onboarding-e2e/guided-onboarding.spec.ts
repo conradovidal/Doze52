@@ -73,7 +73,7 @@ const completePersonalOnboarding = async (
     "profile_reveal"
   );
   await panel
-    .getByRole("button", { name: "Adicionar primeira categoria" })
+    .getByRole("button", { name: "Escolher primeira categoria" })
     .click();
   await expect(panel).toHaveAttribute(
     "data-guided-onboarding-step",
@@ -137,8 +137,8 @@ const completePersonalOnboarding = async (
     .getByRole("button", {
       name:
         finish === "explore"
-          ? "Continuar no meu ano"
-          : "Adicionar outra categoria",
+          ? "Explorar meu ano"
+          : "Continuar personalizando",
     })
     .click();
   await expect(panel).toBeHidden();
@@ -170,8 +170,10 @@ test("monta contexto Pessoal de forma incremental", async ({ page }, testInfo) =
     "context_selection"
   );
   await expect(panel.getByRole("button", { name: /Outro/ })).toHaveCount(0);
-  await expect(page.locator("[data-onboarding-category-id]")).toHaveCount(0);
+  await expect(page.locator("[data-onboarding-profile-id]")).toHaveCount(3);
+  await expect(page.locator("[data-onboarding-category-id]")).toHaveCount(6);
   await expect(page.locator("[data-onboarding-connector]")).toHaveCount(0);
+  await expect(panel).toContainText("O ano da Marina está ao fundo");
   await expect(panel).not.toContainText(/\bperfil\b/i);
   await expect(panel).not.toContainText(/\bcadastr/i);
 
@@ -256,46 +258,81 @@ test("o X encerra o guia e a decisão persiste após recarregar", async ({
   await panel.getByRole("button", { name: "Encerrar guia inicial" }).click();
   await expect(panel).toBeHidden();
   await expect(page.getByText("Dispensar ajuda")).toHaveCount(0);
+  const stored = await page.evaluate(() => {
+    const payload = JSON.parse(window.localStorage.getItem("yiv-store") ?? "{}");
+    return payload.state as {
+      profiles?: Array<{ name: string }>;
+      categories?: unknown[];
+      events?: unknown[];
+    };
+  });
+  expect(stored.profiles?.map((profile) => profile.name)).toEqual(["Meu ano"]);
+  expect(stored.categories).toEqual([]);
+  expect(stored.events).toEqual([]);
 
   await page.reload();
   await expect(panel).toBeHidden();
   await expect(page.locator("[data-guided-calendar-notice]")).toHaveCount(0);
 });
 
-test("centraliza cards e incorpora a instrução ao calendário", async ({
+test("centraliza cards e sobrepõe a instrução ao cabeçalho sem mover o calendário", async ({
   page,
 }, testInfo) => {
-  test.skip(
-    testInfo.project.name === "mobile-chromium",
-    "Centralização vertical é específica do desktop"
-  );
-  await page.goto("/?mobileUi=0");
+  const mobile = testInfo.project.name === "mobile-chromium";
+  await page.goto(mobile ? "/?mobileUi=1" : "/?mobileUi=0");
   const panel = page.getByRole("region", {
     name: "Guia inicial do Doze 52",
   });
-  const panelBox = await panel.boundingBox();
-  const viewport = page.viewportSize();
-  if (!panelBox || !viewport) throw new Error("Card inicial não renderizado");
-  expect(
-    Math.abs(panelBox.x + panelBox.width / 2 - viewport.width / 2)
-  ).toBeLessThan(3);
-  expect(
-    Math.abs(panelBox.y + panelBox.height / 2 - viewport.height / 2)
-  ).toBeLessThan(3);
+  if (!mobile) {
+    const panelBox = await panel.boundingBox();
+    const viewport = page.viewportSize();
+    if (!panelBox || !viewport) throw new Error("Card inicial não renderizado");
+    expect(
+      Math.abs(panelBox.x + panelBox.width / 2 - viewport.width / 2)
+    ).toBeLessThan(3);
+    expect(
+      Math.abs(panelBox.y + panelBox.height / 2 - viewport.height / 2)
+    ).toBeLessThan(3);
+  }
 
   await panel.getByRole("button", { name: /Pessoal/ }).click();
+  const cleanSnapshot = await page.evaluate(() => {
+    const payload = JSON.parse(window.localStorage.getItem("yiv-store") ?? "{}");
+    return payload.state as {
+      profiles?: Array<{ name: string }>;
+      categories?: unknown[];
+      events?: unknown[];
+    };
+  });
+  expect(cleanSnapshot.profiles?.map((profile) => profile.name)).toEqual([
+    "Pessoal",
+  ]);
+  expect(cleanSnapshot.categories).toEqual([]);
+  expect(cleanSnapshot.events).toEqual([]);
   await panel
-    .getByRole("button", { name: "Adicionar primeira categoria" })
+    .getByRole("button", { name: "Escolher primeira categoria" })
     .click();
+  const calendarAnchor = mobile
+    ? page.locator("[data-mobile-calendar-divider]")
+    : page.locator("[data-year-grid]");
+  const beforeSelection = await calendarAnchor.boundingBox();
   await panel.getByRole("button", { name: /Aniversários/ }).click();
 
   await expect(panel).toBeHidden();
-  const notice = page.locator(
-    "[data-year-grid] [data-guided-calendar-notice]"
-  );
+  const notice = page.locator("header [data-guided-calendar-notice]");
   await expect(notice).toBeVisible();
-  await expect(notice).toContainText("Selecione uma data diretamente no calendário.");
+  await expect(notice).toContainText(
+    "Escolha no calendário um aniversário que já passou"
+  );
   await expect(notice).not.toContainText(/\bcadastr/i);
+  await expect(
+    page.locator("[data-year-grid] [data-guided-calendar-notice]")
+  ).toHaveCount(0);
+  const afterSelection = await calendarAnchor.boundingBox();
+  if (!beforeSelection || !afterSelection) {
+    throw new Error("Calendário não renderizado");
+  }
+  expect(Math.abs(beforeSelection.y - afterSelection.y)).toBeLessThan(3);
 });
 
 test("dois eventos espontâneos disparam o convite de conta", async ({
@@ -365,7 +402,7 @@ test("Profissional permite categorias específica e genérica", async ({
   await expect(page.locator("[data-onboarding-category-id]")).toHaveCount(0);
 
   await panel
-    .getByRole("button", { name: "Adicionar primeira categoria" })
+    .getByRole("button", { name: "Escolher primeira categoria" })
     .click();
   await panel.getByRole("button", { name: /Datas importantes/ }).click();
   await expect(
