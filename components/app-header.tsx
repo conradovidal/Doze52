@@ -27,8 +27,6 @@ import type { OnboardingFocusTarget } from "@/lib/onboarding";
 import type { AnchorPoint } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-const CATEGORY_COLLAPSE_STORAGE_KEY = "doze52-categories-expanded";
-
 type AppHeaderProps = {
   year: number;
   onYearChange: (year: number) => void;
@@ -75,7 +73,7 @@ export function AppHeader({
   const [editingCategoryId, setEditingCategoryId] = React.useState<string | null>(null);
   const [categoriesExpanded, setCategoriesExpanded] = React.useState(true);
   const [areMobileFiltersCollapsed, setAreMobileFiltersCollapsed] =
-    React.useState(true);
+    React.useState(false);
 
   const pendingProfileCreateRestoreRef = React.useRef<{
     knownProfileIds: string[];
@@ -98,18 +96,14 @@ export function AppHeader({
     onboardingFocusTarget?.kind === "profile" ? onboardingFocusTarget.id : null;
   const highlightedCategoryId =
     onboardingFocusTarget?.kind === "category" ? onboardingFocusTarget.id : null;
-  const hasOnboardingFilterFocus = Boolean(
-    highlightedProfileId || highlightedCategoryId
-  );
   const effectiveCategoriesExpanded =
-    categoriesExpanded || isInlineEditMode || Boolean(highlightedCategoryId);
+    categoriesExpanded || isInlineEditMode;
   const isMobileMode = isMobileCalendarUi === true;
   const filterPanelId = React.useId();
   const showMobileFilterPanel =
     !isMobileMode ||
     !areMobileFiltersCollapsed ||
-    isInlineEditMode ||
-    hasOnboardingFilterFocus;
+    isInlineEditMode;
   const selectedProfile = React.useMemo(
     () =>
       profiles.find((profile) => selectedProfileIds.includes(profile.id)) ??
@@ -152,17 +146,6 @@ export function AppHeader({
       setEditingProfileId(createdProfile.id);
     }
   }, [profileManagerOpen, profiles, setSelectedProfiles]);
-
-  React.useEffect(() => {
-    try {
-      const stored = window.localStorage.getItem(CATEGORY_COLLAPSE_STORAGE_KEY);
-      if (stored === "true" || stored === "false") {
-        setCategoriesExpanded(stored === "true");
-      }
-    } catch {
-      // Keep categories visible when storage is unavailable.
-    }
-  }, []);
 
   React.useEffect(() => {
     if (isInlineEditMode) {
@@ -208,15 +191,6 @@ export function AppHeader({
       setCategoriesVisibility([highlightedCategoryId], true);
     }
   }, [categories, highlightedCategoryId, setCategoriesVisibility]);
-
-  const setPersistedCategoriesExpanded = React.useCallback((expanded: boolean) => {
-    setCategoriesExpanded(expanded);
-    try {
-      window.localStorage.setItem(CATEGORY_COLLAPSE_STORAGE_KEY, String(expanded));
-    } catch {
-      // Ignore storage errors; this is only a local UI preference.
-    }
-  }, []);
 
   const toggleInlineEditMode = React.useCallback(() => {
     setIsInlineEditMode((current) => {
@@ -282,8 +256,8 @@ export function AppHeader({
                   size="sm"
                   className={utilityActiveEditClass}
                   onClick={toggleInlineEditMode}
-                  aria-label="Finalizar edicao de perfis e categorias"
-                  title="Finalizar edicao de perfis e categorias"
+                  aria-label="Finalizar edição de contextos e categorias"
+                  title="Finalizar edição de contextos e categorias"
                 >
                   <Check className="h-4 w-4" />
                   <span className="hidden min-[420px]:inline">Finalizar</span>
@@ -295,8 +269,8 @@ export function AppHeader({
                   size="icon-sm"
                   className={utilityIconClass}
                   onClick={toggleInlineEditMode}
-                  aria-label="Editar perfis e categorias"
-                  title="Editar perfis e categorias"
+                  aria-label="Editar contextos e categorias"
+                  title="Editar contextos e categorias"
                 >
                   <PencilLine className="h-4 w-4" />
                 </Button>
@@ -358,6 +332,11 @@ export function AppHeader({
                 className="m-[3px] flex h-10 w-[calc(100%-6px)] items-center justify-between gap-3 rounded-[8px] bg-transparent px-2.5 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/45"
                 aria-expanded={showMobileFilterPanel}
                 aria-controls={filterPanelId}
+                aria-label={
+                  showMobileFilterPanel
+                    ? "Recolher contextos e categorias"
+                    : "Mostrar contextos e categorias"
+                }
                 onClick={() =>
                   setAreMobileFiltersCollapsed((current) => !current)
                 }
@@ -373,7 +352,7 @@ export function AppHeader({
                     </span>
                   ) : null}
                   <span className="block min-w-0 truncate text-[13px] font-semibold leading-4 text-foreground">
-                    {selectedProfile?.name ?? "Perfis"}
+                    {selectedProfile?.name ?? "Contextos"}
                   </span>
                 </span>
 
@@ -456,7 +435,7 @@ export function AppHeader({
                       }`}
                       disabled={isInlineEditMode}
                       onClick={() =>
-                        setPersistedCategoriesExpanded(!categoriesExpanded)
+                        setCategoriesExpanded(!categoriesExpanded)
                       }
                       aria-label={
                         isInlineEditMode

@@ -2,8 +2,10 @@ import { expect, test, type Page } from "@playwright/test";
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
+    const marker = "doze52:e2e:initialized";
+    if (window.sessionStorage.getItem(marker)) return;
     window.localStorage.clear();
-    window.sessionStorage.clear();
+    window.sessionStorage.setItem(marker, "true");
   });
 });
 
@@ -15,7 +17,7 @@ const selectGuidedDate = async (
   if (mobile) {
     await page
       .getByRole("button", {
-        name: `Selecionar ${dateIso} para o onboarding`,
+        name: `Selecionar ${dateIso} no guia inicial`,
       })
       .click({ force: true });
     return;
@@ -31,6 +33,9 @@ const selectGuidedPeriod = async (
 ) => {
   if (mobile) {
     await selectGuidedDate(page, true, startIso);
+    await expect(
+      page.locator("[data-guided-calendar-notice]")
+    ).toContainText(/Início selecionado/i);
     await selectGuidedDate(page, true, endIso);
     return;
   }
@@ -60,7 +65,7 @@ const completePersonalOnboarding = async (
   finish: "explore" | "category"
 ) => {
   const panel = page.getByRole("region", {
-    name: "Guia inicial do Doze52",
+    name: "Guia inicial do Doze 52",
   });
   await panel.getByRole("button", { name: /Pessoal/ }).click();
   await expect(panel).toHaveAttribute(
@@ -68,13 +73,17 @@ const completePersonalOnboarding = async (
     "profile_reveal"
   );
   await panel
-    .getByRole("button", { name: "Criar primeira categoria" })
+    .getByRole("button", { name: "Adicionar primeira categoria" })
     .click();
   await expect(panel).toHaveAttribute(
     "data-guided-onboarding-step",
     "date_category_selection"
   );
   await panel.getByRole("button", { name: /Aniversários/ }).click();
+  await expect(panel).toBeHidden();
+  await expect(
+    page.locator("[data-guided-calendar-notice]")
+  ).toHaveAttribute("data-guided-selection-mode", "date");
 
   await selectGuidedDate(page, mobile, "2026-02-10");
   await expect(panel).toHaveAttribute(
@@ -91,6 +100,9 @@ const completePersonalOnboarding = async (
   );
   await panel.getByLabel("Nome da data").fill("Aniversário da mãe");
   await panel.getByRole("button", { name: "Salvar", exact: true }).click();
+  await expect(
+    page.locator("[data-guided-calendar-notice]")
+  ).toHaveAttribute("data-guided-selection-mode", "date");
 
   await selectGuidedDate(page, mobile, "2026-09-12");
   await panel.getByLabel("Nome da data").fill("Aniversário do pai");
@@ -101,10 +113,17 @@ const completePersonalOnboarding = async (
     "period_category_selection"
   );
   await panel.getByRole("button", { name: /Férias e viagens/ }).click();
+  await expect(panel).toBeHidden();
+  await expect(
+    page.locator("[data-guided-calendar-notice]")
+  ).toHaveAttribute("data-guided-selection-mode", "period");
 
   await selectGuidedPeriod(page, mobile, "2026-03-10", "2026-03-16");
   await panel.getByLabel("Nome do período").fill("Últimas férias");
   await panel.getByRole("button", { name: "Salvar", exact: true }).click();
+  await expect(
+    page.locator("[data-guided-calendar-notice]")
+  ).toHaveAttribute("data-guided-selection-mode", "period");
 
   await selectGuidedPeriod(page, mobile, "2026-11-10", "2026-11-20");
   await panel.getByLabel("Nome do período").fill("Próximas férias");
@@ -118,8 +137,8 @@ const completePersonalOnboarding = async (
     .getByRole("button", {
       name:
         finish === "explore"
-          ? "Continuar explorando"
-          : "Criar uma nova categoria",
+          ? "Continuar no meu ano"
+          : "Adicionar outra categoria",
     })
     .click();
   await expect(panel).toBeHidden();
@@ -138,13 +157,13 @@ const createRegularEvent = async (
   await expect(dialog).toBeHidden();
 };
 
-test("monta perfil Pessoal de forma incremental", async ({ page }, testInfo) => {
+test("monta contexto Pessoal de forma incremental", async ({ page }, testInfo) => {
   const mobile = testInfo.project.name === "mobile-chromium";
   await page.goto(mobile ? "/?mobileUi=1" : "/?mobileUi=0");
   await expect(page).toHaveTitle("Doze 52 | Seu ano em uma página");
 
   const panel = page.getByRole("region", {
-    name: "Guia inicial do Doze52",
+    name: "Guia inicial do Doze 52",
   });
   await expect(panel).toHaveAttribute(
     "data-guided-onboarding-step",
@@ -153,6 +172,8 @@ test("monta perfil Pessoal de forma incremental", async ({ page }, testInfo) => 
   await expect(panel.getByRole("button", { name: /Outro/ })).toHaveCount(0);
   await expect(page.locator("[data-onboarding-category-id]")).toHaveCount(0);
   await expect(page.locator("[data-onboarding-connector]")).toHaveCount(0);
+  await expect(panel).not.toContainText(/\bperfil\b/i);
+  await expect(panel).not.toContainText(/\bcadastr/i);
 
   await completePersonalOnboarding(page, mobile, "explore");
 
@@ -194,6 +215,87 @@ test("monta perfil Pessoal de forma incremental", async ({ page }, testInfo) => 
       ?.filter((event) => event.title.startsWith("Aniversário"))
       .every((event) => event.recurrenceType === "yearly")
   ).toBe(true);
+});
+
+test("categorias começam abertas, podem ser recolhidas e reabrem ao recarregar", async ({
+  page,
+}, testInfo) => {
+  const mobile = testInfo.project.name === "mobile-chromium";
+  await page.goto(mobile ? "/?mobileUi=1" : "/?mobileUi=0");
+
+  await page
+    .getByRole("button", { name: "Encerrar guia inicial" })
+    .click();
+
+  const expandedLabel = mobile
+    ? "Recolher contextos e categorias"
+    : "Recolher categorias";
+  const collapsedLabel = mobile
+    ? "Mostrar contextos e categorias"
+    : "Mostrar categorias";
+  const expandedToggle = page.getByRole("button", { name: expandedLabel });
+  await expect(expandedToggle).toHaveAttribute("aria-expanded", "true");
+  await expandedToggle.click();
+  await expect(
+    page.getByRole("button", { name: collapsedLabel })
+  ).toHaveAttribute("aria-expanded", "false");
+
+  await page.reload();
+  await expect(
+    page.getByRole("button", { name: expandedLabel })
+  ).toHaveAttribute("aria-expanded", "true");
+});
+
+test("o X encerra o guia e a decisão persiste após recarregar", async ({
+  page,
+}) => {
+  await page.goto("/?mobileUi=0");
+  const panel = page.getByRole("region", {
+    name: "Guia inicial do Doze 52",
+  });
+  await panel.getByRole("button", { name: "Encerrar guia inicial" }).click();
+  await expect(panel).toBeHidden();
+  await expect(page.getByText("Dispensar ajuda")).toHaveCount(0);
+
+  await page.reload();
+  await expect(panel).toBeHidden();
+  await expect(page.locator("[data-guided-calendar-notice]")).toHaveCount(0);
+});
+
+test("centraliza cards e incorpora a instrução ao calendário", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name === "mobile-chromium",
+    "Centralização vertical é específica do desktop"
+  );
+  await page.goto("/?mobileUi=0");
+  const panel = page.getByRole("region", {
+    name: "Guia inicial do Doze 52",
+  });
+  const panelBox = await panel.boundingBox();
+  const viewport = page.viewportSize();
+  if (!panelBox || !viewport) throw new Error("Card inicial não renderizado");
+  expect(
+    Math.abs(panelBox.x + panelBox.width / 2 - viewport.width / 2)
+  ).toBeLessThan(3);
+  expect(
+    Math.abs(panelBox.y + panelBox.height / 2 - viewport.height / 2)
+  ).toBeLessThan(3);
+
+  await panel.getByRole("button", { name: /Pessoal/ }).click();
+  await panel
+    .getByRole("button", { name: "Adicionar primeira categoria" })
+    .click();
+  await panel.getByRole("button", { name: /Aniversários/ }).click();
+
+  await expect(panel).toBeHidden();
+  const notice = page.locator(
+    "[data-year-grid] [data-guided-calendar-notice]"
+  );
+  await expect(notice).toBeVisible();
+  await expect(notice).toContainText("Selecione uma data diretamente no calendário.");
+  await expect(notice).not.toContainText(/\bcadastr/i);
 });
 
 test("dois eventos espontâneos disparam o convite de conta", async ({
@@ -254,7 +356,7 @@ test("Profissional permite categorias específica e genérica", async ({
   );
   await page.goto("/?mobileUi=0");
   const panel = page.getByRole("region", {
-    name: "Guia inicial do Doze52",
+    name: "Guia inicial do Doze 52",
   });
   await panel.getByRole("button", { name: /Profissional/ }).click();
   await expect(
@@ -263,7 +365,7 @@ test("Profissional permite categorias específica e genérica", async ({
   await expect(page.locator("[data-onboarding-category-id]")).toHaveCount(0);
 
   await panel
-    .getByRole("button", { name: "Criar primeira categoria" })
+    .getByRole("button", { name: "Adicionar primeira categoria" })
     .click();
   await panel.getByRole("button", { name: /Datas importantes/ }).click();
   await expect(

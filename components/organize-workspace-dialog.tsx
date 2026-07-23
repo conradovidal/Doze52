@@ -298,7 +298,7 @@ function ProfileRowVisual({
       ? {
           type: "button" as const,
           onClick: onEdit,
-          "aria-label": `Editar perfil ${profile.name}`,
+          "aria-label": `Editar contexto ${profile.name}`,
         }
       : {};
 
@@ -316,7 +316,7 @@ function ProfileRowVisual({
       {isPlaceholder ? <div className={PLACEHOLDER_PANEL_CLASS} /> : null}
 
       <DesktopHandle
-        label={`Reordenar perfil ${profile.name}`}
+        label={`Reordenar contexto ${profile.name}`}
         interactive={Boolean(interactiveHandle)}
         hidden={!interactiveHandle && !isOverlay && !isPlaceholder}
         faded={isPlaceholder}
@@ -360,7 +360,7 @@ function ProfileRowVisual({
             className="h-8 w-8 rounded-full text-muted-foreground/70 hover:bg-muted/45 hover:text-foreground"
             onClick={onMoveUp}
             disabled={disableMoveUp}
-            aria-label={`Mover perfil ${profile.name} para cima`}
+            aria-label={`Mover contexto ${profile.name} para cima`}
           >
             <ArrowUp className="h-3.5 w-3.5" />
           </Button>
@@ -371,7 +371,7 @@ function ProfileRowVisual({
             className="h-8 w-8 rounded-full text-muted-foreground/70 hover:bg-muted/45 hover:text-foreground"
             onClick={onMoveDown}
             disabled={disableMoveDown}
-            aria-label={`Mover perfil ${profile.name} para baixo`}
+            aria-label={`Mover contexto ${profile.name} para baixo`}
           >
             <ArrowDown className="h-3.5 w-3.5" />
           </Button>
@@ -916,7 +916,7 @@ export function OrganizeWorkspaceDialog({
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                Perfis
+                Contextos
               </button>
               <button
                 type="button"
@@ -944,7 +944,7 @@ export function OrganizeWorkspaceDialog({
                     onClick={openCreateProfile}
                   >
                     <Plus className="h-4 w-4" />
-                    Novo perfil
+                    Novo contexto
                   </Button>
                 </div>
 
@@ -964,7 +964,7 @@ export function OrganizeWorkspaceDialog({
                     <div className={LIST_CLASS}>
                       {orderedProfiles.length === 0 ? (
                         <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-                          Nenhum perfil ainda.
+                          Nenhum contexto ainda.
                         </div>
                       ) : (
                         orderedProfiles.map((profile, index) => {
@@ -1022,7 +1022,7 @@ export function OrganizeWorkspaceDialog({
                     <SelectTrigger className="h-9 rounded-full border-border/65 bg-background/80 px-3 shadow-none sm:min-w-[220px]">
                       <span className="truncate">
                         {profiles.find((profile) => profile.id === categoryProfileId)?.name ??
-                          "Perfil"}
+                          "Contexto"}
                       </span>
                     </SelectTrigger>
                     <SelectContent>
@@ -1064,11 +1064,11 @@ export function OrganizeWorkspaceDialog({
                     <div className={LIST_CLASS}>
                       {!categoryProfileId ? (
                         <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-                          Crie um perfil primeiro.
+                          Crie um contexto primeiro.
                         </div>
                       ) : orderedCategoriesForProfile.length === 0 ? (
                         <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-                          Nenhuma categoria nesse perfil.
+                          Nenhuma categoria nesse contexto.
                         </div>
                       ) : (
                         orderedCategoriesForProfile.map((category, index) => (

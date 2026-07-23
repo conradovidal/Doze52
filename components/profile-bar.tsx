@@ -139,8 +139,8 @@ function EditProfileChip({
         <button
           type="button"
           ref={setHandleRef}
-          aria-label={`Reordenar perfil ${profile.name}`}
-          title={`Reordenar perfil ${profile.name}`}
+          aria-label={`Reordenar contexto ${profile.name}`}
+          title={`Reordenar contexto ${profile.name}`}
           className={cn(
             CHIP_HANDLE_CLASS,
             utilityToneClass,
@@ -190,7 +190,7 @@ function EditProfileChip({
         <button
           type="button"
           onClick={onSelect}
-          aria-label={`Selecionar perfil ${profile.name} para editar`}
+          aria-label={`Selecionar contexto ${profile.name} para editar`}
           className={cn(
             "flex min-w-0 flex-1 self-stretch items-center gap-1.5 pl-1 pr-2 text-[0.78rem] font-semibold",
             mobileDense && "text-left text-[0.74rem] leading-[0.84rem]"
@@ -225,8 +225,8 @@ function EditProfileChip({
               event.stopPropagation();
               onEdit?.();
             }}
-            aria-label={`Editar perfil ${profile.name}`}
-            title={`Editar perfil ${profile.name}`}
+            aria-label={`Editar contexto ${profile.name}`}
+            title={`Editar contexto ${profile.name}`}
             className={cn(
               CHIP_EDIT_ACTION_CLASS,
               utilityToneClass,
@@ -518,8 +518,8 @@ export function ProfileBar({
             type="button"
             onClick={onCreateProfile}
             className={cn(CREATE_ACTION_CLASS, mobileDense && "h-10 w-full rounded-[8px]")}
-            aria-label="Criar novo perfil"
-            title="Criar novo perfil"
+            aria-label="Criar novo contexto"
+            title="Criar novo contexto"
           >
             <Plus className="h-3.5 w-3.5" />
           </button>

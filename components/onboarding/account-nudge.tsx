@@ -25,8 +25,8 @@ export function AccountNudge({
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold">Vale a pena guardar este ano.</p>
           <p className="mt-0.5 text-xs leading-4 text-muted-foreground">
-            Você continuou construindo depois do onboarding. Crie sua conta
-            para acessar esta visão em outros dispositivos.
+            Você continuou adicionando datas e períodos. Crie sua conta para
+            acessar essa visão em outros dispositivos.
           </p>
         </div>
         <Button

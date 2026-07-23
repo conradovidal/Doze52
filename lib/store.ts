@@ -425,7 +425,7 @@ const normalizePersistedProfiles = (
       profile.id && profile.id.trim() && isUuid(profile.id) ? profile.id : uid();
     if (seen.has(normalizedId)) continue;
     seen.add(normalizedId);
-    const normalizedName = profile.name?.trim() || "Perfil";
+    const normalizedName = profile.name?.trim() || "Contexto";
     const normalizedColor = DEFAULT_PROFILE_COLOR;
     next.push({
       ...profile,

@@ -4,7 +4,7 @@ import { THEME_CHROME_COLOR_FALLBACK } from "@/lib/theme-shared";
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Doze 52",
-    short_name: "Doze52",
+    short_name: "Doze 52",
     description: "Planejamento visual anual com foco semanal.",
     start_url: "/",
     scope: "/",

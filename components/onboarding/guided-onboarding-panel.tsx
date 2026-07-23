@@ -7,9 +7,7 @@ import {
   Check,
   Flag,
   Gift,
-  GripHorizontal,
   Layers3,
-  MousePointer2,
   Plane,
   Plus,
   UserRound,
@@ -35,10 +33,7 @@ export type GuidedCalendarDraft = {
 type GuidedOnboardingPanelProps = {
   state: GuidedOnboardingState;
   draft: GuidedCalendarDraft | null;
-  isMobile: boolean;
-  mobileRangeStart?: string | null;
   onClose: () => void;
-  onDismiss: () => void;
   onConfigureContext: (context: OnboardingContext) => void;
   onContinueFromProfile: () => void;
   onChooseCategory: (
@@ -73,6 +68,12 @@ const formatDate = (value: string) => {
     month: "short",
     year: "numeric",
   }).format(new Date(year, month - 1, day));
+};
+
+export type GuidedSelectionNotice = {
+  mode: "date" | "period";
+  title: string;
+  instruction: string;
 };
 
 const getDateCopy = (
@@ -151,7 +152,7 @@ const getPeriodCopy = (
   if (itemCount === 0) {
     if (isTravel) {
       return {
-        title: "Agora cadastre suas últimas férias ou viagem.",
+        title: "Agora adicione suas últimas férias ou viagem.",
         description: "Selecione do primeiro ao último dia desse período.",
         prompt: "Que período foi esse?",
         placeholder: "Ex.: Viagem em família",
@@ -159,7 +160,7 @@ const getPeriodCopy = (
     }
     if (isProject) {
       return {
-        title: "Agora cadastre o período do seu último projeto.",
+        title: "Agora adicione o período do seu último projeto.",
         description: "Selecione desde quando ele começou até quando terminou.",
         prompt: "Qual foi esse projeto?",
         placeholder: "Ex.: Projeto concluído",
@@ -168,8 +169,8 @@ const getPeriodCopy = (
     return {
       title:
         context === "personal"
-          ? "Cadastre um período importante que já passou."
-          : "Cadastre um período profissional que já passou.",
+          ? "Adicione um período importante que já passou."
+          : "Adicione um período profissional que já passou.",
       description: "Selecione o primeiro e o último dia desse período.",
       prompt: "O que ocupou esse período?",
       placeholder: "Ex.: Um período importante",
@@ -178,7 +179,7 @@ const getPeriodCopy = (
 
   if (isTravel) {
     return {
-      title: "Agora cadastre suas próximas férias ou viagem.",
+      title: "Agora adicione suas próximas férias ou viagem.",
       description: "Selecione do primeiro ao último dia planejado.",
       prompt: "Que período será esse?",
       placeholder: "Ex.: Próximas férias",
@@ -186,7 +187,7 @@ const getPeriodCopy = (
   }
   if (isProject) {
     return {
-      title: "Agora cadastre seu projeto atual ou o próximo.",
+      title: "Agora adicione seu projeto atual ou o próximo.",
       description: "Selecione desde o início até a conclusão esperada.",
       prompt: "Qual é esse projeto?",
       placeholder: "Ex.: Reestruturação comercial",
@@ -195,50 +196,96 @@ const getPeriodCopy = (
   return {
     title:
       context === "personal"
-        ? "Agora cadastre o próximo período importante."
-        : "Agora cadastre o próximo período profissional importante.",
+        ? "Agora adicione o próximo período importante."
+        : "Agora adicione o próximo período profissional importante.",
     description: "Selecione o primeiro e o último dia planejado.",
     prompt: "O que vai ocupar esse período?",
     placeholder: "Ex.: Um próximo período",
   };
 };
 
-function InteractionHint({
-  period,
+export const getGuidedSelectionNotice = ({
+  state,
   isMobile,
+  mobileRangeStart,
 }: {
-  period: boolean;
+  state: GuidedOnboardingState;
   isMobile: boolean;
+  mobileRangeStart?: string | null;
+}): GuidedSelectionNotice | null => {
+  const context = state.context ?? "personal";
+  if (state.step === "date_instruction") {
+    const copy = getDateCopy(
+      context,
+      state.dateCategoryId,
+      state.dateItemsCreated ?? 0
+    );
+    return {
+      mode: "date",
+      title: copy.title,
+      instruction: "Selecione uma data diretamente no calendário.",
+    };
+  }
+  if (state.step !== "period_instruction") return null;
+  const copy = getPeriodCopy(
+    context,
+    state.periodCategoryId,
+    state.periodItemsCreated ?? 0
+  );
+  return {
+    mode: "period",
+    title: copy.title,
+    instruction:
+      isMobile && mobileRangeStart
+        ? `Início selecionado em ${formatDate(mobileRangeStart)}. Agora selecione o último dia.`
+        : isMobile
+          ? "Toque no primeiro e depois no último dia do período."
+          : "Clique, segure e arraste do início ao fim do período.",
+  };
+};
+
+export function GuidedCalendarNotice({
+  notice,
+  onClose,
+}: {
+  notice: GuidedSelectionNotice;
+  onClose: () => void;
 }) {
   return (
-    <div className="mt-3 flex items-center gap-2 rounded-xl border border-primary/18 bg-primary/7 px-3 py-2 text-xs font-medium text-primary">
-      {period ? (
-        <GripHorizontal
-          className="size-4 motion-safe:animate-pulse"
-          aria-hidden="true"
-        />
-      ) : (
-        <MousePointer2
-          className="size-4 motion-safe:animate-bounce"
-          aria-hidden="true"
-        />
-      )}
-      {period
-        ? isMobile
-          ? "Toque no início e depois no fim do período."
-          : "Clique, segure e arraste do início ao fim."
-        : "Escolha um dia diretamente no calendário."}
-    </div>
+    <aside
+      data-guided-calendar-notice
+      data-guided-selection-mode={notice.mode}
+      aria-label="Instrução do guia inicial"
+      aria-live="polite"
+      className="flex items-start gap-3 border-b border-border bg-primary/6 px-3 py-3 text-card-foreground sm:px-4"
+    >
+      <div className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+        <CalendarDays className="size-4" aria-hidden="true" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold leading-5">{notice.title}</p>
+        <p className="mt-0.5 text-xs leading-4 text-muted-foreground">
+          {notice.instruction}
+        </p>
+      </div>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-xs"
+        className="-mt-0.5 -mr-1 rounded-full"
+        aria-label="Encerrar guia inicial"
+        onClick={onClose}
+      >
+        <X />
+      </Button>
+    </aside>
   );
 }
 
 export function GuidedOnboardingPanel({
   state,
   draft,
-  isMobile,
-  mobileRangeStart,
   onClose,
-  onDismiss,
   onConfigureContext,
   onContinueFromProfile,
   onChooseCategory,
@@ -295,7 +342,7 @@ export function GuidedOnboardingPanel({
         variant="ghost"
         size="icon-xs"
         className="rounded-full"
-        aria-label="Fechar ajuda por agora"
+        aria-label="Encerrar guia inicial"
         onClick={onClose}
       >
         <X />
@@ -370,10 +417,11 @@ export function GuidedOnboardingPanel({
       return (
         <>
           <h2 className="mt-4 text-xl font-semibold tracking-[-0.025em]">
-            Vamos criar o seu primeiro perfil.
+            Qual contexto você quer enxergar primeiro?
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Onde uma visão do ano inteiro ajudaria mais?
+            Comece pela parte da vida ou do trabalho que você quer observar
+            separadamente.
           </p>
           <div className="mt-4 grid gap-2">
             {CONTEXT_OPTIONS.map((option) => {
@@ -408,10 +456,11 @@ export function GuidedOnboardingPanel({
       return (
         <>
           <h2 className="mt-4 text-lg font-semibold tracking-[-0.02em]">
-            Este é o perfil que vai organizar essa parte do seu ano.
+            Seu primeiro contexto está pronto.
           </h2>
           <p className="mt-1 text-sm leading-5 text-muted-foreground">
-            Agora vamos criar as categorias dentro dele, uma de cada vez.
+            Agora adicione uma categoria para organizar o que você quer
+            enxergar nessa parte do ano.
           </p>
           <Button
             type="button"
@@ -419,7 +468,7 @@ export function GuidedOnboardingPanel({
             className="mt-4 w-full"
             onClick={onContinueFromProfile}
           >
-            Criar primeira categoria
+            Adicionar primeira categoria
           </Button>
         </>
       );
@@ -429,10 +478,10 @@ export function GuidedOnboardingPanel({
       return (
         <>
           <h2 className="mt-4 text-lg font-semibold tracking-[-0.02em]">
-            Qual categoria de datas você quer criar primeiro?
+            Qual categoria de datas você quer adicionar primeiro?
           </h2>
           <p className="mt-1 text-sm leading-5 text-muted-foreground">
-            Nossa sugestão é começar por eventos que acontecem em um único dia.
+            Uma data acontece em um único dia.
           </p>
           {renderCategoryChoices("date")}
         </>
@@ -443,41 +492,12 @@ export function GuidedOnboardingPanel({
       return (
         <>
           <h2 className="mt-4 text-lg font-semibold tracking-[-0.02em]">
-            Agora crie uma categoria para períodos maiores.
+            Agora adicione uma categoria de períodos.
           </h2>
           <p className="mt-1 text-sm leading-5 text-muted-foreground">
-            Ela vai reunir coisas que ocupam vários dias do seu ano.
+            Um período tem início e fim e ocupa mais de um dia.
           </p>
           {renderCategoryChoices("period")}
-        </>
-      );
-    }
-
-    if (state.step === "date_instruction" || state.step === "period_instruction") {
-      const period = state.step === "period_instruction";
-      const copy = period ? periodCopy : dateCopy;
-      return (
-        <>
-          <h2 className="mt-4 text-lg font-semibold tracking-[-0.02em]">
-            {copy.title}
-          </h2>
-          <p className="mt-1 text-sm leading-5 text-muted-foreground">
-            {copy.description}
-          </p>
-          {!period &&
-          state.dateCategoryId === ONBOARDING_CATEGORY_IDS.birthday ? (
-            <p className="mt-2 text-xs font-medium text-primary/90">
-              Recorrência anual ativada nos aniversários.
-            </p>
-          ) : null}
-          {mobileRangeStart && period ? (
-            <p className="mt-3 rounded-xl bg-primary/8 px-3 py-2 text-xs font-medium text-primary">
-              Início escolhido em {formatDate(mobileRangeStart)}. Agora toque no
-              dia final.
-            </p>
-          ) : (
-            <InteractionHint period={period} isMobile={isMobile} />
-          )}
         </>
       );
     }
@@ -578,10 +598,10 @@ export function GuidedOnboardingPanel({
       return (
         <>
           <h2 className="mt-4 text-lg font-semibold tracking-[-0.02em]">
-            Seu ano já começou a ganhar forma.
+            Seu ano começou a ficar visível.
           </h2>
           <p className="mt-1 text-sm leading-5 text-muted-foreground">
-            Você criou duas categorias e já sabe adicionar tanto datas quanto
+            Você adicionou duas categorias e aprendeu a marcar datas e definir
             períodos.
           </p>
           <div className="mt-4 grid gap-2">
@@ -590,14 +610,14 @@ export function GuidedOnboardingPanel({
               variant="premium"
               onClick={() => onComplete("explore")}
             >
-              Continuar explorando
+              Continuar no meu ano
             </Button>
             <Button
               type="button"
               variant="outline"
               onClick={() => onComplete("category")}
             >
-              <Plus /> Criar uma nova categoria
+              <Plus /> Adicionar outra categoria
             </Button>
           </div>
         </>
@@ -612,21 +632,12 @@ export function GuidedOnboardingPanel({
     <section
       data-onboarding-panel
       data-guided-onboarding-step={state.step}
-      aria-label="Guia inicial do Doze52"
+      aria-label="Guia inicial do Doze 52"
       aria-live="polite"
-      className="fixed top-[calc(env(safe-area-inset-top,0px)+4.6rem)] left-1/2 z-50 w-[min(42rem,calc(100vw-1.5rem))] -translate-x-1/2 rounded-[1.5rem] border border-foreground/15 bg-card/98 p-4.5 text-card-foreground shadow-[0_28px_90px_-28px_rgba(15,23,42,0.68)] backdrop-blur-xl animate-in fade-in-0 slide-in-from-top-2 duration-200 motion-reduce:animate-none sm:p-5 md:left-4 md:w-[23rem] md:translate-x-0"
+      className="fixed top-[calc(env(safe-area-inset-top,0px)+4.6rem)] left-1/2 z-50 w-[min(42rem,calc(100vw-1.5rem))] -translate-x-1/2 rounded-[1.5rem] border border-foreground/15 bg-card/98 p-4.5 text-card-foreground shadow-[0_28px_90px_-28px_rgba(15,23,42,0.68)] backdrop-blur-xl animate-in fade-in-0 slide-in-from-top-2 duration-200 motion-reduce:animate-none sm:p-5 md:top-1/2 md:w-[23rem] md:-translate-y-1/2"
     >
       {header}
       {content}
-      <div className="mt-4 border-t border-border/65 pt-3">
-        <button
-          type="button"
-          className="block text-[11px] text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-          onClick={onDismiss}
-        >
-          Dispensar ajuda
-        </button>
-      </div>
     </section>
   );
 }

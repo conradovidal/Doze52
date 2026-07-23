@@ -50,8 +50,17 @@ export const waitForRemoteBootstrapAfterLogin = async (page: Page) => {
 };
 
 export const dismissOnboardingIfVisible = async (page: Page) => {
-  const button = page.getByRole("button", { name: "Entendi" });
-  if (await button.isVisible().catch(() => false)) await button.click();
+  const guidedButton = page.getByRole("button", {
+    name: "Encerrar guia inicial",
+  });
+  if (await guidedButton.isVisible().catch(() => false)) {
+    await guidedButton.click();
+    return;
+  }
+  const legacyButton = page.getByRole("button", { name: "Entendi" });
+  if (await legacyButton.isVisible().catch(() => false)) {
+    await legacyButton.click();
+  }
 };
 
 export const expectAuthenticated = async (page: Page) => {

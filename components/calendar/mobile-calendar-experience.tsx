@@ -17,6 +17,10 @@ import {
 import { getCategoryColorToken } from "@/lib/category-palette";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
+import {
+  GuidedCalendarNotice,
+  type GuidedSelectionNotice,
+} from "@/components/onboarding/guided-onboarding-panel";
 
 type MobileCalendarExperienceProps = {
   year: number;
@@ -33,6 +37,8 @@ type MobileCalendarExperienceProps = {
   guidedSelectionMode?: "date" | "period" | null;
   guidedRangeStart?: string | null;
   onGuidedDaySelect?: (dateIso: string) => void;
+  guidedSelectionNotice?: GuidedSelectionNotice | null;
+  onDismissGuidedSelection?: () => void;
 };
 
 const MONTH_LABELS = [
@@ -160,6 +166,8 @@ export function MobileCalendarExperience({
   guidedSelectionMode = null,
   guidedRangeStart = null,
   onGuidedDaySelect,
+  guidedSelectionNotice = null,
+  onDismissGuidedSelection,
 }: MobileCalendarExperienceProps) {
   const categories = useStore((s) => s.categories as CategoryItem[]);
   const selectedProfileIds = useStore((s) => s.selectedProfileIds);
@@ -538,6 +546,14 @@ export function MobileCalendarExperience({
         className="mx-auto min-h-0 w-full max-w-[31rem] flex-1 overflow-y-auto overscroll-contain pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         <div className="space-y-1">
+          {guidedSelectionNotice && onDismissGuidedSelection ? (
+            <div className="sticky top-0 z-20 mb-2 overflow-hidden rounded-xl border border-border bg-card shadow-[0_18px_36px_-28px_rgba(15,23,42,0.6)]">
+              <GuidedCalendarNotice
+                notice={guidedSelectionNotice}
+                onClose={onDismissGuidedSelection}
+              />
+            </div>
+          ) : null}
           {yearDays.map((day) => {
             const dayIso = toIsoDate(day);
             const dayEvents = getEventsForDay(visibleEvents, dayIso);
@@ -577,7 +593,7 @@ export function MobileCalendarExperience({
                   className="grid h-full place-items-center rounded-[9px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45"
                   aria-label={
                     guidedSelectable
-                      ? `Selecionar ${dayIso} para o onboarding`
+                      ? `Selecionar ${dayIso} no guia inicial`
                       : undefined
                   }
                   onClick={() => {

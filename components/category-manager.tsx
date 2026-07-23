@@ -124,7 +124,7 @@ export function CategoryManager({
     setSaveError(
       profileId && profiles.some((profile) => profile.id === profileId)
         ? null
-        : "Selecione um perfil válido antes de criar a categoria."
+        : "Selecione um contexto válido antes de criar a categoria."
     );
   }, [open, mode, category, profileId, profiles]);
 
@@ -163,11 +163,11 @@ export function CategoryManager({
         return;
       }
       if (!profileDraftId) {
-        setSaveError("Selecione um perfil antes de criar a categoria.");
+        setSaveError("Selecione um contexto antes de criar a categoria.");
         return;
       }
       if (!isPro && isLimitReached(categories.length, limits.maxCategories)) {
-        setSaveError("Mais categorias fazem parte do Doze52 Pro.");
+        setSaveError("Mais categorias fazem parte do Doze 52 Pro.");
         return;
       }
       const id = createCategory({
@@ -260,13 +260,13 @@ export function CategoryManager({
             >
               <SelectTrigger
                 size="sm"
-                aria-label="Perfil da categoria"
+                aria-label="Contexto da categoria"
                 className={`${CHIP_TRIGGER_CLASS} border-border/80 bg-background text-foreground hover:bg-muted/70 sm:flex-1`}
                 disabled={profiles.length === 0}
               >
                 <span className="inline-flex min-w-0 items-center gap-1.5 pr-2">
                   {currentProfile ? <ProfileIcon icon={currentProfile.icon} size={12} /> : null}
-                  <span className="truncate">{currentProfile?.name ?? "Perfil"}</span>
+                  <span className="truncate">{currentProfile?.name ?? "Contexto"}</span>
                 </span>
               </SelectTrigger>
               <SelectContent position="popper" side="bottom" align="start">

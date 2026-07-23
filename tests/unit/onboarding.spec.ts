@@ -30,7 +30,7 @@ const completedState = (): GuidedOnboardingState => ({
   postOnboardingCategoriesCreated: 0,
 });
 
-test("cria perfil, categorias incrementais e quatro eventos", () => {
+test("cria contexto, categorias incrementais e quatro eventos", () => {
   const configured = reduceGuidedOnboardingState(initialState(), {
     type: "configure_profile",
     context: "work",
@@ -231,7 +231,7 @@ test("oferece categorias específicas e genéricas por contexto", () => {
   });
 });
 
-test("novo template começa com perfil neutro e nenhuma categoria", () => {
+test("novo template começa com contexto neutro e nenhuma categoria", () => {
   expect(getOnboardingDefaultProfiles()[0]?.name).toBe("Meu ano");
   expect(getOnboardingDefaultCategories()).toEqual([]);
   expect(
@@ -250,7 +250,7 @@ test("novo template começa com perfil neutro e nenhuma categoria", () => {
 test("materialização cria IDs distintos e preserva relacionamentos", () => {
   const profiles = getOnboardingDefaultProfiles();
   const profile = profiles[0];
-  if (!profile) throw new Error("Template sem perfil");
+  if (!profile) throw new Error("Template sem contexto");
   const definition = getOnboardingCategoryDefinition(
     "personal",
     "date",

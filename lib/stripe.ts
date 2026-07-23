@@ -17,7 +17,7 @@ export const getStripe = () => {
     stripeClient = new Stripe(requireServerEnv("STRIPE_SECRET_KEY"), {
       apiVersion: STRIPE_API_VERSION,
       appInfo: {
-        name: "Doze52",
+        name: "Doze 52",
       },
     });
   }

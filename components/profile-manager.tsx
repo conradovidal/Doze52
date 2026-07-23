@@ -110,7 +110,7 @@ export function ProfileManager({
         startEdit(editingProfile);
         return;
       }
-      showMissingIntentError("Este perfil não foi encontrado. Feche e tente novamente.");
+      showMissingIntentError("Este contexto não foi encontrado. Feche e tente novamente.");
       return;
     }
 
@@ -145,7 +145,7 @@ export function ProfileManager({
       }
 
       if (!isPro && isLimitReached(profiles.length, limits.maxProfiles)) {
-        setSaveError("Perfis múltiplos fazem parte do Doze52 Pro.");
+        setSaveError("Vários contextos fazem parte do Doze 52 Pro.");
         return;
       }
 
@@ -157,7 +157,7 @@ export function ProfileManager({
       setSaveError(
         error instanceof Error
           ? error.message
-          : "Falhou ao salvar perfil. Tente novamente."
+          : "Falhou ao salvar o contexto. Tente novamente."
       );
     } finally {
       setIsSaving(false);
@@ -168,7 +168,7 @@ export function ProfileManager({
     if (!editingProfile) return;
     if (profiles.length <= 1) return;
     if (!deleteTargetProfileId || deleteTargetProfileId === editingProfile.id) {
-      setSaveError("Selecione um perfil de destino para reatribuir as categorias.");
+      setSaveError("Selecione um contexto de destino para reatribuir as categorias.");
       return;
     }
     const target =
@@ -187,7 +187,7 @@ export function ProfileManager({
       setSaveError(
         error instanceof Error
           ? error.message
-          : "Falhou ao excluir perfil. Tente novamente."
+          : "Falhou ao excluir o contexto. Tente novamente."
       );
     } finally {
       setIsSaving(false);
@@ -227,7 +227,7 @@ export function ProfileManager({
     >
       <DialogContent className="sm:max-w-[480px] p-5 sm:p-6">
         <DialogHeader>
-          <DialogTitle>{isEditMode ? "Editar perfil" : "Novo perfil"}</DialogTitle>
+          <DialogTitle>{isEditMode ? "Editar contexto" : "Novo contexto"}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-5">
@@ -237,13 +237,13 @@ export function ProfileManager({
             </div>
             <Input
               id="profile-name"
-              aria-label="Nome do perfil"
+              aria-label="Nome do contexto"
               value={name}
               onChange={(event) =>
                 setName(event.target.value.slice(0, PROFILE_NAME_MAX_LENGTH))
               }
               maxLength={PROFILE_NAME_MAX_LENGTH}
-              placeholder="Nome do perfil"
+              placeholder="Nome do contexto"
               className="h-11 flex-1 rounded-xl"
             />
           </div>
@@ -300,18 +300,19 @@ export function ProfileManager({
     <Dialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
       <DialogContent className="sm:max-w-[460px]">
         <DialogHeader>
-          <DialogTitle>Excluir perfil</DialogTitle>
+          <DialogTitle>Excluir contexto</DialogTitle>
           <DialogDescription>
-            As categorias deste perfil serao reatribuidas para outro perfil antes da exclusao.
+            As categorias deste contexto serão reatribuídas para outro contexto
+            antes da exclusão.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
-            As categorias deste perfil serao reatribuidas para:
+            As categorias deste contexto serão reatribuídas para:
             </p>
           <Select value={deleteTargetProfileId} onValueChange={setDeleteTargetProfileId}>
             <SelectTrigger className="h-10 rounded-xl border-border/80 bg-background shadow-sm">
-              <SelectValue placeholder="Selecione o perfil de destino" />
+              <SelectValue placeholder="Selecione o contexto de destino" />
             </SelectTrigger>
             <SelectContent>
               {profiles

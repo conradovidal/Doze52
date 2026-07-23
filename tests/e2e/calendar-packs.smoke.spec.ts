@@ -10,7 +10,7 @@ import {
   waitForSupabaseWrite,
 } from "./support/browser";
 
-test("perfil, sincronizacao e calendario pronto funcionam de ponta a ponta", async ({
+test("contexto, sincronizacao e calendario pronto funcionam de ponta a ponta", async ({
   page,
 }) => {
   await installVercelBypass(page);
@@ -21,15 +21,15 @@ test("perfil, sincronizacao e calendario pronto funcionam de ponta a ponta", asy
   await expectAuthenticated(page);
   await dismissOnboardingIfVisible(page);
 
-  await page.getByRole("button", { name: "Editar perfis e categorias" }).click();
-  await page.getByRole("button", { name: "Criar novo perfil" }).click();
-  const profileDialog = page.getByRole("dialog", { name: "Novo perfil" });
-  await profileDialog.getByLabel("Nome do perfil").fill("QA Smoke");
+  await page.getByRole("button", { name: "Editar contextos e categorias" }).click();
+  await page.getByRole("button", { name: "Criar novo contexto" }).click();
+  const profileDialog = page.getByRole("dialog", { name: "Novo contexto" });
+  await profileDialog.getByLabel("Nome do contexto").fill("QA Smoke");
   const profileSaved = waitForSupabaseWrite(page, "calendar_profiles", ["POST"]);
   await profileDialog.getByRole("button", { name: "Criar", exact: true }).click();
   await expect(profileDialog).toBeHidden();
   await page
-    .getByRole("button", { name: "Finalizar edicao de perfis e categorias" })
+    .getByRole("button", { name: "Finalizar edição de contextos e categorias" })
     .click();
   await profileSaved;
   await waitForSyncReady(page);
@@ -48,12 +48,12 @@ test("perfil, sincronizacao e calendario pronto funcionam de ponta a ponta", asy
     .getByRole("article")
     .filter({ hasText: "Jogos do seu time favorito" });
   await teamCard.getByRole("button", { name: "Adicionar calendário" }).click();
-  await teamCard.getByRole("combobox", { name: "Perfil para Jogos do seu time favorito" }).click();
+  await teamCard.getByRole("combobox", { name: "Contexto para Jogos do seu time favorito" }).click();
   await page.getByRole("option", { name: "QA Smoke" }).click();
   const eventsImported = waitForSupabaseWrite(page, "events", ["POST"]);
   await teamCard
     .getByRole("button", {
-      name: "Adicionar calendário Jogos do seu time favorito ao perfil QA Smoke",
+      name: "Adicionar calendário Jogos do seu time favorito ao contexto QA Smoke",
     })
     .click();
   await expect(teamCard.getByRole("button", { name: "Remover" })).toBeVisible();

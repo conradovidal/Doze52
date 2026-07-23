@@ -496,7 +496,7 @@ const validateSnapshot = (snapshot: CalendarSnapshot) => {
   for (const category of snapshot.categories) {
     validateCategoryInput(category);
     if (!profileIds.has(category.profileId)) {
-      throw new ValidationError("Categoria invalida: perfil nao encontrado.");
+      throw new ValidationError("Categoria inválida: contexto não encontrado.");
     }
     categoryIds.add(category.id);
   }

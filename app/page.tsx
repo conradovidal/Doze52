@@ -14,6 +14,7 @@ import {
 import { AuthDialog } from "@/components/auth/auth-dialog";
 import {
   GuidedOnboardingPanel,
+  getGuidedSelectionNotice,
   type GuidedCalendarDraft,
 } from "@/components/onboarding/guided-onboarding-panel";
 import { AccountNudge } from "@/components/onboarding/account-nudge";
@@ -65,7 +66,7 @@ const toSnapshotHash = (snapshot: CalendarSnapshot) => JSON.stringify(snapshot);
 
 const SYNC_HINT_BY_KIND: Record<SyncError["kind"], string> = {
   missing_relation:
-    "Schema pendente no Supabase (rode as migrations de perfis/icones).",
+    "Schema pendente no Supabase (rode as migrations de contextos/ícones).",
   permission: "RLS/policies sem permissao para seu usuario.",
   not_authenticated: "Sessao expirada. Faca login novamente.",
   network: "Falha de rede. Tente novamente em instantes.",
@@ -310,7 +311,6 @@ export default function HomePage() {
     React.useState<ProductOnboardingState | null>(null);
   const [guidedOnboarding, setGuidedOnboarding] =
     React.useState<GuidedOnboardingState | null>(null);
-  const [guidedPanelHidden, setGuidedPanelHidden] = React.useState(false);
   const [accountNudgeVisible, setAccountNudgeVisible] = React.useState(false);
   const [categoryCreateRequestKey, setCategoryCreateRequestKey] =
     React.useState(0);
@@ -588,7 +588,6 @@ export default function HomePage() {
     const syncOnboarding = () => {
       setCalendarCreateOnboarding(readProductOnboardingState("create-event"));
       setGuidedOnboarding(readGuidedOnboardingState());
-      setGuidedPanelHidden(false);
     };
 
     const syncGuidedOnboarding = (event: Event) => {
@@ -1001,7 +1000,6 @@ export default function HomePage() {
     guidedOnboarding &&
       calendarCreateOnboarding &&
       isMobileCalendarUi !== null &&
-      !guidedPanelHidden &&
       shouldShowGuidedOnboarding({
         state: guidedOnboarding,
         legacyState: calendarCreateOnboarding,
@@ -1041,7 +1039,7 @@ export default function HomePage() {
       if (!configured) {
         notify({
           tone: "error",
-          title: "Não foi possível configurar este perfil",
+          title: "Não foi possível configurar este contexto",
           description: "Confira o nome ou continue usando o calendário atual.",
         });
         return;
@@ -1069,7 +1067,7 @@ export default function HomePage() {
         notify({
           tone: "error",
           title: "Não foi possível criar esta categoria",
-          description: "Tente novamente ou dispense a ajuda para continuar.",
+          description: "Tente novamente ou encerre o guia para continuar.",
         });
         return;
       }
@@ -1096,13 +1094,12 @@ export default function HomePage() {
       if (current.step === "completed") return;
       const completed = updateGuidedOnboarding({ type: "complete" });
       if (completed.step !== "completed") return;
-      setGuidedPanelHidden(true);
       if (next === "category") {
         setCategoryCreateRequestKey((value) => value + 1);
       }
       notify({
         tone: "success",
-        title: "Teu ano já começou a ganhar forma",
+        title: "Seu ano começou a ficar visível",
         description: "Continue adicionando contexto quando algo mudar.",
         durationMs: 3200,
       });
@@ -1112,7 +1109,6 @@ export default function HomePage() {
 
   const dismissGuidedOnboarding = React.useCallback(() => {
     updateGuidedOnboarding({ type: "dismiss" });
-    setGuidedPanelHidden(true);
   }, [updateGuidedOnboarding]);
 
   const trackPostOnboardingElement = React.useCallback(
@@ -1580,6 +1576,23 @@ export default function HomePage() {
     return null;
   }, [guidedOnboarding, profiles, selectedProfileIds, showGuidedOnboarding]);
 
+  const guidedSelectionNotice = React.useMemo(
+    () =>
+      showGuidedOnboarding && guidedOnboarding
+        ? getGuidedSelectionNotice({
+            state: guidedOnboarding,
+            isMobile: isMobileCalendarUi === true,
+            mobileRangeStart: mobileGuidedRangeStart,
+          })
+        : null,
+    [
+      guidedOnboarding,
+      isMobileCalendarUi,
+      mobileGuidedRangeStart,
+      showGuidedOnboarding,
+    ]
+  );
+
   const handleYearChange = React.useCallback(
     (nextYear: number) => {
       setYear(nextYear);
@@ -1671,6 +1684,8 @@ export default function HomePage() {
           }
           guidedRangeStart={mobileGuidedRangeStart}
           onGuidedDaySelect={handleMobileGuidedDaySelect}
+          guidedSelectionNotice={guidedSelectionNotice}
+          onDismissGuidedSelection={dismissGuidedOnboarding}
         />
       ) : (
         <div className="overflow-x-auto pb-1 md:overflow-visible">
@@ -1704,6 +1719,8 @@ export default function HomePage() {
                 normalizeDayOrder(dayIso, orderedIds);
               }}
               isMobileInteractionMode={false}
+              guidedSelectionNotice={guidedSelectionNotice}
+              onDismissGuidedSelection={dismissGuidedOnboarding}
             />
           </div>
         </div>
@@ -1713,10 +1730,7 @@ export default function HomePage() {
         <GuidedOnboardingPanel
           state={guidedOnboarding}
           draft={guidedDraft}
-          isMobile={isMobileCalendarUi === true}
-          mobileRangeStart={mobileGuidedRangeStart}
-          onClose={() => setGuidedPanelHidden(true)}
-          onDismiss={dismissGuidedOnboarding}
+          onClose={dismissGuidedOnboarding}
           onConfigureContext={handleConfigureGuidedContext}
           onContinueFromProfile={() =>
             updateGuidedOnboarding({ type: "continue_from_profile" })

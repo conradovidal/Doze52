@@ -85,7 +85,7 @@ export function BillingProvider({ children }: { children: React.ReactNode }) {
       notify({
         tone: "info",
         title: "Entre para assinar",
-        description: "Depois do login, você pode ativar o Doze52 Pro.",
+        description: "Depois do login, você pode ativar o Doze 52 Pro.",
       });
       return false;
     },
