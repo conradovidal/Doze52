@@ -18,6 +18,8 @@ import {
   type GuidedCalendarDraft,
 } from "@/components/onboarding/guided-onboarding-panel";
 import { AccountNudge } from "@/components/onboarding/account-nudge";
+import { OnboardingTestReset } from "@/components/onboarding/onboarding-test-reset";
+import type { GuidedToolbarNotice } from "@/components/onboarding/guided-toolbar-notice";
 import { Button } from "@/components/ui/button";
 import { useFeedback } from "@/components/ui/feedback-provider";
 import {
@@ -47,6 +49,7 @@ import {
   hasAuthorCalendarEvents,
   readGuidedOnboardingState,
   readProductOnboardingState,
+  resetAllProductOnboarding,
   shouldShowGuidedOnboarding,
   type GuidedOnboardingAction,
   type GuidedOnboardingState,
@@ -1106,7 +1109,8 @@ export default function HomePage() {
   const handleChooseGuidedCategory = React.useCallback(
     (
       intent: "date" | "period",
-      choice: OnboardingCategoryChoice
+      choice: OnboardingCategoryChoice,
+      color: string
     ) => {
       const current = readGuidedOnboardingState();
       if (!current.context) return;
@@ -1114,6 +1118,7 @@ export default function HomePage() {
         context: current.context,
         intent,
         choice,
+        color,
       });
       if (!categoryId) {
         notify({
@@ -1163,6 +1168,21 @@ export default function HomePage() {
     clearOnboardingPersonalDemo();
     updateGuidedOnboarding({ type: "dismiss" });
   }, [clearOnboardingPersonalDemo, updateGuidedOnboarding]);
+
+  const resetGuidedOnboardingForTesting = React.useCallback(() => {
+    if (
+      process.env.NEXT_PUBLIC_ONBOARDING_TEST_CONTROLS !== "1" ||
+      session?.user.id
+    ) {
+      return;
+    }
+    resetAllProductOnboarding();
+    loadOnboardingPersonalDemo(year);
+    setGuidedDraft(null);
+    setMobileGuidedRangeStart(null);
+    setAccountNudgeVisible(false);
+    window.location.reload();
+  }, [loadOnboardingPersonalDemo, session?.user.id, year]);
 
   const trackPostOnboardingElement = React.useCallback(
     (kind: "event" | "category") => {
@@ -1646,6 +1666,51 @@ export default function HomePage() {
     ]
   );
 
+  const guidedToolbarNotice = React.useMemo<GuidedToolbarNotice | null>(() => {
+    if (!showGuidedOnboarding || !guidedOnboarding) return null;
+    if (guidedOnboarding.step === "edit_instruction") {
+      return {
+        target: "edit",
+        title: "Edite do seu jeito.",
+        instruction: "Clique no lápis.",
+      };
+    }
+    if (guidedOnboarding.step === "edit_active") {
+      return {
+        target: "edit",
+        title: "Contextos e categorias estão liberados.",
+        instruction: "Agora clique em Finalizar.",
+      };
+    }
+    if (guidedOnboarding.step === "theme_instruction") {
+      return {
+        target: "theme",
+        title: "Escolha o clima do seu ano.",
+        instruction: "Alterne entre claro e escuro.",
+      };
+    }
+    return null;
+  }, [guidedOnboarding, showGuidedOnboarding]);
+
+  const handleGuidedEditModeChange = React.useCallback(
+    (active: boolean) => {
+      const current = readGuidedOnboardingState();
+      if (active && current.step === "edit_instruction") {
+        updateGuidedOnboarding({ type: "open_inline_edit" });
+      } else if (!active && current.step === "edit_active") {
+        updateGuidedOnboarding({ type: "close_inline_edit" });
+      }
+    },
+    [updateGuidedOnboarding]
+  );
+
+  const handleGuidedThemeChange = React.useCallback(() => {
+    const current = readGuidedOnboardingState();
+    if (current.step === "theme_instruction") {
+      updateGuidedOnboarding({ type: "choose_theme" });
+    }
+  }, [updateGuidedOnboarding]);
+
   const handleYearChange = React.useCallback(
     (nextYear: number) => {
       setYear(nextYear);
@@ -1704,7 +1769,10 @@ export default function HomePage() {
           onCalendarPackFocusYear={handleYearChange}
           onboardingFocusTarget={onboardingFocusTarget}
           guidedSelectionNotice={guidedSelectionNotice}
+          guidedToolbarNotice={guidedToolbarNotice}
           onDismissGuidedSelection={dismissGuidedOnboarding}
+          onGuidedEditModeChange={handleGuidedEditModeChange}
+          onGuidedThemeChange={handleGuidedThemeChange}
           onboardingLayoutLocked={showGuidedOnboarding}
           categoryCreateRequestKey={categoryCreateRequestKey}
           onCategoryCreated={() =>
@@ -1804,6 +1872,12 @@ export default function HomePage() {
             setAuthDialogOpen(true);
           }}
         />
+      ) : null}
+
+      {process.env.NEXT_PUBLIC_ONBOARDING_TEST_CONTROLS === "1" &&
+      !authLoading &&
+      !session?.user.id ? (
+        <OnboardingTestReset onReset={resetGuidedOnboardingForTesting} />
       ) : null}
 
       {isMobileCalendarUi && !showGuidedOnboarding ? (

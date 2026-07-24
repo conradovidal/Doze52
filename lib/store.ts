@@ -14,6 +14,7 @@ import {
   CATEGORY_COLOR_BASE_VIOLET,
   DEFAULT_CATEGORY_COLOR,
   ONBOARDING_CATEGORY_COLOR_BY_ID,
+  getNearestCategoryColor,
 } from "./category-palette";
 import {
   normalizeProfileIconId,
@@ -69,6 +70,7 @@ type StoreState = {
     context: OnboardingContext;
     intent: "date" | "period";
     choice: OnboardingCategoryChoice;
+    color?: string;
   }) => string | null;
   markLocalImported: (userId: string) => void;
   isLocalImported: (userId: string) => boolean;
@@ -1012,11 +1014,14 @@ export const useStore = create<StoreState>()(
         });
         return configured;
       },
-      createOnboardingCategory: ({ context, intent, choice }) => {
+      createOnboardingCategory: ({ context, intent, choice, color }) => {
         const definition = getOnboardingCategoryDefinition(
           context,
           intent,
           choice
+        );
+        const categoryColor = getNearestCategoryColor(
+          color ?? definition.color
         );
         let createdId: string | null = null;
         set((state) => {
@@ -1036,6 +1041,7 @@ export const useStore = create<StoreState>()(
               ...state.categories,
               {
                 ...definition,
+                color: categoryColor,
                 profileId,
                 visible: true,
               },

@@ -24,12 +24,15 @@ export type GuidedOnboardingStep =
   | "period_category_selection"
   | "period_instruction"
   | "period_details"
+  | "edit_instruction"
+  | "edit_active"
+  | "theme_instruction"
   | "completion_choice"
   | "completed"
   | "dismissed";
 
 export type GuidedOnboardingState = {
-  version: 4;
+  version: 5;
   step: GuidedOnboardingStep;
   context?: OnboardingContext;
   startedAt?: string;
@@ -57,6 +60,9 @@ export type GuidedOnboardingAction =
   | { type: "choose_period_category"; categoryId: string }
   | { type: "select_period" }
   | { type: "period_saved"; at?: string }
+  | { type: "open_inline_edit" }
+  | { type: "close_inline_edit" }
+  | { type: "choose_theme" }
   | { type: "complete"; at?: string }
   | { type: "record_post_onboarding_event"; at?: string }
   | { type: "record_post_onboarding_category"; at?: string }
@@ -93,7 +99,7 @@ export const PRODUCT_ONBOARDING_RESET_EVENT = "doze52:onboarding-reset";
 export const GUIDED_ONBOARDING_CHANGE_EVENT = "doze52:onboarding-change";
 
 const initialGuidedState = (): GuidedOnboardingState => ({
-  version: 4,
+  version: 5,
   step: "context_selection",
 });
 
@@ -132,6 +138,9 @@ const isGuidedStep = (value: unknown): value is GuidedOnboardingStep =>
   value === "period_category_selection" ||
   value === "period_instruction" ||
   value === "period_details" ||
+  value === "edit_instruction" ||
+  value === "edit_active" ||
+  value === "theme_instruction" ||
   value === "completion_choice" ||
   value === "completed" ||
   value === "dismissed";
@@ -160,9 +169,12 @@ export const migrateGuidedOnboardingState = (
     accountNudgeShownAt?: unknown;
   };
 
-  if (candidate.version === 4 && isGuidedStep(candidate.step)) {
+  if (
+    (candidate.version === 4 || candidate.version === 5) &&
+    isGuidedStep(candidate.step)
+  ) {
     return {
-      version: 4,
+      version: 5,
       step: candidate.step,
       context: isContext(candidate.context) ? candidate.context : undefined,
       startedAt: candidate.startedAt,
@@ -211,7 +223,7 @@ export const migrateGuidedOnboardingState = (
       candidate.step === "completed" || candidate.step === "dismissed";
     const preserveAsCompleted = !terminal && hasLegacyProgress(candidate);
     return {
-      version: 4,
+      version: 5,
       step: terminal
         ? (candidate.step as "completed" | "dismissed")
         : preserveAsCompleted
@@ -305,11 +317,23 @@ export const reduceGuidedOnboardingState = (
       const nextPeriodCount = (state.periodItemsCreated ?? 0) + 1;
       return {
         ...state,
-        step: nextPeriodCount >= 2 ? "completion_choice" : "period_instruction",
+        step: nextPeriodCount >= 2 ? "edit_instruction" : "period_instruction",
         periodItemsCreated: nextPeriodCount,
         firstPeriodCreatedAt:
           state.firstPeriodCreatedAt ?? action.at ?? nowIso(),
       };
+    case "open_inline_edit":
+      return state.step === "edit_instruction"
+        ? { ...state, step: "edit_active" }
+        : state;
+    case "close_inline_edit":
+      return state.step === "edit_active"
+        ? { ...state, step: "theme_instruction" }
+        : state;
+    case "choose_theme":
+      return state.step === "theme_instruction"
+        ? { ...state, step: "completion_choice" }
+        : state;
     case "complete":
       if (state.step !== "completion_choice") return state;
       return {

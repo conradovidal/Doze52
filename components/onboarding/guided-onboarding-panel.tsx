@@ -13,6 +13,7 @@ import {
   UserRound,
   X,
 } from "lucide-react";
+import { CategoryColorPicker } from "@/components/category-color-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { GuidedSelectionNotice } from "@/components/onboarding/guided-selection-notice";
@@ -39,7 +40,8 @@ type GuidedOnboardingPanelProps = {
   onContinueFromProfile: () => void;
   onChooseCategory: (
     intent: "date" | "period",
-    choice: OnboardingCategoryChoice
+    choice: OnboardingCategoryChoice,
+    color: string
   ) => void;
   onChangeDraft: (draft: GuidedCalendarDraft) => void;
   onSaveDraft: (title: string) => void;
@@ -210,34 +212,43 @@ export const getGuidedSelectionNotice = ({
   isMobile: boolean;
   mobileRangeStart?: string | null;
 }): GuidedSelectionNotice | null => {
-  const context = state.context ?? "personal";
   if (state.step === "date_instruction") {
-    const copy = getDateCopy(
-      context,
-      state.dateCategoryId,
-      state.dateItemsCreated ?? 0
-    );
+    const firstItem = (state.dateItemsCreated ?? 0) === 0;
+    const isBirthday =
+      state.dateCategoryId === ONBOARDING_CATEGORY_IDS.birthday;
     return {
       mode: "date",
-      title: copy.title,
-      instruction: copy.description,
+      title: isBirthday
+        ? firstItem
+          ? "Comece por um aniversário que já passou."
+          : "Agora escolha um aniversário que ainda vem."
+        : firstItem
+          ? "Comece por uma data que marcou seu ano."
+          : "Agora marque algo bom que ainda vem.",
+      instruction: isMobile ? "Toque no dia." : "Clique no dia.",
     };
   }
   if (state.step !== "period_instruction") return null;
-  const copy = getPeriodCopy(
-    context,
-    state.periodCategoryId,
-    state.periodItemsCreated ?? 0
-  );
+  const firstItem = (state.periodItemsCreated ?? 0) === 0;
+  const isTravel = state.periodCategoryId === ONBOARDING_CATEGORY_IDS.travel;
   return {
     mode: "period",
-    title: copy.title,
+    title:
+      isMobile && mobileRangeStart
+        ? "Agora escolha o último dia."
+        : isTravel
+          ? firstItem
+            ? "Reviva uma viagem deste ano."
+            : "Agora abra espaço para a próxima viagem."
+          : firstItem
+            ? "Marque um período que deixou história."
+            : "Agora abra espaço para o próximo período.",
     instruction:
       isMobile && mobileRangeStart
-        ? `Início selecionado em ${formatDate(mobileRangeStart)}. Agora selecione o último dia.`
+        ? `Início em ${formatDate(mobileRangeStart)}.`
         : isMobile
-          ? `${copy.description} Toque no primeiro e depois no último dia.`
-          : `${copy.description} Clique, segure e arraste do início ao fim.`,
+          ? "Toque no primeiro e no último dia."
+          : "Clique e arraste do início ao fim.",
   };
 };
 
@@ -254,6 +265,10 @@ export function GuidedOnboardingPanel({
 }: GuidedOnboardingPanelProps) {
   const [title, setTitle] = React.useState("");
   const [showExternalDates, setShowExternalDates] = React.useState(false);
+  const [selectedCategoryChoice, setSelectedCategoryChoice] =
+    React.useState<OnboardingCategoryChoice | null>(null);
+  const [selectedCategoryColor, setSelectedCategoryColor] =
+    React.useState<string | null>(null);
   const context = state.context ?? "personal";
   const dateItemsCreated = state.dateItemsCreated ?? 0;
   const periodItemsCreated = state.periodItemsCreated ?? 0;
@@ -276,11 +291,15 @@ export function GuidedOnboardingPanel({
           ? 3
           : state.step.startsWith("period")
             ? 4
-            : 5;
+            : state.step === "completion_choice"
+              ? 6
+              : 5;
 
   React.useEffect(() => {
     setTitle("");
     setShowExternalDates(false);
+    setSelectedCategoryChoice(null);
+    setSelectedCategoryColor(null);
   }, [state.step]);
 
   const header = (
@@ -293,7 +312,7 @@ export function GuidedOnboardingPanel({
           Monte o seu ano
         </p>
         <p className="mt-0.5 text-xs text-muted-foreground">
-          Passo {progressStep} de 5
+          Passo {progressStep} de 6
         </p>
       </div>
       <Button
@@ -329,30 +348,50 @@ export function GuidedOnboardingPanel({
           ? Plane
           : Layers3;
 
+    const options = [
+      {
+        choice: "specific" as const,
+        definition: specific,
+        icon: SpecificIcon,
+      },
+      {
+        choice: "generic" as const,
+        definition: generic,
+        icon: CalendarDays,
+      },
+    ];
+    const selectedOption =
+      options.find((option) => option.choice === selectedCategoryChoice) ?? null;
+
     return (
       <div className="mt-4 grid gap-2">
-        {[
-          {
-            choice: "specific" as const,
-            definition: specific,
-            icon: SpecificIcon,
-          },
-          {
-            choice: "generic" as const,
-            definition: generic,
-            icon: CalendarDays,
-          },
-        ].map((option) => {
+        {options.map((option) => {
           const Icon = option.icon;
+          const selected = selectedCategoryChoice === option.choice;
           return (
             <button
               key={option.choice}
               type="button"
-              className="flex items-center gap-3 rounded-2xl border border-border bg-background/80 p-3 text-left transition hover:border-primary/35 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
-              onClick={() => onChooseCategory(intent, option.choice)}
+              aria-pressed={selected}
+              className={`flex items-center gap-3 rounded-2xl border bg-background/80 p-3 text-left transition hover:border-primary/35 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 ${
+                selected
+                  ? "border-primary/50 ring-1 ring-primary/30"
+                  : "border-border"
+              }`}
+              onClick={() => {
+                setSelectedCategoryChoice(option.choice);
+                setSelectedCategoryColor(option.definition.color);
+              }}
             >
-              <span className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-primary/8 text-primary">
-                <Icon className="size-4" aria-hidden="true" />
+              <span
+                className="flex size-8 shrink-0 items-center justify-center rounded-full text-white shadow-sm"
+                style={{ backgroundColor: option.definition.color }}
+              >
+                {selected ? (
+                  <Check className="size-4" strokeWidth={3} aria-hidden="true" />
+                ) : (
+                  <Icon className="size-4" aria-hidden="true" />
+                )}
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block text-sm font-semibold">
@@ -369,6 +408,33 @@ export function GuidedOnboardingPanel({
             </button>
           );
         })}
+        {selectedOption && selectedCategoryColor ? (
+          <div className="mt-2 rounded-2xl border border-border/70 bg-background/65 p-3">
+            <p className="mb-2.5 text-sm font-semibold">
+              Escolha a cor de {selectedOption.definition.name}
+            </p>
+            <CategoryColorPicker
+              compact
+              value={selectedCategoryColor}
+              onChange={setSelectedCategoryColor}
+              ariaLabel={`Cor de ${selectedOption.definition.name}`}
+            />
+            <Button
+              type="button"
+              variant="premium"
+              className="mt-4 w-full"
+              onClick={() =>
+                onChooseCategory(
+                  intent,
+                  selectedOption.choice,
+                  selectedCategoryColor
+                )
+              }
+            >
+              Criar esta categoria
+            </Button>
+          </div>
+        ) : null}
       </div>
     );
   };
@@ -572,16 +638,16 @@ export function GuidedOnboardingPanel({
             <Button
               type="button"
               variant="premium"
-              onClick={() => onComplete("explore")}
+              onClick={() => onComplete("category")}
             >
-              Explorar meu ano
+              <Plus /> Criar outra categoria
             </Button>
             <Button
               type="button"
               variant="outline"
-              onClick={() => onComplete("category")}
+              onClick={() => onComplete("explore")}
             >
-              <Plus /> Continuar personalizando
+              Explorar meu ano
             </Button>
           </div>
         </>
@@ -598,7 +664,7 @@ export function GuidedOnboardingPanel({
       data-guided-onboarding-step={state.step}
       aria-label="Guia inicial do Doze 52"
       aria-live="polite"
-      className="fixed top-[calc(env(safe-area-inset-top,0px)+4.6rem)] left-1/2 z-50 w-[min(42rem,calc(100vw-1.5rem))] -translate-x-1/2 rounded-[1.5rem] border border-foreground/15 bg-card/98 p-4.5 text-card-foreground shadow-[0_28px_90px_-28px_rgba(15,23,42,0.68)] backdrop-blur-xl animate-in fade-in-0 duration-200 motion-reduce:animate-none sm:p-5 md:top-1/2 md:w-[23rem] md:-translate-y-1/2"
+      className="fixed top-[calc(env(safe-area-inset-top,0px)+4.6rem)] left-1/2 z-50 max-h-[calc(100dvh-6rem)] w-[min(42rem,calc(100vw-1.5rem))] -translate-x-1/2 overflow-y-auto rounded-[1.5rem] border border-foreground/15 bg-card/98 p-4.5 text-card-foreground shadow-[0_28px_90px_-28px_rgba(15,23,42,0.68)] backdrop-blur-xl animate-in fade-in-0 duration-200 motion-reduce:animate-none sm:p-5 md:top-1/2 md:w-[23rem] md:-translate-y-1/2"
     >
       {header}
       {content}

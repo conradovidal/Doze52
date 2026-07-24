@@ -21,12 +21,12 @@ import {
 import { materializeUserOwnedSnapshot } from "../../lib/snapshot-ownership";
 
 const initialState = (): GuidedOnboardingState => ({
-  version: 4,
+  version: 5,
   step: "context_selection",
 });
 
 const completedState = (): GuidedOnboardingState => ({
-  version: 4,
+  version: 5,
   step: "completed",
   context: "personal",
   completedAt: "2026-07-20T10:05:00.000Z",
@@ -99,9 +99,22 @@ test("cria contexto, categorias incrementais e quatro eventos", () => {
     at: "2026-07-20T10:04:00.000Z",
   });
   expect(state).toMatchObject({
-    step: "completion_choice",
+    step: "edit_instruction",
     periodItemsCreated: 2,
   });
+
+  state = reduceGuidedOnboardingState(state, {
+    type: "open_inline_edit",
+  });
+  expect(state.step).toBe("edit_active");
+  state = reduceGuidedOnboardingState(state, {
+    type: "close_inline_edit",
+  });
+  expect(state.step).toBe("theme_instruction");
+  state = reduceGuidedOnboardingState(state, {
+    type: "choose_theme",
+  });
+  expect(state.step).toBe("completion_choice");
 
   state = reduceGuidedOnboardingState(state, {
     type: "complete",
@@ -160,7 +173,7 @@ test("migra v3 com progresso sem reabrir fluxo incompatível", () => {
       firstDateCreatedAt: "2026-07-20T10:01:00.000Z",
     })
   ).toMatchObject({
-    version: 4,
+    version: 5,
     step: "completed",
     context: "personal",
     dateItemsCreated: 2,
@@ -172,7 +185,21 @@ test("migra v3 com progresso sem reabrir fluxo incompatível", () => {
       step: "completed",
       completedAt: "2026-07-20T10:03:00.000Z",
     })
-  ).toMatchObject({ version: 4, step: "completed" });
+  ).toMatchObject({ version: 5, step: "completed" });
+
+  expect(
+    migrateGuidedOnboardingState({
+      version: 4,
+      step: "completion_choice",
+      context: "personal",
+      dateItemsCreated: 2,
+      periodItemsCreated: 2,
+    })
+  ).toMatchObject({
+    version: 5,
+    step: "completion_choice",
+    context: "personal",
+  });
 });
 
 test("dispensa e conclusão são terminais para a elegibilidade", () => {
