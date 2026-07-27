@@ -4,11 +4,11 @@
   "description": "Corridas da temporada 2026 em um único calendário.",
   "year": 2026,
   "datasetStatus": "complete",
-  "updateNote": "Calendário oficial completo e vencedores das dez etapas disputadas até o GP da Bélgica.",
+  "updateNote": "Calendário oficial completo e vencedores das onze etapas disputadas até o GP da Hungria.",
   "source": {
     "label": "Calendário oficial da Fórmula 1 2026",
     "url": "https://www.formula1.com/en/racing/2026",
-    "lastVerified": "2026-07-20"
+    "lastVerified": "2026-07-27"
   },
   "profile": {
     "id": "2026f100-0000-4000-8000-000000000001",
@@ -258,11 +258,12 @@
       "suggestedCategoryKey": "races",
       "source": "Calendário oficial da Fórmula 1 2026",
       "sourceUrl": "https://www.formula1.com/en/racing/2026",
-      "lastVerified": "2026-06-03",
+      "lastVerified": "2026-07-27",
       "weekend": "24-26 Jul",
       "notes": [
         "FORMULA 1 AWS HUNGARIAN GRAND PRIX 2026"
       ],
+      "result": "Lando Norris",
       "isBrazilMatch": false
     },
     {
