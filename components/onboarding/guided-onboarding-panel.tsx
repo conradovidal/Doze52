@@ -48,6 +48,14 @@ const ONBOARDING_QUICK_COLORS = [
   CATEGORY_COLOR_BASE_GRAPHITE,
 ] as const;
 
+const getDefaultChoiceColors = (
+  context: OnboardingContext,
+  intent: "date" | "period"
+): Record<OnboardingCategoryChoice, string> => ({
+  specific: getOnboardingCategoryDefinition(context, intent, "specific").color,
+  generic: getOnboardingCategoryDefinition(context, intent, "generic").color,
+});
+
 export type GuidedCalendarDraft = {
   startDate: string;
   endDate: string;
@@ -286,9 +294,10 @@ export function GuidedOnboardingPanel({
   const [showExternalDates, setShowExternalDates] = React.useState(false);
   const [selectedCategoryChoice, setSelectedCategoryChoice] =
     React.useState<OnboardingCategoryChoice | null>(null);
-  const [selectedCategoryColor, setSelectedCategoryColor] =
-    React.useState<string | null>(null);
   const context = state.context ?? "personal";
+  const [categoryColors, setCategoryColors] = React.useState<
+    Record<OnboardingCategoryChoice, string>
+  >(() => getDefaultChoiceColors(context, "date"));
   const dateItemsCreated = state.dateItemsCreated ?? 0;
   const periodItemsCreated = state.periodItemsCreated ?? 0;
   const dateCopy = getDateCopy(
@@ -309,17 +318,23 @@ export function GuidedOnboardingPanel({
         : state.step.startsWith("date")
           ? 3
           : state.step.startsWith("period")
-            ? 5
-            : state.step === "completion_choice"
-              ? 7
-              : 6;
+            ? 4
+            : state.step === "theme_instruction"
+              ? 5
+              : state.step === "completion_choice"
+                ? 7
+                : 6;
 
   React.useEffect(() => {
     setTitle("");
     setShowExternalDates(false);
     setSelectedCategoryChoice(null);
-    setSelectedCategoryColor(null);
-  }, [state.step]);
+    if (state.step === "date_category_selection") {
+      setCategoryColors(getDefaultChoiceColors(context, "date"));
+    } else if (state.step === "period_category_selection") {
+      setCategoryColors(getDefaultChoiceColors(context, "period"));
+    }
+  }, [context, state.step]);
 
   const header = (
     <div className="flex items-start gap-3">
@@ -381,6 +396,9 @@ export function GuidedOnboardingPanel({
     ];
     const selectedOption =
       options.find((option) => option.choice === selectedCategoryChoice) ?? null;
+    const selectedCategoryColor = selectedCategoryChoice
+      ? categoryColors[selectedCategoryChoice]
+      : null;
 
     return (
       <div className="mt-4 grid gap-2">
@@ -391,22 +409,19 @@ export function GuidedOnboardingPanel({
             <button
               key={option.choice}
               type="button"
+              data-onboarding-category-choice={option.choice}
               aria-pressed={selected}
-              className={`flex items-center gap-3 rounded-2xl border bg-background/80 p-3 text-left transition hover:border-primary/35 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 ${
+              className={`flex items-center gap-3 rounded-2xl border bg-background/80 px-3 py-2.5 text-left transition hover:border-primary/35 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 ${
                 selected
                   ? "border-primary/50 ring-1 ring-primary/30"
                   : "border-border"
               }`}
-              onClick={() => {
-                setSelectedCategoryChoice(option.choice);
-                setSelectedCategoryColor(
-                  (currentColor) => currentColor ?? option.definition.color
-                );
-              }}
+              onClick={() => setSelectedCategoryChoice(option.choice)}
             >
               <span
+                data-onboarding-category-color-indicator
                 className="flex size-8 shrink-0 items-center justify-center rounded-full text-white shadow-sm"
-                style={{ backgroundColor: option.definition.color }}
+                style={{ backgroundColor: categoryColors[option.choice] }}
               >
                 {selected ? (
                   <Check className="size-4" strokeWidth={3} aria-hidden="true" />
@@ -417,13 +432,6 @@ export function GuidedOnboardingPanel({
               <span className="min-w-0 flex-1">
                 <span className="block text-sm font-semibold">
                   {option.definition.name}
-                </span>
-                <span className="mt-0.5 block text-[11px] leading-4 text-muted-foreground">
-                  {option.choice === "specific"
-                    ? intent === "date"
-                      ? "Um jeito afetivo de começar a contar o seu ano."
-                      : "Para enxergar o espaço que descanso e descobertas ocupam."
-                    : "Para tudo que importa e merece um nome só seu."}
                 </span>
               </span>
             </button>
@@ -439,7 +447,14 @@ export function GuidedOnboardingPanel({
             compact
             value={selectedCategoryColor}
             colors={ONBOARDING_QUICK_COLORS}
-            onChange={setSelectedCategoryColor}
+            disabled={!selectedCategoryChoice}
+            onChange={(color) => {
+              if (!selectedCategoryChoice) return;
+              setCategoryColors((current) => ({
+                ...current,
+                [selectedCategoryChoice]: color,
+              }));
+            }}
             ariaLabel={
               selectedOption
                 ? `Cor de ${selectedOption.definition.name}`
@@ -460,7 +475,7 @@ export function GuidedOnboardingPanel({
               );
             }}
           >
-            Criar esta categoria
+            Criar categoria
           </Button>
         </div>
       </div>
@@ -534,11 +549,11 @@ export function GuidedOnboardingPanel({
       return (
         <>
           <h2 className="mt-4 text-lg font-semibold tracking-[-0.02em]">
-            Que tipo de dia merece aparecer primeiro?
+            O que vai dar vida ao seu ano primeiro?
           </h2>
           <p className="mt-1 text-sm leading-5 text-muted-foreground">
-            Comece por uma categoria que ajude você a reconhecer esses momentos
-            num olhar.
+            Comece pelo aniversário de alguém querido ou por uma data
+            importante.
           </p>
           {renderCategoryChoices("date")}
         </>
@@ -549,11 +564,11 @@ export function GuidedOnboardingPanel({
       return (
         <>
           <h2 className="mt-4 text-lg font-semibold tracking-[-0.02em]">
-            Agora reserve espaço para algo que dura mais de um dia.
+            Dê visibilidade ao que dura mais de um dia.
           </h2>
           <p className="mt-1 text-sm leading-5 text-muted-foreground">
-            Férias, viagens e projetos contam outra história quando você
-            enxerga o começo e o fim.
+            Férias, viagens e outros períodos também contam a história do seu
+            ano.
           </p>
           {renderCategoryChoices("period")}
         </>
@@ -692,7 +707,7 @@ export function GuidedOnboardingPanel({
       data-guided-onboarding-step={state.step}
       aria-label="Guia inicial do Doze 52"
       aria-live="polite"
-      className="onboarding-inverse-surface fixed top-[calc(env(safe-area-inset-top,0px)+4.6rem)] left-1/2 z-50 max-h-[calc(100dvh-6rem)] w-[min(42rem,calc(100vw-1.5rem))] -translate-x-1/2 overflow-y-auto rounded-[1.5rem] border border-border bg-card p-4.5 text-card-foreground shadow-[0_30px_95px_-20px_rgba(15,23,42,0.82)] animate-in fade-in-0 duration-200 motion-reduce:animate-none sm:p-5 md:top-1/2 md:w-[23rem] md:-translate-y-1/2"
+      className="inverse-product-surface fixed top-[calc(env(safe-area-inset-top,0px)+4.6rem)] left-1/2 z-50 max-h-[calc(100dvh-6rem)] w-[min(42rem,calc(100vw-1.5rem))] -translate-x-1/2 overflow-y-auto rounded-[1.5rem] border border-border bg-card p-4.5 text-card-foreground shadow-[0_30px_95px_-20px_rgba(15,23,42,0.82)] animate-in fade-in-0 duration-200 motion-reduce:animate-none sm:p-5 md:top-1/2 md:w-[23rem] md:-translate-y-1/2"
     >
       {header}
       {content}

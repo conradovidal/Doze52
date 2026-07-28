@@ -14,6 +14,7 @@ type CategoryColorPickerProps = {
   onChange: (color: string) => void;
   colors?: readonly string[];
   compact?: boolean;
+  disabled?: boolean;
   className?: string;
   ariaLabel?: string;
 };
@@ -23,6 +24,7 @@ export function CategoryColorPicker({
   onChange,
   colors,
   compact = false,
+  disabled = false,
   className,
   ariaLabel = "Cor da categoria",
 }: CategoryColorPickerProps) {
@@ -40,10 +42,12 @@ export function CategoryColorPicker({
       role="group"
       className={cn("w-full space-y-3.5", className)}
       aria-label={ariaLabel}
+      aria-disabled={disabled}
     >
       {colorSets.map((set, index) => (
         <fieldset
           key={set.id}
+          disabled={disabled}
           className={cn(
             "space-y-2",
             index > 0 && "border-t border-border/50 pt-3"
@@ -61,6 +65,7 @@ export function CategoryColorPicker({
                 <button
                   key={preset}
                   type="button"
+                  disabled={disabled}
                   data-category-color-swatch
                   data-color={preset}
                   onClick={() => onChange(preset)}
@@ -69,6 +74,8 @@ export function CategoryColorPicker({
                   title={token.label}
                   className={cn(
                     "grid place-items-center rounded-full border border-black/8 transition-[transform,opacity,box-shadow] hover:scale-105 hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                    disabled &&
+                      "cursor-not-allowed opacity-45 hover:scale-100 hover:opacity-45",
                     compact ? "size-7" : "size-[30px] sm:size-8"
                   )}
                   style={{

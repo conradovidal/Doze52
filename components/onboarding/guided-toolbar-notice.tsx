@@ -29,7 +29,7 @@ export function GuidedToolbarNoticeCard({
       aria-label="Instrução do guia inicial"
       aria-live="polite"
       className={cn(
-        "onboarding-inverse-surface absolute top-[calc(100%+0.6rem)] z-60 w-[min(20rem,calc(100vw-1.5rem))] rounded-2xl border border-border bg-card p-3.5 text-left text-card-foreground shadow-[0_24px_60px_-20px_rgba(15,23,42,0.85)]",
+        "inverse-product-surface absolute top-[calc(100%+0.6rem)] z-60 w-[min(20rem,calc(100vw-1.5rem))] rounded-2xl border border-border bg-card p-3.5 text-left text-card-foreground shadow-[0_24px_60px_-20px_rgba(15,23,42,0.85)]",
         align === "start" ? "left-0" : "right-0"
       )}
     >

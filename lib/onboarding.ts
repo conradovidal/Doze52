@@ -32,7 +32,7 @@ export type GuidedOnboardingStep =
   | "dismissed";
 
 export type GuidedOnboardingState = {
-  version: 6;
+  version: 7;
   step: GuidedOnboardingStep;
   context?: OnboardingContext;
   startedAt?: string;
@@ -101,7 +101,7 @@ export const PRODUCT_ONBOARDING_RESET_EVENT = "doze52:onboarding-reset";
 export const GUIDED_ONBOARDING_CHANGE_EVENT = "doze52:onboarding-change";
 
 const initialGuidedState = (): GuidedOnboardingState => ({
-  version: 6,
+  version: 7,
   step: "context_selection",
 });
 
@@ -174,12 +174,46 @@ export const migrateGuidedOnboardingState = (
   if (
     (candidate.version === 4 ||
       candidate.version === 5 ||
-      candidate.version === 6) &&
+      candidate.version === 6 ||
+      candidate.version === 7) &&
     isGuidedStep(candidate.step)
   ) {
+    const dateItemsCreated =
+      typeof candidate.dateItemsCreated === "number"
+        ? Math.max(0, candidate.dateItemsCreated)
+        : candidate.firstDateCreatedAt
+          ? 1
+          : 0;
+    const periodItemsCreated =
+      typeof candidate.periodItemsCreated === "number"
+        ? Math.max(0, candidate.periodItemsCreated)
+        : candidate.firstPeriodCreatedAt
+          ? 1
+          : 0;
+    const themeConfirmedAt =
+      typeof candidate.themeConfirmedAt === "string"
+        ? candidate.themeConfirmedAt
+        : candidate.version === 5 && candidate.step === "completion_choice"
+          ? candidate.completedAt ?? nowIso()
+          : undefined;
+    let step = candidate.step;
+
+    if (candidate.version < 7) {
+      if (step === "theme_instruction" && periodItemsCreated < 2) {
+        step = "period_category_selection";
+      } else if (
+        (step === "edit_instruction" ||
+          step === "edit_active" ||
+          step === "completion_choice") &&
+        !themeConfirmedAt
+      ) {
+        step = "theme_instruction";
+      }
+    }
+
     return {
-      version: 6,
-      step: candidate.step,
+      version: 7,
+      step,
       context: isContext(candidate.context) ? candidate.context : undefined,
       startedAt: candidate.startedAt,
       profileConfiguredAt: candidate.profileConfiguredAt,
@@ -191,26 +225,11 @@ export const migrateGuidedOnboardingState = (
         typeof candidate.periodCategoryId === "string"
           ? candidate.periodCategoryId
           : undefined,
-      dateItemsCreated:
-        typeof candidate.dateItemsCreated === "number"
-          ? Math.max(0, candidate.dateItemsCreated)
-          : candidate.firstDateCreatedAt
-            ? 1
-            : 0,
-      periodItemsCreated:
-        typeof candidate.periodItemsCreated === "number"
-          ? Math.max(0, candidate.periodItemsCreated)
-          : candidate.firstPeriodCreatedAt
-            ? 1
-            : 0,
+      dateItemsCreated,
+      periodItemsCreated,
       firstDateCreatedAt: candidate.firstDateCreatedAt,
       firstPeriodCreatedAt: candidate.firstPeriodCreatedAt,
-      themeConfirmedAt:
-        typeof candidate.themeConfirmedAt === "string"
-          ? candidate.themeConfirmedAt
-          : candidate.version === 5 && candidate.step === "completion_choice"
-            ? candidate.completedAt ?? nowIso()
-            : undefined,
+      themeConfirmedAt,
       postOnboardingEventsCreated:
         typeof candidate.postOnboardingEventsCreated === "number"
           ? Math.max(0, candidate.postOnboardingEventsCreated)
@@ -233,7 +252,7 @@ export const migrateGuidedOnboardingState = (
       candidate.step === "completed" || candidate.step === "dismissed";
     const preserveAsCompleted = !terminal && hasLegacyProgress(candidate);
     return {
-      version: 6,
+      version: 7,
       step: terminal
         ? (candidate.step as "completed" | "dismissed")
         : preserveAsCompleted
@@ -305,7 +324,7 @@ export const reduceGuidedOnboardingState = (
         ...state,
         step:
           nextDateCount >= 2
-            ? "theme_instruction"
+            ? "period_category_selection"
             : "date_instruction",
         dateItemsCreated: nextDateCount,
         firstDateCreatedAt: state.firstDateCreatedAt ?? action.at ?? nowIso(),
@@ -327,7 +346,12 @@ export const reduceGuidedOnboardingState = (
       const nextPeriodCount = (state.periodItemsCreated ?? 0) + 1;
       return {
         ...state,
-        step: nextPeriodCount >= 2 ? "edit_instruction" : "period_instruction",
+        step:
+          nextPeriodCount >= 2
+            ? state.themeConfirmedAt
+              ? "edit_instruction"
+              : "theme_instruction"
+            : "period_instruction",
         periodItemsCreated: nextPeriodCount,
         firstPeriodCreatedAt:
           state.firstPeriodCreatedAt ?? action.at ?? nowIso(),
@@ -338,21 +362,13 @@ export const reduceGuidedOnboardingState = (
         : state;
     case "close_inline_edit":
       return state.step === "edit_active"
-        ? {
-            ...state,
-            step: state.themeConfirmedAt
-              ? "completion_choice"
-              : "theme_instruction",
-          }
+        ? { ...state, step: "completion_choice" }
         : state;
     case "confirm_theme":
       return state.step === "theme_instruction"
         ? {
             ...state,
-            step:
-              (state.periodItemsCreated ?? 0) >= 2
-                ? "completion_choice"
-                : "period_category_selection",
+            step: "edit_instruction",
             themeConfirmedAt: action.at ?? nowIso(),
           }
         : state;

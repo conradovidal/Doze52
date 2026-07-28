@@ -288,8 +288,18 @@ export function AppHeader({
           </div>
 
           <div className="w-full min-w-0 justify-self-end">
-            <div className="flex min-w-0 flex-wrap items-center justify-end gap-1 sm:gap-2">
-              <div className="relative shrink-0">
+            <div
+              data-onboarding-toolbar-spotlight={
+                guidedToolbarNotice ? "true" : undefined
+              }
+              className="flex min-w-0 flex-wrap items-center justify-end gap-1 sm:gap-2"
+            >
+              <div
+                data-onboarding-spotlight-target={
+                  guidedToolbarNotice?.target === "edit" ? "true" : undefined
+                }
+                className="relative shrink-0"
+              >
                 {isInlineEditMode ? (
                   <Button
                     type="button"
@@ -305,7 +315,7 @@ export function AppHeader({
                     className={cn(
                       utilityActiveEditClass,
                       guidedToolbarNotice?.target === "edit" &&
-                        "ring-4 ring-primary/18 animate-pulse motion-reduce:animate-none"
+                        "product-spotlight-target"
                     )}
                     onClick={toggleInlineEditMode}
                     aria-label="Finalizar edição de contextos e categorias"
@@ -329,7 +339,7 @@ export function AppHeader({
                     className={cn(
                       utilityIconClass,
                       guidedToolbarNotice?.target === "edit" &&
-                        "border-primary text-primary ring-4 ring-primary/18 animate-pulse motion-reduce:animate-none"
+                        "product-spotlight-target"
                     )}
                     onClick={toggleInlineEditMode}
                     aria-label="Editar contextos e categorias"
@@ -364,7 +374,12 @@ export function AppHeader({
                 </SelectContent>
               </Select>
 
-              <div className="relative shrink-0">
+              <div
+                data-onboarding-spotlight-target={
+                  guidedToolbarNotice?.target === "theme" ? "true" : undefined
+                }
+                className="relative shrink-0"
+              >
                 <ThemeToggle
                   highlighted={guidedToolbarNotice?.target === "theme"}
                   disabled={themeToggleDisabled}
@@ -598,7 +613,7 @@ export function AppHeader({
             >
               <div
                 data-guided-selection-card
-                className="onboarding-inverse-surface w-[min(34rem,calc(100%-1rem))] overflow-hidden rounded-2xl border border-border bg-card shadow-[0_24px_60px_-22px_rgba(15,23,42,0.84)]"
+                className="inverse-product-surface w-[min(34rem,calc(100%-1rem))] overflow-hidden rounded-2xl border border-border bg-card shadow-[0_24px_60px_-22px_rgba(15,23,42,0.84)]"
               >
                 <GuidedCalendarNotice
                   notice={guidedSelectionNotice}

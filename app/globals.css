@@ -128,7 +128,7 @@
   --cal-cell-outside-past: 220 14% 11%;
 }
 
-.onboarding-inverse-surface {
+.inverse-product-surface {
   --background: #111827;
   --foreground: #f9fafb;
   --card: #172233;
@@ -149,7 +149,7 @@
   color-scheme: dark;
 }
 
-.dark .onboarding-inverse-surface {
+.dark .inverse-product-surface {
   --background: #ffffff;
   --foreground: #172033;
   --card: #ffffff;
@@ -168,6 +168,42 @@
   --input: #b9c4d2;
   --ring: #172033;
   color-scheme: light;
+}
+
+@keyframes product-spotlight-enter {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.08);
+  }
+}
+
+[data-onboarding-toolbar-spotlight="true"] > * {
+  transition: opacity 180ms ease;
+}
+
+[data-onboarding-toolbar-spotlight="true"]
+  > :not([data-onboarding-spotlight-target="true"]) {
+  opacity: 0.48;
+}
+
+.product-spotlight-target {
+  position: relative;
+  z-index: 61;
+  border-color: var(--foreground) !important;
+  box-shadow:
+    0 0 0 2px var(--background),
+    0 0 0 5px var(--foreground),
+    0 0 0 9px color-mix(in srgb, var(--foreground) 24%, transparent);
+  animation: product-spotlight-enter 620ms cubic-bezier(0.22, 1, 0.36, 1) 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .product-spotlight-target {
+    animation: none;
+  }
 }
 
 @layer base {

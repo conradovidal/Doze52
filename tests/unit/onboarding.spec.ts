@@ -33,12 +33,12 @@ import {
 } from "../../lib/category-palette";
 
 const initialState = (): GuidedOnboardingState => ({
-  version: 6,
+  version: 7,
   step: "context_selection",
 });
 
 const completedState = (): GuidedOnboardingState => ({
-  version: 6,
+  version: 7,
   step: "completed",
   context: "personal",
   completedAt: "2026-07-20T10:05:00.000Z",
@@ -121,17 +121,8 @@ test("cria contexto, categorias incrementais e quatro eventos", () => {
     at: "2026-07-20T10:02:00.000Z",
   });
   expect(state).toMatchObject({
-    step: "theme_instruction",
-    dateItemsCreated: 2,
-  });
-
-  state = reduceGuidedOnboardingState(state, {
-    type: "confirm_theme",
-    at: "2026-07-20T10:02:30.000Z",
-  });
-  expect(state).toMatchObject({
     step: "period_category_selection",
-    themeConfirmedAt: "2026-07-20T10:02:30.000Z",
+    dateItemsCreated: 2,
   });
 
   state = reduceGuidedOnboardingState(state, {
@@ -154,8 +145,17 @@ test("cria contexto, categorias incrementais e quatro eventos", () => {
     at: "2026-07-20T10:04:00.000Z",
   });
   expect(state).toMatchObject({
-    step: "edit_instruction",
+    step: "theme_instruction",
     periodItemsCreated: 2,
+  });
+
+  state = reduceGuidedOnboardingState(state, {
+    type: "confirm_theme",
+    at: "2026-07-20T10:04:30.000Z",
+  });
+  expect(state).toMatchObject({
+    step: "edit_instruction",
+    themeConfirmedAt: "2026-07-20T10:04:30.000Z",
   });
 
   state = reduceGuidedOnboardingState(state, {
@@ -224,7 +224,7 @@ test("migra v3 com progresso sem reabrir fluxo incompatível", () => {
       firstDateCreatedAt: "2026-07-20T10:01:00.000Z",
     })
   ).toMatchObject({
-    version: 6,
+    version: 7,
     step: "completed",
     context: "personal",
     dateItemsCreated: 2,
@@ -236,7 +236,7 @@ test("migra v3 com progresso sem reabrir fluxo incompatível", () => {
       step: "completed",
       completedAt: "2026-07-20T10:03:00.000Z",
     })
-  ).toMatchObject({ version: 6, step: "completed" });
+  ).toMatchObject({ version: 7, step: "completed" });
 
   expect(
     migrateGuidedOnboardingState({
@@ -247,33 +247,68 @@ test("migra v3 com progresso sem reabrir fluxo incompatível", () => {
       periodItemsCreated: 2,
     })
   ).toMatchObject({
-    version: 6,
-    step: "completion_choice",
+    version: 7,
+    step: "theme_instruction",
     context: "personal",
   });
 });
 
-test("migra fluxo v5 avançado sem perder períodos e recupera a etapa de tema", () => {
-  let state = migrateGuidedOnboardingState({
-    version: 5,
+test("migra v6 sem perder períodos e posiciona o tema depois deles", () => {
+  expect(
+    migrateGuidedOnboardingState({
+      version: 6,
+      step: "theme_instruction",
+      context: "personal",
+      dateItemsCreated: 2,
+      periodItemsCreated: 0,
+    })
+  ).toMatchObject({
+    version: 7,
+    step: "period_category_selection",
+    dateItemsCreated: 2,
+  });
+
+  expect(
+    migrateGuidedOnboardingState({
+      version: 6,
+      step: "period_instruction",
+      context: "personal",
+      dateItemsCreated: 2,
+      periodItemsCreated: 1,
+    })
+  ).toMatchObject({
+    version: 7,
+    step: "period_instruction",
+    periodItemsCreated: 1,
+  });
+
+  const state = migrateGuidedOnboardingState({
+    version: 6,
     step: "edit_active",
     context: "personal",
     dateItemsCreated: 2,
     periodItemsCreated: 2,
   });
   expect(state).toMatchObject({
-    version: 6,
-    step: "edit_active",
+    version: 7,
+    step: "theme_instruction",
     periodItemsCreated: 2,
   });
-  state = reduceGuidedOnboardingState(state, { type: "close_inline_edit" });
-  expect(state.step).toBe("theme_instruction");
-  state = reduceGuidedOnboardingState(state, {
-    type: "confirm_theme",
-    at: "2026-07-20T10:04:30.000Z",
-  });
-  expect(state).toMatchObject({
-    step: "completion_choice",
+});
+
+test("migra v6 com tema confirmado sem repetir a etapa", () => {
+  expect(
+    migrateGuidedOnboardingState({
+      version: 6,
+      step: "edit_instruction",
+      context: "personal",
+      dateItemsCreated: 2,
+      periodItemsCreated: 2,
+      themeConfirmedAt: "2026-07-20T10:04:30.000Z",
+    })
+  ).toMatchObject({
+    version: 7,
+    step: "edit_instruction",
     themeConfirmedAt: "2026-07-20T10:04:30.000Z",
   });
 });

@@ -42,8 +42,7 @@ export function ThemeToggle({
         "hover:border-foreground/18 hover:bg-muted hover:text-foreground",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
         disabled && "cursor-not-allowed opacity-45",
-        highlighted &&
-          "border-primary text-primary ring-4 ring-primary/18 animate-pulse motion-reduce:animate-none"
+        highlighted && "product-spotlight-target"
       )}
     >
       <span className="sr-only">
