@@ -275,7 +275,7 @@ export function AuthDialog({
         title: mode === "login" ? "Login concluído" : "Conta criada",
         description:
           mode === "login"
-            ? "Sua conta já está conectada ao Doze52."
+            ? "Sua conta já está conectada ao Doze 52."
             : "Sua conta foi criada com sucesso.",
       });
       onOpenChange(false);

@@ -133,15 +133,15 @@ export function UserMenu() {
     : hasBillingError
       ? "Plano indisponivel"
       : isPro
-        ? "Doze52 Pro"
+        ? "Doze 52 Pro"
         : "Plano Free";
   const planDescription = hasBillingError
     ? "Nao foi possivel carregar o status do plano."
     : isPro
       ? billingStatus.cancelAtPeriodEnd && formattedPeriodEnd
         ? `Pro ativo até ${formattedPeriodEnd}.`
-        : "Perfis e categorias sem limite prático. Calendários ilimitados."
-      : "1 perfil, 3 categorias e 1 calendário.";
+        : "Contextos e categorias sem limite prático. Calendários ilimitados."
+      : "1 contexto, 3 categorias e 1 calendário.";
   const planActionLabel = isBillingLoading
     ? "Carregando..."
     : hasBillingError

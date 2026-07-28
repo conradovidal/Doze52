@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { CategoryColorPicker } from "@/components/category-color-picker";
 import { ProUpgradeDialog } from "@/components/billing/pro-upgrade-dialog";
 import { ProfileIcon } from "@/components/profile-icon";
 import { Button } from "@/components/ui/button";
@@ -19,7 +20,6 @@ import {
   SelectTrigger,
 } from "@/components/ui/select";
 import {
-  CATEGORY_COLOR_SETS,
   DEFAULT_CATEGORY_COLOR,
   getCategoryColorToken,
   getNearestCategoryColor,
@@ -124,7 +124,7 @@ export function CategoryManager({
     setSaveError(
       profileId && profiles.some((profile) => profile.id === profileId)
         ? null
-        : "Selecione um perfil válido antes de criar a categoria."
+        : "Selecione um contexto válido antes de criar a categoria."
     );
   }, [open, mode, category, profileId, profiles]);
 
@@ -138,7 +138,6 @@ export function CategoryManager({
   const canSave = normalizedName.length > 0 && Boolean(profileDraftId);
   const canDelete =
     Boolean(category) && (Boolean(calendarPackCategory) || categories.length > 1);
-  const normalizedColor = color.toLowerCase();
   const currentColorToken = React.useMemo(
     () => getCategoryColorToken(color, themeMode),
     [color, themeMode]
@@ -163,11 +162,11 @@ export function CategoryManager({
         return;
       }
       if (!profileDraftId) {
-        setSaveError("Selecione um perfil antes de criar a categoria.");
+        setSaveError("Selecione um contexto antes de criar a categoria.");
         return;
       }
       if (!isPro && isLimitReached(categories.length, limits.maxCategories)) {
-        setSaveError("Mais categorias fazem parte do Doze52 Pro.");
+        setSaveError("Mais categorias fazem parte do Doze 52 Pro.");
         return;
       }
       const id = createCategory({
@@ -260,13 +259,13 @@ export function CategoryManager({
             >
               <SelectTrigger
                 size="sm"
-                aria-label="Perfil da categoria"
+                aria-label="Contexto da categoria"
                 className={`${CHIP_TRIGGER_CLASS} border-border/80 bg-background text-foreground hover:bg-muted/70 sm:flex-1`}
                 disabled={profiles.length === 0}
               >
                 <span className="inline-flex min-w-0 items-center gap-1.5 pr-2">
                   {currentProfile ? <ProfileIcon icon={currentProfile.icon} size={12} /> : null}
-                  <span className="truncate">{currentProfile?.name ?? "Perfil"}</span>
+                  <span className="truncate">{currentProfile?.name ?? "Contexto"}</span>
                 </span>
               </SelectTrigger>
               <SelectContent position="popper" side="bottom" align="start">
@@ -298,49 +297,11 @@ export function CategoryManager({
             </div>
           </div>
 
-          <div className="mx-auto w-full max-w-[21rem] space-y-3.5">
-            {CATEGORY_COLOR_SETS.map((set, index) => (
-              <fieldset
-                key={set.id}
-                className={index === 0 ? "space-y-2" : "space-y-2 border-t border-border/50 pt-3"}
-              >
-                <legend className="text-[11px] font-medium tracking-wide text-muted-foreground">
-                  {set.label}
-                </legend>
-                <div className="grid grid-cols-8 gap-2 sm:gap-2.5">
-                  {set.colors.map((preset) => {
-                    const selected = preset.toLowerCase() === normalizedColor;
-                    const presetToken = getCategoryColorToken(preset, themeMode);
-                    return (
-                      <button
-                        key={preset}
-                        type="button"
-                        onClick={() => setColor(preset)}
-                        aria-label={`Selecionar ${presetToken.label}`}
-                        aria-pressed={selected}
-                        title={presetToken.label}
-                        className="grid size-[30px] place-items-center rounded-full border transition-[transform,opacity,box-shadow] hover:scale-105 hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45 sm:size-8"
-                        style={{
-                          backgroundColor: presetToken.soft,
-                          borderColor: presetToken.border,
-                          boxShadow: selected
-                            ? `0 0 0 2px var(--background), 0 0 0 4px ${presetToken.indicator}`
-                            : undefined,
-                        }}
-                      >
-                        <span
-                          aria-hidden="true"
-                          className="size-2.5 rounded-full"
-                          style={{ backgroundColor: presetToken.indicator }}
-                        />
-                        <span className="sr-only">{presetToken.label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </fieldset>
-            ))}
-          </div>
+          <CategoryColorPicker
+            value={color}
+            onChange={setColor}
+            className="mx-auto max-w-[21rem]"
+          />
         </div>
         <DialogFooter className="sm:justify-between">
           {isEdit ? (

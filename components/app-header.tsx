@@ -3,6 +3,14 @@
 import * as React from "react";
 import { Check, ChevronDown, PencilLine } from "lucide-react";
 import { BrandLogo } from "@/components/brand-logo";
+import {
+  GuidedCalendarNotice,
+  type GuidedSelectionNotice,
+} from "@/components/onboarding/guided-selection-notice";
+import {
+  GuidedToolbarNoticeCard,
+  type GuidedToolbarNotice,
+} from "@/components/onboarding/guided-toolbar-notice";
 import { CategoryBar } from "@/components/category-bar";
 import { CategoryManager } from "@/components/category-manager";
 import { CalendarPackLauncher } from "@/components/calendar-packs/calendar-pack-launcher";
@@ -27,8 +35,6 @@ import type { OnboardingFocusTarget } from "@/lib/onboarding";
 import type { AnchorPoint } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-const CATEGORY_COLLAPSE_STORAGE_KEY = "doze52-categories-expanded";
-
 type AppHeaderProps = {
   year: number;
   onYearChange: (year: number) => void;
@@ -38,6 +44,14 @@ type AppHeaderProps = {
   onOpenAuthDialog: (anchorPoint?: AnchorPoint) => void;
   onCalendarPackFocusYear: (year: number) => void;
   onboardingFocusTarget?: OnboardingFocusTarget;
+  guidedSelectionNotice?: GuidedSelectionNotice | null;
+  guidedToolbarNotice?: GuidedToolbarNotice | null;
+  onDismissGuidedSelection?: () => void;
+  onGuidedEditModeChange?: (active: boolean) => void;
+  onGuidedThemeChange?: () => void;
+  onboardingLayoutLocked?: boolean;
+  categoryCreateRequestKey?: number;
+  onCategoryCreated?: (categoryId: string) => void;
 };
 
 const getPreferredEditingProfileId = (
@@ -54,6 +68,14 @@ export function AppHeader({
   onOpenAuthDialog,
   onCalendarPackFocusYear,
   onboardingFocusTarget = null,
+  guidedSelectionNotice = null,
+  guidedToolbarNotice = null,
+  onDismissGuidedSelection,
+  onGuidedEditModeChange,
+  onGuidedThemeChange,
+  onboardingLayoutLocked = false,
+  categoryCreateRequestKey = 0,
+  onCategoryCreated,
 }: AppHeaderProps) {
   const profiles = useStore((s) => s.profiles);
   const categories = useStore((s) => s.categories);
@@ -71,13 +93,15 @@ export function AppHeader({
   const [editingCategoryId, setEditingCategoryId] = React.useState<string | null>(null);
   const [categoriesExpanded, setCategoriesExpanded] = React.useState(true);
   const [areMobileFiltersCollapsed, setAreMobileFiltersCollapsed] =
-    React.useState(true);
+    React.useState(false);
+  const previousOnboardingLayoutLockedRef = React.useRef(false);
 
   const pendingProfileCreateRestoreRef = React.useRef<{
     knownProfileIds: string[];
     selectedProfileIds: string[];
   } | null>(null);
   const previousProfileManagerOpenRef = React.useRef(false);
+  const handledCategoryCreateRequestRef = React.useRef(0);
 
   const utilityIconClass =
     "h-8 w-8 rounded-[10px] border-border bg-card text-muted-foreground shadow-none transition-colors hover:border-foreground/18 hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 md:h-9 md:w-9";
@@ -93,19 +117,19 @@ export function AppHeader({
     onboardingFocusTarget?.kind === "profile" ? onboardingFocusTarget.id : null;
   const highlightedCategoryId =
     onboardingFocusTarget?.kind === "category" ? onboardingFocusTarget.id : null;
-  const hasOnboardingFilterFocus = Boolean(
-    highlightedProfileId || highlightedCategoryId
-  );
-  const highlightAuthEntry = onboardingFocusTarget?.kind === "auth";
   const effectiveCategoriesExpanded =
-    categoriesExpanded || isInlineEditMode || Boolean(highlightedCategoryId);
+    categoriesExpanded || isInlineEditMode;
+  const filtersLocked = onboardingLayoutLocked && !isInlineEditMode;
+  const inlineEditDisabled =
+    onboardingLayoutLocked && guidedToolbarNotice?.target !== "edit";
+  const themeToggleDisabled =
+    onboardingLayoutLocked && guidedToolbarNotice?.target !== "theme";
   const isMobileMode = isMobileCalendarUi === true;
   const filterPanelId = React.useId();
   const showMobileFilterPanel =
     !isMobileMode ||
     !areMobileFiltersCollapsed ||
-    isInlineEditMode ||
-    hasOnboardingFilterFocus;
+    isInlineEditMode;
   const selectedProfile = React.useMemo(
     () =>
       profiles.find((profile) => selectedProfileIds.includes(profile.id)) ??
@@ -150,21 +174,33 @@ export function AppHeader({
   }, [profileManagerOpen, profiles, setSelectedProfiles]);
 
   React.useEffect(() => {
-    try {
-      const stored = window.localStorage.getItem(CATEGORY_COLLAPSE_STORAGE_KEY);
-      if (stored === "true" || stored === "false") {
-        setCategoriesExpanded(stored === "true");
-      }
-    } catch {
-      // Keep categories visible when storage is unavailable.
-    }
-  }, []);
-
-  React.useEffect(() => {
     if (isInlineEditMode) {
       setAreMobileFiltersCollapsed(false);
     }
   }, [isInlineEditMode]);
+
+  React.useEffect(() => {
+    const wasLocked = previousOnboardingLayoutLockedRef.current;
+    previousOnboardingLayoutLockedRef.current = onboardingLayoutLocked;
+    if (wasLocked && !onboardingLayoutLocked) {
+      setIsInlineEditMode(false);
+    }
+  }, [onboardingLayoutLocked]);
+
+  React.useEffect(() => {
+    if (
+      categoryCreateRequestKey <= 0 ||
+      categoryCreateRequestKey === handledCategoryCreateRequestRef.current
+    ) {
+      return;
+    }
+    handledCategoryCreateRequestRef.current = categoryCreateRequestKey;
+    const profileId =
+      selectedProfileIds[0] ?? profiles[0]?.id ?? null;
+    if (!profileId) return;
+    setEditingProfileId(profileId);
+    setCategoryCreateOpen(true);
+  }, [categoryCreateRequestKey, profiles, selectedProfileIds]);
 
   React.useEffect(() => {
     if (!highlightedCategoryId) return;
@@ -190,25 +226,22 @@ export function AppHeader({
     }
   }, [categories, highlightedCategoryId, setCategoriesVisibility]);
 
-  const setPersistedCategoriesExpanded = React.useCallback((expanded: boolean) => {
-    setCategoriesExpanded(expanded);
-    try {
-      window.localStorage.setItem(CATEGORY_COLLAPSE_STORAGE_KEY, String(expanded));
-    } catch {
-      // Ignore storage errors; this is only a local UI preference.
-    }
-  }, []);
-
   const toggleInlineEditMode = React.useCallback(() => {
-    setIsInlineEditMode((current) => {
-      const next = !current;
-      if (next) {
-        const profileIds = profiles.map((profile) => profile.id);
-        setEditingProfileId(getPreferredEditingProfileId(selectedProfileIds, profileIds));
-      }
-      return next;
-    });
-  }, [profiles, selectedProfileIds]);
+    const next = !isInlineEditMode;
+    if (next) {
+      const profileIds = profiles.map((profile) => profile.id);
+      setEditingProfileId(
+        getPreferredEditingProfileId(selectedProfileIds, profileIds)
+      );
+    }
+    setIsInlineEditMode(next);
+    onGuidedEditModeChange?.(next);
+  }, [
+    isInlineEditMode,
+    onGuidedEditModeChange,
+    profiles,
+    selectedProfileIds,
+  ]);
 
   const openCreateProfile = React.useCallback(() => {
     pendingProfileCreateRestoreRef.current = {
@@ -256,32 +289,63 @@ export function AppHeader({
 
           <div className="w-full min-w-0 justify-self-end">
             <div className="flex min-w-0 flex-wrap items-center justify-end gap-1 sm:gap-2">
-              {isInlineEditMode ? (
-                <Button
-                  type="button"
-                  variant="premium"
-                  size="sm"
-                  className={utilityActiveEditClass}
-                  onClick={toggleInlineEditMode}
-                  aria-label="Finalizar edicao de perfis e categorias"
-                  title="Finalizar edicao de perfis e categorias"
-                >
-                  <Check className="h-4 w-4" />
-                  <span className="hidden min-[420px]:inline">Finalizar</span>
-                </Button>
-              ) : (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon-sm"
-                  className={utilityIconClass}
-                  onClick={toggleInlineEditMode}
-                  aria-label="Editar perfis e categorias"
-                  title="Editar perfis e categorias"
-                >
-                  <PencilLine className="h-4 w-4" />
-                </Button>
-              )}
+              <div className="relative shrink-0">
+                {isInlineEditMode ? (
+                  <Button
+                    type="button"
+                    data-onboarding-edit-control
+                    data-onboarding-highlighted={
+                      guidedToolbarNotice?.target === "edit"
+                        ? "true"
+                        : undefined
+                    }
+                    variant="premium"
+                    size="sm"
+                    disabled={inlineEditDisabled}
+                    className={cn(
+                      utilityActiveEditClass,
+                      guidedToolbarNotice?.target === "edit" &&
+                        "ring-4 ring-primary/18 animate-pulse motion-reduce:animate-none"
+                    )}
+                    onClick={toggleInlineEditMode}
+                    aria-label="Finalizar edição de contextos e categorias"
+                    title="Finalizar edição de contextos e categorias"
+                  >
+                    <Check className="h-4 w-4" />
+                    <span className="hidden min-[420px]:inline">Finalizar</span>
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    data-onboarding-edit-control
+                    data-onboarding-highlighted={
+                      guidedToolbarNotice?.target === "edit"
+                        ? "true"
+                        : undefined
+                    }
+                    variant="outline"
+                    size="icon-sm"
+                    disabled={inlineEditDisabled}
+                    className={cn(
+                      utilityIconClass,
+                      guidedToolbarNotice?.target === "edit" &&
+                        "border-primary text-primary ring-4 ring-primary/18 animate-pulse motion-reduce:animate-none"
+                    )}
+                    onClick={toggleInlineEditMode}
+                    aria-label="Editar contextos e categorias"
+                    title="Editar contextos e categorias"
+                  >
+                    <PencilLine className="h-4 w-4" />
+                  </Button>
+                )}
+                {guidedToolbarNotice?.target === "edit" &&
+                onDismissGuidedSelection ? (
+                  <GuidedToolbarNoticeCard
+                    notice={guidedToolbarNotice}
+                    onClose={onDismissGuidedSelection}
+                  />
+                ) : null}
+              </div>
 
               <CalendarPackLauncher
                 onFocusYear={onCalendarPackFocusYear}
@@ -300,7 +364,21 @@ export function AppHeader({
                 </SelectContent>
               </Select>
 
-              <ThemeToggle />
+              <div className="relative shrink-0">
+                <ThemeToggle
+                  highlighted={guidedToolbarNotice?.target === "theme"}
+                  disabled={themeToggleDisabled}
+                  onThemeChange={() => onGuidedThemeChange?.()}
+                />
+                {guidedToolbarNotice?.target === "theme" &&
+                onDismissGuidedSelection ? (
+                  <GuidedToolbarNoticeCard
+                    notice={guidedToolbarNotice}
+                    onClose={onDismissGuidedSelection}
+                    align="end"
+                  />
+                ) : null}
+              </div>
 
               <div className="flex h-8 items-center justify-end md:h-9">
                 {authLoading ? null : isAuthenticated ? (
@@ -308,16 +386,9 @@ export function AppHeader({
                 ) : (
                   <Button
                     data-onboarding-auth-entry
-                    data-onboarding-highlighted={
-                      highlightAuthEntry ? "true" : undefined
-                    }
                     size="sm"
                     variant="outline"
-                    className={cn(
-                      utilityButtonClass,
-                      highlightAuthEntry &&
-                        "relative z-[46] ring-2 ring-primary ring-offset-2 ring-offset-background shadow-[0_0_0_7px_hsl(var(--primary)/0.12)] motion-safe:animate-[pulse_700ms_ease-in-out_2]"
-                    )}
+                    className={utilityButtonClass}
                     onClick={(event) => {
                       const rect = event.currentTarget.getBoundingClientRect();
                       onOpenAuthDialog({ x: rect.right, y: rect.bottom });
@@ -332,20 +403,36 @@ export function AppHeader({
         </div>
 
         <div
+          data-onboarding-filter-region
           className={cn(
-            "mx-auto flex w-full flex-col items-center gap-1.5 md:gap-2",
+            "relative mx-auto flex w-full flex-col items-center gap-1.5 md:gap-2",
             isMobileMode
               ? "max-w-[31rem]"
-              : "max-w-[62rem] border-t border-border/45 pt-2.5 md:pt-3"
+              : "max-w-[62rem] border-t border-border/45 pt-2.5 md:pt-3",
+            onboardingLayoutLocked &&
+              (isMobileMode ? "min-h-[10.25rem]" : "min-h-[5.6rem]")
           )}
         >
-          {isMobileMode ? (
-            <div className="w-full overflow-hidden rounded-[10px] border border-border bg-card">
+          <div
+            className={cn(
+              "flex w-full flex-col items-center gap-1.5 transition-opacity duration-150 md:gap-2",
+              guidedSelectionNotice && "opacity-0"
+            )}
+            inert={filtersLocked ? true : undefined}
+            aria-hidden={guidedSelectionNotice ? true : undefined}
+          >
+            {isMobileMode ? (
+              <div className="w-full overflow-hidden rounded-[10px] border border-border bg-card">
               <button
                 type="button"
                 className="m-[3px] flex h-10 w-[calc(100%-6px)] items-center justify-between gap-3 rounded-[8px] bg-transparent px-2.5 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/45"
                 aria-expanded={showMobileFilterPanel}
                 aria-controls={filterPanelId}
+                aria-label={
+                  showMobileFilterPanel
+                    ? "Recolher contextos e categorias"
+                    : "Mostrar contextos e categorias"
+                }
                 onClick={() =>
                   setAreMobileFiltersCollapsed((current) => !current)
                 }
@@ -361,7 +448,7 @@ export function AppHeader({
                     </span>
                   ) : null}
                   <span className="block min-w-0 truncate text-[13px] font-semibold leading-4 text-foreground">
-                    {selectedProfile?.name ?? "Perfis"}
+                    {selectedProfile?.name ?? "Contextos"}
                   </span>
                 </span>
 
@@ -418,9 +505,9 @@ export function AppHeader({
                   </div>
                 </div>
               </div>
-            </div>
-          ) : (
-            <>
+              </div>
+            ) : (
+              <>
               <div className="-mx-4 w-[calc(100%+2rem)] overflow-x-auto px-4 pb-0.5 doze52-scrollbar-none sm:mx-0 sm:w-full sm:px-0 md:overflow-visible">
                 <div className="flex w-max min-w-full flex-nowrap items-center justify-start gap-x-1.5 gap-y-1.5 sm:w-full sm:flex-wrap sm:justify-center sm:gap-x-2">
                   <div className="flex shrink-0 flex-nowrap items-center justify-center gap-1.5 sm:flex-wrap sm:gap-2">
@@ -444,7 +531,7 @@ export function AppHeader({
                       }`}
                       disabled={isInlineEditMode}
                       onClick={() =>
-                        setPersistedCategoriesExpanded(!categoriesExpanded)
+                        setCategoriesExpanded(!categoriesExpanded)
                       }
                       aria-label={
                         isInlineEditMode
@@ -496,8 +583,26 @@ export function AppHeader({
                   </div>
                 </div>
               ) : null}
-            </>
-          )}
+              </>
+            )}
+          </div>
+
+          {guidedSelectionNotice && onDismissGuidedSelection ? (
+            <div
+              data-guided-selection-overlay
+              className="absolute inset-0 z-40 flex items-center justify-center rounded-2xl bg-background"
+            >
+              <div
+                data-guided-selection-card
+                className="w-[min(34rem,calc(100%-1rem))] overflow-hidden rounded-2xl border border-primary/20 bg-card/98 shadow-[0_20px_50px_-30px_rgba(15,23,42,0.72)] backdrop-blur-xl"
+              >
+                <GuidedCalendarNotice
+                  notice={guidedSelectionNotice}
+                  onClose={onDismissGuidedSelection}
+                />
+              </div>
+            </div>
+          ) : null}
         </div>
 
         {isMobileMode ? null : (
@@ -517,6 +622,7 @@ export function AppHeader({
         open={categoryCreateOpen}
         onOpenChange={setCategoryCreateOpen}
         profileId={editingProfileId ?? undefined}
+        onCreated={onCategoryCreated}
         onRequireAuth={() => onOpenAuthDialog()}
       />
 

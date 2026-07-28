@@ -577,7 +577,7 @@ export function MobileCalendarExperience({
                   className="grid h-full place-items-center rounded-[9px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45"
                   aria-label={
                     guidedSelectable
-                      ? `Selecionar ${dayIso} para o onboarding`
+                      ? `Selecionar ${dayIso} no guia inicial`
                       : undefined
                   }
                   onClick={() => {

@@ -654,6 +654,7 @@ export function YearGrid({
 
   return (
     <div
+      data-year-grid
       className={cn(
         "w-full overflow-hidden rounded-[1.35rem] border border-border bg-card shadow-[0_18px_42px_-34px_rgba(15,23,42,0.24)]",
         canvasWidthClass

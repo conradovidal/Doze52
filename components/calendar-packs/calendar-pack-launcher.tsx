@@ -261,7 +261,7 @@ export function CalendarPackLauncher({
       if (!targetProfileId || !profileNameById.has(targetProfileId)) {
         notify({
           tone: "error",
-          title: "Escolha um perfil",
+          title: "Escolha um contexto",
           description: "Selecione onde este calendário deve entrar.",
         });
         return;
@@ -538,9 +538,9 @@ export function CalendarPackLauncher({
                             <SelectTrigger
                               size="sm"
                               className="h-7 w-[8.25rem] rounded-[9px] border-border bg-card px-2.5 text-xs font-semibold shadow-none hover:border-foreground/18 hover:bg-muted sm:w-[9rem]"
-                              aria-label={`Perfil para ${pack.name}`}
+                              aria-label={`Contexto para ${pack.name}`}
                             >
-                              <SelectValue placeholder="Perfil" />
+                              <SelectValue placeholder="Contexto" />
                             </SelectTrigger>
                             <SelectContent align="end">
                               {profiles.map((profile) => (
@@ -566,13 +566,13 @@ export function CalendarPackLauncher({
                             }
                             aria-label={
                               targetProfileName
-                                ? `Adicionar calendário ${pack.name} ao perfil ${targetProfileName}`
+                                ? `Adicionar calendário ${pack.name} ao contexto ${targetProfileName}`
                                 : `Adicionar calendário ${pack.name}`
                             }
                             title={
                               targetProfileName
                                 ? `Adicionar em ${targetProfileName}`
-                                : "Escolha um perfil"
+                                : "Escolha um contexto"
                             }
                           >
                             {currentFlow === "adding" ? (

@@ -7,21 +7,34 @@ import {
   type GuidedOnboardingState,
 } from "../../lib/onboarding";
 import {
-  getOnboardingCategoryIdForIntent,
+  getOnboardingCategoryDefinition,
   getOnboardingDefaultCategories,
   getOnboardingDefaultProfiles,
+  getOnboardingPersonalDemoSnapshot,
+  isOnboardingPersonalDemoSnapshot,
   isOnboardingProfilesSnapshot,
   ONBOARDING_CATEGORY_IDS,
+  ONBOARDING_PERSONAL_DEMO_GROUP_ID,
   ONBOARDING_PROFILE_IDS,
+  stripOnboardingPersonalDemo,
 } from "../../lib/store";
 import { materializeUserOwnedSnapshot } from "../../lib/snapshot-ownership";
 
 const initialState = (): GuidedOnboardingState => ({
-  version: 3,
+  version: 5,
   step: "context_selection",
 });
 
-test("configura contexto, data, período e chega à prévia sem reflexão", () => {
+const completedState = (): GuidedOnboardingState => ({
+  version: 5,
+  step: "completed",
+  context: "personal",
+  completedAt: "2026-07-20T10:05:00.000Z",
+  postOnboardingEventsCreated: 0,
+  postOnboardingCategoriesCreated: 0,
+});
+
+test("cria contexto, categorias incrementais e quatro eventos", () => {
   const configured = reduceGuidedOnboardingState(initialState(), {
     type: "configure_profile",
     context: "work",
@@ -32,108 +45,161 @@ test("configura contexto, data, período e chega à prévia sem reflexão", () =
     context: "work",
   });
 
-  const dateInstruction = reduceGuidedOnboardingState(configured, {
+  const dateCategorySelection = reduceGuidedOnboardingState(configured, {
     type: "continue_from_profile",
   });
-  expect(dateInstruction.step).toBe("date_instruction");
+  expect(dateCategorySelection.step).toBe("date_category_selection");
 
-  const dateDetails = reduceGuidedOnboardingState(dateInstruction, {
-    type: "select_date",
+  let state = reduceGuidedOnboardingState(dateCategorySelection, {
+    type: "choose_date_category",
+    categoryId: ONBOARDING_CATEGORY_IDS.workDeliveries,
   });
-  const firstDateSaved = reduceGuidedOnboardingState(dateDetails, {
+  expect(state).toMatchObject({
+    step: "date_instruction",
+    dateCategoryId: ONBOARDING_CATEGORY_IDS.workDeliveries,
+  });
+
+  state = reduceGuidedOnboardingState(state, { type: "select_date" });
+  state = reduceGuidedOnboardingState(state, {
     type: "date_saved",
     at: "2026-07-20T10:01:00.000Z",
   });
-  expect(firstDateSaved.step).toBe("date_instruction");
-  expect(firstDateSaved.dateItemsCreated).toBe(1);
-
-  const secondDateDetails = reduceGuidedOnboardingState(firstDateSaved, {
-    type: "select_date",
+  expect(state).toMatchObject({
+    step: "date_instruction",
+    dateItemsCreated: 1,
   });
-  const dateSaved = reduceGuidedOnboardingState(secondDateDetails, {
+
+  state = reduceGuidedOnboardingState(state, { type: "select_date" });
+  state = reduceGuidedOnboardingState(state, {
     type: "date_saved",
-    at: "2026-07-20T10:01:30.000Z",
-  });
-  expect(dateSaved.step).toBe("period_instruction");
-  expect(dateSaved.firstDateCreatedAt).toBe("2026-07-20T10:01:00.000Z");
-  expect(dateSaved.dateItemsCreated).toBe(2);
-
-  const periodDetails = reduceGuidedOnboardingState(dateSaved, {
-    type: "select_period",
-  });
-  const firstPeriodSaved = reduceGuidedOnboardingState(periodDetails, {
-    type: "period_saved",
     at: "2026-07-20T10:02:00.000Z",
   });
-  expect(firstPeriodSaved.step).toBe("period_instruction");
-  expect(firstPeriodSaved.periodItemsCreated).toBe(1);
-
-  const secondPeriodDetails = reduceGuidedOnboardingState(firstPeriodSaved, {
-    type: "select_period",
+  expect(state).toMatchObject({
+    step: "period_category_selection",
+    dateItemsCreated: 2,
   });
-  const preview = reduceGuidedOnboardingState(secondPeriodDetails, {
+
+  state = reduceGuidedOnboardingState(state, {
+    type: "choose_period_category",
+    categoryId: ONBOARDING_CATEGORY_IDS.workTrips,
+  });
+  state = reduceGuidedOnboardingState(state, { type: "select_period" });
+  state = reduceGuidedOnboardingState(state, {
     type: "period_saved",
     at: "2026-07-20T10:03:00.000Z",
   });
-  expect(preview.step).toBe("use_case_preview");
-  expect(preview.firstPeriodCreatedAt).toBe("2026-07-20T10:02:00.000Z");
-  expect(preview.periodItemsCreated).toBe(2);
-});
-
-test("permite seguir após uma data e um período", () => {
-  const datePrompt: GuidedOnboardingState = {
-    version: 3,
-    step: "date_instruction",
-    context: "personal",
-    dateItemsCreated: 1,
-  };
-  const periods = reduceGuidedOnboardingState(datePrompt, {
-    type: "continue_to_periods",
-  });
-  expect(periods.step).toBe("period_instruction");
-
-  const periodPrompt: GuidedOnboardingState = {
-    ...periods,
+  expect(state).toMatchObject({
+    step: "period_instruction",
     periodItemsCreated: 1,
-  };
-  expect(
-    reduceGuidedOnboardingState(periodPrompt, {
-      type: "continue_to_preview",
-    }).step
-  ).toBe("use_case_preview");
-});
-
-test("Outro pede nome antes de configurar o perfil", () => {
-  const custom = reduceGuidedOnboardingState(initialState(), {
-    type: "choose_context",
-    context: "custom",
   });
-  expect(custom.step).toBe("custom_profile");
-  expect(custom.context).toBe("custom");
+
+  state = reduceGuidedOnboardingState(state, { type: "select_period" });
+  state = reduceGuidedOnboardingState(state, {
+    type: "period_saved",
+    at: "2026-07-20T10:04:00.000Z",
+  });
+  expect(state).toMatchObject({
+    step: "edit_instruction",
+    periodItemsCreated: 2,
+  });
+
+  state = reduceGuidedOnboardingState(state, {
+    type: "open_inline_edit",
+  });
+  expect(state.step).toBe("edit_active");
+  state = reduceGuidedOnboardingState(state, {
+    type: "close_inline_edit",
+  });
+  expect(state.step).toBe("theme_instruction");
+  state = reduceGuidedOnboardingState(state, {
+    type: "choose_theme",
+  });
+  expect(state.step).toBe("completion_choice");
+
+  state = reduceGuidedOnboardingState(state, {
+    type: "complete",
+    at: "2026-07-20T10:05:00.000Z",
+  });
+  expect(state).toMatchObject({
+    step: "completed",
+    postOnboardingEventsCreated: 0,
+    postOnboardingCategoriesCreated: 0,
+  });
 });
 
-test("migre v2 em andamento removendo reflexão e preserve terminais", () => {
+test("convite de conta exige dois eventos espontâneos", () => {
+  const first = reduceGuidedOnboardingState(completedState(), {
+    type: "record_post_onboarding_event",
+    at: "2026-07-20T11:00:00.000Z",
+  });
+  expect(first.postOnboardingEventsCreated).toBe(1);
+  expect(first.accountNudgeShownAt).toBeUndefined();
+
+  const second = reduceGuidedOnboardingState(first, {
+    type: "record_post_onboarding_event",
+    at: "2026-07-20T11:01:00.000Z",
+  });
+  expect(second.postOnboardingEventsCreated).toBe(2);
+  expect(second.accountNudgeShownAt).toBe("2026-07-20T11:01:00.000Z");
+});
+
+test("categoria e evento também qualificam o convite uma única vez", () => {
+  const category = reduceGuidedOnboardingState(completedState(), {
+    type: "record_post_onboarding_category",
+    at: "2026-07-20T11:00:00.000Z",
+  });
+  expect(category.accountNudgeShownAt).toBeUndefined();
+
+  const event = reduceGuidedOnboardingState(category, {
+    type: "record_post_onboarding_event",
+    at: "2026-07-20T11:01:00.000Z",
+  });
+  expect(event.accountNudgeShownAt).toBe("2026-07-20T11:01:00.000Z");
+
+  const ignored = reduceGuidedOnboardingState(event, {
+    type: "record_post_onboarding_event",
+    at: "2026-07-20T11:02:00.000Z",
+  });
+  expect(ignored).toEqual(event);
+});
+
+test("migra v3 com progresso sem reabrir fluxo incompatível", () => {
   expect(
     migrateGuidedOnboardingState({
-      version: 2,
-      step: "reflection",
-      startedAt: "2026-07-20T10:00:00.000Z",
-      firstItemCreatedAt: "2026-07-20T10:01:00.000Z",
+      version: 3,
+      step: "period_instruction",
+      context: "personal",
+      dateItemsCreated: 2,
+      firstDateCreatedAt: "2026-07-20T10:01:00.000Z",
     })
   ).toMatchObject({
-    version: 3,
-    step: "period_instruction",
+    version: 5,
+    step: "completed",
     context: "personal",
-    firstDateCreatedAt: "2026-07-20T10:01:00.000Z",
+    dateItemsCreated: 2,
   });
 
   expect(
     migrateGuidedOnboardingState({
-      version: 2,
+      version: 3,
       step: "completed",
       completedAt: "2026-07-20T10:03:00.000Z",
     })
-  ).toMatchObject({ version: 3, step: "completed" });
+  ).toMatchObject({ version: 5, step: "completed" });
+
+  expect(
+    migrateGuidedOnboardingState({
+      version: 4,
+      step: "completion_choice",
+      context: "personal",
+      dateItemsCreated: 2,
+      periodItemsCreated: 2,
+    })
+  ).toMatchObject({
+    version: 5,
+    step: "completion_choice",
+    context: "personal",
+  });
 });
 
 test("dispensa e conclusão são terminais para a elegibilidade", () => {
@@ -167,27 +233,38 @@ test("conta autenticada só recebe o fluxo depois da carga remota", () => {
 });
 
 test("eventos de calendários prontos não contam como autorais", () => {
-  expect(hasAuthorCalendarEvents([{ calendarPackGroupId: "feriados-2026" }])).toBe(false);
-  expect(hasAuthorCalendarEvents([{ calendarPackGroupId: undefined }])).toBe(true);
+  expect(
+    hasAuthorCalendarEvents([{ calendarPackGroupId: "feriados-2026" }])
+  ).toBe(false);
+  expect(
+    hasAuthorCalendarEvents([{ calendarPackGroupId: undefined }])
+  ).toBe(true);
 });
 
-test("mapeia as intenções para as categorias corretas", () => {
-  expect(getOnboardingCategoryIdForIntent("personal", "date")).toBe(
-    ONBOARDING_CATEGORY_IDS.birthday
-  );
-  expect(getOnboardingCategoryIdForIntent("work", "date")).toBe(
-    ONBOARDING_CATEGORY_IDS.workDeliveries
-  );
-  expect(getOnboardingCategoryIdForIntent("work", "period")).toBe(
-    ONBOARDING_CATEGORY_IDS.workTrips
-  );
-  expect(getOnboardingCategoryIdForIntent("custom", "period")).toBe(
-    ONBOARDING_CATEGORY_IDS.customPeriods
-  );
+test("oferece categorias específicas e genéricas por contexto", () => {
+  expect(
+    getOnboardingCategoryDefinition("personal", "date", "specific")
+  ).toMatchObject({
+    id: ONBOARDING_CATEGORY_IDS.birthday,
+    name: "Aniversários",
+  });
+  expect(
+    getOnboardingCategoryDefinition("work", "period", "specific")
+  ).toMatchObject({
+    id: ONBOARDING_CATEGORY_IDS.workTrips,
+    name: "Projetos",
+  });
+  expect(
+    getOnboardingCategoryDefinition("work", "date", "generic")
+  ).toMatchObject({
+    id: ONBOARDING_CATEGORY_IDS.customImportantDates,
+    name: "Datas importantes",
+  });
 });
 
-test("novo template neutro e Pessoal legado continuam reconhecidos", () => {
+test("novo template começa com contexto neutro e nenhuma categoria", () => {
   expect(getOnboardingDefaultProfiles()[0]?.name).toBe("Meu ano");
+  expect(getOnboardingDefaultCategories()).toEqual([]);
   expect(
     isOnboardingProfilesSnapshot([
       {
@@ -201,29 +278,86 @@ test("novo template neutro e Pessoal legado continuam reconhecidos", () => {
   ).toBe(true);
 });
 
+test("demonstração pessoal monta um ano completo e identificável", () => {
+  const snapshot = getOnboardingPersonalDemoSnapshot(2026);
+  expect(snapshot.profiles.map((profile) => profile.name)).toEqual([
+    "Pessoal",
+    "Família",
+    "Profissional",
+  ]);
+  expect(snapshot.categories.map((category) => category.name)).toEqual([
+    "Aniversários",
+    "Férias e viagens",
+    "Família e escola",
+    "Saúde e bem-estar",
+    "Celebrações",
+    "Projetos pessoais",
+  ]);
+  expect(snapshot.events).toHaveLength(22);
+  expect(isOnboardingPersonalDemoSnapshot(snapshot)).toBe(true);
+  expect(
+    snapshot.events.every(
+      (event) =>
+        event.calendarPackGroupId === ONBOARDING_PERSONAL_DEMO_GROUP_ID
+    )
+  ).toBe(true);
+  expect(
+    snapshot.events.filter((event) => event.recurrenceType === "yearly")
+  ).toHaveLength(4);
+});
+
+test("demonstração é removida antes de qualquer importação", () => {
+  const stripped = stripOnboardingPersonalDemo(
+    getOnboardingPersonalDemoSnapshot(2026)
+  );
+  expect(stripped.profiles.map((profile) => profile.name)).toEqual(["Meu ano"]);
+  expect(stripped.categories).toEqual([]);
+  expect(stripped.events).toEqual([]);
+});
+
 test("materialização cria IDs distintos e preserva relacionamentos", () => {
   const profiles = getOnboardingDefaultProfiles();
-  const categories = getOnboardingDefaultCategories();
-  const sourceCategory = categories[0];
-  if (!sourceCategory) throw new Error("Template sem categoria");
+  const profile = profiles[0];
+  if (!profile) throw new Error("Template sem contexto");
+  const definition = getOnboardingCategoryDefinition(
+    "personal",
+    "date",
+    "specific"
+  );
+  const category = {
+    ...definition,
+    profileId: profile.id,
+    visible: true,
+  };
   const snapshot = {
     profiles,
-    categories,
-    events: [{
-      id: "11111111-aaaa-4111-8111-111111111111",
-      title: "Viagem",
-      categoryId: sourceCategory.id,
-      color: sourceCategory.color,
-      startDate: "2026-08-01",
-      endDate: "2026-08-10",
-      createdAt: "2026-07-20T10:00:00.000Z",
-      dayOrder: 0,
-    }],
+    categories: [category],
+    events: [
+      {
+        id: "11111111-aaaa-4111-8111-111111111111",
+        title: "Aniversário",
+        categoryId: category.id,
+        color: category.color,
+        startDate: "2026-08-01",
+        endDate: "2026-08-01",
+        recurrenceType: "yearly" as const,
+        createdAt: "2026-07-20T10:00:00.000Z",
+        dayOrder: 0,
+      },
+    ],
   };
   const first = materializeUserOwnedSnapshot(snapshot);
   const second = materializeUserOwnedSnapshot(snapshot);
-  const firstIds = new Set([...first.profiles, ...first.categories, ...first.events].map((item) => item.id));
-  const secondIds = new Set([...second.profiles, ...second.categories, ...second.events].map((item) => item.id));
+  const firstIds = new Set(
+    [...first.profiles, ...first.categories, ...first.events].map(
+      (item) => item.id
+    )
+  );
+  const secondIds = new Set(
+    [...second.profiles, ...second.categories, ...second.events].map(
+      (item) => item.id
+    )
+  );
   expect([...firstIds].some((id) => secondIds.has(id))).toBe(false);
   expect(first.categories[0]?.profileId).toBe(first.profiles[0]?.id);
   expect(first.events[0]?.categoryId).toBe(first.categories[0]?.id);

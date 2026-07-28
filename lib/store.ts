@@ -9,16 +9,22 @@ import {
   CATEGORY_COLOR_BASE_CYAN,
   CATEGORY_COLOR_BASE_GREEN,
   CATEGORY_COLOR_BASE_LIME,
+  CATEGORY_COLOR_BASE_MINT,
+  CATEGORY_COLOR_BASE_ROSE,
   CATEGORY_COLOR_BASE_VIOLET,
   DEFAULT_CATEGORY_COLOR,
   ONBOARDING_CATEGORY_COLOR_BY_ID,
+  getNearestCategoryColor,
 } from "./category-palette";
 import {
   normalizeProfileIconId,
   type ProfileIconId,
 } from "./profile-icons";
 import type { CalendarEvent, CalendarProfile, CategoryItem } from "./types";
-import type { OnboardingContext } from "./onboarding";
+import type {
+  OnboardingCategoryChoice,
+  OnboardingContext,
+} from "./onboarding";
 
 export type EventInput = {
   title: string;
@@ -55,10 +61,17 @@ type StoreState = {
     events: CalendarEvent[];
   }) => void;
   resetToOnboardingData: () => void;
+  loadOnboardingPersonalDemo: (year: number) => void;
+  clearOnboardingPersonalDemo: () => void;
   configureOnboardingContext: (input: {
     context: OnboardingContext;
-    customName?: string;
   }) => boolean;
+  createOnboardingCategory: (input: {
+    context: OnboardingContext;
+    intent: "date" | "period";
+    choice: OnboardingCategoryChoice;
+    color?: string;
+  }) => string | null;
   markLocalImported: (userId: string) => void;
   isLocalImported: (userId: string) => boolean;
   ensureEventMetadata: () => void;
@@ -140,6 +153,8 @@ export const ONBOARDING_CATEGORY_IDS = {
 } as const;
 
 export const ONBOARDING_DEFAULT_CATEGORY_ID = ONBOARDING_CATEGORY_IDS.events;
+export const ONBOARDING_PERSONAL_DEMO_GROUP_ID =
+  "onboarding-personal-demo-v1";
 
 const defaultCategoryColor =
   ONBOARDING_CATEGORY_COLOR_BY_ID[ONBOARDING_DEFAULT_CATEGORY_ID] ??
@@ -185,6 +200,30 @@ const getFeatureDefaultProfiles = (): CalendarProfile[] => [
     name: "Familia",
     color: DEFAULT_PROFILE_COLOR,
     icon: "users",
+    position: 2,
+  },
+];
+
+const getPersonalDemoProfiles = (): CalendarProfile[] => [
+  {
+    id: ONBOARDING_PROFILE_IDS.personal,
+    name: "Pessoal",
+    color: DEFAULT_PROFILE_COLOR,
+    icon: "user",
+    position: 0,
+  },
+  {
+    id: ONBOARDING_PROFILE_IDS.family,
+    name: "Família",
+    color: DEFAULT_PROFILE_COLOR,
+    icon: "users",
+    position: 1,
+  },
+  {
+    id: ONBOARDING_PROFILE_IDS.professional,
+    name: "Profissional",
+    color: DEFAULT_PROFILE_COLOR,
+    icon: "briefcase",
     position: 2,
   },
 ];
@@ -305,60 +344,363 @@ const getFeatureDefaultCategories = (): CategoryItem[] => [
   },
 ];
 
-const getContextCategories = (
-  context: OnboardingContext,
-  profileId: string
-): CategoryItem[] => {
-  const definitions =
-    context === "personal"
-      ? [
-          [ONBOARDING_CATEGORY_IDS.birthday, "Aniversários", CATEGORY_COLOR_BASE_AMBER],
-          [ONBOARDING_CATEGORY_IDS.travel, "Férias e viagens", CATEGORY_COLOR_BASE_CYAN],
-          [ONBOARDING_CATEGORY_IDS.events, "Eventos", CATEGORY_COLOR_BASE_VIOLET],
-        ]
-      : context === "work"
-        ? [
-            [ONBOARDING_CATEGORY_IDS.workDeliveries, "Entregas", CATEGORY_COLOR_BASE_VIOLET],
-            [ONBOARDING_CATEGORY_IDS.workTrips, "Projetos", CATEGORY_COLOR_BASE_BLUE],
-            [ONBOARDING_CATEGORY_IDS.workMeetings, "Reuniões", CATEGORY_COLOR_BASE_CYAN],
-          ]
-        : [
-            [ONBOARDING_CATEGORY_IDS.customImportantDates, "Datas importantes", CATEGORY_COLOR_BASE_AMBER],
-            [ONBOARDING_CATEGORY_IDS.customPeriods, "Períodos importantes", CATEGORY_COLOR_BASE_BLUE],
-            [ONBOARDING_CATEGORY_IDS.customOther, "Outros", CATEGORY_COLOR_BASE_VIOLET],
-          ];
-
-  return definitions.map(([id, name, color]) => ({
-    id,
-    profileId,
-    name,
-    color,
+const getPersonalDemoCategories = (): CategoryItem[] => [
+  {
+    id: ONBOARDING_CATEGORY_IDS.birthday,
+    profileId: ONBOARDING_PROFILE_IDS.personal,
+    name: "Aniversários",
+    color: CATEGORY_COLOR_BASE_AMBER,
     visible: true,
+    calendarPackGroupId: ONBOARDING_PERSONAL_DEMO_GROUP_ID,
+  },
+  {
+    id: ONBOARDING_CATEGORY_IDS.travel,
+    profileId: ONBOARDING_PROFILE_IDS.personal,
+    name: "Férias e viagens",
+    color: CATEGORY_COLOR_BASE_CYAN,
+    visible: true,
+    calendarPackGroupId: ONBOARDING_PERSONAL_DEMO_GROUP_ID,
+  },
+  {
+    id: ONBOARDING_CATEGORY_IDS.familySchool,
+    profileId: ONBOARDING_PROFILE_IDS.personal,
+    name: "Família e escola",
+    color: CATEGORY_COLOR_BASE_GREEN,
+    visible: true,
+    calendarPackGroupId: ONBOARDING_PERSONAL_DEMO_GROUP_ID,
+  },
+  {
+    id: ONBOARDING_CATEGORY_IDS.familyHealth,
+    profileId: ONBOARDING_PROFILE_IDS.personal,
+    name: "Saúde e bem-estar",
+    color: CATEGORY_COLOR_BASE_MINT,
+    visible: true,
+    calendarPackGroupId: ONBOARDING_PERSONAL_DEMO_GROUP_ID,
+  },
+  {
+    id: ONBOARDING_CATEGORY_IDS.familyMoments,
+    profileId: ONBOARDING_PROFILE_IDS.personal,
+    name: "Celebrações",
+    color: CATEGORY_COLOR_BASE_ROSE,
+    visible: true,
+    calendarPackGroupId: ONBOARDING_PERSONAL_DEMO_GROUP_ID,
+  },
+  {
+    id: ONBOARDING_CATEGORY_IDS.customPeriods,
+    profileId: ONBOARDING_PROFILE_IDS.personal,
+    name: "Projetos pessoais",
+    color: CATEGORY_COLOR_BASE_VIOLET,
+    visible: true,
+    calendarPackGroupId: ONBOARDING_PERSONAL_DEMO_GROUP_ID,
+  },
+];
+
+const toDemoIsoDate = (year: number, month: number, day: number) =>
+  `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+
+const getCarnivalRange = (year: number) => {
+  const ranges: Record<number, [string, string]> = {
+    2025: ["2025-03-01", "2025-03-05"],
+    2026: ["2026-02-14", "2026-02-18"],
+    2027: ["2027-02-06", "2027-02-10"],
+  };
+  return (
+    ranges[year] ?? [
+      toDemoIsoDate(year, 2, 14),
+      toDemoIsoDate(year, 2, 18),
+    ]
+  );
+};
+
+type PersonalDemoEventInput = {
+  key: string;
+  title: string;
+  categoryId: string;
+  startDate: string;
+  endDate?: string;
+  recurrenceType?: CalendarEvent["recurrenceType"];
+};
+
+const getPersonalDemoEvents = (year: number): CalendarEvent[] => {
+  const [carnivalStart, carnivalEnd] = getCarnivalRange(year);
+  const eventInputs: PersonalDemoEventInput[] = [
+    {
+      key: "family-album",
+      title: "Álbum da família",
+      categoryId: ONBOARDING_CATEGORY_IDS.customPeriods,
+      startDate: toDemoIsoDate(year, 1, 12),
+      endDate: toDemoIsoDate(year, 1, 24),
+    },
+    {
+      key: "school-return",
+      title: "Volta às aulas",
+      categoryId: ONBOARDING_CATEGORY_IDS.familySchool,
+      startDate: toDemoIsoDate(year, 2, 2),
+    },
+    {
+      key: "mother-birthday",
+      title: "Aniversário da mãe",
+      categoryId: ONBOARDING_CATEGORY_IDS.birthday,
+      startDate: toDemoIsoDate(year, 2, 8),
+      recurrenceType: "yearly",
+    },
+    {
+      key: "carnival-paraty",
+      title: "Carnaval em Paraty",
+      categoryId: ONBOARDING_CATEGORY_IDS.travel,
+      startDate: carnivalStart,
+      endDate: carnivalEnd,
+    },
+    {
+      key: "annual-checkup",
+      title: "Check-up anual",
+      categoryId: ONBOARDING_CATEGORY_IDS.familyHealth,
+      startDate: toDemoIsoDate(year, 3, 7),
+    },
+    {
+      key: "balcony-renovation",
+      title: "Reforma da varanda",
+      categoryId: ONBOARDING_CATEGORY_IDS.customPeriods,
+      startDate: toDemoIsoDate(year, 3, 16),
+      endDate: toDemoIsoDate(year, 5, 8),
+    },
+    {
+      key: "offline-week",
+      title: "Semana de descanso",
+      categoryId: ONBOARDING_CATEGORY_IDS.familyHealth,
+      startDate: toDemoIsoDate(year, 4, 6),
+      endDate: toDemoIsoDate(year, 4, 12),
+    },
+    {
+      key: "lia-birthday",
+      title: "Aniversário da Lia",
+      categoryId: ONBOARDING_CATEGORY_IDS.birthday,
+      startDate: toDemoIsoDate(year, 4, 21),
+      recurrenceType: "yearly",
+    },
+    {
+      key: "wedding-anniversary",
+      title: "Nosso aniversário de casamento",
+      categoryId: ONBOARDING_CATEGORY_IDS.familyMoments,
+      startDate: toDemoIsoDate(year, 5, 23),
+    },
+    {
+      key: "campos-weekend",
+      title: "Fim de semana em Campos",
+      categoryId: ONBOARDING_CATEGORY_IDS.travel,
+      startDate: toDemoIsoDate(year, 5, 29),
+      endDate: toDemoIsoDate(year, 5, 31),
+    },
+    {
+      key: "school-presentation",
+      title: "Apresentação da escola",
+      categoryId: ONBOARDING_CATEGORY_IDS.familySchool,
+      startDate: toDemoIsoDate(year, 6, 20),
+    },
+    {
+      key: "school-june-party",
+      title: "Festa junina da escola",
+      categoryId: ONBOARDING_CATEGORY_IDS.familyMoments,
+      startDate: toDemoIsoDate(year, 6, 27),
+    },
+    {
+      key: "kids-holidays",
+      title: "Férias das crianças",
+      categoryId: ONBOARDING_CATEGORY_IDS.familySchool,
+      startDate: toDemoIsoDate(year, 7, 1),
+      endDate: toDemoIsoDate(year, 7, 31),
+    },
+    {
+      key: "mountain-holidays",
+      title: "Férias na Serra",
+      categoryId: ONBOARDING_CATEGORY_IDS.travel,
+      startDate: toDemoIsoDate(year, 7, 11),
+      endDate: toDemoIsoDate(year, 7, 19),
+    },
+    {
+      key: "second-school-return",
+      title: "Volta às aulas",
+      categoryId: ONBOARDING_CATEGORY_IDS.familySchool,
+      startDate: toDemoIsoDate(year, 8, 3),
+    },
+    {
+      key: "photography-course",
+      title: "Curso de fotografia",
+      categoryId: ONBOARDING_CATEGORY_IDS.customPeriods,
+      startDate: toDemoIsoDate(year, 8, 10),
+      endDate: toDemoIsoDate(year, 10, 2),
+    },
+    {
+      key: "ten-k-run",
+      title: "Corrida de 10 km",
+      categoryId: ONBOARDING_CATEGORY_IDS.familyHealth,
+      startDate: toDemoIsoDate(year, 8, 23),
+    },
+    {
+      key: "bruno-birthday",
+      title: "Aniversário do Bruno",
+      categoryId: ONBOARDING_CATEGORY_IDS.birthday,
+      startDate: toDemoIsoDate(year, 9, 12),
+      recurrenceType: "yearly",
+    },
+    {
+      key: "school-showcase",
+      title: "Mostra cultural",
+      categoryId: ONBOARDING_CATEGORY_IDS.familySchool,
+      startDate: toDemoIsoDate(year, 10, 17),
+    },
+    {
+      key: "marina-birthday",
+      title: "Meu aniversário",
+      categoryId: ONBOARDING_CATEGORY_IDS.birthday,
+      startDate: toDemoIsoDate(year, 11, 6),
+      recurrenceType: "yearly",
+    },
+    {
+      key: "family-christmas",
+      title: "Natal em família",
+      categoryId: ONBOARDING_CATEGORY_IDS.familyMoments,
+      startDate: toDemoIsoDate(year, 12, 24),
+      endDate: toDemoIsoDate(year, 12, 26),
+    },
+    {
+      key: "new-year-beach",
+      title: "Ano-novo em Ilhabela",
+      categoryId: ONBOARDING_CATEGORY_IDS.travel,
+      startDate: toDemoIsoDate(year, 12, 27),
+      endDate: toDemoIsoDate(year, 12, 31),
+    },
+  ];
+  const categoryColorById = new Map(
+    getPersonalDemoCategories().map((category) => [
+      category.id,
+      category.color,
+    ])
+  );
+
+  return eventInputs.map((event, index) => ({
+    id: `88888888-8888-4888-8${String(index).padStart(3, "0")}-888888888888`,
+    title: event.title,
+    categoryId: event.categoryId,
+    color: categoryColorById.get(event.categoryId) ?? defaultCategoryColor,
+    startDate: event.startDate,
+    endDate: event.endDate ?? event.startDate,
+    recurrenceType: event.recurrenceType,
+    createdAt: `${year}-01-01T00:00:${String(index).padStart(2, "0")}.000Z`,
+    dayOrder: 0,
+    calendarPackGroupId: ONBOARDING_PERSONAL_DEMO_GROUP_ID,
+    calendarPackEventKey: event.key,
   }));
 };
 
-export const getOnboardingCategoryIdForIntent = (
+export type OnboardingPersonalDemoSnapshot = {
+  profiles: CalendarProfile[];
+  categories: CategoryItem[];
+  events: CalendarEvent[];
+};
+
+export const getOnboardingPersonalDemoSnapshot = (
+  year: number
+): OnboardingPersonalDemoSnapshot => ({
+  profiles: getPersonalDemoProfiles().map((profile) => ({ ...profile })),
+  categories: getPersonalDemoCategories().map((category) => ({ ...category })),
+  events: getPersonalDemoEvents(year).map((event) => ({ ...event })),
+});
+
+export const isOnboardingPersonalDemoSnapshot = (
+  snapshot: OnboardingPersonalDemoSnapshot
+) =>
+  snapshot.categories.length === 6 &&
+  snapshot.events.length > 0 &&
+  snapshot.categories.every(
+    (category) =>
+      category.calendarPackGroupId === ONBOARDING_PERSONAL_DEMO_GROUP_ID
+  ) &&
+  snapshot.events.every(
+    (event) =>
+      event.calendarPackGroupId === ONBOARDING_PERSONAL_DEMO_GROUP_ID
+  );
+
+export const stripOnboardingPersonalDemo = (
+  snapshot: OnboardingPersonalDemoSnapshot
+): OnboardingPersonalDemoSnapshot => {
+  const categories = snapshot.categories.filter(
+    (category) =>
+      category.calendarPackGroupId !== ONBOARDING_PERSONAL_DEMO_GROUP_ID
+  );
+  const events = snapshot.events.filter(
+    (event) => event.calendarPackGroupId !== ONBOARDING_PERSONAL_DEMO_GROUP_ID
+  );
+
+  if (
+    categories.length === snapshot.categories.length &&
+    events.length === snapshot.events.length
+  ) {
+    return snapshot;
+  }
+
+  const referencedProfileIds = new Set(
+    categories.map((category) => category.profileId)
+  );
+  const profiles = snapshot.profiles.filter((profile) =>
+    referencedProfileIds.has(profile.id)
+  );
+
+  return {
+    profiles:
+      profiles.length > 0 ? profiles : getOnboardingDefaultProfiles(),
+    categories,
+    events,
+  };
+};
+
+export const getOnboardingCategoryDefinition = (
   context: OnboardingContext,
-  intent: "date" | "period"
+  intent: "date" | "period",
+  choice: OnboardingCategoryChoice
 ) => {
+  if (choice === "generic") {
+    return intent === "date"
+      ? {
+          id: ONBOARDING_CATEGORY_IDS.customImportantDates,
+          name: "Datas importantes",
+          color: CATEGORY_COLOR_BASE_AMBER,
+        }
+      : {
+          id: ONBOARDING_CATEGORY_IDS.customPeriods,
+          name: "Períodos importantes",
+          color: CATEGORY_COLOR_BASE_BLUE,
+        };
+  }
   if (context === "personal") {
     return intent === "date"
-      ? ONBOARDING_CATEGORY_IDS.birthday
-      : ONBOARDING_CATEGORY_IDS.travel;
-  }
-  if (context === "work") {
-    return intent === "date"
-      ? ONBOARDING_CATEGORY_IDS.workDeliveries
-      : ONBOARDING_CATEGORY_IDS.workTrips;
+      ? {
+          id: ONBOARDING_CATEGORY_IDS.birthday,
+          name: "Aniversários",
+          color: CATEGORY_COLOR_BASE_AMBER,
+        }
+      : {
+          id: ONBOARDING_CATEGORY_IDS.travel,
+          name: "Férias e viagens",
+          color: CATEGORY_COLOR_BASE_CYAN,
+        };
   }
   return intent === "date"
-    ? ONBOARDING_CATEGORY_IDS.customImportantDates
-    : ONBOARDING_CATEGORY_IDS.customPeriods;
+    ? {
+        id: ONBOARDING_CATEGORY_IDS.workDeliveries,
+        name: "Entregas",
+        color: CATEGORY_COLOR_BASE_VIOLET,
+      }
+    : {
+        id: ONBOARDING_CATEGORY_IDS.workTrips,
+        name: "Projetos",
+        color: CATEGORY_COLOR_BASE_BLUE,
+      };
 };
 
 const getTemplateCategories = (options?: { legacyOnly?: boolean }) => {
   if (options?.legacyOnly) return getLegacyDefaultCategories();
-  return getLegacyDefaultCategories();
+  return [];
 };
 
 export const ONBOARDING_DEFAULT_CATEGORIES: CategoryItem[] = getTemplateCategories();
@@ -369,6 +711,7 @@ export const getOnboardingDefaultCategories = (): CategoryItem[] =>
 export const isOnboardingCategoriesSnapshot = (categories: CategoryItem[]) => {
   const candidates = [
     getOnboardingDefaultCategories(),
+    getLegacyDefaultCategories(),
     getFeatureDefaultCategories(),
   ];
   return candidates.some((expected) => {
@@ -424,7 +767,7 @@ const normalizePersistedProfiles = (
       profile.id && profile.id.trim() && isUuid(profile.id) ? profile.id : uid();
     if (seen.has(normalizedId)) continue;
     seen.add(normalizedId);
-    const normalizedName = profile.name?.trim() || "Perfil";
+    const normalizedName = profile.name?.trim() || "Contexto";
     const normalizedColor = DEFAULT_PROFILE_COLOR;
     next.push({
       ...profile,
@@ -608,47 +951,104 @@ export const useStore = create<StoreState>()(
             events: [],
           };
         }),
-      configureOnboardingContext: ({ context, customName }) => {
-        let configured = false;
+      loadOnboardingPersonalDemo: (year) =>
+        set(() => {
+          const snapshot = getOnboardingPersonalDemoSnapshot(year);
+          return {
+            ...snapshot,
+            selectedProfileIds: [ONBOARDING_PROFILE_IDS.personal],
+          };
+        }),
+      clearOnboardingPersonalDemo: () =>
         set((state) => {
-          if (state.events.some((event) => !event.calendarPackGroupId)) return state;
-
-          const profile = state.profiles[0];
-          if (!profile) return state;
-          const requestedName = customName?.trim() ?? "";
-          if (context === "custom" && (requestedName.length < 1 || requestedName.length > 40)) {
+          if (
+            !isOnboardingPersonalDemoSnapshot({
+              profiles: state.profiles,
+              categories: state.categories,
+              events: state.events,
+            })
+          ) {
             return state;
           }
-
+          const profiles = getOnboardingDefaultProfiles();
+          return {
+            profiles,
+            selectedProfileIds: ensureSelectedProfileIds(undefined, profiles),
+            categories: getOnboardingDefaultCategories(),
+            events: [],
+          };
+        }),
+      configureOnboardingContext: ({ context }) => {
+        let configured = false;
+        set((state) => {
+          if (state.events.some((event) => !event.calendarPackGroupId)) {
+            return state;
+          }
           const name =
             context === "personal"
               ? "Pessoal"
-              : context === "work"
-                ? "Trabalho"
-                : requestedName;
+              : "Profissional";
           const icon =
             context === "personal"
               ? "user"
-              : context === "work"
-                ? "briefcase"
-                : "calendar-days";
-          const authoredCategories = getContextCategories(context, profile.id);
-          const managedCategories = state.categories.filter(
-            (category) => Boolean(category.calendarPackGroupId)
-          );
+              : "briefcase";
+          const id =
+            context === "personal"
+              ? ONBOARDING_PROFILE_IDS.personal
+              : ONBOARDING_PROFILE_IDS.professional;
+          const profile: CalendarProfile = {
+            id,
+            name,
+            color: DEFAULT_PROFILE_COLOR,
+            icon,
+            position: 0,
+          };
 
           configured = true;
           return {
-            profiles: state.profiles.map((entry, index) =>
-              index === 0
-                ? { ...entry, name, icon, position: 0 }
-                : entry
-            ),
-            selectedProfileIds: [profile.id],
-            categories: [...authoredCategories, ...managedCategories],
+            profiles: [profile],
+            selectedProfileIds: [id],
+            categories: [],
+            events: [],
           };
         });
         return configured;
+      },
+      createOnboardingCategory: ({ context, intent, choice, color }) => {
+        const definition = getOnboardingCategoryDefinition(
+          context,
+          intent,
+          choice
+        );
+        const categoryColor = getNearestCategoryColor(
+          color ?? definition.color
+        );
+        let createdId: string | null = null;
+        set((state) => {
+          const profileId =
+            state.selectedProfileIds[0] ?? state.profiles[0]?.id ?? null;
+          if (!profileId) return state;
+          const existing = state.categories.find(
+            (category) => category.id === definition.id
+          );
+          if (existing) {
+            createdId = existing.id;
+            return state;
+          }
+          createdId = definition.id;
+          return {
+            categories: [
+              ...state.categories,
+              {
+                ...definition,
+                color: categoryColor,
+                profileId,
+                visible: true,
+              },
+            ],
+          };
+        });
+        return createdId;
       },
       markLocalImported: (userId) => {
         if (typeof window === "undefined") return;

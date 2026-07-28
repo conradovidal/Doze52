@@ -329,7 +329,7 @@ export function EventDialog({
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-1">
-              <label className={FIELD_LABEL_CLASS}>Perfil</label>
+              <label className={FIELD_LABEL_CLASS}>Contexto</label>
               <Select
                 value={profileId}
                 onValueChange={handleProfileSelect}
@@ -341,7 +341,7 @@ export function EventDialog({
                 >
                   <span className="inline-flex min-w-0 items-center gap-1.5 pr-2">
                     {currentProfile ? <ProfileIcon icon={currentProfile.icon} size={12} /> : null}
-                    <span className="truncate">{currentProfile?.name ?? "Perfil"}</span>
+                    <span className="truncate">{currentProfile?.name ?? "Contexto"}</span>
                   </span>
                 </SelectTrigger>
                 <SelectContent position="popper" side="bottom" align="start">
