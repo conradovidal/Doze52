@@ -1,6 +1,6 @@
-export const ONBOARDING_VERSION = 9;
+export const ONBOARDING_VERSION = 10;
 export const ONBOARDING_REGION_TRACKED_STORAGE_KEY =
-  "doze52:onboarding-region:v9";
+  "doze52:onboarding-region:v10";
 
 export const BRAZIL_UFS = [
   "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO",

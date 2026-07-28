@@ -7,12 +7,15 @@ import {
   CATEGORY_COLOR_BASE_AMBER,
   CATEGORY_COLOR_BASE_BLUE,
   CATEGORY_COLOR_BASE_CYAN,
+  CATEGORY_COLOR_BASE_GRAPHITE,
   CATEGORY_COLOR_BASE_GREEN,
+  CATEGORY_COLOR_BASE_INK,
   CATEGORY_COLOR_BASE_LIME,
-  CATEGORY_COLOR_BASE_MINT,
   CATEGORY_COLOR_BASE_ORANGE,
-  CATEGORY_COLOR_BASE_ROSE,
+  CATEGORY_COLOR_BASE_PINK,
+  CATEGORY_COLOR_BASE_RED,
   CATEGORY_COLOR_BASE_VIOLET,
+  CATEGORY_COLOR_BASE_YELLOW,
   DEFAULT_CATEGORY_COLOR,
   ONBOARDING_CATEGORY_COLOR_BY_ID,
   getNearestCategoryColor,
@@ -26,6 +29,9 @@ import type {
   OnboardingCategoryChoice,
   OnboardingContext,
 } from "./onboarding";
+import { brasileirao2026Packs } from "./calendar-packs/brasileirao-2026";
+import { formula12026Pack } from "./calendar-packs/formula-1-2026";
+import { holidays2026Packs } from "./calendar-packs/holidays-2026";
 
 export type EventInput = {
   title: string;
@@ -63,6 +69,7 @@ type StoreState = {
   }) => void;
   resetToOnboardingData: () => void;
   loadOnboardingPersonalDemo: (year: number) => void;
+  unlockOnboardingPersonalDemo: () => void;
   clearOnboardingPersonalDemo: () => void;
   configureOnboardingContext: (input: {
     context: OnboardingContext;
@@ -155,7 +162,14 @@ export const ONBOARDING_CATEGORY_IDS = {
 
 export const ONBOARDING_DEFAULT_CATEGORY_ID = ONBOARDING_CATEGORY_IDS.events;
 export const ONBOARDING_PERSONAL_DEMO_GROUP_ID =
-  "onboarding-personal-demo-v1";
+  "onboarding-personal-demo-v2";
+const ONBOARDING_PERSONAL_DEMO_GROUP_IDS = new Set([
+  "onboarding-personal-demo-v1",
+  ONBOARDING_PERSONAL_DEMO_GROUP_ID,
+]);
+
+export const isOnboardingPersonalDemoGroup = (groupId?: string) =>
+  Boolean(groupId && ONBOARDING_PERSONAL_DEMO_GROUP_IDS.has(groupId));
 
 const defaultCategoryColor =
   ONBOARDING_CATEGORY_COLOR_BY_ID[ONBOARDING_DEFAULT_CATEGORY_ID] ??
@@ -214,18 +228,11 @@ const getPersonalDemoProfiles = (): CalendarProfile[] => [
     position: 0,
   },
   {
-    id: ONBOARDING_PROFILE_IDS.family,
-    name: "Família",
-    color: DEFAULT_PROFILE_COLOR,
-    icon: "users",
-    position: 1,
-  },
-  {
     id: ONBOARDING_PROFILE_IDS.professional,
     name: "Profissional",
     color: DEFAULT_PROFILE_COLOR,
     icon: "briefcase",
-    position: 2,
+    position: 1,
   },
 ];
 
@@ -345,55 +352,119 @@ const getFeatureDefaultCategories = (): CategoryItem[] => [
   },
 ];
 
+const DEMO_CATEGORY_IDS = {
+  relationship: "99999999-0001-4000-8000-000000000001",
+  friends: "99999999-0001-4000-8000-000000000002",
+  family: "99999999-0001-4000-8000-000000000003",
+  holidays: "99999999-0001-4000-8000-000000000004",
+  gremio: "99999999-0001-4000-8000-000000000005",
+  competitions: "99999999-0001-4000-8000-000000000006",
+  formula1: "99999999-0001-4000-8000-000000000007",
+  workEvents: "99999999-0001-4000-8000-000000000008",
+} as const;
+
+const demoCategory = (
+  id: string,
+  profileId: string,
+  name: string,
+  color: string,
+  visible = true
+): CategoryItem => ({
+  id,
+  profileId,
+  name,
+  color,
+  visible,
+  calendarPackGroupId: ONBOARDING_PERSONAL_DEMO_GROUP_ID,
+});
+
 const getPersonalDemoCategories = (): CategoryItem[] => [
-  {
-    id: ONBOARDING_CATEGORY_IDS.birthday,
-    profileId: ONBOARDING_PROFILE_IDS.personal,
-    name: "Aniversários",
-    color: CATEGORY_COLOR_BASE_AMBER,
-    visible: true,
-    calendarPackGroupId: ONBOARDING_PERSONAL_DEMO_GROUP_ID,
-  },
-  {
-    id: ONBOARDING_CATEGORY_IDS.travel,
-    profileId: ONBOARDING_PROFILE_IDS.personal,
-    name: "Férias e viagens",
-    color: CATEGORY_COLOR_BASE_CYAN,
-    visible: true,
-    calendarPackGroupId: ONBOARDING_PERSONAL_DEMO_GROUP_ID,
-  },
-  {
-    id: ONBOARDING_CATEGORY_IDS.familySchool,
-    profileId: ONBOARDING_PROFILE_IDS.personal,
-    name: "Família e escola",
-    color: CATEGORY_COLOR_BASE_GREEN,
-    visible: true,
-    calendarPackGroupId: ONBOARDING_PERSONAL_DEMO_GROUP_ID,
-  },
-  {
-    id: ONBOARDING_CATEGORY_IDS.familyHealth,
-    profileId: ONBOARDING_PROFILE_IDS.personal,
-    name: "Saúde e bem-estar",
-    color: CATEGORY_COLOR_BASE_MINT,
-    visible: true,
-    calendarPackGroupId: ONBOARDING_PERSONAL_DEMO_GROUP_ID,
-  },
-  {
-    id: ONBOARDING_CATEGORY_IDS.familyMoments,
-    profileId: ONBOARDING_PROFILE_IDS.personal,
-    name: "Celebrações",
-    color: CATEGORY_COLOR_BASE_ROSE,
-    visible: true,
-    calendarPackGroupId: ONBOARDING_PERSONAL_DEMO_GROUP_ID,
-  },
-  {
-    id: ONBOARDING_CATEGORY_IDS.customPeriods,
-    profileId: ONBOARDING_PROFILE_IDS.personal,
-    name: "Projetos pessoais",
-    color: CATEGORY_COLOR_BASE_VIOLET,
-    visible: true,
-    calendarPackGroupId: ONBOARDING_PERSONAL_DEMO_GROUP_ID,
-  },
+  demoCategory(
+    ONBOARDING_CATEGORY_IDS.events,
+    ONBOARDING_PROFILE_IDS.personal,
+    "Eventos",
+    CATEGORY_COLOR_BASE_GRAPHITE
+  ),
+  demoCategory(
+    DEMO_CATEGORY_IDS.relationship,
+    ONBOARDING_PROFILE_IDS.personal,
+    "Relacionamento a dois",
+    CATEGORY_COLOR_BASE_RED
+  ),
+  demoCategory(
+    DEMO_CATEGORY_IDS.friends,
+    ONBOARDING_PROFILE_IDS.personal,
+    "Amigos",
+    CATEGORY_COLOR_BASE_BLUE
+  ),
+  demoCategory(
+    ONBOARDING_CATEGORY_IDS.travel,
+    ONBOARDING_PROFILE_IDS.personal,
+    "Férias e viagens",
+    CATEGORY_COLOR_BASE_GREEN
+  ),
+  demoCategory(
+    DEMO_CATEGORY_IDS.family,
+    ONBOARDING_PROFILE_IDS.personal,
+    "Família",
+    CATEGORY_COLOR_BASE_PINK
+  ),
+  demoCategory(
+    ONBOARDING_CATEGORY_IDS.birthday,
+    ONBOARDING_PROFILE_IDS.personal,
+    "Aniversários",
+    CATEGORY_COLOR_BASE_YELLOW
+  ),
+  demoCategory(
+    DEMO_CATEGORY_IDS.holidays,
+    ONBOARDING_PROFILE_IDS.personal,
+    "Feriados",
+    CATEGORY_COLOR_BASE_INK
+  ),
+  demoCategory(
+    DEMO_CATEGORY_IDS.gremio,
+    ONBOARDING_PROFILE_IDS.personal,
+    "Grêmio",
+    CATEGORY_COLOR_BASE_BLUE,
+    false
+  ),
+  demoCategory(
+    DEMO_CATEGORY_IDS.competitions,
+    ONBOARDING_PROFILE_IDS.personal,
+    "Competições",
+    CATEGORY_COLOR_BASE_ORANGE
+  ),
+  demoCategory(
+    DEMO_CATEGORY_IDS.formula1,
+    ONBOARDING_PROFILE_IDS.personal,
+    "Corridas F1",
+    CATEGORY_COLOR_BASE_ORANGE,
+    false
+  ),
+  demoCategory(
+    DEMO_CATEGORY_IDS.workEvents,
+    ONBOARDING_PROFILE_IDS.professional,
+    "Eventos",
+    CATEGORY_COLOR_BASE_GRAPHITE
+  ),
+  demoCategory(
+    ONBOARDING_CATEGORY_IDS.workMeetings,
+    ONBOARDING_PROFILE_IDS.professional,
+    "Agendas importantes",
+    CATEGORY_COLOR_BASE_BLUE
+  ),
+  demoCategory(
+    ONBOARDING_CATEGORY_IDS.workTrips,
+    ONBOARDING_PROFILE_IDS.professional,
+    "Projetos",
+    CATEGORY_COLOR_BASE_VIOLET
+  ),
+  demoCategory(
+    ONBOARDING_CATEGORY_IDS.workDeliveries,
+    ONBOARDING_PROFILE_IDS.professional,
+    "Entregas",
+    CATEGORY_COLOR_BASE_ORANGE
+  ),
 ];
 
 const toDemoIsoDate = (year: number, month: number, day: number) =>
@@ -426,16 +497,15 @@ const getPersonalDemoEvents = (year: number): CalendarEvent[] => {
   const [carnivalStart, carnivalEnd] = getCarnivalRange(year);
   const eventInputs: PersonalDemoEventInput[] = [
     {
-      key: "family-album",
-      title: "Álbum da família",
-      categoryId: ONBOARDING_CATEGORY_IDS.customPeriods,
-      startDate: toDemoIsoDate(year, 1, 12),
-      endDate: toDemoIsoDate(year, 1, 24),
+      key: "friends-summer-lunch",
+      title: "Almoço de verão com os amigos",
+      categoryId: DEMO_CATEGORY_IDS.friends,
+      startDate: toDemoIsoDate(year, 1, 31),
     },
     {
       key: "school-return",
       title: "Volta às aulas",
-      categoryId: ONBOARDING_CATEGORY_IDS.familySchool,
+      categoryId: DEMO_CATEGORY_IDS.family,
       startDate: toDemoIsoDate(year, 2, 2),
     },
     {
@@ -453,24 +523,24 @@ const getPersonalDemoEvents = (year: number): CalendarEvent[] => {
       endDate: carnivalEnd,
     },
     {
-      key: "annual-checkup",
-      title: "Check-up anual",
-      categoryId: ONBOARDING_CATEGORY_IDS.familyHealth,
-      startDate: toDemoIsoDate(year, 3, 7),
+      key: "music-festival",
+      title: "Festival de música",
+      categoryId: ONBOARDING_CATEGORY_IDS.events,
+      startDate: toDemoIsoDate(year, 3, 14),
+      endDate: toDemoIsoDate(year, 3, 15),
     },
     {
-      key: "balcony-renovation",
-      title: "Reforma da varanda",
-      categoryId: ONBOARDING_CATEGORY_IDS.customPeriods,
-      startDate: toDemoIsoDate(year, 3, 16),
-      endDate: toDemoIsoDate(year, 5, 8),
+      key: "beach-tennis",
+      title: "Torneio de beach tennis",
+      categoryId: DEMO_CATEGORY_IDS.competitions,
+      startDate: toDemoIsoDate(year, 4, 11),
     },
     {
-      key: "offline-week",
-      title: "Semana de descanso",
-      categoryId: ONBOARDING_CATEGORY_IDS.familyHealth,
-      startDate: toDemoIsoDate(year, 4, 6),
-      endDate: toDemoIsoDate(year, 4, 12),
+      key: "couple-weekend",
+      title: "Fim de semana a dois",
+      categoryId: DEMO_CATEGORY_IDS.relationship,
+      startDate: toDemoIsoDate(year, 4, 17),
+      endDate: toDemoIsoDate(year, 4, 19),
     },
     {
       key: "lia-birthday",
@@ -482,32 +552,31 @@ const getPersonalDemoEvents = (year: number): CalendarEvent[] => {
     {
       key: "wedding-anniversary",
       title: "Nosso aniversário de casamento",
-      categoryId: ONBOARDING_CATEGORY_IDS.familyMoments,
+      categoryId: DEMO_CATEGORY_IDS.relationship,
       startDate: toDemoIsoDate(year, 5, 23),
     },
     {
-      key: "campos-weekend",
-      title: "Fim de semana em Campos",
-      categoryId: ONBOARDING_CATEGORY_IDS.travel,
-      startDate: toDemoIsoDate(year, 5, 29),
-      endDate: toDemoIsoDate(year, 5, 31),
+      key: "friends-wedding",
+      title: "Casamento da Ana e do Lucas",
+      categoryId: DEMO_CATEGORY_IDS.friends,
+      startDate: toDemoIsoDate(year, 6, 13),
     },
     {
-      key: "school-presentation",
-      title: "Apresentação da escola",
-      categoryId: ONBOARDING_CATEGORY_IDS.familySchool,
-      startDate: toDemoIsoDate(year, 6, 20),
+      key: "cycling-challenge",
+      title: "Desafio de ciclismo",
+      categoryId: DEMO_CATEGORY_IDS.competitions,
+      startDate: toDemoIsoDate(year, 6, 7),
     },
     {
       key: "school-june-party",
       title: "Festa junina da escola",
-      categoryId: ONBOARDING_CATEGORY_IDS.familyMoments,
+      categoryId: DEMO_CATEGORY_IDS.family,
       startDate: toDemoIsoDate(year, 6, 27),
     },
     {
       key: "kids-holidays",
       title: "Férias das crianças",
-      categoryId: ONBOARDING_CATEGORY_IDS.familySchool,
+      categoryId: DEMO_CATEGORY_IDS.family,
       startDate: toDemoIsoDate(year, 7, 1),
       endDate: toDemoIsoDate(year, 7, 31),
     },
@@ -519,22 +588,9 @@ const getPersonalDemoEvents = (year: number): CalendarEvent[] => {
       endDate: toDemoIsoDate(year, 7, 19),
     },
     {
-      key: "second-school-return",
-      title: "Volta às aulas",
-      categoryId: ONBOARDING_CATEGORY_IDS.familySchool,
-      startDate: toDemoIsoDate(year, 8, 3),
-    },
-    {
-      key: "photography-course",
-      title: "Curso de fotografia",
-      categoryId: ONBOARDING_CATEGORY_IDS.customPeriods,
-      startDate: toDemoIsoDate(year, 8, 10),
-      endDate: toDemoIsoDate(year, 10, 2),
-    },
-    {
       key: "ten-k-run",
       title: "Corrida de 10 km",
-      categoryId: ONBOARDING_CATEGORY_IDS.familyHealth,
+      categoryId: DEMO_CATEGORY_IDS.competitions,
       startDate: toDemoIsoDate(year, 8, 23),
     },
     {
@@ -545,10 +601,10 @@ const getPersonalDemoEvents = (year: number): CalendarEvent[] => {
       recurrenceType: "yearly",
     },
     {
-      key: "school-showcase",
-      title: "Mostra cultural",
-      categoryId: ONBOARDING_CATEGORY_IDS.familySchool,
-      startDate: toDemoIsoDate(year, 10, 17),
+      key: "friends-reunion",
+      title: "Reencontro da turma",
+      categoryId: DEMO_CATEGORY_IDS.friends,
+      startDate: toDemoIsoDate(year, 10, 10),
     },
     {
       key: "marina-birthday",
@@ -560,7 +616,7 @@ const getPersonalDemoEvents = (year: number): CalendarEvent[] => {
     {
       key: "family-christmas",
       title: "Natal em família",
-      categoryId: ONBOARDING_CATEGORY_IDS.familyMoments,
+      categoryId: DEMO_CATEGORY_IDS.family,
       startDate: toDemoIsoDate(year, 12, 24),
       endDate: toDemoIsoDate(year, 12, 26),
     },
@@ -571,6 +627,129 @@ const getPersonalDemoEvents = (year: number): CalendarEvent[] => {
       startDate: toDemoIsoDate(year, 12, 27),
       endDate: toDemoIsoDate(year, 12, 31),
     },
+    {
+      key: "strategy-planning",
+      title: "Planejamento estratégico",
+      categoryId: DEMO_CATEGORY_IDS.workEvents,
+      startDate: toDemoIsoDate(year, 1, 12),
+      endDate: toDemoIsoDate(year, 1, 16),
+    },
+    ...[
+      [4, 6, "Q1"],
+      [7, 6, "Q2"],
+      [10, 5, "Q3"],
+      [12, 14, "Q4"],
+    ].map(([month, day, quarter]) => ({
+      key: `results-${quarter}`,
+      title: `Revisão de resultados ${quarter}`,
+      categoryId: DEMO_CATEGORY_IDS.workEvents,
+      startDate: toDemoIsoDate(year, Number(month), Number(day)),
+    })),
+    ...[
+      [2, 6],
+      [5, 8],
+      [8, 7],
+      [11, 6],
+    ].map(([month, day], index) => ({
+      key: `all-hands-${index + 1}`,
+      title: "All Hands",
+      categoryId: ONBOARDING_CATEGORY_IDS.workMeetings,
+      startDate: toDemoIsoDate(year, month, day),
+    })),
+    ...[
+      [4, 9],
+      [7, 9],
+      [10, 8],
+    ].map(([month, day], index) => ({
+      key: `qbr-${index + 1}`,
+      title: "QBR",
+      categoryId: ONBOARDING_CATEGORY_IDS.workMeetings,
+      startDate: toDemoIsoDate(year, month, day),
+    })),
+    {
+      key: "mobile-experience",
+      title: "Nova experiência mobile",
+      categoryId: ONBOARDING_CATEGORY_IDS.workTrips,
+      startDate: toDemoIsoDate(year, 2, 2),
+      endDate: toDemoIsoDate(year, 5, 29),
+    },
+    {
+      key: "smb-expansion",
+      title: "Expansão para PMEs",
+      categoryId: ONBOARDING_CATEGORY_IDS.workTrips,
+      startDate: toDemoIsoDate(year, 4, 13),
+      endDate: toDemoIsoDate(year, 8, 28),
+    },
+    {
+      key: "onboarding-evolution",
+      title: "Evolução do onboarding",
+      categoryId: ONBOARDING_CATEGORY_IDS.workTrips,
+      startDate: toDemoIsoDate(year, 8, 3),
+      endDate: toDemoIsoDate(year, 11, 13),
+    },
+    ...[
+      [1, 23, "Roadmap do semestre"],
+      [3, 20, "Protótipo validado"],
+      [6, 18, "Lançamento mobile"],
+      [9, 25, "Relatório para o conselho"],
+      [12, 4, "Plano do próximo ano"],
+    ].map(([month, day, title]) => ({
+      key: `delivery-${String(title).toLowerCase().replaceAll(" ", "-")}`,
+      title: String(title),
+      categoryId: ONBOARDING_CATEGORY_IDS.workDeliveries,
+      startDate: toDemoIsoDate(year, Number(month), Number(day)),
+    })),
+  ];
+
+  const holidayPack = holidays2026Packs.find(
+    (pack) => pack.regionCode === "RS" && pack.year === year
+  );
+  const holidayEvents: PersonalDemoEventInput[] = holidayPack
+    ? holidayPack.events.map((event) => ({
+        key: `holiday-${event.id}`,
+        title: event.title,
+        categoryId: DEMO_CATEGORY_IDS.holidays,
+        startDate: event.date,
+        recurrenceType: event.recurrenceType,
+      }))
+    : [
+        [1, 1, "Confraternização Universal"],
+        [4, 21, "Tiradentes"],
+        [5, 1, "Dia do Trabalho"],
+        [9, 20, "Revolução Farroupilha"],
+        [12, 25, "Natal"],
+      ].map(([month, day, title]) => ({
+        key: `holiday-${month}-${day}`,
+        title: String(title),
+        categoryId: DEMO_CATEGORY_IDS.holidays,
+        startDate: toDemoIsoDate(year, Number(month), Number(day)),
+        recurrenceType: "yearly" as const,
+      }));
+
+  const gremioPack = brasileirao2026Packs.find(
+    (pack) => pack.eyebrow === "Grêmio" && pack.year === year
+  );
+  const gremioEvents: PersonalDemoEventInput[] =
+    gremioPack?.events.map((event) => ({
+      key: `gremio-${event.id}`,
+      title: event.title,
+      categoryId: DEMO_CATEGORY_IDS.gremio,
+      startDate: event.date,
+    })) ?? [];
+  const formulaEvents: PersonalDemoEventInput[] =
+    formula12026Pack.year === year
+      ? formula12026Pack.events.map((event) => ({
+          key: `f1-${event.id}`,
+          title: event.title,
+          categoryId: DEMO_CATEGORY_IDS.formula1,
+          startDate: event.date,
+        }))
+      : [];
+  const allEventInputs = [
+    ...eventInputs,
+    ...holidayEvents,
+    ...gremioEvents,
+    ...formulaEvents,
   ];
   const categoryColorById = new Map(
     getPersonalDemoCategories().map((category) => [
@@ -579,7 +758,7 @@ const getPersonalDemoEvents = (year: number): CalendarEvent[] => {
     ])
   );
 
-  return eventInputs.map((event, index) => ({
+  return allEventInputs.map((event, index) => ({
     id: `88888888-8888-4888-8${String(index).padStart(3, "0")}-888888888888`,
     title: event.title,
     categoryId: event.categoryId,
@@ -587,7 +766,7 @@ const getPersonalDemoEvents = (year: number): CalendarEvent[] => {
     startDate: event.startDate,
     endDate: event.endDate ?? event.startDate,
     recurrenceType: event.recurrenceType,
-    createdAt: `${year}-01-01T00:00:${String(index).padStart(2, "0")}.000Z`,
+    createdAt: `${year}-01-01T00:00:00.${String(index).padStart(3, "0")}Z`,
     dayOrder: 0,
     calendarPackGroupId: ONBOARDING_PERSONAL_DEMO_GROUP_ID,
     calendarPackEventKey: event.key,
@@ -611,26 +790,23 @@ export const getOnboardingPersonalDemoSnapshot = (
 export const isOnboardingPersonalDemoSnapshot = (
   snapshot: OnboardingPersonalDemoSnapshot
 ) =>
-  snapshot.categories.length === 6 &&
+  (snapshot.categories.length === 6 || snapshot.categories.length === 14) &&
   snapshot.events.length > 0 &&
-  snapshot.categories.every(
-    (category) =>
-      category.calendarPackGroupId === ONBOARDING_PERSONAL_DEMO_GROUP_ID
+  snapshot.categories.every((category) =>
+    isOnboardingPersonalDemoGroup(category.calendarPackGroupId)
   ) &&
-  snapshot.events.every(
-    (event) =>
-      event.calendarPackGroupId === ONBOARDING_PERSONAL_DEMO_GROUP_ID
+  snapshot.events.every((event) =>
+    isOnboardingPersonalDemoGroup(event.calendarPackGroupId)
   );
 
 export const stripOnboardingPersonalDemo = (
   snapshot: OnboardingPersonalDemoSnapshot
 ): OnboardingPersonalDemoSnapshot => {
   const categories = snapshot.categories.filter(
-    (category) =>
-      category.calendarPackGroupId !== ONBOARDING_PERSONAL_DEMO_GROUP_ID
+    (category) => !isOnboardingPersonalDemoGroup(category.calendarPackGroupId)
   );
   const events = snapshot.events.filter(
-    (event) => event.calendarPackGroupId !== ONBOARDING_PERSONAL_DEMO_GROUP_ID
+    (event) => !isOnboardingPersonalDemoGroup(event.calendarPackGroupId)
   );
 
   if (
@@ -960,6 +1136,29 @@ export const useStore = create<StoreState>()(
             selectedProfileIds: [ONBOARDING_PROFILE_IDS.personal],
           };
         }),
+      unlockOnboardingPersonalDemo: () =>
+        set((state) => ({
+          categories: state.categories.map((category) =>
+            isOnboardingPersonalDemoGroup(category.calendarPackGroupId)
+              ? {
+                  ...category,
+                  calendarPackGroupId: undefined,
+                  calendarPackVariantId: undefined,
+                  calendarPackCategoryKey: undefined,
+                  calendarPackVersion: undefined,
+                }
+              : category
+          ),
+          events: state.events.map((event) =>
+            isOnboardingPersonalDemoGroup(event.calendarPackGroupId)
+              ? {
+                  ...event,
+                  calendarPackGroupId: undefined,
+                  calendarPackEventKey: undefined,
+                }
+              : event
+          ),
+        })),
       clearOnboardingPersonalDemo: () =>
         set((state) => {
           if (

@@ -41,6 +41,7 @@ export const CATEGORY_COLOR_BASE_TERRA = "#D6A060";
 export const CATEGORY_COLOR_BASE_OLIVE = "#B7B86F";
 export const CATEGORY_COLOR_BASE_SAND = "#D9BE8C";
 export const CATEGORY_COLOR_BASE_GRAPHITE = "#9CA6B4";
+export const CATEGORY_COLOR_BASE_INK = "#1F2937";
 
 export const DEFAULT_CATEGORY_COLOR = CATEGORY_COLOR_BASE_BLUE;
 
@@ -463,7 +464,21 @@ export const getCategoryColorToken = (
   value: string | undefined | null,
   mode: ThemeMode = "light"
 ): ResolvedCategoryColorToken => {
-  void mode;
+  if (normalizeHex(value)?.toLowerCase() === CATEGORY_COLOR_BASE_INK.toLowerCase()) {
+    return {
+      id: "ink",
+      label: "Preto",
+      base: CATEGORY_COLOR_BASE_INK,
+      chipSoft: CATEGORY_COLOR_BASE_INK,
+      chipBorder: mode === "dark" ? "#64748B" : "#111827",
+      eventSoft: CATEGORY_COLOR_BASE_INK,
+      eventBorder: mode === "dark" ? "#94A3B8" : "#111827",
+      text: "#F8FAFC",
+      soft: CATEGORY_COLOR_BASE_INK,
+      border: mode === "dark" ? "#64748B" : "#111827",
+      indicator: CATEGORY_COLOR_BASE_INK,
+    };
+  }
 
   const nearestColor = getNearestCategoryColor(value);
   const token =

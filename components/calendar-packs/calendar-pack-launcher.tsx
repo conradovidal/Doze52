@@ -143,6 +143,7 @@ export function CalendarPackLauncher({
   onOpen,
   onClose,
   onImported,
+  bypassLimits = false,
 }: {
   onFocusYear?: (year: number) => void;
   className?: string;
@@ -155,6 +156,7 @@ export function CalendarPackLauncher({
   onOpen?: () => void;
   onClose?: () => void;
   onImported?: (pack: CalendarPack) => void;
+  bypassLimits?: boolean;
 }) {
   const { notify } = useFeedback();
   const { isPro, limits } = useBilling();
@@ -202,6 +204,7 @@ export function CalendarPackLauncher({
     [availabilityByPack]
   );
   const isCalendarSubscriptionLimitReached =
+    !bypassLimits &&
     !isPro &&
     isLimitReached(subscribedPackCount, limits.maxCalendarSubscriptions);
   const launcherAriaCopy =

@@ -31,11 +31,12 @@ export type GuidedOnboardingStep =
   | "calendar_selection"
   | "year_instruction"
   | "theme_instruction"
+  | "demo_exploration"
   | "completed"
   | "dismissed";
 
 export type GuidedOnboardingState = {
-  version: 9;
+  version: 10;
   step: GuidedOnboardingStep;
   context?: OnboardingContext;
   startedAt?: string;
@@ -53,6 +54,9 @@ export type GuidedOnboardingState = {
   postOnboardingEventsCreated?: number;
   postOnboardingCategoriesCreated?: number;
   accountNudgeShownAt?: string;
+  demoExplorationStartedAt?: string;
+  demoInteractionKeys?: string[];
+  demoInviteEligibleAt?: string;
   completedAt?: string;
   dismissedAt?: string;
 };
@@ -76,6 +80,9 @@ export type GuidedOnboardingAction =
   | { type: "confirm_theme"; at?: string }
   | { type: "complete"; at?: string }
   | { type: "record_post_onboarding_event"; at?: string }
+  | { type: "enter_demo_exploration"; at?: string }
+  | { type: "record_demo_interaction"; key: string; at?: string }
+  | { type: "restart_from_demo" }
   | { type: "dismiss"; at?: string };
 
 type ProductOnboardingPayload = Partial<
@@ -103,6 +110,9 @@ type LegacyGuidedOnboardingState = {
   holidayCalendarAddedAt?: string;
   dateItemsCreated?: number;
   periodItemsCreated?: number;
+  demoExplorationStartedAt?: string;
+  demoInteractionKeys?: unknown;
+  demoInviteEligibleAt?: string;
   completedAt?: string;
   dismissedAt?: string;
 };
@@ -111,7 +121,8 @@ export const PRODUCT_ONBOARDING_STORAGE_KEY = "doze52:onboarding:v1";
 export const GUIDED_ONBOARDING_STORAGE_KEY = "doze52:onboarding:v2";
 export const PRODUCT_ONBOARDING_RESET_EVENT = "doze52:onboarding-reset";
 export const GUIDED_ONBOARDING_CHANGE_EVENT = "doze52:onboarding-change";
-export const GUIDED_CATEGORY_REVEAL_MS = 900;
+export const GUIDED_CATEGORY_REVEAL_MS = 1_800;
+export const GUIDED_DEMO_INTERACTION_THRESHOLD = 5;
 
 export const getGuidedCategoryRevealRemainingMs = (
   startedAt: string | undefined,
@@ -126,7 +137,7 @@ export const getGuidedCategoryRevealRemainingMs = (
 };
 
 const initialGuidedState = (): GuidedOnboardingState => ({
-  version: 9,
+  version: 10,
   step: "context_selection",
 });
 
@@ -172,6 +183,7 @@ const isGuidedStep = (value: unknown): value is GuidedOnboardingStep =>
   value === "calendar_selection" ||
   value === "year_instruction" ||
   value === "theme_instruction" ||
+  value === "demo_exploration" ||
   value === "completed" ||
   value === "dismissed";
 
@@ -200,9 +212,22 @@ export const migrateGuidedOnboardingState = (
     categoryRevealStartedAt?: unknown;
   };
 
-  if (candidate.version === 9 && isGuidedStep(candidate.step)) {
+  if (
+    (candidate.version === 9 || candidate.version === 10) &&
+    isGuidedStep(candidate.step)
+  ) {
+    const demoInteractionKeys = Array.isArray(candidate.demoInteractionKeys)
+      ? [
+          ...new Set(
+            candidate.demoInteractionKeys.filter(
+              (key): key is string =>
+                typeof key === "string" && key.trim().length > 0
+            )
+          ),
+        ]
+      : [];
     return {
-      version: 9,
+      version: 10,
       step: candidate.step,
       context: isContext(candidate.context) ? candidate.context : undefined,
       startedAt: candidate.startedAt,
@@ -242,6 +267,9 @@ export const migrateGuidedOnboardingState = (
         typeof candidate.accountNudgeShownAt === "string"
           ? candidate.accountNudgeShownAt
           : undefined,
+      demoExplorationStartedAt: candidate.demoExplorationStartedAt,
+      demoInteractionKeys,
+      demoInviteEligibleAt: candidate.demoInviteEligibleAt,
       completedAt: candidate.completedAt,
       dismissedAt: candidate.dismissedAt,
     };
@@ -249,7 +277,7 @@ export const migrateGuidedOnboardingState = (
 
   if (candidate.version === 8 && isGuidedStep(candidate.step)) {
     return {
-      version: 9,
+      version: 10,
       step: candidate.step,
       context: isContext(candidate.context) ? candidate.context : undefined,
       startedAt: candidate.startedAt,
@@ -341,7 +369,7 @@ export const migrateGuidedOnboardingState = (
     }
 
     return {
-      version: 9,
+      version: 10,
       step,
       context: isContext(candidate.context) ? candidate.context : undefined,
       startedAt: candidate.startedAt,
@@ -378,7 +406,7 @@ export const migrateGuidedOnboardingState = (
       candidate.step === "completed" || candidate.step === "dismissed";
     const preserveAsCompleted = !terminal && hasLegacyProgress(candidate);
     return {
-      version: 9,
+      version: 10,
       step: terminal
         ? (candidate.step as "completed" | "dismissed")
         : preserveAsCompleted
@@ -573,6 +601,32 @@ export const reduceGuidedOnboardingState = (
           : undefined,
       };
     }
+    case "enter_demo_exploration":
+      return {
+        version: 10,
+        step: "demo_exploration",
+        demoExplorationStartedAt: action.at ?? nowIso(),
+        demoInteractionKeys: [],
+      };
+    case "record_demo_interaction": {
+      if (state.step !== "demo_exploration") return state;
+      const currentKeys = state.demoInteractionKeys ?? [];
+      if (currentKeys.includes(action.key)) return state;
+      const demoInteractionKeys = [...currentKeys, action.key];
+      return {
+        ...state,
+        demoInteractionKeys,
+        demoInviteEligibleAt:
+          state.demoInviteEligibleAt ??
+          (demoInteractionKeys.length >= GUIDED_DEMO_INTERACTION_THRESHOLD
+            ? action.at ?? nowIso()
+            : undefined),
+      };
+    }
+    case "restart_from_demo":
+      return state.step === "demo_exploration"
+        ? initialGuidedState()
+        : state;
     case "dismiss":
       return {
         ...state,
@@ -623,6 +677,7 @@ export const dispatchGuidedOnboarding = (
 
 export const isGuidedOnboardingInProgress = (state: GuidedOnboardingState) =>
   Boolean(state.startedAt) &&
+  state.step !== "demo_exploration" &&
   state.step !== "completed" &&
   state.step !== "dismissed";
 

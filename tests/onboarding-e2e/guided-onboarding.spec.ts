@@ -346,8 +346,8 @@ test("monta contexto Pessoal de forma incremental", async ({ page }, testInfo) =
     "context_selection"
   );
   await expect(panel.getByRole("button", { name: /Outro/ })).toHaveCount(0);
-  await expect(page.locator("[data-onboarding-profile-id]")).toHaveCount(3);
-  await expect(page.locator("[data-onboarding-category-id]")).toHaveCount(6);
+  await expect(page.locator("[data-onboarding-profile-id]")).toHaveCount(2);
+  await expect(page.locator("[data-onboarding-category-id]")).toHaveCount(10);
   await expect(page.locator("[data-onboarding-connector]")).toHaveCount(0);
   await expect(panel).toContainText(
     "Escolha onde começar a dar visibilidade ao que importa para você."
@@ -381,7 +381,7 @@ test("monta contexto Pessoal de forma incremental", async ({ page }, testInfo) =
   }));
 
   expect(stored.onboarding).toMatchObject({
-    version: 9,
+    version: 10,
     step: "completed",
     context: "personal",
   });
@@ -456,7 +456,7 @@ test("primeira visita segue o sistema e o onboarding usa superfície inversa", a
   ).toBe("rgb(23, 34, 51)");
 });
 
-test("o X encerra o guia e a decisão persiste após recarregar", async ({
+test("o X libera o ano de exemplo e a decisão persiste após recarregar", async ({
   page,
 }) => {
   await page.goto("/?mobileUi=0");
@@ -474,13 +474,54 @@ test("o X encerra o guia e a decisão persiste após recarregar", async ({
       events?: unknown[];
     };
   });
-  expect(stored.profiles?.map((profile) => profile.name)).toEqual(["Meu ano"]);
-  expect(stored.categories).toEqual([]);
-  expect(stored.events).toEqual([]);
+  expect(stored.profiles?.map((profile) => profile.name)).toEqual([
+    "Pessoal",
+    "Profissional",
+  ]);
+  expect(stored.categories).toHaveLength(14);
+  expect(stored.events?.length).toBeGreaterThan(80);
+  await expect(page.locator("[data-demo-mode-badge]")).toContainText(
+    "Ano de exemplo"
+  );
 
   await page.reload();
   await expect(panel).toBeHidden();
   await expect(page.locator("[data-guided-calendar-notice]")).toHaveCount(0);
+  await expect(page.locator("[data-demo-mode-badge]")).toBeVisible();
+});
+
+test("sandbox convida após cinco alvos e retoma o onboarding limpo", async ({
+  page,
+}, testInfo) => {
+  const mobile = testInfo.project.name === "mobile-chromium";
+  await page.goto(mobile ? "/?mobileUi=1" : "/?mobileUi=0");
+  await page
+    .getByRole("button", { name: "Encerrar guia inicial" })
+    .click();
+
+  await page.locator('[data-onboarding-category-id][title="Relacionamento a dois"]').click();
+  await page.locator('[data-onboarding-category-id][title="Amigos"]').click();
+  await page.locator('[data-onboarding-category-id][title="Grêmio"]').click();
+  await page.locator('[data-onboarding-profile-id][title="Profissional"]').click();
+  await page.locator('[data-onboarding-category-id][title="Eventos"]').click();
+
+  const invite = page.locator("[data-demo-exploration-invite]");
+  await expect(invite).toContainText(
+    "Agora, que tal montar o seu próprio ano?"
+  );
+  await invite
+    .getByRole("button", { name: "Continuar explorando", exact: true })
+    .click();
+  await expect(invite).toBeHidden();
+
+  await page.reload();
+  await expect(invite).toBeVisible();
+  await invite.getByRole("button", { name: "Criar meu ano" }).click();
+  await expect(
+    page.getByRole("region", { name: "Guia inicial do Doze 52" })
+  ).toHaveAttribute("data-guided-onboarding-step", "context_selection");
+  await expect(page.locator("[data-onboarding-profile-id]")).toHaveCount(2);
+  await expect(page.locator("[data-onboarding-category-id]")).toHaveCount(10);
 });
 
 test("controle temporário reinicia dados locais e restaura a demonstração", async ({
@@ -504,8 +545,8 @@ test("controle temporário reinicia dados locais e restaura a demonstração", a
     "data-guided-onboarding-step",
     "context_selection"
   );
-  await expect(page.locator("[data-onboarding-profile-id]")).toHaveCount(3);
-  await expect(page.locator("[data-onboarding-category-id]")).toHaveCount(6);
+  await expect(page.locator("[data-onboarding-profile-id]")).toHaveCount(2);
+  await expect(page.locator("[data-onboarding-category-id]")).toHaveCount(10);
 });
 
 test("centraliza cards e sobrepõe a instrução ao cabeçalho sem mover o calendário", async ({
@@ -516,6 +557,13 @@ test("centraliza cards e sobrepõe a instrução ao cabeçalho sem mover o calen
   const panel = page.getByRole("region", {
     name: "Guia inicial do Doze 52",
   });
+  const contextTitle = panel.getByRole("heading", {
+    name: "Por qual contexto você quer começar?",
+  });
+  await expect(contextTitle).toHaveCSS("white-space", "nowrap");
+  expect(
+    await contextTitle.evaluate((node) => node.scrollWidth <= node.clientWidth)
+  ).toBe(true);
   if (!mobile) {
     const panelBox = await panel.boundingBox();
     const viewport = page.viewportSize();
@@ -708,7 +756,7 @@ test("Profissional permite categorias específica e genérica", async ({
       "doze52:onboarding:v2",
       JSON.stringify({
         ...current,
-        version: 9,
+        version: 10,
         step: "period_category_selection",
         dateItemsCreated: 2,
         categoryRevealStartedAt: undefined,

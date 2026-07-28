@@ -18,6 +18,7 @@ import {
   type GuidedCalendarDraft,
 } from "@/components/onboarding/guided-onboarding-panel";
 import { AccountNudge } from "@/components/onboarding/account-nudge";
+import { DemoExplorationInvite } from "@/components/onboarding/demo-exploration-invite";
 import { OnboardingTestReset } from "@/components/onboarding/onboarding-test-reset";
 import type { GuidedToolbarNotice } from "@/components/onboarding/guided-toolbar-notice";
 import { Button } from "@/components/ui/button";
@@ -197,12 +198,23 @@ const formatSyncDebugDetail = (error: SyncUiError) => {
   return detail.length > 180 ? `${detail.slice(0, 177)}...` : detail;
 };
 
-const filterAnonymousDraft = (snapshot: CalendarSnapshot): CalendarSnapshot =>
-  stripOnboardingPersonalDemo({
+const filterAnonymousDraft = (
+  snapshot: CalendarSnapshot,
+  discardSandbox = false
+): CalendarSnapshot => {
+  if (discardSandbox) {
+    return {
+      profiles: [],
+      categories: [],
+      events: [],
+    };
+  }
+  return stripOnboardingPersonalDemo({
     profiles: snapshot.profiles.filter((profile) => !profile.userId),
     categories: snapshot.categories.filter((category) => !category.userId),
     events: snapshot.events.filter((event) => !event.userId),
   });
+};
 
 const hasRelevantLocalDraft = (snapshot: CalendarSnapshot) =>
   snapshot.events.length > 0 ||
@@ -267,8 +279,8 @@ export default function HomePage() {
   const loadOnboardingPersonalDemo = useStore(
     (s) => s.loadOnboardingPersonalDemo
   );
-  const clearOnboardingPersonalDemo = useStore(
-    (s) => s.clearOnboardingPersonalDemo
+  const unlockOnboardingPersonalDemo = useStore(
+    (s) => s.unlockOnboardingPersonalDemo
   );
   const configureOnboardingContext = useStore(
     (s) => s.configureOnboardingContext
@@ -328,6 +340,7 @@ export default function HomePage() {
   const [guidedOnboarding, setGuidedOnboarding] =
     React.useState<GuidedOnboardingState | null>(null);
   const [accountNudgeVisible, setAccountNudgeVisible] = React.useState(false);
+  const [demoInviteSuppressed, setDemoInviteSuppressed] = React.useState(false);
   const [guidedDraft, setGuidedDraft] =
     React.useState<GuidedCalendarDraft | null>(null);
   const [mobileGuidedRangeStart, setMobileGuidedRangeStart] = React.useState<
@@ -851,7 +864,8 @@ export default function HomePage() {
             profiles: profilesRef.current,
             categories: categoriesRef.current,
             events: eventsRef.current,
-          })
+          }),
+          readGuidedOnboardingState().step === "demo_exploration"
         );
 
         const pendingSnapshot = readPendingSyncSnapshot(userId);
@@ -1065,6 +1079,13 @@ export default function HomePage() {
         remoteReady,
       })
   );
+  const isDemoExploration =
+    guidedOnboarding?.step === "demo_exploration" && !session?.user.id;
+  const showDemoInvite = Boolean(
+    isDemoExploration &&
+      guidedOnboarding?.demoInviteEligibleAt &&
+      !demoInviteSuppressed
+  );
 
   const handleEditEvent = (payload: {
     eventId: string;
@@ -1088,6 +1109,57 @@ export default function HomePage() {
     },
     []
   );
+
+  const recordDemoInteraction = React.useCallback(
+    (key: string) => {
+      if (readGuidedOnboardingState().step !== "demo_exploration") return;
+      updateGuidedOnboarding({ type: "record_demo_interaction", key });
+    },
+    [updateGuidedOnboarding]
+  );
+
+  React.useEffect(() => {
+    if (!isDemoExploration) return;
+    const handleDemoClick = (event: MouseEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const profile = target.closest<HTMLElement>("[data-onboarding-profile-id]");
+      if (profile?.dataset.onboardingProfileId) {
+        recordDemoInteraction(`profile:${profile.dataset.onboardingProfileId}`);
+        return;
+      }
+      const category = target.closest<HTMLElement>("[data-onboarding-category-id]");
+      if (category?.dataset.onboardingCategoryId) {
+        recordDemoInteraction(`category:${category.dataset.onboardingCategoryId}`);
+        return;
+      }
+      const calendarEvent = target.closest<HTMLElement>("[data-calendar-event-id]");
+      if (calendarEvent?.dataset.calendarEventId) {
+        recordDemoInteraction(`event:${calendarEvent.dataset.calendarEventId}`);
+        return;
+      }
+      if (target.closest("[data-onboarding-edit-control]")) {
+        recordDemoInteraction("toolbar:edit");
+        return;
+      }
+      if (target.closest("[data-onboarding-calendar-control]")) {
+        recordDemoInteraction("toolbar:calendars");
+        return;
+      }
+      if (target.closest("[data-onboarding-theme-control]")) {
+        recordDemoInteraction("toolbar:theme");
+      }
+    };
+    document.addEventListener("click", handleDemoClick, true);
+    return () => document.removeEventListener("click", handleDemoClick, true);
+  }, [isDemoExploration, recordDemoInteraction]);
+
+  React.useEffect(() => {
+    if (!session?.user.id || guidedOnboarding?.step !== "demo_exploration") {
+      return;
+    }
+    updateGuidedOnboarding({ type: "dismiss" });
+  }, [guidedOnboarding?.step, session?.user.id, updateGuidedOnboarding]);
 
   React.useEffect(() => {
     if (
@@ -1178,9 +1250,27 @@ export default function HomePage() {
   }, [notify]);
 
   const dismissGuidedOnboarding = React.useCallback(() => {
-    clearOnboardingPersonalDemo();
-    updateGuidedOnboarding({ type: "dismiss" });
-  }, [clearOnboardingPersonalDemo, updateGuidedOnboarding]);
+    loadOnboardingPersonalDemo(year);
+    unlockOnboardingPersonalDemo();
+    updateGuidedOnboarding({ type: "enter_demo_exploration" });
+    setGuidedDraft(null);
+    setMobileGuidedRangeStart(null);
+    setAccountNudgeVisible(false);
+    setDemoInviteSuppressed(false);
+  }, [
+    loadOnboardingPersonalDemo,
+    unlockOnboardingPersonalDemo,
+    updateGuidedOnboarding,
+    year,
+  ]);
+
+  const restartGuidedOnboardingFromDemo = React.useCallback(() => {
+    loadOnboardingPersonalDemo(year);
+    updateGuidedOnboarding({ type: "restart_from_demo" });
+    setGuidedDraft(null);
+    setMobileGuidedRangeStart(null);
+    setDemoInviteSuppressed(false);
+  }, [loadOnboardingPersonalDemo, updateGuidedOnboarding, year]);
 
   const resetGuidedOnboardingForTesting = React.useCallback(() => {
     if (
@@ -1215,6 +1305,7 @@ export default function HomePage() {
   const handleSubmit = async (payload: EventInput) => {
     if (editingId) {
       updateEvent(editingId, payload);
+      recordDemoInteraction(`mutation:event:update:${editingId}`);
 
       notify({
         tone: "success",
@@ -1231,7 +1322,11 @@ export default function HomePage() {
     }
 
     setHighlightedEventId(eventId);
-    trackPostOnboardingEvent();
+    if (isDemoExploration) {
+      recordDemoInteraction(`mutation:event:create:${eventId}`);
+    } else {
+      trackPostOnboardingEvent();
+    }
 
     notify({
       tone: "success",
@@ -1257,6 +1352,7 @@ export default function HomePage() {
     if (!editingId) return;
 
     deleteEvent(editingId);
+    recordDemoInteraction(`mutation:event:delete:${editingId}`);
 
     notify({
       tone: "success",
@@ -1266,7 +1362,7 @@ export default function HomePage() {
 
     setDialogAnchorPoint(undefined);
     setDialogOpen(false);
-  }, [deleteEvent, editingId, notify]);
+  }, [deleteEvent, editingId, notify, recordDemoInteraction]);
 
   const handleStartCreateRange = (startIso: string) => {
     if (
@@ -1806,8 +1902,9 @@ export default function HomePage() {
     (nextYear: number) => {
       setYear(nextYear);
       resetCalendarFocusOnYearChange();
+      recordDemoInteraction(`year:${nextYear}`);
     },
-    [resetCalendarFocusOnYearChange]
+    [recordDemoInteraction, resetCalendarFocusOnYearChange]
   );
 
   React.useEffect(() => {
@@ -1872,6 +1969,13 @@ export default function HomePage() {
           }
           guidedEditPreviewActive={guidedOnboarding?.step === "edit_preview"}
           onboardingLayoutLocked={showGuidedOnboarding}
+          demoExplorationActive={isDemoExploration}
+          onCategoryCreated={(categoryId) =>
+            recordDemoInteraction(`mutation:category:create:${categoryId}`)
+          }
+          onProfileCreated={(profileId) =>
+            recordDemoInteraction(`mutation:profile:create:${profileId}`)
+          }
           onOpenAuthDialog={(anchorPoint) => {
             setAuthDialogInitialMode("login");
             setAuthDialogAnchorPoint(anchorPoint);
@@ -1951,6 +2055,22 @@ export default function HomePage() {
           onChooseCategory={handleChooseGuidedCategory}
           onChangeDraft={setGuidedDraft}
           onSaveDraft={saveGuidedDraft}
+        />
+      ) : null}
+
+      {isDemoExploration ? (
+        <div
+          data-demo-mode-badge
+          className="pointer-events-none fixed bottom-3 left-1/2 z-30 -translate-x-1/2 rounded-full border border-border/75 bg-card/92 px-3 py-1 text-[11px] font-semibold tracking-wide text-muted-foreground shadow-sm backdrop-blur"
+        >
+          Ano de exemplo
+        </div>
+      ) : null}
+
+      {showDemoInvite ? (
+        <DemoExplorationInvite
+          onCreateYear={restartGuidedOnboardingFromDemo}
+          onContinue={() => setDemoInviteSuppressed(true)}
         />
       ) : null}
 

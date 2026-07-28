@@ -48,6 +48,7 @@ type CategoryManagerProps = {
   onCreated?: (id: string) => void;
   anchorPoint?: AnchorPoint;
   onRequireAuth?: () => void;
+  bypassLimits?: boolean;
 };
 
 export function CategoryManager({
@@ -59,6 +60,7 @@ export function CategoryManager({
   onCreated,
   anchorPoint,
   onRequireAuth,
+  bypassLimits = false,
 }: CategoryManagerProps) {
   const { isPro, limits } = useBilling();
   const { mode: themeMode } = useTheme();
@@ -132,6 +134,7 @@ export function CategoryManager({
   const isCreateBlocked =
     open &&
     mode === "create" &&
+    !bypassLimits &&
     !isPro &&
     isLimitReached(categories.length, limits.maxCategories);
   const normalizedName = name.trim().slice(0, CATEGORY_NAME_MAX_LENGTH).trim();
@@ -165,7 +168,11 @@ export function CategoryManager({
         setSaveError("Selecione um contexto antes de criar a categoria.");
         return;
       }
-      if (!isPro && isLimitReached(categories.length, limits.maxCategories)) {
+      if (
+        !bypassLimits &&
+        !isPro &&
+        isLimitReached(categories.length, limits.maxCategories)
+      ) {
         setSaveError("Mais categorias fazem parte do Doze 52 Pro.");
         return;
       }

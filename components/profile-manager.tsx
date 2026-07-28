@@ -41,6 +41,8 @@ type ProfileManagerProps = {
   onOpenChange: (open: boolean) => void;
   intent: ProfileManagerIntent | null;
   onRequireAuth?: () => void;
+  bypassLimits?: boolean;
+  onCreated?: (profileId: string) => void;
 };
 
 export function ProfileManager({
@@ -48,6 +50,8 @@ export function ProfileManager({
   onOpenChange,
   intent,
   onRequireAuth,
+  bypassLimits = false,
+  onCreated,
 }: ProfileManagerProps) {
   const { isPro, limits } = useBilling();
   const profiles = useStore((s) => s.profiles);
@@ -122,6 +126,7 @@ export function ProfileManager({
   const isCreateBlocked =
     open &&
     isCreateIntent &&
+    !bypassLimits &&
     !isPro &&
     isLimitReached(profiles.length, limits.maxProfiles);
   const normalizedName = name.trim().slice(0, PROFILE_NAME_MAX_LENGTH).trim();
@@ -144,13 +149,18 @@ export function ProfileManager({
         return;
       }
 
-      if (!isPro && isLimitReached(profiles.length, limits.maxProfiles)) {
+      if (
+        !bypassLimits &&
+        !isPro &&
+        isLimitReached(profiles.length, limits.maxProfiles)
+      ) {
         setSaveError("Vários contextos fazem parte do Doze 52 Pro.");
         return;
       }
 
       const createdId = createProfile({ name: normalizedName, icon });
       if (createdId) {
+        onCreated?.(createdId);
         onOpenChange(false);
       }
     } catch (error) {

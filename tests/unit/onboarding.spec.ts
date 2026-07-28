@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import {
   GUIDED_CATEGORY_REVEAL_MS,
+  GUIDED_DEMO_INTERACTION_THRESHOLD,
   getGuidedCategoryRevealRemainingMs,
   hasAuthorCalendarEvents,
   migrateGuidedOnboardingState,
@@ -19,6 +20,7 @@ import {
   ONBOARDING_PERSONAL_DEMO_GROUP_ID,
   ONBOARDING_PROFILE_IDS,
   stripOnboardingPersonalDemo,
+  useStore,
 } from "../../lib/store";
 import { materializeUserOwnedSnapshot } from "../../lib/snapshot-ownership";
 import {
@@ -40,12 +42,12 @@ import {
 } from "../../lib/category-palette";
 
 const initialState = (): GuidedOnboardingState => ({
-  version: 9,
+  version: 10,
   step: "context_selection",
 });
 
 const completedState = (): GuidedOnboardingState => ({
-  version: 9,
+  version: 10,
   step: "completed",
   context: "personal",
   completedAt: "2026-07-20T10:05:00.000Z",
@@ -54,28 +56,28 @@ const completedState = (): GuidedOnboardingState => ({
 });
 
 test("métrica regional aceita apenas as 27 UFs na versão atual", () => {
-  expect(ONBOARDING_VERSION).toBe(9);
+  expect(ONBOARDING_VERSION).toBe(10);
   expect(BRAZIL_UFS).toHaveLength(27);
   expect(isBrazilUf("RS")).toBe(true);
   expect(isBrazilUf("BR")).toBe(false);
   expect(isBrazilUf("rs")).toBe(false);
 });
 
-test("revelação de categoria dura 900 ms e retoma pelo tempo restante", () => {
-  expect(GUIDED_CATEGORY_REVEAL_MS).toBe(900);
+test("revelação de categoria dura 1,8 s e retoma pelo tempo restante", () => {
+  expect(GUIDED_CATEGORY_REVEAL_MS).toBe(1_800);
   expect(
     getGuidedCategoryRevealRemainingMs(
       "2026-07-20T10:00:00.000Z",
       Date.parse("2026-07-20T10:00:00.350Z")
     )
-  ).toBe(550);
+  ).toBe(1_450);
   expect(
     getGuidedCategoryRevealRemainingMs(
       "2026-07-20T10:00:00.000Z",
-      Date.parse("2026-07-20T10:00:01.000Z")
+      Date.parse("2026-07-20T10:00:02.000Z")
     )
   ).toBe(0);
-  expect(getGuidedCategoryRevealRemainingMs(undefined)).toBe(900);
+  expect(getGuidedCategoryRevealRemainingMs(undefined)).toBe(1_800);
 });
 
 test("organiza 24 cores e mantém padrões distintos no onboarding", () => {
@@ -270,6 +272,51 @@ test("um único evento não qualifica o convite e o estado terminal não reconta
   expect(ignored).toEqual(qualified);
 });
 
+test("sandbox qualifica o convite com cinco alvos únicos", () => {
+  expect(GUIDED_DEMO_INTERACTION_THRESHOLD).toBe(5);
+  let state = reduceGuidedOnboardingState(
+    {
+      ...initialState(),
+      step: "date_details",
+      context: "personal",
+      startedAt: "2026-07-20T10:00:00.000Z",
+    },
+    { type: "enter_demo_exploration", at: "2026-07-20T11:00:00.000Z" }
+  );
+  expect(state).toMatchObject({
+    version: 10,
+    step: "demo_exploration",
+    demoInteractionKeys: [],
+  });
+  expect(state.context).toBeUndefined();
+
+  const keys = [
+    "profile:personal",
+    "category:family",
+    "category:gremio",
+    "event:festival",
+    "toolbar:theme",
+  ];
+  keys.forEach((key, index) => {
+    state = reduceGuidedOnboardingState(state, {
+      type: "record_demo_interaction",
+      key,
+      at: `2026-07-20T11:0${index}:00.000Z`,
+    });
+  });
+  expect(state.demoInteractionKeys).toEqual(keys);
+  expect(state.demoInviteEligibleAt).toBe("2026-07-20T11:04:00.000Z");
+
+  const duplicate = reduceGuidedOnboardingState(state, {
+    type: "record_demo_interaction",
+    key: "category:gremio",
+  });
+  expect(duplicate).toEqual(state);
+  expect(
+    reduceGuidedOnboardingState(state, { type: "restart_from_demo" })
+  ).toEqual(initialState());
+});
+
 test("migra v3 com progresso sem reabrir fluxo incompatível", () => {
   expect(
     migrateGuidedOnboardingState({
@@ -280,7 +327,7 @@ test("migra v3 com progresso sem reabrir fluxo incompatível", () => {
       firstDateCreatedAt: "2026-07-20T10:01:00.000Z",
     })
   ).toMatchObject({
-    version: 9,
+    version: 10,
     step: "completed",
     context: "personal",
     dateItemsCreated: 2,
@@ -292,7 +339,7 @@ test("migra v3 com progresso sem reabrir fluxo incompatível", () => {
       step: "completed",
       completedAt: "2026-07-20T10:03:00.000Z",
     })
-  ).toMatchObject({ version: 9, step: "completed" });
+  ).toMatchObject({ version: 10, step: "completed" });
 
   expect(
     migrateGuidedOnboardingState({
@@ -303,7 +350,7 @@ test("migra v3 com progresso sem reabrir fluxo incompatível", () => {
       periodItemsCreated: 2,
     })
   ).toMatchObject({
-    version: 9,
+    version: 10,
     step: "calendar_instruction",
     context: "personal",
   });
@@ -319,7 +366,7 @@ test("migra v6 sem perder períodos e posiciona calendários depois deles", () =
       periodItemsCreated: 0,
     })
   ).toMatchObject({
-    version: 9,
+    version: 10,
     step: "period_category_selection",
     dateItemsCreated: 2,
   });
@@ -333,7 +380,7 @@ test("migra v6 sem perder períodos e posiciona calendários depois deles", () =
       periodItemsCreated: 1,
     })
   ).toMatchObject({
-    version: 9,
+    version: 10,
     step: "period_instruction",
     periodItemsCreated: 1,
   });
@@ -346,7 +393,7 @@ test("migra v6 sem perder períodos e posiciona calendários depois deles", () =
     periodItemsCreated: 2,
   });
   expect(state).toMatchObject({
-    version: 9,
+    version: 10,
     step: "calendar_instruction",
     periodItemsCreated: 2,
   });
@@ -363,7 +410,7 @@ test("migra v6 com tema confirmado e preserva a confirmação", () => {
       themeConfirmedAt: "2026-07-20T10:04:30.000Z",
     })
   ).toMatchObject({
-    version: 9,
+    version: 10,
     step: "calendar_instruction",
     themeConfirmedAt: "2026-07-20T10:04:30.000Z",
   });
@@ -377,7 +424,7 @@ test("migra v7 sem reabrir terminais e consolida o passo de contexto", () => {
       context: "personal",
     })
   ).toMatchObject({
-    version: 9,
+    version: 10,
     step: "date_category_selection",
   });
 
@@ -391,7 +438,7 @@ test("migra v7 sem reabrir terminais e consolida o passo de contexto", () => {
       themeConfirmedAt: "2026-07-20T10:04:30.000Z",
     })
   ).toMatchObject({
-    version: 9,
+    version: 10,
     step: "calendar_instruction",
     themeConfirmedAt: "2026-07-20T10:04:30.000Z",
   });
@@ -402,7 +449,7 @@ test("migra v7 sem reabrir terminais e consolida o passo de contexto", () => {
       step: "completed",
       completedAt: "2026-07-20T10:05:00.000Z",
     })
-  ).toMatchObject({ version: 9, step: "completed" });
+  ).toMatchObject({ version: 10, step: "completed" });
 });
 
 test("migra v8 sem repetir revelações e preserva estados terminais", () => {
@@ -414,7 +461,7 @@ test("migra v8 sem repetir revelações e preserva estados terminais", () => {
       dateCategoryId: ONBOARDING_CATEGORY_IDS.workDeliveries,
     })
   ).toMatchObject({
-    version: 9,
+    version: 10,
     step: "date_instruction",
     context: "work",
   });
@@ -425,7 +472,7 @@ test("migra v8 sem repetir revelações e preserva estados terminais", () => {
       step: "completed",
       completedAt: "2026-07-20T10:05:00.000Z",
     })
-  ).toMatchObject({ version: 9, step: "completed" });
+  ).toMatchObject({ version: 10, step: "completed" });
 });
 
 test("dispensa e conclusão são terminais para a elegibilidade", () => {
@@ -438,6 +485,23 @@ test("dispensa e conclusão são terminais para a elegibilidade", () => {
       state: dismissed,
       legacyState: "pending",
       hasAuthorEvents: false,
+      authLoading: false,
+      isAuthenticated: false,
+      remoteReady: false,
+    })
+  ).toBe(false);
+});
+
+test("modo de demonstração libera a interface sem reabrir o painel", () => {
+  const demo = reduceGuidedOnboardingState(initialState(), {
+    type: "enter_demo_exploration",
+    at: "2026-07-20T10:00:00.000Z",
+  });
+  expect(
+    shouldShowGuidedOnboarding({
+      state: demo,
+      legacyState: "pending",
+      hasAuthorEvents: true,
       authLoading: false,
       isAuthenticated: false,
       remoteReady: false,
@@ -504,22 +568,63 @@ test("novo template começa com contexto neutro e nenhuma categoria", () => {
   ).toBe(true);
 });
 
-test("demonstração pessoal monta um ano completo e identificável", () => {
+test("demonstração monta dois contextos e categorias pessoais e profissionais", () => {
   const snapshot = getOnboardingPersonalDemoSnapshot(2026);
   expect(snapshot.profiles.map((profile) => profile.name)).toEqual([
     "Pessoal",
-    "Família",
     "Profissional",
   ]);
   expect(snapshot.categories.map((category) => category.name)).toEqual([
-    "Aniversários",
+    "Eventos",
+    "Relacionamento a dois",
+    "Amigos",
     "Férias e viagens",
-    "Família e escola",
-    "Saúde e bem-estar",
-    "Celebrações",
-    "Projetos pessoais",
+    "Família",
+    "Aniversários",
+    "Feriados",
+    "Grêmio",
+    "Competições",
+    "Corridas F1",
+    "Eventos",
+    "Agendas importantes",
+    "Projetos",
+    "Entregas",
   ]);
-  expect(snapshot.events).toHaveLength(22);
+  expect(snapshot.categories.map((category) => category.color)).toEqual([
+    "#9CA6B4",
+    "#EF8F8F",
+    "#4F8FD6",
+    "#58B76F",
+    "#F09CCF",
+    "#E1D15D",
+    "#1F2937",
+    "#4F8FD6",
+    "#EBA16D",
+    "#EBA16D",
+    "#9CA6B4",
+    "#4F8FD6",
+    "#B79AEF",
+    "#EBA16D",
+  ]);
+  expect(snapshot.events.length).toBeGreaterThan(80);
+  expect(new Set(snapshot.events.map((event) => event.startDate.slice(5, 7))).size).toBe(12);
+  expect(snapshot.events.map((event) => event.title)).toEqual(
+    expect.arrayContaining([
+      "Planejamento estratégico",
+      "Revisão de resultados Q1",
+      "Revisão de resultados Q4",
+      "All Hands",
+      "QBR",
+      "Nova experiência mobile",
+      "Expansão para PMEs",
+      "Evolução do onboarding",
+      "Roadmap do semestre",
+      "Protótipo validado",
+      "Lançamento mobile",
+      "Relatório para o conselho",
+      "Plano do próximo ano",
+    ])
+  );
   expect(isOnboardingPersonalDemoSnapshot(snapshot)).toBe(true);
   expect(
     snapshot.events.every(
@@ -528,8 +633,16 @@ test("demonstração pessoal monta um ano completo e identificável", () => {
     )
   ).toBe(true);
   expect(
-    snapshot.events.filter((event) => event.recurrenceType === "yearly")
-  ).toHaveLength(4);
+    snapshot.categories.filter((category) => !category.visible).map((category) => category.name)
+  ).toEqual(["Grêmio", "Corridas F1"]);
+  expect(
+    snapshot.categories.filter(
+      (category) => category.profileId === ONBOARDING_PROFILE_IDS.professional
+    ).map((category) => category.name)
+  ).toEqual(["Eventos", "Agendas importantes", "Projetos", "Entregas"]);
+  expect(
+    snapshot.events.filter((event) => event.recurrenceType === "yearly").length
+  ).toBeGreaterThanOrEqual(4);
 });
 
 test("demonstração é removida antes de qualquer importação", () => {
@@ -539,6 +652,42 @@ test("demonstração é removida antes de qualquer importação", () => {
   expect(stripped.profiles.map((profile) => profile.name)).toEqual(["Meu ano"]);
   expect(stripped.categories).toEqual([]);
   expect(stripped.events).toEqual([]);
+});
+
+test("sandbox libera criação, edição e exclusão sem preservar a origem demonstrativa", () => {
+  const store = useStore.getState();
+  store.loadOnboardingPersonalDemo(2026);
+  store.unlockOnboardingPersonalDemo();
+
+  const sandbox = useStore.getState();
+  expect(
+    sandbox.categories.every((category) => !category.calendarPackGroupId)
+  ).toBe(true);
+  expect(sandbox.events.every((event) => !event.calendarPackGroupId)).toBe(true);
+
+  const categoryId = sandbox.categories[0]?.id;
+  expect(categoryId).toBeTruthy();
+  const eventId = sandbox.addEvent({
+    title: "Novo evento no exemplo",
+    categoryId: categoryId!,
+    startDate: "2026-08-12",
+    endDate: "2026-08-12",
+  });
+  expect(eventId).toBeTruthy();
+
+  useStore.getState().updateEvent(eventId!, {
+    title: "Evento ajustado no exemplo",
+    categoryId: categoryId!,
+    startDate: "2026-08-13",
+    endDate: "2026-08-13",
+  });
+  expect(useStore.getState().getEventById(eventId!)?.title).toBe(
+    "Evento ajustado no exemplo"
+  );
+
+  useStore.getState().deleteEvent(eventId!);
+  expect(useStore.getState().getEventById(eventId!)).toBeUndefined();
+  useStore.getState().resetToOnboardingData();
 });
 
 test("materialização cria IDs distintos e preserva relacionamentos", () => {

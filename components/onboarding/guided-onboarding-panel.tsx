@@ -481,7 +481,7 @@ export function GuidedOnboardingPanel({
     if (state.step === "context_selection") {
       return (
         <>
-          <h2 className="mt-4 max-w-[30rem] text-balance text-xl font-semibold tracking-[-0.025em]">
+          <h2 className="mt-4 whitespace-nowrap text-[clamp(1rem,4.4vw,1.25rem)] font-semibold tracking-[-0.025em]">
             Por qual contexto você quer começar?
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -650,7 +650,7 @@ export function GuidedOnboardingPanel({
       data-guided-onboarding-step={state.step}
       aria-label="Guia inicial do Doze 52"
       aria-live="polite"
-      className="inverse-product-surface fixed top-[calc(env(safe-area-inset-top,0px)+4.6rem)] left-1/2 z-50 max-h-[calc(100dvh-6rem)] w-[min(42rem,calc(100vw-1.5rem))] -translate-x-1/2 overflow-y-auto rounded-[1.5rem] border border-border bg-card p-4.5 text-card-foreground shadow-[0_30px_95px_-20px_rgba(15,23,42,0.82)] animate-in fade-in-0 duration-200 motion-reduce:animate-none sm:p-5 md:top-1/2 md:w-[23rem] md:-translate-y-1/2"
+      className="inverse-product-surface fixed top-[calc(env(safe-area-inset-top,0px)+4.6rem)] left-1/2 z-50 max-h-[calc(100dvh-6rem)] w-[min(42rem,calc(100vw-.75rem))] -translate-x-1/2 overflow-y-auto rounded-[1.5rem] border border-border bg-card p-4 text-card-foreground shadow-[0_30px_95px_-20px_rgba(15,23,42,0.82)] animate-in fade-in-0 duration-200 motion-reduce:animate-none sm:p-5 md:top-1/2 md:w-[30rem] md:-translate-y-1/2"
     >
       {header}
       {content}

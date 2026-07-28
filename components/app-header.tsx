@@ -54,8 +54,10 @@ type AppHeaderProps = {
   guidedCalendarSelectionActive?: boolean;
   guidedEditPreviewActive?: boolean;
   onboardingLayoutLocked?: boolean;
+  demoExplorationActive?: boolean;
   categoryCreateRequestKey?: number;
   onCategoryCreated?: (categoryId: string) => void;
+  onProfileCreated?: (profileId: string) => void;
 };
 
 const getPreferredEditingProfileId = (
@@ -82,8 +84,10 @@ export function AppHeader({
   guidedCalendarSelectionActive = false,
   guidedEditPreviewActive = false,
   onboardingLayoutLocked = false,
+  demoExplorationActive = false,
   categoryCreateRequestKey = 0,
   onCategoryCreated,
+  onProfileCreated,
 }: AppHeaderProps) {
   const profiles = useStore((s) => s.profiles);
   const categories = useStore((s) => s.categories);
@@ -396,6 +400,7 @@ export function AppHeader({
                   className="shrink-0"
                   onRequireAuth={() => onOpenAuthDialog()}
                   disabled={calendarLauncherDisabled}
+                  bypassLimits={demoExplorationActive}
                   highlighted={guidedToolbarNotice?.target === "calendars"}
                   guidedVariantGroupId={
                     guidedCalendarSelectionActive
@@ -724,6 +729,8 @@ export function AppHeader({
         onOpenChange={handleProfileManagerOpenChange}
         intent={profileManagerIntent}
         onRequireAuth={() => onOpenAuthDialog()}
+        bypassLimits={demoExplorationActive}
+        onCreated={onProfileCreated}
       />
 
       <CategoryManager
@@ -733,6 +740,7 @@ export function AppHeader({
         profileId={editingProfileId ?? undefined}
         onCreated={onCategoryCreated}
         onRequireAuth={() => onOpenAuthDialog()}
+        bypassLimits={demoExplorationActive}
       />
 
       <CategoryManager
@@ -745,6 +753,7 @@ export function AppHeader({
           }
         }}
         categoryId={editingCategoryId ?? undefined}
+        bypassLimits={demoExplorationActive}
       />
     </>
   );
