@@ -40,6 +40,7 @@ import {
   CATEGORY_COLOR_BASE_TEAL,
   CATEGORY_COLOR_BASE_VIOLET,
   CATEGORY_PRESET_COLORS,
+  getNearestCategoryColor,
 } from "../../lib/category-palette";
 
 const initialState = (): GuidedOnboardingState => ({
@@ -113,6 +114,10 @@ test("organiza 24 cores e mantém padrões distintos no onboarding", () => {
   expect(
     getOnboardingCategoryDefinition("work", "period", "specific").color
   ).toBe(CATEGORY_COLOR_BASE_GREEN);
+});
+
+test("normaliza a antiga cor escura para uma opção oficial", () => {
+  expect(getNearestCategoryColor("#1F2937")).toBe("#9CA6B4");
 });
 
 test("cria contexto, categorias incrementais e quatro eventos", () => {
@@ -594,7 +599,7 @@ test("demonstração monta dois contextos e categorias pessoais e profissionais"
     "#4F8FD6",
     "#58B76F",
     "#E1D15D",
-    "#1F2937",
+    "#B79AEF",
     "#EBA16D",
     "#9CA6B4",
     "#4F8FD6",
@@ -650,7 +655,7 @@ test("demonstração monta dois contextos e categorias pessoais e profissionais"
       (event) => event.categoryId === personalCategoryIds.get(name)
     ).length;
   expect(countCategoryEvents("Eventos")).toBe(12);
-  expect(countCategoryEvents("Família")).toBe(14);
+  expect(countCategoryEvents("Família")).toBe(15);
   expect(countCategoryEvents("Amigos")).toBe(19);
   expect(countCategoryEvents("Viagens")).toBe(6);
   expect(countCategoryEvents("Aniversários")).toBe(10);
@@ -670,14 +675,19 @@ test("demonstração monta dois contextos e categorias pessoais e profissionais"
   expect(snapshot.events).toEqual(
     expect.arrayContaining([
       expect.objectContaining({
+        title: "Férias de verão",
+        startDate: "2026-01-02",
+        endDate: "2026-01-18",
+      }),
+      expect.objectContaining({
         title: "Férias das crianças",
-        startDate: "2026-07-27",
+        startDate: "2026-07-20",
         endDate: "2026-08-02",
       }),
       expect.objectContaining({
         title: "Férias em família — Maceió",
-        startDate: "2026-07-27",
-        endDate: "2026-08-02",
+        startDate: "2026-07-25",
+        endDate: "2026-07-30",
       }),
       expect.objectContaining({
         title: "Ano Novo em Tiradentes",
@@ -689,10 +699,11 @@ test("demonstração monta dois contextos e categorias pessoais e profissionais"
   );
 });
 
-test("reconhece e remove snapshots demonstrativos v1 e v2", () => {
+test("reconhece e remove snapshots demonstrativos v1, v2 e v3", () => {
   for (const groupId of [
     "onboarding-personal-demo-v1",
     "onboarding-personal-demo-v2",
+    "onboarding-personal-demo-v3",
   ]) {
     const current = getOnboardingPersonalDemoSnapshot(2026);
     const legacy = {

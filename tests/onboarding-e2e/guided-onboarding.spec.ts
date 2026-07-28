@@ -352,6 +352,7 @@ const createRegularEvent = async (
 
 test("monta contexto Pessoal de forma incremental", async ({ page }, testInfo) => {
   const mobile = testInfo.project.name === "mobile-chromium";
+  test.skip(mobile, "O onboarding guiado começa exclusivamente no desktop");
   const regionRequests: string[] = [];
   page.on("request", (request) => {
     if (request.url().includes("/api/onboarding/region")) {
@@ -426,10 +427,113 @@ test("monta contexto Pessoal de forma incremental", async ({ page }, testInfo) =
   ).toBe(true);
 });
 
+test("mobile recomenda o desktop e libera uma prévia somente na sessão", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "mobile-chromium",
+    "Entrada desktop-first validada no viewport mobile"
+  );
+
+  await page.goto("/?mobileUi=1");
+
+  const gate = page.locator("[data-mobile-desktop-first-gate]");
+  await expect(gate).toBeVisible();
+  await expect(gate).toContainText("Comece pelo desktop.");
+  await expect(gate).toContainText(
+    "O Doze 52 foi pensado para montar e visualizar o ano inteiro em uma tela maior."
+  );
+  await expect(
+    page.getByRole("region", { name: "Guia inicial do Doze 52" })
+  ).toHaveCount(0);
+  const onboardingBeforePreview = await page.evaluate(() =>
+    window.localStorage.getItem("doze52:onboarding:v2")
+  );
+
+  await gate.getByRole("button", { name: "Entrar na minha conta" }).click();
+  const authDialog = page.getByRole("dialog", { name: "Entrar" });
+  await expect(authDialog).toBeVisible();
+  await authDialog.getByRole("button", { name: "Cancelar" }).click();
+
+  await gate
+    .getByRole("button", { name: "Explorar o ano de exemplo" })
+    .click();
+  await expect(gate).toBeHidden();
+  await expect(page.locator("[data-mobile-calendar-experience]")).toBeVisible();
+  await expect(page.locator("[data-onboarding-edit-control]")).toBeDisabled();
+  await expect(page.locator("[data-onboarding-calendar-control]")).toBeDisabled();
+  await expect(page.locator("[data-onboarding-year-control]")).toBeEnabled();
+  await expect(page.locator("[data-onboarding-theme-control]")).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Novo evento" })).toHaveCount(0);
+
+  await page.locator('[data-onboarding-profile-id][title="Profissional"]').click();
+  await expect(
+    page.locator('[data-onboarding-category-id][title="Projetos"]')
+  ).toBeVisible();
+
+  const persisted = await page.evaluate(() => ({
+    sessionPreview: window.sessionStorage.getItem(
+      "doze52:mobile-example-preview:session"
+    ),
+    onboardingRaw: window.localStorage.getItem("doze52:onboarding:v2"),
+  }));
+  expect(persisted.sessionPreview).toBe("1");
+  expect(persisted.onboardingRaw).toBe(onboardingBeforePreview);
+
+  await page.reload();
+  await expect(gate).toBeHidden();
+
+  await page.goto("/?mobileUi=0");
+  await expect(
+    page.getByRole("region", { name: "Guia inicial do Doze 52" })
+  ).toHaveAttribute("data-guided-onboarding-step", "context_selection");
+});
+
+test("mobile preserva progresso parcial e exige continuação no desktop", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "mobile-chromium",
+    "Retomada desktop-first validada no viewport mobile"
+  );
+
+  await page.goto("/?mobileUi=0");
+  const panel = page.getByRole("region", {
+    name: "Guia inicial do Doze 52",
+  });
+  await panel.getByRole("button", { name: /Pessoal/ }).click();
+  await expect(panel).toHaveAttribute(
+    "data-guided-onboarding-step",
+    "date_category_selection"
+  );
+
+  await page.goto("/?mobileUi=1");
+  const gate = page.locator("[data-mobile-desktop-first-gate]");
+  await expect(gate).toContainText(
+    "Continue a montagem do seu ano no desktop."
+  );
+  await expect(
+    gate.getByRole("button", { name: "Explorar o ano de exemplo" })
+  ).toHaveCount(0);
+  await expect(panel).toHaveCount(0);
+
+  const persisted = await page.evaluate(() => ({
+    sessionPreview: window.sessionStorage.getItem(
+      "doze52:mobile-example-preview:session"
+    ),
+    onboarding: JSON.parse(
+      window.localStorage.getItem("doze52:onboarding:v2") ?? "null"
+    ) as { step?: string } | null,
+  }));
+  expect(persisted.sessionPreview).toBeNull();
+  expect(persisted.onboarding?.step).toBe("date_category_selection");
+});
+
 test("categorias começam abertas, podem ser recolhidas e reabrem ao recarregar", async ({
   page,
 }, testInfo) => {
   const mobile = testInfo.project.name === "mobile-chromium";
+  test.skip(mobile, "Comportamento do cabeçalho coberto no desktop");
   await page.goto(mobile ? "/?mobileUi=1" : "/?mobileUi=0");
 
   await page
@@ -481,7 +585,11 @@ test("primeira visita segue o sistema e o onboarding usa superfície inversa", a
 
 test("o X libera o ano de exemplo e a decisão persiste após recarregar", async ({
   page,
-}) => {
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name === "mobile-chromium",
+    "O encerramento do guia acontece no desktop"
+  );
   await page.goto("/?mobileUi=0");
   const panel = page.getByRole("region", {
     name: "Guia inicial do Doze 52",
@@ -513,7 +621,7 @@ test("o X libera o ano de exemplo e a decisão persiste após recarregar", async
   await expect(page.locator("[data-demo-mode-badge]")).toBeVisible();
 });
 
-test("substitui automaticamente um exemplo v2 ainda bloqueado", async ({
+test("substitui automaticamente um exemplo v3 ainda bloqueado", async ({
   page,
 }, testInfo) => {
   test.skip(
@@ -539,13 +647,13 @@ test("substitui automaticamente um exemplo v2 ainda bloqueado", async ({
     payload.state.categories = (payload.state.categories ?? []).map(
       (category: Record<string, unknown>) => ({
         ...category,
-        calendarPackGroupId: "onboarding-personal-demo-v2",
+        calendarPackGroupId: "onboarding-personal-demo-v3",
       })
     );
     payload.state.events = (payload.state.events ?? []).map(
       (event: Record<string, unknown>) => ({
         ...event,
-        calendarPackGroupId: "onboarding-personal-demo-v2",
+        calendarPackGroupId: "onboarding-personal-demo-v3",
       })
     );
     window.localStorage.setItem("yiv-store", JSON.stringify(payload));
@@ -560,13 +668,14 @@ test("substitui automaticamente um exemplo v2 ainda bloqueado", async ({
       ...(payload.state.events ?? []),
     ].map((item: { calendarPackGroupId?: string }) => item.calendarPackGroupId);
   });
-  expect(new Set(groupIds)).toEqual(new Set(["onboarding-personal-demo-v3"]));
+  expect(new Set(groupIds)).toEqual(new Set(["onboarding-personal-demo-v4"]));
 });
 
 test("sandbox convida após cinco alvos e retoma o onboarding limpo", async ({
   page,
 }, testInfo) => {
   const mobile = testInfo.project.name === "mobile-chromium";
+  test.skip(mobile, "Entrada no sandbox coberta no desktop");
   await page.goto(mobile ? "/?mobileUi=1" : "/?mobileUi=0");
   await page
     .getByRole("button", { name: "Encerrar guia inicial" })
@@ -599,7 +708,11 @@ test("sandbox convida após cinco alvos e retoma o onboarding limpo", async ({
 
 test("controle temporário reinicia dados locais e restaura a demonstração", async ({
   page,
-}) => {
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name === "mobile-chromium",
+    "Controle temporário validado no desktop"
+  );
   await page.goto("/?mobileUi=0");
   const panel = page.getByRole("region", {
     name: "Guia inicial do Doze 52",
@@ -626,6 +739,7 @@ test("centraliza cards e sobrepõe a instrução ao cabeçalho sem mover o calen
   page,
 }, testInfo) => {
   const mobile = testInfo.project.name === "mobile-chromium";
+  test.skip(mobile, "Os cards guiados não são exibidos no mobile");
   await page.goto(mobile ? "/?mobileUi=1" : "/?mobileUi=0");
   const panel = page.getByRole("region", {
     name: "Guia inicial do Doze 52",

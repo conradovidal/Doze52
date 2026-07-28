@@ -9,7 +9,6 @@ import {
   CATEGORY_COLOR_BASE_CYAN,
   CATEGORY_COLOR_BASE_GRAPHITE,
   CATEGORY_COLOR_BASE_GREEN,
-  CATEGORY_COLOR_BASE_INK,
   CATEGORY_COLOR_BASE_LIME,
   CATEGORY_COLOR_BASE_ORANGE,
   CATEGORY_COLOR_BASE_RED,
@@ -160,10 +159,11 @@ export const ONBOARDING_CATEGORY_IDS = {
 
 export const ONBOARDING_DEFAULT_CATEGORY_ID = ONBOARDING_CATEGORY_IDS.events;
 export const ONBOARDING_PERSONAL_DEMO_GROUP_ID =
-  "onboarding-personal-demo-v3";
+  "onboarding-personal-demo-v4";
 const ONBOARDING_PERSONAL_DEMO_GROUP_IDS = new Set([
   "onboarding-personal-demo-v1",
   "onboarding-personal-demo-v2",
+  "onboarding-personal-demo-v3",
   ONBOARDING_PERSONAL_DEMO_GROUP_ID,
 ]);
 
@@ -409,7 +409,7 @@ const getPersonalDemoCategories = (): CategoryItem[] => [
     DEMO_CATEGORY_IDS.holidays,
     ONBOARDING_PROFILE_IDS.personal,
     "Feriados",
-    CATEGORY_COLOR_BASE_INK
+    CATEGORY_COLOR_BASE_VIOLET
   ),
   demoCategory(
     DEMO_CATEGORY_IDS.formula1,
@@ -548,6 +548,13 @@ const getPersonalDemoEvents = (year: number): CalendarEvent[] => {
       startDate: toDemoIsoDate(year, 12, 12),
     },
     {
+      key: "kids-summer-break",
+      title: "Férias de verão",
+      categoryId: DEMO_CATEGORY_IDS.family,
+      startDate: toDemoIsoDate(year, 1, 2),
+      endDate: toDemoIsoDate(year, 1, 18),
+    },
+    {
       key: "family-lunch-parents",
       title: "Almoço com os pais",
       categoryId: DEMO_CATEGORY_IDS.family,
@@ -593,7 +600,7 @@ const getPersonalDemoEvents = (year: number): CalendarEvent[] => {
       key: "kids-winter-break",
       title: "Férias das crianças",
       categoryId: DEMO_CATEGORY_IDS.family,
-      startDate: toDemoIsoDate(year, 7, 27),
+      startDate: toDemoIsoDate(year, 7, 20),
       endDate: toDemoIsoDate(year, 8, 2),
     },
     {
@@ -684,8 +691,8 @@ const getPersonalDemoEvents = (year: number): CalendarEvent[] => {
       key: "maceio-family-holidays",
       title: "Férias em família — Maceió",
       categoryId: ONBOARDING_CATEGORY_IDS.travel,
-      startDate: toDemoIsoDate(year, 7, 27),
-      endDate: toDemoIsoDate(year, 8, 2),
+      startDate: toDemoIsoDate(year, 7, 25),
+      endDate: toDemoIsoDate(year, 7, 30),
     },
     {
       key: "florianopolis-holiday",

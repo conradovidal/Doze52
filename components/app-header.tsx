@@ -54,6 +54,7 @@ type AppHeaderProps = {
   guidedCalendarSelectionActive?: boolean;
   guidedEditPreviewActive?: boolean;
   onboardingLayoutLocked?: boolean;
+  mobileExamplePreviewActive?: boolean;
   demoExplorationActive?: boolean;
   categoryCreateRequestKey?: number;
   onCategoryCreated?: (categoryId: string) => void;
@@ -84,6 +85,7 @@ export function AppHeader({
   guidedCalendarSelectionActive = false,
   guidedEditPreviewActive = false,
   onboardingLayoutLocked = false,
+  mobileExamplePreviewActive = false,
   demoExplorationActive = false,
   categoryCreateRequestKey = 0,
   onCategoryCreated,
@@ -142,9 +144,11 @@ export function AppHeader({
     highlightedCategoryEffect === "reveal";
   const filtersLocked = onboardingLayoutLocked;
   const inlineEditDisabled =
-    onboardingLayoutLocked && guidedToolbarNotice?.target !== "edit";
+    mobileExamplePreviewActive ||
+    (onboardingLayoutLocked && guidedToolbarNotice?.target !== "edit");
   const calendarLauncherDisabled =
-    onboardingLayoutLocked && !guidedCalendarSelectionActive;
+    mobileExamplePreviewActive ||
+    (onboardingLayoutLocked && !guidedCalendarSelectionActive);
   const yearSelectDisabled = onboardingLayoutLocked;
   const themeToggleDisabled =
     onboardingLayoutLocked && guidedToolbarNotice?.target !== "theme";

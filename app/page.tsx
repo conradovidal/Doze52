@@ -19,6 +19,7 @@ import {
 } from "@/components/onboarding/guided-onboarding-panel";
 import { AccountNudge } from "@/components/onboarding/account-nudge";
 import { DemoExplorationInvite } from "@/components/onboarding/demo-exploration-invite";
+import { MobileDesktopFirstGate } from "@/components/onboarding/mobile-desktop-first-gate";
 import { OnboardingTestReset } from "@/components/onboarding/onboarding-test-reset";
 import type { GuidedToolbarNotice } from "@/components/onboarding/guided-toolbar-notice";
 import { Button } from "@/components/ui/button";
@@ -118,6 +119,28 @@ const isDetailedSyncDiagnosticsEnabled =
   process.env.NEXT_PUBLIC_APP_ENV === "dev";
 
 const MOBILE_CALENDAR_UI_MAX_WIDTH_PX = 767;
+const MOBILE_EXAMPLE_PREVIEW_SESSION_KEY =
+  "doze52:mobile-example-preview:session";
+
+const readMobileExamplePreviewSession = () => {
+  if (typeof window === "undefined") return false;
+
+  try {
+    return (
+      window.sessionStorage.getItem(MOBILE_EXAMPLE_PREVIEW_SESSION_KEY) === "1"
+    );
+  } catch {
+    return false;
+  }
+};
+
+const writeMobileExamplePreviewSession = () => {
+  try {
+    window.sessionStorage.setItem(MOBILE_EXAMPLE_PREVIEW_SESSION_KEY, "1");
+  } catch {
+    // A prévia continua válida para a página atual quando o storage está indisponível.
+  }
+};
 
 const cloneSnapshot = (snapshot: CalendarSnapshot): CalendarSnapshot => ({
   profiles: snapshot.profiles.map((profile) => ({ ...profile })),
@@ -352,6 +375,8 @@ export default function HomePage() {
   const [isMobileCalendarUi, setIsMobileCalendarUi] = React.useState<
     boolean | null
   >(null);
+  const [mobileExamplePreviewDismissed, setMobileExamplePreviewDismissed] =
+    React.useState(readMobileExamplePreviewSession);
   const [mobileActiveDateIso, setMobileActiveDateIso] = React.useState(() =>
     format(new Date(), "yyyy-MM-dd")
   );
@@ -1066,7 +1091,7 @@ export default function HomePage() {
   ]);
 
   const hasAuthorEvents = hasAuthorCalendarEvents(events);
-  const showGuidedOnboarding = Boolean(
+  const guidedOnboardingEligible = Boolean(
     guidedOnboarding &&
       calendarCreateOnboarding &&
       isMobileCalendarUi !== null &&
@@ -1078,6 +1103,23 @@ export default function HomePage() {
         isAuthenticated: Boolean(session?.user.id),
         remoteReady,
       })
+  );
+  const showGuidedOnboarding = Boolean(
+    guidedOnboardingEligible && isMobileCalendarUi === false
+  );
+  const isMobileOnboardingPending = Boolean(
+    guidedOnboardingEligible && isMobileCalendarUi === true
+  );
+  const isInitialMobileOnboarding =
+    guidedOnboarding?.step === "context_selection";
+  const isMobileExamplePreview = Boolean(
+    isMobileOnboardingPending &&
+      isInitialMobileOnboarding &&
+      mobileExamplePreviewDismissed
+  );
+  const showMobileDesktopFirstGate = Boolean(
+    isMobileOnboardingPending &&
+      (!isInitialMobileOnboarding || !mobileExamplePreviewDismissed)
   );
   const isDemoExploration =
     guidedOnboarding?.step === "demo_exploration" && !session?.user.id;
@@ -1365,6 +1407,7 @@ export default function HomePage() {
   }, [deleteEvent, editingId, notify, recordDemoInteraction]);
 
   const handleStartCreateRange = (startIso: string) => {
+    if (isMobileExamplePreview) return;
     if (
       showGuidedOnboarding &&
       guidedOnboarding?.step !== "date_instruction" &&
@@ -1969,6 +2012,7 @@ export default function HomePage() {
           }
           guidedEditPreviewActive={guidedOnboarding?.step === "edit_preview"}
           onboardingLayoutLocked={showGuidedOnboarding}
+          mobileExamplePreviewActive={isMobileExamplePreview}
           demoExplorationActive={isDemoExploration}
           onCategoryCreated={(categoryId) =>
             recordDemoInteraction(`mutation:category:create:${categoryId}`)
@@ -2058,6 +2102,21 @@ export default function HomePage() {
         />
       ) : null}
 
+      {showMobileDesktopFirstGate ? (
+        <MobileDesktopFirstGate
+          allowExample={isInitialMobileOnboarding}
+          onExploreExample={() => {
+            writeMobileExamplePreviewSession();
+            setMobileExamplePreviewDismissed(true);
+          }}
+          onOpenLogin={() => {
+            setAuthDialogInitialMode("login");
+            setAuthDialogAnchorPoint(undefined);
+            setAuthDialogOpen(true);
+          }}
+        />
+      ) : null}
+
       {isDemoExploration ? (
         <div
           data-demo-mode-badge
@@ -2092,7 +2151,10 @@ export default function HomePage() {
         <OnboardingTestReset onReset={resetGuidedOnboardingForTesting} />
       ) : null}
 
-      {isMobileCalendarUi && !showGuidedOnboarding ? (
+      {isMobileCalendarUi &&
+      !showGuidedOnboarding &&
+      !isMobileExamplePreview &&
+      !showMobileDesktopFirstGate ? (
         <div
           className="fixed right-4 z-40"
           style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 2.75rem)" }}
