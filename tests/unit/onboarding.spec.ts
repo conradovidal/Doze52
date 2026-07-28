@@ -23,6 +23,7 @@ import {
   useStore,
 } from "../../lib/store";
 import { materializeUserOwnedSnapshot } from "../../lib/snapshot-ownership";
+import { expandEventsForYear } from "../../lib/recurrence";
 import {
   BRAZIL_UFS,
   isBrazilUf,
@@ -576,14 +577,11 @@ test("demonstração monta dois contextos e categorias pessoais e profissionais"
   ]);
   expect(snapshot.categories.map((category) => category.name)).toEqual([
     "Eventos",
-    "Relacionamento a dois",
-    "Amigos",
-    "Férias e viagens",
     "Família",
+    "Amigos",
+    "Viagens",
     "Aniversários",
     "Feriados",
-    "Grêmio",
-    "Competições",
     "Corridas F1",
     "Eventos",
     "Agendas importantes",
@@ -595,18 +593,15 @@ test("demonstração monta dois contextos e categorias pessoais e profissionais"
     "#EF8F8F",
     "#4F8FD6",
     "#58B76F",
-    "#F09CCF",
     "#E1D15D",
     "#1F2937",
-    "#4F8FD6",
-    "#EBA16D",
     "#EBA16D",
     "#9CA6B4",
     "#4F8FD6",
     "#B79AEF",
     "#EBA16D",
   ]);
-  expect(snapshot.events.length).toBeGreaterThan(80);
+  expect(snapshot.events.length).toBeGreaterThan(150);
   expect(new Set(snapshot.events.map((event) => event.startDate.slice(5, 7))).size).toBe(12);
   expect(snapshot.events.map((event) => event.title)).toEqual(
     expect.arrayContaining([
@@ -634,7 +629,7 @@ test("demonstração monta dois contextos e categorias pessoais e profissionais"
   ).toBe(true);
   expect(
     snapshot.categories.filter((category) => !category.visible).map((category) => category.name)
-  ).toEqual(["Grêmio", "Corridas F1"]);
+  ).toEqual(["Corridas F1"]);
   expect(
     snapshot.categories.filter(
       (category) => category.profileId === ONBOARDING_PROFILE_IDS.professional
@@ -642,7 +637,78 @@ test("demonstração monta dois contextos e categorias pessoais e profissionais"
   ).toEqual(["Eventos", "Agendas importantes", "Projetos", "Entregas"]);
   expect(
     snapshot.events.filter((event) => event.recurrenceType === "yearly").length
-  ).toBeGreaterThanOrEqual(4);
+  ).toBeGreaterThanOrEqual(10);
+
+  const personalCategories = snapshot.categories.filter(
+    (category) => category.profileId === ONBOARDING_PROFILE_IDS.personal
+  );
+  const personalCategoryIds = new Map(
+    personalCategories.map((category) => [category.name, category.id])
+  );
+  const countCategoryEvents = (name: string) =>
+    snapshot.events.filter(
+      (event) => event.categoryId === personalCategoryIds.get(name)
+    ).length;
+  expect(countCategoryEvents("Eventos")).toBe(12);
+  expect(countCategoryEvents("Família")).toBe(14);
+  expect(countCategoryEvents("Amigos")).toBe(19);
+  expect(countCategoryEvents("Viagens")).toBe(6);
+  expect(countCategoryEvents("Aniversários")).toBe(10);
+  expect(countCategoryEvents("Corridas F1")).toBeGreaterThan(20);
+
+  const visiblePersonalCategoryIds = new Set(
+    personalCategories
+      .filter((category) => category.visible)
+      .map((category) => category.id)
+  );
+  const visiblePersonalEvents = expandEventsForYear(snapshot.events, 2026).filter(
+    (event) => visiblePersonalCategoryIds.has(event.categoryId)
+  );
+  expect(visiblePersonalEvents.length).toBeGreaterThanOrEqual(70);
+  expect(visiblePersonalEvents.length).toBeLessThanOrEqual(85);
+
+  expect(snapshot.events).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        title: "Férias das crianças",
+        startDate: "2026-07-27",
+        endDate: "2026-08-02",
+      }),
+      expect.objectContaining({
+        title: "Férias em família — Maceió",
+        startDate: "2026-07-27",
+        endDate: "2026-08-02",
+      }),
+      expect.objectContaining({
+        title: "Ano Novo em Tiradentes",
+        startDate: "2026-12-27",
+        endDate: "2027-01-03",
+      }),
+      expect.objectContaining({ title: "Revolução Farroupilha" }),
+    ])
+  );
+});
+
+test("reconhece e remove snapshots demonstrativos v1 e v2", () => {
+  for (const groupId of [
+    "onboarding-personal-demo-v1",
+    "onboarding-personal-demo-v2",
+  ]) {
+    const current = getOnboardingPersonalDemoSnapshot(2026);
+    const legacy = {
+      profiles: current.profiles,
+      categories: current.categories.map((category) => ({
+        ...category,
+        calendarPackGroupId: groupId,
+      })),
+      events: current.events.map((event) => ({
+        ...event,
+        calendarPackGroupId: groupId,
+      })),
+    };
+    expect(isOnboardingPersonalDemoSnapshot(legacy)).toBe(true);
+    expect(stripOnboardingPersonalDemo(legacy).events).toEqual([]);
+  }
 });
 
 test("demonstração é removida antes de qualquer importação", () => {

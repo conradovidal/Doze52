@@ -84,8 +84,7 @@ const CONTEXT_OPTIONS = [
   {
     value: "work" as const,
     title: "Profissional",
-    description:
-      "Para acompanhar entregas, compromissos e conquistas do seu trabalho.",
+    description: "Para acompanhar projetos, compromissos e conquistas.",
     icon: BriefcaseBusiness,
   },
 ];

@@ -1811,7 +1811,7 @@ export default function HomePage() {
     if (guidedOnboarding.step === "calendar_instruction") {
       return {
         target: "calendars",
-        title: "Complete seu ano com calendários prontos.",
+        title: "Complemente seu ano com calendários prontos.",
         instruction: "Adicione os feriados do seu estado.",
         stepLabel: "Passo 5 de 7",
       };

@@ -12,7 +12,6 @@ import {
   CATEGORY_COLOR_BASE_INK,
   CATEGORY_COLOR_BASE_LIME,
   CATEGORY_COLOR_BASE_ORANGE,
-  CATEGORY_COLOR_BASE_PINK,
   CATEGORY_COLOR_BASE_RED,
   CATEGORY_COLOR_BASE_VIOLET,
   CATEGORY_COLOR_BASE_YELLOW,
@@ -29,7 +28,6 @@ import type {
   OnboardingCategoryChoice,
   OnboardingContext,
 } from "./onboarding";
-import { brasileirao2026Packs } from "./calendar-packs/brasileirao-2026";
 import { formula12026Pack } from "./calendar-packs/formula-1-2026";
 import { holidays2026Packs } from "./calendar-packs/holidays-2026";
 
@@ -162,9 +160,10 @@ export const ONBOARDING_CATEGORY_IDS = {
 
 export const ONBOARDING_DEFAULT_CATEGORY_ID = ONBOARDING_CATEGORY_IDS.events;
 export const ONBOARDING_PERSONAL_DEMO_GROUP_ID =
-  "onboarding-personal-demo-v2";
+  "onboarding-personal-demo-v3";
 const ONBOARDING_PERSONAL_DEMO_GROUP_IDS = new Set([
   "onboarding-personal-demo-v1",
+  "onboarding-personal-demo-v2",
   ONBOARDING_PERSONAL_DEMO_GROUP_ID,
 ]);
 
@@ -353,12 +352,9 @@ const getFeatureDefaultCategories = (): CategoryItem[] => [
 ];
 
 const DEMO_CATEGORY_IDS = {
-  relationship: "99999999-0001-4000-8000-000000000001",
   friends: "99999999-0001-4000-8000-000000000002",
   family: "99999999-0001-4000-8000-000000000003",
   holidays: "99999999-0001-4000-8000-000000000004",
-  gremio: "99999999-0001-4000-8000-000000000005",
-  competitions: "99999999-0001-4000-8000-000000000006",
   formula1: "99999999-0001-4000-8000-000000000007",
   workEvents: "99999999-0001-4000-8000-000000000008",
 } as const;
@@ -386,9 +382,9 @@ const getPersonalDemoCategories = (): CategoryItem[] => [
     CATEGORY_COLOR_BASE_GRAPHITE
   ),
   demoCategory(
-    DEMO_CATEGORY_IDS.relationship,
+    DEMO_CATEGORY_IDS.family,
     ONBOARDING_PROFILE_IDS.personal,
-    "Relacionamento a dois",
+    "Família",
     CATEGORY_COLOR_BASE_RED
   ),
   demoCategory(
@@ -400,14 +396,8 @@ const getPersonalDemoCategories = (): CategoryItem[] => [
   demoCategory(
     ONBOARDING_CATEGORY_IDS.travel,
     ONBOARDING_PROFILE_IDS.personal,
-    "Férias e viagens",
+    "Viagens",
     CATEGORY_COLOR_BASE_GREEN
-  ),
-  demoCategory(
-    DEMO_CATEGORY_IDS.family,
-    ONBOARDING_PROFILE_IDS.personal,
-    "Família",
-    CATEGORY_COLOR_BASE_PINK
   ),
   demoCategory(
     ONBOARDING_CATEGORY_IDS.birthday,
@@ -420,19 +410,6 @@ const getPersonalDemoCategories = (): CategoryItem[] => [
     ONBOARDING_PROFILE_IDS.personal,
     "Feriados",
     CATEGORY_COLOR_BASE_INK
-  ),
-  demoCategory(
-    DEMO_CATEGORY_IDS.gremio,
-    ONBOARDING_PROFILE_IDS.personal,
-    "Grêmio",
-    CATEGORY_COLOR_BASE_BLUE,
-    false
-  ),
-  demoCategory(
-    DEMO_CATEGORY_IDS.competitions,
-    ONBOARDING_PROFILE_IDS.personal,
-    "Competições",
-    CATEGORY_COLOR_BASE_ORANGE
   ),
   demoCategory(
     DEMO_CATEGORY_IDS.formula1,
@@ -497,30 +474,16 @@ const getPersonalDemoEvents = (year: number): CalendarEvent[] => {
   const [carnivalStart, carnivalEnd] = getCarnivalRange(year);
   const eventInputs: PersonalDemoEventInput[] = [
     {
-      key: "friends-summer-lunch",
-      title: "Almoço de verão com os amigos",
-      categoryId: DEMO_CATEGORY_IDS.friends,
-      startDate: toDemoIsoDate(year, 1, 31),
+      key: "summer-festival",
+      title: "Festival de verão",
+      categoryId: ONBOARDING_CATEGORY_IDS.events,
+      startDate: toDemoIsoDate(year, 1, 17),
     },
     {
-      key: "school-return",
-      title: "Volta às aulas",
-      categoryId: DEMO_CATEGORY_IDS.family,
-      startDate: toDemoIsoDate(year, 2, 2),
-    },
-    {
-      key: "mother-birthday",
-      title: "Aniversário da mãe",
-      categoryId: ONBOARDING_CATEGORY_IDS.birthday,
-      startDate: toDemoIsoDate(year, 2, 8),
-      recurrenceType: "yearly",
-    },
-    {
-      key: "carnival-paraty",
-      title: "Carnaval em Paraty",
-      categoryId: ONBOARDING_CATEGORY_IDS.travel,
-      startDate: carnivalStart,
-      endDate: carnivalEnd,
+      key: "food-fair",
+      title: "Feira gastronômica",
+      categoryId: ONBOARDING_CATEGORY_IDS.events,
+      startDate: toDemoIsoDate(year, 2, 7),
     },
     {
       key: "music-festival",
@@ -530,42 +493,95 @@ const getPersonalDemoEvents = (year: number): CalendarEvent[] => {
       endDate: toDemoIsoDate(year, 3, 15),
     },
     {
-      key: "beach-tennis",
-      title: "Torneio de beach tennis",
-      categoryId: DEMO_CATEGORY_IDS.competitions,
-      startDate: toDemoIsoDate(year, 4, 11),
+      key: "theater-play",
+      title: "Peça de teatro",
+      categoryId: ONBOARDING_CATEGORY_IDS.events,
+      startDate: toDemoIsoDate(year, 4, 25),
     },
     {
-      key: "couple-weekend",
-      title: "Fim de semana a dois",
-      categoryId: DEMO_CATEGORY_IDS.relationship,
-      startDate: toDemoIsoDate(year, 4, 17),
-      endDate: toDemoIsoDate(year, 4, 19),
+      key: "araujo-vianna-concert",
+      title: "Show no Araújo Vianna",
+      categoryId: ONBOARDING_CATEGORY_IDS.events,
+      startDate: toDemoIsoDate(year, 5, 16),
     },
     {
-      key: "lia-birthday",
-      title: "Aniversário da Lia",
-      categoryId: ONBOARDING_CATEGORY_IDS.birthday,
-      startDate: toDemoIsoDate(year, 4, 21),
-      recurrenceType: "yearly",
+      key: "neighborhood-party",
+      title: "Festa do bairro",
+      categoryId: ONBOARDING_CATEGORY_IDS.events,
+      startDate: toDemoIsoDate(year, 6, 20),
+    },
+    {
+      key: "winter-festival",
+      title: "Festival de inverno",
+      categoryId: ONBOARDING_CATEGORY_IDS.events,
+      startDate: toDemoIsoDate(year, 7, 11),
+    },
+    {
+      key: "film-showcase",
+      title: "Mostra de cinema",
+      categoryId: ONBOARDING_CATEGORY_IDS.events,
+      startDate: toDemoIsoDate(year, 8, 15),
+    },
+    {
+      key: "design-fair",
+      title: "Feira de design",
+      categoryId: ONBOARDING_CATEGORY_IDS.events,
+      startDate: toDemoIsoDate(year, 9, 5),
+    },
+    {
+      key: "book-fair",
+      title: "Feira do Livro",
+      categoryId: ONBOARDING_CATEGORY_IDS.events,
+      startDate: toDemoIsoDate(year, 10, 30),
+      endDate: toDemoIsoDate(year, 11, 15),
+    },
+    {
+      key: "year-end-concert",
+      title: "Show de fim de ano",
+      categoryId: ONBOARDING_CATEGORY_IDS.events,
+      startDate: toDemoIsoDate(year, 11, 21),
+    },
+    {
+      key: "christmas-concert",
+      title: "Concerto de Natal",
+      categoryId: ONBOARDING_CATEGORY_IDS.events,
+      startDate: toDemoIsoDate(year, 12, 12),
+    },
+    {
+      key: "family-lunch-parents",
+      title: "Almoço com os pais",
+      categoryId: DEMO_CATEGORY_IDS.family,
+      startDate: toDemoIsoDate(year, 1, 25),
+    },
+    {
+      key: "school-year-start",
+      title: "Volta às aulas",
+      categoryId: DEMO_CATEGORY_IDS.family,
+      startDate: toDemoIsoDate(year, 2, 18),
+    },
+    {
+      key: "family-march-lunch",
+      title: "Almoço em família",
+      categoryId: DEMO_CATEGORY_IDS.family,
+      startDate: toDemoIsoDate(year, 3, 8),
+    },
+    {
+      key: "family-easter",
+      title: "Páscoa em família",
+      categoryId: DEMO_CATEGORY_IDS.family,
+      startDate: toDemoIsoDate(year, 4, 5),
+    },
+    {
+      key: "mothers-day",
+      title: "Dia das Mães",
+      categoryId: DEMO_CATEGORY_IDS.family,
+      startDate: toDemoIsoDate(year, 5, 10),
     },
     {
       key: "wedding-anniversary",
-      title: "Nosso aniversário de casamento",
-      categoryId: DEMO_CATEGORY_IDS.relationship,
+      title: "Aniversário de casamento",
+      categoryId: DEMO_CATEGORY_IDS.family,
       startDate: toDemoIsoDate(year, 5, 23),
-    },
-    {
-      key: "friends-wedding",
-      title: "Casamento da Ana e do Lucas",
-      categoryId: DEMO_CATEGORY_IDS.friends,
-      startDate: toDemoIsoDate(year, 6, 13),
-    },
-    {
-      key: "cycling-challenge",
-      title: "Desafio de ciclismo",
-      categoryId: DEMO_CATEGORY_IDS.competitions,
-      startDate: toDemoIsoDate(year, 6, 7),
     },
     {
       key: "school-june-party",
@@ -574,44 +590,41 @@ const getPersonalDemoEvents = (year: number): CalendarEvent[] => {
       startDate: toDemoIsoDate(year, 6, 27),
     },
     {
-      key: "kids-holidays",
+      key: "kids-winter-break",
       title: "Férias das crianças",
       categoryId: DEMO_CATEGORY_IDS.family,
-      startDate: toDemoIsoDate(year, 7, 1),
-      endDate: toDemoIsoDate(year, 7, 31),
+      startDate: toDemoIsoDate(year, 7, 27),
+      endDate: toDemoIsoDate(year, 8, 2),
     },
     {
-      key: "mountain-holidays",
-      title: "Férias na Serra",
-      categoryId: ONBOARDING_CATEGORY_IDS.travel,
-      startDate: toDemoIsoDate(year, 7, 11),
-      endDate: toDemoIsoDate(year, 7, 19),
+      key: "school-second-semester",
+      title: "Volta às aulas",
+      categoryId: DEMO_CATEGORY_IDS.family,
+      startDate: toDemoIsoDate(year, 8, 3),
     },
     {
-      key: "ten-k-run",
-      title: "Corrida de 10 km",
-      categoryId: DEMO_CATEGORY_IDS.competitions,
-      startDate: toDemoIsoDate(year, 8, 23),
+      key: "grandparents-sunday",
+      title: "Domingo com os avós",
+      categoryId: DEMO_CATEGORY_IDS.family,
+      startDate: toDemoIsoDate(year, 9, 27),
     },
     {
-      key: "bruno-birthday",
-      title: "Aniversário do Bruno",
-      categoryId: ONBOARDING_CATEGORY_IDS.birthday,
-      startDate: toDemoIsoDate(year, 9, 12),
-      recurrenceType: "yearly",
+      key: "childrens-day",
+      title: "Dia das Crianças",
+      categoryId: DEMO_CATEGORY_IDS.family,
+      startDate: toDemoIsoDate(year, 10, 12),
     },
     {
-      key: "friends-reunion",
-      title: "Reencontro da turma",
-      categoryId: DEMO_CATEGORY_IDS.friends,
-      startDate: toDemoIsoDate(year, 10, 10),
+      key: "school-showcase",
+      title: "Apresentação da escola",
+      categoryId: DEMO_CATEGORY_IDS.family,
+      startDate: toDemoIsoDate(year, 11, 28),
     },
     {
-      key: "marina-birthday",
-      title: "Meu aniversário",
-      categoryId: ONBOARDING_CATEGORY_IDS.birthday,
-      startDate: toDemoIsoDate(year, 11, 6),
-      recurrenceType: "yearly",
+      key: "school-year-end",
+      title: "Encerramento das aulas",
+      categoryId: DEMO_CATEGORY_IDS.family,
+      startDate: toDemoIsoDate(year, 12, 18),
     },
     {
       key: "family-christmas",
@@ -620,13 +633,92 @@ const getPersonalDemoEvents = (year: number): CalendarEvent[] => {
       startDate: toDemoIsoDate(year, 12, 24),
       endDate: toDemoIsoDate(year, 12, 26),
     },
+    ...[
+      [1, 10, "Jantar da turma"],
+      [1, 31, "Almoço de verão com os amigos"],
+      [2, 7, "Churrasco no parque"],
+      [2, 27, "Cinema com os amigos"],
+      [3, 6, "Happy hour"],
+      [3, 21, "Noite de jogos"],
+      [4, 11, "Brunch de sábado"],
+      [4, 25, "Encontro da faculdade"],
+      [5, 9, "Jantar em casa"],
+      [5, 30, "Bar com a turma"],
+      [6, 13, "Casamento da Ana e do Lucas"],
+      [6, 26, "Arraiá dos amigos"],
+      [7, 4, "Café com a Júlia"],
+      [7, 18, "Piquenique no parque"],
+      [8, 22, "Noite de fondue"],
+      [9, 19, "Churrasco de primavera"],
+      [10, 10, "Reencontro da turma"],
+      [11, 7, "Cinema e jantar"],
+      [12, 19, "Amigo secreto"],
+    ].map(([month, day, title], index) => ({
+      key: `friends-${index + 1}`,
+      title: String(title),
+      categoryId: DEMO_CATEGORY_IDS.friends,
+      startDate: toDemoIsoDate(year, Number(month), Number(day)),
+    })),
     {
-      key: "new-year-beach",
-      title: "Ano-novo em Ilhabela",
+      key: "carnival-paraty",
+      title: "Carnaval em Paraty",
+      categoryId: ONBOARDING_CATEGORY_IDS.travel,
+      startDate: carnivalStart,
+      endDate: carnivalEnd,
+    },
+    {
+      key: "bento-goncalves-weekend",
+      title: "Fim de semana em Bento Gonçalves",
+      categoryId: ONBOARDING_CATEGORY_IDS.travel,
+      startDate: toDemoIsoDate(year, 4, 18),
+      endDate: toDemoIsoDate(year, 4, 21),
+    },
+    {
+      key: "gramado-weekend",
+      title: "Fim de semana em Gramado",
+      categoryId: ONBOARDING_CATEGORY_IDS.travel,
+      startDate: toDemoIsoDate(year, 5, 29),
+      endDate: toDemoIsoDate(year, 5, 31),
+    },
+    {
+      key: "maceio-family-holidays",
+      title: "Férias em família — Maceió",
+      categoryId: ONBOARDING_CATEGORY_IDS.travel,
+      startDate: toDemoIsoDate(year, 7, 27),
+      endDate: toDemoIsoDate(year, 8, 2),
+    },
+    {
+      key: "florianopolis-holiday",
+      title: "Feriado em Florianópolis",
+      categoryId: ONBOARDING_CATEGORY_IDS.travel,
+      startDate: toDemoIsoDate(year, 9, 5),
+      endDate: toDemoIsoDate(year, 9, 7),
+    },
+    {
+      key: "new-year-tiradentes",
+      title: "Ano Novo em Tiradentes",
       categoryId: ONBOARDING_CATEGORY_IDS.travel,
       startDate: toDemoIsoDate(year, 12, 27),
-      endDate: toDemoIsoDate(year, 12, 31),
+      endDate: toDemoIsoDate(year + 1, 1, 3),
     },
+    ...[
+      [2, 8, "Aniversário da mãe"],
+      [3, 3, "Aniversário da Carla"],
+      [4, 21, "Aniversário da Lia"],
+      [5, 16, "Aniversário do pai"],
+      [6, 22, "Aniversário do Pedro"],
+      [7, 12, "Aniversário da Ana"],
+      [8, 29, "Aniversário do Lucas"],
+      [9, 12, "Aniversário do Bruno"],
+      [11, 6, "Aniversário da Marina"],
+      [12, 2, "Aniversário da Renata"],
+    ].map(([month, day, title], index) => ({
+      key: `birthday-${index + 1}`,
+      title: String(title),
+      categoryId: ONBOARDING_CATEGORY_IDS.birthday,
+      startDate: toDemoIsoDate(year, Number(month), Number(day)),
+      recurrenceType: "yearly" as const,
+    })),
     {
       key: "strategy-planning",
       title: "Planejamento estratégico",
@@ -726,16 +818,6 @@ const getPersonalDemoEvents = (year: number): CalendarEvent[] => {
         recurrenceType: "yearly" as const,
       }));
 
-  const gremioPack = brasileirao2026Packs.find(
-    (pack) => pack.eyebrow === "Grêmio" && pack.year === year
-  );
-  const gremioEvents: PersonalDemoEventInput[] =
-    gremioPack?.events.map((event) => ({
-      key: `gremio-${event.id}`,
-      title: event.title,
-      categoryId: DEMO_CATEGORY_IDS.gremio,
-      startDate: event.date,
-    })) ?? [];
   const formulaEvents: PersonalDemoEventInput[] =
     formula12026Pack.year === year
       ? formula12026Pack.events.map((event) => ({
@@ -748,7 +830,6 @@ const getPersonalDemoEvents = (year: number): CalendarEvent[] => {
   const allEventInputs = [
     ...eventInputs,
     ...holidayEvents,
-    ...gremioEvents,
     ...formulaEvents,
   ];
   const categoryColorById = new Map(
@@ -790,7 +871,9 @@ export const getOnboardingPersonalDemoSnapshot = (
 export const isOnboardingPersonalDemoSnapshot = (
   snapshot: OnboardingPersonalDemoSnapshot
 ) =>
-  (snapshot.categories.length === 6 || snapshot.categories.length === 14) &&
+  (snapshot.categories.length === 6 ||
+    snapshot.categories.length === 11 ||
+    snapshot.categories.length === 14) &&
   snapshot.events.length > 0 &&
   snapshot.categories.every((category) =>
     isOnboardingPersonalDemoGroup(category.calendarPackGroupId)

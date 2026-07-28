@@ -227,6 +227,23 @@ const completePersonalOnboarding = async (
   await expect(toolbarNotice).toContainText(
     "Veja como editar contextos e categorias"
   );
+  await expect(toolbarNotice.locator("p").nth(1)).not.toHaveCSS(
+    "text-wrap-style",
+    "balance"
+  );
+  const editNoticeBox = await toolbarNotice.boundingBox();
+  const viewport = page.viewportSize();
+  if (!editNoticeBox || !viewport) {
+    throw new Error("Coachmark de edição não renderizado");
+  }
+  expect(editNoticeBox.width).toBeLessThanOrEqual(352.5);
+  expect(editNoticeBox.x).toBeGreaterThanOrEqual(-0.5);
+  expect(editNoticeBox.x + editNoticeBox.width).toBeLessThanOrEqual(
+    viewport.width + 0.5
+  );
+  await expect(
+    toolbarNotice.getByRole("button", { name: "Encerrar guia inicial" })
+  ).toHaveCSS("position", "absolute");
   await page.locator("[data-onboarding-edit-control]").click();
   await expect(toolbarNotice).toContainText("Este é o modo de edição");
   const filterRegion = page.locator("[data-onboarding-filter-region]");
@@ -247,6 +264,12 @@ const completePersonalOnboarding = async (
   await expect(toolbarNotice).toHaveAttribute(
     "data-guided-toolbar-target",
     "calendars"
+  );
+  await expect(toolbarNotice).toContainText(
+    "Complemente seu ano com calendários prontos."
+  );
+  await expect(toolbarNotice).toContainText(
+    "Adicione os feriados do seu estado."
   );
   await page.locator("[data-onboarding-calendar-control]").click();
   const calendarDialog = page.getByRole("dialog", {
@@ -347,7 +370,7 @@ test("monta contexto Pessoal de forma incremental", async ({ page }, testInfo) =
   );
   await expect(panel.getByRole("button", { name: /Outro/ })).toHaveCount(0);
   await expect(page.locator("[data-onboarding-profile-id]")).toHaveCount(2);
-  await expect(page.locator("[data-onboarding-category-id]")).toHaveCount(10);
+  await expect(page.locator("[data-onboarding-category-id]")).toHaveCount(7);
   await expect(page.locator("[data-onboarding-connector]")).toHaveCount(0);
   await expect(panel).toContainText(
     "Escolha onde começar a dar visibilidade ao que importa para você."
@@ -478,8 +501,8 @@ test("o X libera o ano de exemplo e a decisão persiste após recarregar", async
     "Pessoal",
     "Profissional",
   ]);
-  expect(stored.categories).toHaveLength(14);
-  expect(stored.events?.length).toBeGreaterThan(80);
+  expect(stored.categories).toHaveLength(11);
+  expect(stored.events?.length).toBeGreaterThan(150);
   await expect(page.locator("[data-demo-mode-badge]")).toContainText(
     "Ano de exemplo"
   );
@@ -488,6 +511,56 @@ test("o X libera o ano de exemplo e a decisão persiste após recarregar", async
   await expect(panel).toBeHidden();
   await expect(page.locator("[data-guided-calendar-notice]")).toHaveCount(0);
   await expect(page.locator("[data-demo-mode-badge]")).toBeVisible();
+});
+
+test("substitui automaticamente um exemplo v2 ainda bloqueado", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name === "mobile-chromium",
+    "Compatibilidade do armazenamento coberta no desktop"
+  );
+  await page.goto("/?mobileUi=0");
+  await expect(
+    page.locator('[data-onboarding-category-id][title="Viagens"]')
+  ).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const payload = JSON.parse(
+          window.localStorage.getItem("yiv-store") ?? "{}"
+        );
+        return Boolean(payload.state?.categories?.length);
+      })
+    )
+    .toBe(true);
+  await page.evaluate(() => {
+    const payload = JSON.parse(window.localStorage.getItem("yiv-store") ?? "{}");
+    payload.state.categories = (payload.state.categories ?? []).map(
+      (category: Record<string, unknown>) => ({
+        ...category,
+        calendarPackGroupId: "onboarding-personal-demo-v2",
+      })
+    );
+    payload.state.events = (payload.state.events ?? []).map(
+      (event: Record<string, unknown>) => ({
+        ...event,
+        calendarPackGroupId: "onboarding-personal-demo-v2",
+      })
+    );
+    window.localStorage.setItem("yiv-store", JSON.stringify(payload));
+  });
+
+  await page.reload();
+  await expect(page.locator('[data-onboarding-category-id][title="Viagens"]')).toBeVisible();
+  const groupIds = await page.evaluate(() => {
+    const payload = JSON.parse(window.localStorage.getItem("yiv-store") ?? "{}");
+    return [
+      ...(payload.state.categories ?? []),
+      ...(payload.state.events ?? []),
+    ].map((item: { calendarPackGroupId?: string }) => item.calendarPackGroupId);
+  });
+  expect(new Set(groupIds)).toEqual(new Set(["onboarding-personal-demo-v3"]));
 });
 
 test("sandbox convida após cinco alvos e retoma o onboarding limpo", async ({
@@ -499,9 +572,9 @@ test("sandbox convida após cinco alvos e retoma o onboarding limpo", async ({
     .getByRole("button", { name: "Encerrar guia inicial" })
     .click();
 
-  await page.locator('[data-onboarding-category-id][title="Relacionamento a dois"]').click();
+  await page.locator('[data-onboarding-category-id][title="Família"]').click();
   await page.locator('[data-onboarding-category-id][title="Amigos"]').click();
-  await page.locator('[data-onboarding-category-id][title="Grêmio"]').click();
+  await page.locator('[data-onboarding-category-id][title="Viagens"]').click();
   await page.locator('[data-onboarding-profile-id][title="Profissional"]').click();
   await page.locator('[data-onboarding-category-id][title="Eventos"]').click();
 
@@ -521,7 +594,7 @@ test("sandbox convida após cinco alvos e retoma o onboarding limpo", async ({
     page.getByRole("region", { name: "Guia inicial do Doze 52" })
   ).toHaveAttribute("data-guided-onboarding-step", "context_selection");
   await expect(page.locator("[data-onboarding-profile-id]")).toHaveCount(2);
-  await expect(page.locator("[data-onboarding-category-id]")).toHaveCount(10);
+  await expect(page.locator("[data-onboarding-category-id]")).toHaveCount(7);
 });
 
 test("controle temporário reinicia dados locais e restaura a demonstração", async ({
@@ -546,7 +619,7 @@ test("controle temporário reinicia dados locais e restaura a demonstração", a
     "context_selection"
   );
   await expect(page.locator("[data-onboarding-profile-id]")).toHaveCount(2);
-  await expect(page.locator("[data-onboarding-category-id]")).toHaveCount(10);
+  await expect(page.locator("[data-onboarding-category-id]")).toHaveCount(7);
 });
 
 test("centraliza cards e sobrepõe a instrução ao cabeçalho sem mover o calendário", async ({
@@ -721,6 +794,9 @@ test("Profissional permite categorias específica e genérica", async ({
   const panel = page.getByRole("region", {
     name: "Guia inicial do Doze 52",
   });
+  await expect(panel).toContainText(
+    "Para acompanhar projetos, compromissos e conquistas."
+  );
   await panel.getByRole("button", { name: /Profissional/ }).click();
   await expect(panel).toContainText("O que você quer tornar visível primeiro?");
   await expect(panel).toContainText(
