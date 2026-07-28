@@ -9,7 +9,6 @@ import {
   Gift,
   Layers3,
   Plane,
-  Plus,
   UserRound,
   X,
 } from "lucide-react";
@@ -66,7 +65,6 @@ type GuidedOnboardingPanelProps = {
   draft: GuidedCalendarDraft | null;
   onClose: () => void;
   onConfigureContext: (context: OnboardingContext) => void;
-  onContinueFromProfile: () => void;
   onChooseCategory: (
     intent: "date" | "period",
     choice: OnboardingCategoryChoice,
@@ -74,20 +72,21 @@ type GuidedOnboardingPanelProps = {
   ) => void;
   onChangeDraft: (draft: GuidedCalendarDraft) => void;
   onSaveDraft: (title: string) => void;
-  onComplete: (next: "explore" | "category") => void;
 };
 
 const CONTEXT_OPTIONS = [
   {
     value: "personal" as const,
     title: "Pessoal",
-    description: "Família, viagens e momentos que fazem o ano ser seu.",
+    description:
+      "Relações, saúde, viagens e projetos que fazem parte da sua vida.",
     icon: UserRound,
   },
   {
     value: "work" as const,
     title: "Profissional",
-    description: "Projetos, entregas e conquistas que movem o seu trabalho.",
+    description:
+      "Entregas, compromissos e conquistas que movimentam o seu trabalho.",
     icon: BriefcaseBusiness,
   },
 ];
@@ -115,7 +114,7 @@ const getDateCopy = (
   if (itemCount === 0) {
     if (isBirthday) {
       return {
-        title: "Adicione um aniversário importante.",
+        title: "Adicione o aniversário de alguém importante.",
         description: "Escolha o dia no calendário.",
         prompt: "De quem é esse aniversário?",
         placeholder: "Ex.: Aniversário da mãe",
@@ -142,7 +141,7 @@ const getDateCopy = (
 
   if (isBirthday) {
     return {
-      title: "Agora adicione outro aniversário importante.",
+      title: "Agora adicione o aniversário de outra pessoa importante.",
       description: "Escolha outro dia no calendário.",
       prompt: "De quem é esse aniversário?",
       placeholder: "Ex.: Aniversário do pai",
@@ -247,8 +246,8 @@ export const getGuidedSelectionNotice = ({
       mode: "date",
       title: isBirthday
         ? firstItem
-          ? "Adicione um aniversário importante."
-          : "Agora adicione outro aniversário importante."
+          ? "Adicione o aniversário de alguém importante."
+          : "Agora adicione o aniversário de outra pessoa importante."
         : firstItem
           ? "Adicione uma data importante."
           : "Agora adicione outra data importante.",
@@ -284,11 +283,9 @@ export function GuidedOnboardingPanel({
   draft,
   onClose,
   onConfigureContext,
-  onContinueFromProfile,
   onChooseCategory,
   onChangeDraft,
   onSaveDraft,
-  onComplete,
 }: GuidedOnboardingPanelProps) {
   const [title, setTitle] = React.useState("");
   const [showExternalDates, setShowExternalDates] = React.useState(false);
@@ -313,17 +310,11 @@ export function GuidedOnboardingPanel({
   const progressStep =
     state.step === "context_selection"
       ? 1
-      : state.step === "profile_reveal"
+      : state.step.startsWith("date")
         ? 2
-        : state.step.startsWith("date")
+        : state.step.startsWith("period")
           ? 3
-          : state.step.startsWith("period")
-            ? 4
-            : state.step === "theme_instruction"
-              ? 5
-              : state.step === "completion_choice"
-                ? 7
-                : 6;
+          : 4;
 
   React.useEffect(() => {
     setTitle("");
@@ -487,12 +478,12 @@ export function GuidedOnboardingPanel({
       return (
         <>
           <h2 className="mt-4 text-xl font-semibold tracking-[-0.025em]">
-            Por onde o seu ano começa?
+            Qual contexto merece mais a sua atenção agora?
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            O ano da Marina está ao fundo só para mostrar o que ganha forma
-            quando tudo importante ocupa o mesmo lugar. Escolha seu primeiro
-            contexto para começar o seu.
+            Ao fundo está o ano de alguém com prioridades próprias, como você.
+            Escolha onde quer começar e vamos dar visibilidade ao que importa
+            no seu.
           </p>
           <div className="mt-4 grid gap-2">
             {CONTEXT_OPTIONS.map((option) => {
@@ -523,37 +514,15 @@ export function GuidedOnboardingPanel({
       );
     }
 
-    if (state.step === "profile_reveal") {
-      return (
-        <>
-          <h2 className="mt-4 text-lg font-semibold tracking-[-0.02em]">
-            Pronto. Agora este ano é seu.
-          </h2>
-          <p className="mt-1 text-sm leading-5 text-muted-foreground">
-            Seu primeiro contexto já está no lugar. Vamos dar uma primeira cor
-            ao que importa?
-          </p>
-          <Button
-            type="button"
-            variant="premium"
-            className="mt-4 w-full"
-            onClick={onContinueFromProfile}
-          >
-            Escolher primeira categoria
-          </Button>
-        </>
-      );
-    }
-
     if (state.step === "date_category_selection") {
       return (
         <>
           <h2 className="mt-4 text-lg font-semibold tracking-[-0.02em]">
-            O que vai dar vida ao seu ano primeiro?
+            Como vamos começar a dar vida ao seu ano?
           </h2>
           <p className="mt-1 text-sm leading-5 text-muted-foreground">
-            Comece pelo aniversário de alguém querido ou por uma data
-            importante.
+            Seu contexto está pronto. Comece pelo aniversário de alguém querido
+            ou por uma data importante.
           </p>
           {renderCategoryChoices("date")}
         </>
@@ -564,11 +533,11 @@ export function GuidedOnboardingPanel({
       return (
         <>
           <h2 className="mt-4 text-lg font-semibold tracking-[-0.02em]">
-            Dê visibilidade ao que dura mais de um dia.
+            Traga visibilidade aos períodos importantes do seu ano.
           </h2>
           <p className="mt-1 text-sm leading-5 text-muted-foreground">
-            Férias, viagens e outros períodos também contam a história do seu
-            ano.
+            Férias, viagens e outros períodos também ajudam a contar a história
+            do seu ano.
           </p>
           {renderCategoryChoices("period")}
         </>
@@ -664,36 +633,6 @@ export function GuidedOnboardingPanel({
             <Check /> Salvar
           </Button>
         </form>
-      );
-    }
-
-    if (state.step === "completion_choice") {
-      return (
-        <>
-          <h2 className="mt-4 text-lg font-semibold tracking-[-0.02em]">
-            Agora o seu ano começa a contar uma história.
-          </h2>
-          <p className="mt-1 text-sm leading-5 text-muted-foreground">
-            Datas e períodos ganharam cor, espaço e significado. Daqui em
-            diante, cada escolha deixa essa visão mais sua.
-          </p>
-          <div className="mt-4 grid gap-2">
-            <Button
-              type="button"
-              variant="premium"
-              onClick={() => onComplete("category")}
-            >
-              <Plus /> Criar outra categoria
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onComplete("explore")}
-            >
-              Explorar meu ano
-            </Button>
-          </div>
-        </>
       );
     }
 

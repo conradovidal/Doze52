@@ -47,8 +47,11 @@ type AppHeaderProps = {
   guidedSelectionNotice?: GuidedSelectionNotice | null;
   guidedToolbarNotice?: GuidedToolbarNotice | null;
   onDismissGuidedSelection?: () => void;
-  onGuidedEditModeChange?: (active: boolean) => void;
-  onGuidedThemeConfirm?: () => void;
+  onGuidedToolbarAction?: (target: GuidedToolbarNotice["target"]) => void;
+  onGuidedCalendarOpen?: () => void;
+  onGuidedCalendarClose?: () => void;
+  onGuidedCalendarImported?: (uf?: string) => void;
+  guidedCalendarSelectionActive?: boolean;
   onboardingLayoutLocked?: boolean;
   categoryCreateRequestKey?: number;
   onCategoryCreated?: (categoryId: string) => void;
@@ -71,8 +74,11 @@ export function AppHeader({
   guidedSelectionNotice = null,
   guidedToolbarNotice = null,
   onDismissGuidedSelection,
-  onGuidedEditModeChange,
-  onGuidedThemeConfirm,
+  onGuidedToolbarAction,
+  onGuidedCalendarOpen,
+  onGuidedCalendarClose,
+  onGuidedCalendarImported,
+  guidedCalendarSelectionActive = false,
   onboardingLayoutLocked = false,
   categoryCreateRequestKey = 0,
   onCategoryCreated,
@@ -120,8 +126,10 @@ export function AppHeader({
   const effectiveCategoriesExpanded =
     categoriesExpanded || isInlineEditMode;
   const filtersLocked = onboardingLayoutLocked && !isInlineEditMode;
-  const inlineEditDisabled =
-    onboardingLayoutLocked && guidedToolbarNotice?.target !== "edit";
+  const inlineEditDisabled = onboardingLayoutLocked;
+  const calendarLauncherDisabled =
+    onboardingLayoutLocked && !guidedCalendarSelectionActive;
+  const yearSelectDisabled = onboardingLayoutLocked;
   const themeToggleDisabled =
     onboardingLayoutLocked && guidedToolbarNotice?.target !== "theme";
   const isMobileMode = isMobileCalendarUi === true;
@@ -235,10 +243,8 @@ export function AppHeader({
       );
     }
     setIsInlineEditMode(next);
-    onGuidedEditModeChange?.(next);
   }, [
     isInlineEditMode,
-    onGuidedEditModeChange,
     profiles,
     selectedProfileIds,
   ]);
@@ -353,26 +359,86 @@ export function AppHeader({
                   <GuidedToolbarNoticeCard
                     notice={guidedToolbarNotice}
                     onClose={onDismissGuidedSelection}
+                    onAction={() => onGuidedToolbarAction?.("edit")}
                   />
                 ) : null}
               </div>
 
-              <CalendarPackLauncher
-                onFocusYear={onCalendarPackFocusYear}
-                className="shrink-0"
-                onRequireAuth={() => onOpenAuthDialog()}
-              />
+              <div
+                data-onboarding-spotlight-target={
+                  guidedToolbarNotice?.target === "calendars" ? "true" : undefined
+                }
+                className="relative shrink-0"
+              >
+                <CalendarPackLauncher
+                  onFocusYear={onCalendarPackFocusYear}
+                  className="shrink-0"
+                  onRequireAuth={() => onOpenAuthDialog()}
+                  disabled={calendarLauncherDisabled}
+                  highlighted={guidedToolbarNotice?.target === "calendars"}
+                  guidedVariantGroupId={
+                    guidedCalendarSelectionActive
+                      ? "holidays-by-state"
+                      : undefined
+                  }
+                  requireExplicitVariant={
+                    guidedCalendarSelectionActive
+                  }
+                  onOpen={onGuidedCalendarOpen}
+                  onClose={onGuidedCalendarClose}
+                  onImported={(pack) =>
+                    onGuidedCalendarImported?.(pack.regionCode)
+                  }
+                />
+                {guidedToolbarNotice?.target === "calendars" &&
+                onDismissGuidedSelection ? (
+                  <GuidedToolbarNoticeCard
+                    notice={guidedToolbarNotice}
+                    onClose={onDismissGuidedSelection}
+                  />
+                ) : null}
+              </div>
 
-              <Select value={String(year)} onValueChange={(v) => onYearChange(Number(v))}>
-                <SelectTrigger className={yearSelectClass}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="2025">2025</SelectItem>
-                  <SelectItem value="2026">2026</SelectItem>
-                  <SelectItem value="2027">2027</SelectItem>
-                </SelectContent>
-              </Select>
+              <div
+                data-onboarding-spotlight-target={
+                  guidedToolbarNotice?.target === "year" ? "true" : undefined
+                }
+                className="relative shrink-0"
+              >
+                <Select
+                  value={String(year)}
+                  disabled={yearSelectDisabled}
+                  onValueChange={(v) => onYearChange(Number(v))}
+                >
+                  <SelectTrigger
+                    data-onboarding-year-control
+                    data-onboarding-highlighted={
+                      guidedToolbarNotice?.target === "year" ? "true" : undefined
+                    }
+                    className={cn(
+                      yearSelectClass,
+                      guidedToolbarNotice?.target === "year" &&
+                        "product-spotlight-target"
+                    )}
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={String(year - 1)}>{year - 1}</SelectItem>
+                    <SelectItem value={String(year)}>{year}</SelectItem>
+                    <SelectItem value={String(year + 1)}>{year + 1}</SelectItem>
+                  </SelectContent>
+                </Select>
+                {guidedToolbarNotice?.target === "year" &&
+                onDismissGuidedSelection ? (
+                  <GuidedToolbarNoticeCard
+                    notice={guidedToolbarNotice}
+                    onClose={onDismissGuidedSelection}
+                    onAction={() => onGuidedToolbarAction?.("year")}
+                    align="end"
+                  />
+                ) : null}
+              </div>
 
               <div
                 data-onboarding-spotlight-target={
@@ -391,7 +457,7 @@ export function AppHeader({
                     onClose={onDismissGuidedSelection}
                     onAction={
                       guidedToolbarNotice.actionLabel
-                        ? onGuidedThemeConfirm
+                        ? () => onGuidedToolbarAction?.("theme")
                         : undefined
                     }
                     align="end"
@@ -407,6 +473,7 @@ export function AppHeader({
                     data-onboarding-auth-entry
                     size="sm"
                     variant="outline"
+                    disabled={onboardingLayoutLocked}
                     className={utilityButtonClass}
                     onClick={(event) => {
                       const rect = event.currentTarget.getBoundingClientRect();

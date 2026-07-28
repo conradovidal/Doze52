@@ -1,6 +1,6 @@
 "use client";
 
-import { Cloud, X } from "lucide-react";
+import { CalendarDays, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 type AccountNudgeProps = {
@@ -20,13 +20,18 @@ export function AccountNudge({
     >
       <div className="flex items-start gap-2.5">
         <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-          <Cloud className="size-4" aria-hidden="true" />
+          <CalendarDays
+            data-account-nudge-icon="calendar"
+            className="size-4"
+            aria-hidden="true"
+          />
         </div>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold">Seu ano começou a tomar forma.</p>
           <p className="mt-0.5 text-xs leading-4 text-muted-foreground">
-            Crie sua conta para guardar o que você registrou e continuar
-            construindo essa visão em qualquer dispositivo.
+            Crie sua conta para guardar essa visão, acessá-la em qualquer
+            dispositivo e usar seu ano como apoio para planejar o que vem pela
+            frente.
           </p>
         </div>
         <Button

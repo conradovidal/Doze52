@@ -20,6 +20,11 @@ import {
 } from "../../lib/store";
 import { materializeUserOwnedSnapshot } from "../../lib/snapshot-ownership";
 import {
+  BRAZIL_UFS,
+  isBrazilUf,
+  ONBOARDING_VERSION,
+} from "../../lib/onboarding-region";
+import {
   CATEGORY_COLOR_BASE_AMBER,
   CATEGORY_COLOR_BASE_BLUE,
   CATEGORY_COLOR_BASE_CORAL,
@@ -33,17 +38,25 @@ import {
 } from "../../lib/category-palette";
 
 const initialState = (): GuidedOnboardingState => ({
-  version: 7,
+  version: 8,
   step: "context_selection",
 });
 
 const completedState = (): GuidedOnboardingState => ({
-  version: 7,
+  version: 8,
   step: "completed",
   context: "personal",
   completedAt: "2026-07-20T10:05:00.000Z",
   postOnboardingEventsCreated: 0,
   postOnboardingCategoriesCreated: 0,
+});
+
+test("métrica regional aceita apenas as 27 UFs na versão atual", () => {
+  expect(ONBOARDING_VERSION).toBe(8);
+  expect(BRAZIL_UFS).toHaveLength(27);
+  expect(isBrazilUf("RS")).toBe(true);
+  expect(isBrazilUf("BR")).toBe(false);
+  expect(isBrazilUf("rs")).toBe(false);
 });
 
 test("organiza 24 cores e mantém padrões distintos no onboarding", () => {
@@ -87,16 +100,11 @@ test("cria contexto, categorias incrementais e quatro eventos", () => {
     at: "2026-07-20T10:00:00.000Z",
   });
   expect(configured).toMatchObject({
-    step: "profile_reveal",
+    step: "date_category_selection",
     context: "work",
   });
 
-  const dateCategorySelection = reduceGuidedOnboardingState(configured, {
-    type: "continue_from_profile",
-  });
-  expect(dateCategorySelection.step).toBe("date_category_selection");
-
-  let state = reduceGuidedOnboardingState(dateCategorySelection, {
+  let state = reduceGuidedOnboardingState(configured, {
     type: "choose_date_category",
     categoryId: ONBOARDING_CATEGORY_IDS.workDeliveries,
   });
@@ -145,30 +153,43 @@ test("cria contexto, categorias incrementais e quatro eventos", () => {
     at: "2026-07-20T10:04:00.000Z",
   });
   expect(state).toMatchObject({
-    step: "theme_instruction",
+    step: "edit_instruction",
     periodItemsCreated: 2,
   });
 
   state = reduceGuidedOnboardingState(state, {
-    type: "confirm_theme",
+    type: "continue_from_edit",
+  });
+  expect(state.step).toBe("calendar_instruction");
+
+  state = reduceGuidedOnboardingState(state, {
+    type: "open_calendar",
+  });
+  expect(state.step).toBe("calendar_selection");
+  state = reduceGuidedOnboardingState(state, {
+    type: "close_calendar",
+  });
+  expect(state.step).toBe("calendar_instruction");
+  state = reduceGuidedOnboardingState(state, {
+    type: "open_calendar",
+  });
+  state = reduceGuidedOnboardingState(state, {
+    type: "calendar_added",
+    uf: "RS",
     at: "2026-07-20T10:04:30.000Z",
   });
   expect(state).toMatchObject({
-    step: "edit_instruction",
-    themeConfirmedAt: "2026-07-20T10:04:30.000Z",
+    step: "year_instruction",
+    holidayUf: "RS",
   });
 
   state = reduceGuidedOnboardingState(state, {
-    type: "open_inline_edit",
+    type: "continue_from_year",
   });
-  expect(state.step).toBe("edit_active");
-  state = reduceGuidedOnboardingState(state, {
-    type: "close_inline_edit",
-  });
-  expect(state.step).toBe("completion_choice");
+  expect(state.step).toBe("theme_instruction");
 
   state = reduceGuidedOnboardingState(state, {
-    type: "complete",
+    type: "confirm_theme",
     at: "2026-07-20T10:05:00.000Z",
   });
   expect(state).toMatchObject({
@@ -194,24 +215,22 @@ test("convite de conta exige dois eventos espontâneos", () => {
   expect(second.accountNudgeShownAt).toBe("2026-07-20T11:01:00.000Z");
 });
 
-test("categoria e evento também qualificam o convite uma única vez", () => {
-  const category = reduceGuidedOnboardingState(completedState(), {
-    type: "record_post_onboarding_category",
-    at: "2026-07-20T11:00:00.000Z",
-  });
-  expect(category.accountNudgeShownAt).toBeUndefined();
-
-  const event = reduceGuidedOnboardingState(category, {
+test("um único evento não qualifica o convite e o estado terminal não reconta", () => {
+  const event = reduceGuidedOnboardingState(completedState(), {
     type: "record_post_onboarding_event",
     at: "2026-07-20T11:01:00.000Z",
   });
-  expect(event.accountNudgeShownAt).toBe("2026-07-20T11:01:00.000Z");
+  expect(event.accountNudgeShownAt).toBeUndefined();
 
-  const ignored = reduceGuidedOnboardingState(event, {
+  const qualified = reduceGuidedOnboardingState(event, {
     type: "record_post_onboarding_event",
     at: "2026-07-20T11:02:00.000Z",
   });
-  expect(ignored).toEqual(event);
+  const ignored = reduceGuidedOnboardingState(qualified, {
+    type: "record_post_onboarding_event",
+    at: "2026-07-20T11:03:00.000Z",
+  });
+  expect(ignored).toEqual(qualified);
 });
 
 test("migra v3 com progresso sem reabrir fluxo incompatível", () => {
@@ -224,7 +243,7 @@ test("migra v3 com progresso sem reabrir fluxo incompatível", () => {
       firstDateCreatedAt: "2026-07-20T10:01:00.000Z",
     })
   ).toMatchObject({
-    version: 7,
+    version: 8,
     step: "completed",
     context: "personal",
     dateItemsCreated: 2,
@@ -236,7 +255,7 @@ test("migra v3 com progresso sem reabrir fluxo incompatível", () => {
       step: "completed",
       completedAt: "2026-07-20T10:03:00.000Z",
     })
-  ).toMatchObject({ version: 7, step: "completed" });
+  ).toMatchObject({ version: 8, step: "completed" });
 
   expect(
     migrateGuidedOnboardingState({
@@ -247,13 +266,13 @@ test("migra v3 com progresso sem reabrir fluxo incompatível", () => {
       periodItemsCreated: 2,
     })
   ).toMatchObject({
-    version: 7,
-    step: "theme_instruction",
+    version: 8,
+    step: "calendar_instruction",
     context: "personal",
   });
 });
 
-test("migra v6 sem perder períodos e posiciona o tema depois deles", () => {
+test("migra v6 sem perder períodos e posiciona calendários depois deles", () => {
   expect(
     migrateGuidedOnboardingState({
       version: 6,
@@ -263,7 +282,7 @@ test("migra v6 sem perder períodos e posiciona o tema depois deles", () => {
       periodItemsCreated: 0,
     })
   ).toMatchObject({
-    version: 7,
+    version: 8,
     step: "period_category_selection",
     dateItemsCreated: 2,
   });
@@ -277,7 +296,7 @@ test("migra v6 sem perder períodos e posiciona o tema depois deles", () => {
       periodItemsCreated: 1,
     })
   ).toMatchObject({
-    version: 7,
+    version: 8,
     step: "period_instruction",
     periodItemsCreated: 1,
   });
@@ -290,13 +309,13 @@ test("migra v6 sem perder períodos e posiciona o tema depois deles", () => {
     periodItemsCreated: 2,
   });
   expect(state).toMatchObject({
-    version: 7,
-    step: "theme_instruction",
+    version: 8,
+    step: "calendar_instruction",
     periodItemsCreated: 2,
   });
 });
 
-test("migra v6 com tema confirmado sem repetir a etapa", () => {
+test("migra v6 com tema confirmado e preserva a confirmação", () => {
   expect(
     migrateGuidedOnboardingState({
       version: 6,
@@ -307,10 +326,46 @@ test("migra v6 com tema confirmado sem repetir a etapa", () => {
       themeConfirmedAt: "2026-07-20T10:04:30.000Z",
     })
   ).toMatchObject({
-    version: 7,
-    step: "edit_instruction",
+    version: 8,
+    step: "calendar_instruction",
     themeConfirmedAt: "2026-07-20T10:04:30.000Z",
   });
+});
+
+test("migra v7 sem reabrir terminais e consolida o passo de contexto", () => {
+  expect(
+    migrateGuidedOnboardingState({
+      version: 7,
+      step: "profile_reveal",
+      context: "personal",
+    })
+  ).toMatchObject({
+    version: 8,
+    step: "date_category_selection",
+  });
+
+  expect(
+    migrateGuidedOnboardingState({
+      version: 7,
+      step: "completion_choice",
+      context: "personal",
+      dateItemsCreated: 2,
+      periodItemsCreated: 2,
+      themeConfirmedAt: "2026-07-20T10:04:30.000Z",
+    })
+  ).toMatchObject({
+    version: 8,
+    step: "calendar_instruction",
+    themeConfirmedAt: "2026-07-20T10:04:30.000Z",
+  });
+
+  expect(
+    migrateGuidedOnboardingState({
+      version: 7,
+      step: "completed",
+      completedAt: "2026-07-20T10:05:00.000Z",
+    })
+  ).toMatchObject({ version: 8, step: "completed" });
 });
 
 test("dispensa e conclusão são terminais para a elegibilidade", () => {

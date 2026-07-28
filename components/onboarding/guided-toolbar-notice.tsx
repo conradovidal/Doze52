@@ -5,10 +5,11 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 export type GuidedToolbarNotice = {
-  target: "edit" | "theme";
+  target: "edit" | "calendars" | "year" | "theme";
   title: string;
   instruction: string;
   actionLabel?: string;
+  stepLabel?: string;
 };
 
 export function GuidedToolbarNoticeCard({
@@ -35,6 +36,11 @@ export function GuidedToolbarNoticeCard({
     >
       <div className="flex items-start gap-2.5">
         <div className="min-w-0 flex-1">
+          {notice.stepLabel ? (
+            <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-primary">
+              {notice.stepLabel}
+            </p>
+          ) : null}
           <p className="text-base font-semibold leading-5">{notice.title}</p>
           <p className="mt-1 text-sm leading-5 text-muted-foreground">
             {notice.instruction}

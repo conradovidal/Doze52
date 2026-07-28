@@ -17,7 +17,6 @@ export type GuidedCreationIntent =
 
 export type GuidedOnboardingStep =
   | "context_selection"
-  | "profile_reveal"
   | "date_category_selection"
   | "date_instruction"
   | "date_details"
@@ -25,14 +24,15 @@ export type GuidedOnboardingStep =
   | "period_instruction"
   | "period_details"
   | "edit_instruction"
-  | "edit_active"
+  | "calendar_instruction"
+  | "calendar_selection"
+  | "year_instruction"
   | "theme_instruction"
-  | "completion_choice"
   | "completed"
   | "dismissed";
 
 export type GuidedOnboardingState = {
-  version: 7;
+  version: 8;
   step: GuidedOnboardingStep;
   context?: OnboardingContext;
   startedAt?: string;
@@ -44,6 +44,8 @@ export type GuidedOnboardingState = {
   firstDateCreatedAt?: string;
   firstPeriodCreatedAt?: string;
   themeConfirmedAt?: string;
+  holidayUf?: string;
+  holidayCalendarAddedAt?: string;
   postOnboardingEventsCreated?: number;
   postOnboardingCategoriesCreated?: number;
   accountNudgeShownAt?: string;
@@ -54,19 +56,20 @@ export type GuidedOnboardingState = {
 export type GuidedOnboardingAction =
   | { type: "start"; at?: string }
   | { type: "configure_profile"; context: OnboardingContext; at?: string }
-  | { type: "continue_from_profile" }
   | { type: "choose_date_category"; categoryId: string }
   | { type: "select_date" }
   | { type: "date_saved"; at?: string }
   | { type: "choose_period_category"; categoryId: string }
   | { type: "select_period" }
   | { type: "period_saved"; at?: string }
-  | { type: "open_inline_edit" }
-  | { type: "close_inline_edit" }
+  | { type: "continue_from_edit" }
+  | { type: "open_calendar" }
+  | { type: "close_calendar" }
+  | { type: "calendar_added"; uf?: string; at?: string }
+  | { type: "continue_from_year"; at?: string }
   | { type: "confirm_theme"; at?: string }
   | { type: "complete"; at?: string }
   | { type: "record_post_onboarding_event"; at?: string }
-  | { type: "record_post_onboarding_category"; at?: string }
   | { type: "dismiss"; at?: string };
 
 type ProductOnboardingPayload = Partial<
@@ -89,6 +92,8 @@ type LegacyGuidedOnboardingState = {
   firstDateCreatedAt?: string;
   firstPeriodCreatedAt?: string;
   themeConfirmedAt?: string;
+  holidayUf?: string;
+  holidayCalendarAddedAt?: string;
   dateItemsCreated?: number;
   periodItemsCreated?: number;
   completedAt?: string;
@@ -101,7 +106,7 @@ export const PRODUCT_ONBOARDING_RESET_EVENT = "doze52:onboarding-reset";
 export const GUIDED_ONBOARDING_CHANGE_EVENT = "doze52:onboarding-change";
 
 const initialGuidedState = (): GuidedOnboardingState => ({
-  version: 7,
+  version: 8,
   step: "context_selection",
 });
 
@@ -133,7 +138,6 @@ const writePayload = (payload: ProductOnboardingPayload) => {
 
 const isGuidedStep = (value: unknown): value is GuidedOnboardingStep =>
   value === "context_selection" ||
-  value === "profile_reveal" ||
   value === "date_category_selection" ||
   value === "date_instruction" ||
   value === "date_details" ||
@@ -141,9 +145,10 @@ const isGuidedStep = (value: unknown): value is GuidedOnboardingStep =>
   value === "period_instruction" ||
   value === "period_details" ||
   value === "edit_instruction" ||
-  value === "edit_active" ||
+  value === "calendar_instruction" ||
+  value === "calendar_selection" ||
+  value === "year_instruction" ||
   value === "theme_instruction" ||
-  value === "completion_choice" ||
   value === "completed" ||
   value === "dismissed";
 
@@ -171,12 +176,55 @@ export const migrateGuidedOnboardingState = (
     accountNudgeShownAt?: unknown;
   };
 
+  if (candidate.version === 8 && isGuidedStep(candidate.step)) {
+    return {
+      version: 8,
+      step: candidate.step,
+      context: isContext(candidate.context) ? candidate.context : undefined,
+      startedAt: candidate.startedAt,
+      profileConfiguredAt: candidate.profileConfiguredAt,
+      dateCategoryId:
+        typeof candidate.dateCategoryId === "string"
+          ? candidate.dateCategoryId
+          : undefined,
+      periodCategoryId:
+        typeof candidate.periodCategoryId === "string"
+          ? candidate.periodCategoryId
+          : undefined,
+      dateItemsCreated:
+        typeof candidate.dateItemsCreated === "number"
+          ? Math.max(0, candidate.dateItemsCreated)
+          : 0,
+      periodItemsCreated:
+        typeof candidate.periodItemsCreated === "number"
+          ? Math.max(0, candidate.periodItemsCreated)
+          : 0,
+      firstDateCreatedAt: candidate.firstDateCreatedAt,
+      firstPeriodCreatedAt: candidate.firstPeriodCreatedAt,
+      themeConfirmedAt: candidate.themeConfirmedAt,
+      holidayUf:
+        typeof candidate.holidayUf === "string" ? candidate.holidayUf : undefined,
+      holidayCalendarAddedAt: candidate.holidayCalendarAddedAt,
+      postOnboardingEventsCreated:
+        typeof candidate.postOnboardingEventsCreated === "number"
+          ? Math.max(0, candidate.postOnboardingEventsCreated)
+          : 0,
+      postOnboardingCategoriesCreated: 0,
+      accountNudgeShownAt:
+        typeof candidate.accountNudgeShownAt === "string"
+          ? candidate.accountNudgeShownAt
+          : undefined,
+      completedAt: candidate.completedAt,
+      dismissedAt: candidate.dismissedAt,
+    };
+  }
+
   if (
     (candidate.version === 4 ||
       candidate.version === 5 ||
       candidate.version === 6 ||
       candidate.version === 7) &&
-    isGuidedStep(candidate.step)
+    typeof candidate.step === "string"
   ) {
     const dateItemsCreated =
       typeof candidate.dateItemsCreated === "number"
@@ -196,23 +244,33 @@ export const migrateGuidedOnboardingState = (
         : candidate.version === 5 && candidate.step === "completion_choice"
           ? candidate.completedAt ?? nowIso()
           : undefined;
-    let step = candidate.step;
+    let step: GuidedOnboardingStep;
 
-    if (candidate.version < 7) {
-      if (step === "theme_instruction" && periodItemsCreated < 2) {
-        step = "period_category_selection";
-      } else if (
-        (step === "edit_instruction" ||
-          step === "edit_active" ||
-          step === "completion_choice") &&
-        !themeConfirmedAt
-      ) {
-        step = "theme_instruction";
-      }
+    if (candidate.step === "completed" || candidate.step === "dismissed") {
+      step = candidate.step;
+    } else if (candidate.step === "context_selection") {
+      step = "context_selection";
+    } else if (
+      candidate.step === "profile_reveal" ||
+      candidate.step === "date_category_selection"
+    ) {
+      step = "date_category_selection";
+    } else if (
+      candidate.step === "date_instruction" ||
+      candidate.step === "date_details" ||
+      candidate.step === "period_category_selection" ||
+      candidate.step === "period_instruction" ||
+      candidate.step === "period_details"
+    ) {
+      step = candidate.step;
+    } else {
+      step = periodItemsCreated >= 2
+        ? "calendar_instruction"
+        : "period_category_selection";
     }
 
     return {
-      version: 7,
+      version: 8,
       step,
       context: isContext(candidate.context) ? candidate.context : undefined,
       startedAt: candidate.startedAt,
@@ -234,10 +292,7 @@ export const migrateGuidedOnboardingState = (
         typeof candidate.postOnboardingEventsCreated === "number"
           ? Math.max(0, candidate.postOnboardingEventsCreated)
           : 0,
-      postOnboardingCategoriesCreated:
-        typeof candidate.postOnboardingCategoriesCreated === "number"
-          ? Math.max(0, candidate.postOnboardingCategoriesCreated)
-          : 0,
+      postOnboardingCategoriesCreated: 0,
       accountNudgeShownAt:
         typeof candidate.accountNudgeShownAt === "string"
           ? candidate.accountNudgeShownAt
@@ -252,7 +307,7 @@ export const migrateGuidedOnboardingState = (
       candidate.step === "completed" || candidate.step === "dismissed";
     const preserveAsCompleted = !terminal && hasLegacyProgress(candidate);
     return {
-      version: 7,
+      version: 8,
       step: terminal
         ? (candidate.step as "completed" | "dismissed")
         : preserveAsCompleted
@@ -296,14 +351,10 @@ export const reduceGuidedOnboardingState = (
         ? {
             ...state,
             context: action.context,
-            step: "profile_reveal",
+            step: "date_category_selection",
             startedAt: state.startedAt ?? action.at ?? nowIso(),
             profileConfiguredAt: action.at ?? nowIso(),
           }
-        : state;
-    case "continue_from_profile":
-      return state.step === "profile_reveal"
-        ? { ...state, step: "date_category_selection" }
         : state;
     case "choose_date_category":
       return state.step === "date_category_selection"
@@ -348,32 +399,66 @@ export const reduceGuidedOnboardingState = (
         ...state,
         step:
           nextPeriodCount >= 2
-            ? state.themeConfirmedAt
-              ? "edit_instruction"
-              : "theme_instruction"
+            ? "edit_instruction"
             : "period_instruction",
         periodItemsCreated: nextPeriodCount,
         firstPeriodCreatedAt:
           state.firstPeriodCreatedAt ?? action.at ?? nowIso(),
       };
-    case "open_inline_edit":
+    case "continue_from_edit":
       return state.step === "edit_instruction"
-        ? { ...state, step: "edit_active" }
+        ? { ...state, step: "calendar_instruction" }
         : state;
-    case "close_inline_edit":
-      return state.step === "edit_active"
-        ? { ...state, step: "completion_choice" }
+    case "open_calendar":
+      return state.step === "calendar_instruction"
+        ? { ...state, step: "calendar_selection" }
         : state;
+    case "close_calendar":
+      return state.step === "calendar_selection"
+        ? { ...state, step: "calendar_instruction" }
+        : state;
+    case "calendar_added":
+      return state.step === "calendar_instruction" ||
+        state.step === "calendar_selection"
+        ? {
+            ...state,
+            step: "year_instruction",
+            holidayUf: action.uf ?? state.holidayUf,
+            holidayCalendarAddedAt:
+              state.holidayCalendarAddedAt ?? action.at ?? nowIso(),
+          }
+        : state;
+    case "continue_from_year":
+      if (state.step !== "year_instruction") return state;
+      if (!state.themeConfirmedAt) {
+        return { ...state, step: "theme_instruction" };
+      }
+      return {
+        ...state,
+        step: "completed",
+        postOnboardingEventsCreated: 0,
+        postOnboardingCategoriesCreated: 0,
+        accountNudgeShownAt: undefined,
+        completedAt: action.at ?? nowIso(),
+        dismissedAt: undefined,
+      };
     case "confirm_theme":
       return state.step === "theme_instruction"
         ? {
             ...state,
-            step: "edit_instruction",
+            step: "completed",
             themeConfirmedAt: action.at ?? nowIso(),
+            postOnboardingEventsCreated: 0,
+            postOnboardingCategoriesCreated: 0,
+            accountNudgeShownAt: undefined,
+            completedAt: action.at ?? nowIso(),
+            dismissedAt: undefined,
           }
         : state;
     case "complete":
-      if (state.step !== "completion_choice") return state;
+      if (state.step !== "theme_instruction" && state.step !== "year_instruction") {
+        return state;
+      }
       return {
         ...state,
         step: "completed",
@@ -387,34 +472,10 @@ export const reduceGuidedOnboardingState = (
       if (state.step !== "completed" || state.accountNudgeShownAt) return state;
       const postOnboardingEventsCreated =
         (state.postOnboardingEventsCreated ?? 0) + 1;
-      const postOnboardingCategoriesCreated =
-        state.postOnboardingCategoriesCreated ?? 0;
-      const qualifiesForNudge =
-        postOnboardingEventsCreated >= 2 ||
-        (postOnboardingEventsCreated >= 1 &&
-          postOnboardingCategoriesCreated >= 1);
       return {
         ...state,
         postOnboardingEventsCreated,
-        accountNudgeShownAt: qualifiesForNudge
-          ? action.at ?? nowIso()
-          : undefined,
-      };
-    }
-    case "record_post_onboarding_category": {
-      if (state.step !== "completed" || state.accountNudgeShownAt) return state;
-      const postOnboardingCategoriesCreated =
-        (state.postOnboardingCategoriesCreated ?? 0) + 1;
-      const postOnboardingEventsCreated =
-        state.postOnboardingEventsCreated ?? 0;
-      const qualifiesForNudge =
-        postOnboardingEventsCreated >= 2 ||
-        (postOnboardingEventsCreated >= 1 &&
-          postOnboardingCategoriesCreated >= 1);
-      return {
-        ...state,
-        postOnboardingCategoriesCreated,
-        accountNudgeShownAt: qualifiesForNudge
+        accountNudgeShownAt: postOnboardingEventsCreated >= 2
           ? action.at ?? nowIso()
           : undefined,
       };

@@ -61,20 +61,12 @@ const selectGuidedPeriod = async (
 
 const completePersonalOnboarding = async (
   page: Page,
-  mobile: boolean,
-  finish: "explore" | "category"
+  mobile: boolean
 ) => {
   const panel = page.getByRole("region", {
     name: "Guia inicial do Doze 52",
   });
   await panel.getByRole("button", { name: /Pessoal/ }).click();
-  await expect(panel).toHaveAttribute(
-    "data-guided-onboarding-step",
-    "profile_reveal"
-  );
-  await panel
-    .getByRole("button", { name: "Escolher primeira categoria" })
-    .click();
   await expect(panel).toHaveAttribute(
     "data-guided-onboarding-step",
     "date_category_selection"
@@ -85,9 +77,9 @@ const completePersonalOnboarding = async (
     panel.getByRole("button", { name: "Criar categoria" })
   ).toBeDisabled();
   await expect(panel.locator("[data-category-color-swatch]").first()).toBeDisabled();
-  await expect(panel).toContainText("O que vai dar vida ao seu ano primeiro?");
+  await expect(panel).toContainText("Como vamos começar a dar vida ao seu ano?");
   await expect(panel).toContainText(
-    "Comece pelo aniversário de alguém querido ou por uma data importante."
+    "Seu contexto está pronto. Comece pelo aniversário de alguém querido ou por uma data importante."
   );
   await expect(panel).not.toContainText("Um jeito afetivo de começar");
   await panel.getByRole("button", { name: /Aniversários/ }).click();
@@ -176,10 +168,10 @@ const completePersonalOnboarding = async (
     "period_category_selection"
   );
   await expect(panel).toContainText(
-    "Dê visibilidade ao que dura mais de um dia."
+    "Traga visibilidade aos períodos importantes do seu ano."
   );
   await expect(panel).toContainText(
-    "Férias, viagens e outros períodos também contam a história do seu ano."
+    "Férias, viagens e outros períodos também ajudam a contar a história do seu ano."
   );
   await panel.getByRole("button", { name: /Férias e viagens/ }).click();
   await expect(
@@ -216,10 +208,53 @@ const completePersonalOnboarding = async (
   const toolbarNotice = page.locator("[data-guided-toolbar-notice]");
   await expect(toolbarNotice).toHaveAttribute(
     "data-guided-toolbar-target",
-    "theme"
+    "edit"
   );
   const spotlightToolbar = page.locator(
     '[data-onboarding-toolbar-spotlight="true"]'
+  );
+  await expect(page.locator("[data-onboarding-edit-control]")).toBeDisabled();
+  await expect(toolbarNotice).toContainText(
+    "Edite contextos e categorias quando precisar"
+  );
+  await toolbarNotice.getByRole("button", { name: "Continuar" }).click();
+
+  await expect(toolbarNotice).toHaveAttribute(
+    "data-guided-toolbar-target",
+    "calendars"
+  );
+  await page.locator("[data-onboarding-calendar-control]").click();
+  const calendarDialog = page.getByRole("dialog", { name: "Calendários" });
+  await expect(calendarDialog).toBeVisible();
+  const lockedCalendarCards = calendarDialog.locator(
+    '[data-guided-disabled="true"]'
+  );
+  await expect(lockedCalendarCards.first()).toBeVisible();
+  expect(await lockedCalendarCards.count()).toBeGreaterThan(0);
+  for (const button of await lockedCalendarCards.getByRole("button").all()) {
+    await expect(button).toBeDisabled();
+  }
+  const stateSelect = calendarDialog.getByRole("combobox", {
+    name: /Estado para Feriados nacionais/i,
+  });
+  await expect(stateSelect).toHaveText(/Escolha seu estado/i);
+  await stateSelect.click();
+  await page.getByRole("option", { name: "Rio Grande do Sul (RS)" }).click();
+  await calendarDialog
+    .getByRole("button", { name: "Adicionar feriados" })
+    .click();
+  await expect(calendarDialog).toBeHidden();
+
+  await expect(toolbarNotice).toHaveAttribute(
+    "data-guided-toolbar-target",
+    "year"
+  );
+  await expect(page.locator("[data-onboarding-year-control]")).toBeDisabled();
+  await toolbarNotice.getByRole("button", { name: "Continuar" }).click();
+
+  await expect(toolbarNotice).toHaveAttribute(
+    "data-guided-toolbar-target",
+    "theme"
   );
   const themeTarget = spotlightToolbar.locator(
     '[data-onboarding-spotlight-target="true"]'
@@ -245,41 +280,8 @@ const completePersonalOnboarding = async (
   await page.locator("[data-onboarding-theme-control]").click();
   await page.locator("[data-onboarding-theme-control]").click();
   await toolbarNotice.getByRole("button", { name: "Continuar" }).click();
-
-  await expect(toolbarNotice).toHaveAttribute(
-    "data-guided-toolbar-target",
-    "edit"
-  );
-  await expect(
-    spotlightToolbar.locator(
-      '[data-onboarding-spotlight-target="true"] [data-onboarding-edit-control]'
-    )
-  ).toHaveCount(1);
-  await expect(toolbarNotice).toContainText(
-    "Clique aqui para editar seus contextos e categorias"
-  );
-  await page.locator("[data-onboarding-edit-control]").click();
-  await expect(toolbarNotice).toContainText(
-    "Agora seus contextos e categorias estão disponíveis para serem editados"
-  );
-  await page
-    .getByRole("button", {
-      name: "Finalizar edição de contextos e categorias",
-    })
-    .click();
-  await expect(panel).toHaveAttribute(
-    "data-guided-onboarding-step",
-    "completion_choice"
-  );
-  await panel
-    .getByRole("button", {
-      name:
-        finish === "explore"
-          ? "Explorar meu ano"
-          : "Criar outra categoria",
-    })
-    .click();
   await expect(panel).toBeHidden();
+  await expect(toolbarNotice).toBeHidden();
 };
 
 const createRegularEvent = async (
@@ -297,6 +299,12 @@ const createRegularEvent = async (
 
 test("monta contexto Pessoal de forma incremental", async ({ page }, testInfo) => {
   const mobile = testInfo.project.name === "mobile-chromium";
+  const regionRequests: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().includes("/api/onboarding/region")) {
+      regionRequests.push(request.url());
+    }
+  });
   await page.goto(mobile ? "/?mobileUi=1" : "/?mobileUi=0");
   await expect(page).toHaveTitle("Doze 52 | Seu ano em uma página");
 
@@ -311,11 +319,14 @@ test("monta contexto Pessoal de forma incremental", async ({ page }, testInfo) =
   await expect(page.locator("[data-onboarding-profile-id]")).toHaveCount(3);
   await expect(page.locator("[data-onboarding-category-id]")).toHaveCount(6);
   await expect(page.locator("[data-onboarding-connector]")).toHaveCount(0);
-  await expect(panel).toContainText("O ano da Marina está ao fundo");
+  await expect(panel).toContainText(
+    "Ao fundo está o ano de alguém com prioridades próprias"
+  );
   await expect(panel).not.toContainText(/\bperfil\b/i);
   await expect(panel).not.toContainText(/\bcadastr/i);
 
-  await completePersonalOnboarding(page, mobile, "explore");
+  await completePersonalOnboarding(page, mobile);
+  expect(regionRequests).toEqual([]);
 
   await expect(
     page.getByRole("complementary", {
@@ -340,7 +351,7 @@ test("monta contexto Pessoal de forma incremental", async ({ page }, testInfo) =
   }));
 
   expect(stored.onboarding).toMatchObject({
-    version: 7,
+    version: 8,
     step: "completed",
     context: "personal",
   });
@@ -348,12 +359,13 @@ test("monta contexto Pessoal de forma incremental", async ({ page }, testInfo) =
   expect(stored.store?.state?.categories?.map((item) => item.name)).toEqual([
     "Aniversários",
     "Férias e viagens",
+    "Feriados",
   ]);
-  expect(stored.store?.state?.categories?.map((item) => item.color)).toEqual([
+  expect(stored.store?.state?.categories?.slice(0, 2).map((item) => item.color)).toEqual([
     "#EF8F8F",
     "#72CFE3",
   ]);
-  expect(stored.store?.state?.events).toHaveLength(4);
+  expect(stored.store?.state?.events?.length).toBeGreaterThan(4);
   expect(
     stored.store?.state?.events
       ?.filter((event) => event.title.startsWith("Aniversário"))
@@ -449,9 +461,6 @@ test("controle temporário reinicia dados locais e restaura a demonstração", a
     name: "Guia inicial do Doze 52",
   });
   await panel.getByRole("button", { name: /Pessoal/ }).click();
-  await panel
-    .getByRole("button", { name: "Escolher primeira categoria" })
-    .click();
   await panel.getByRole("button", { name: /Aniversários/ }).click();
   await panel
     .getByRole("button", { name: "Criar categoria" })
@@ -503,9 +512,6 @@ test("centraliza cards e sobrepõe a instrução ao cabeçalho sem mover o calen
   ]);
   expect(cleanSnapshot.categories).toEqual([]);
   expect(cleanSnapshot.events).toEqual([]);
-  await panel
-    .getByRole("button", { name: "Escolher primeira categoria" })
-    .click();
   const calendarAnchor = mobile
     ? page.locator("[data-mobile-calendar-divider]")
     : page.locator("[data-year-grid]");
@@ -519,7 +525,7 @@ test("centraliza cards e sobrepõe a instrução ao cabeçalho sem mover o calen
   const notice = page.locator("header [data-guided-calendar-notice]");
   await expect(notice).toBeVisible();
   await expect(notice).toContainText(
-    "Adicione um aniversário importante"
+    "Adicione o aniversário de alguém importante"
   );
   await expect(notice).not.toContainText(/\bcadastr/i);
   await expect(
@@ -562,7 +568,7 @@ test("dois eventos espontâneos disparam o convite de conta", async ({
     window.localStorage.setItem("doze52-theme", "light");
   });
   await page.goto("/?mobileUi=0");
-  await completePersonalOnboarding(page, false, "explore");
+  await completePersonalOnboarding(page, false);
 
   const nudge = page.getByRole("complementary", {
     name: "Convite para guardar o ano",
@@ -573,11 +579,12 @@ test("dois eventos espontâneos disparam o convite de conta", async ({
   await expect(nudge).toBeVisible();
   await expect(nudge).toContainText("Seu ano começou a tomar forma.");
   await expect(nudge).toContainText(
-    "Crie sua conta para guardar o que você registrou e continuar construindo essa visão em qualquer dispositivo."
+    "Crie sua conta para guardar essa visão, acessá-la em qualquer dispositivo e usar seu ano como apoio para planejar o que vem pela frente."
   );
   await expect(
     nudge.getByRole("button", { name: "Guardar meu ano" })
   ).toBeVisible();
+  await expect(nudge.locator('[data-account-nudge-icon="calendar"]')).toBeVisible();
   await expect(nudge).toHaveCSS("background-color", "rgb(23, 34, 51)");
 
   await page.locator("[data-onboarding-theme-control]").click();
@@ -600,7 +607,7 @@ test("spotlight respeita redução de movimento", async ({ page }, testInfo) => 
     window.localStorage.setItem(
       "doze52:onboarding:v2",
       JSON.stringify({
-        version: 7,
+        version: 8,
         step: "theme_instruction",
         context: "personal",
         dateItemsCreated: 2,
@@ -613,45 +620,6 @@ test("spotlight respeita redução de movimento", async ({ page }, testInfo) => 
   const themeControl = page.locator("[data-onboarding-theme-control]");
   await expect(themeControl).toHaveAttribute("data-onboarding-highlighted", "true");
   await expect(themeControl).toHaveCSS("animation-name", "none");
-});
-
-test("terceira categoria e um evento disparam o convite", async ({
-  page,
-}, testInfo) => {
-  test.skip(
-    testInfo.project.name === "mobile-chromium",
-    "Gerenciador de categoria coberto no desktop"
-  );
-  await page.goto("/?mobileUi=0");
-  await completePersonalOnboarding(page, false, "category");
-
-  const categoryDialog = page.getByRole("dialog", {
-    name: "Nova categoria",
-  });
-  await expect(categoryDialog).toBeVisible();
-  const regularSwatches = categoryDialog.locator(
-    "[data-category-color-swatch]"
-  );
-  await expect(regularSwatches).toHaveCount(24);
-  expect(
-    await regularSwatches.first().evaluate((node) => ({
-      background: getComputedStyle(node).backgroundColor,
-      innerWhiteCenter: node.querySelector("span") !== null,
-    }))
-  ).toEqual({
-    background: "rgb(225, 209, 93)",
-    innerWhiteCenter: false,
-  });
-  await categoryDialog.getByLabel("Nome da categoria").fill("Celebrações");
-  await categoryDialog.getByRole("button", { name: "Criar" }).click();
-  await expect(categoryDialog).toBeHidden();
-
-  const nudge = page.getByRole("complementary", {
-    name: "Convite para guardar o ano",
-  });
-  await expect(nudge).toBeHidden();
-  await createRegularEvent(page, "2026-06-05", "Celebração espontânea");
-  await expect(nudge).toBeVisible();
 });
 
 test("Profissional permite categorias específica e genérica", async ({
@@ -671,9 +639,6 @@ test("Profissional permite categorias específica e genérica", async ({
   ).toBeVisible();
   await expect(page.locator("[data-onboarding-category-id]")).toHaveCount(0);
 
-  await panel
-    .getByRole("button", { name: "Escolher primeira categoria" })
-    .click();
   await panel.getByRole("button", { name: /Datas importantes/ }).click();
   await panel
     .getByRole("button", { name: "Criar categoria" })
