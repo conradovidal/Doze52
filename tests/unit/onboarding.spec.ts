@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 import {
+  GUIDED_CATEGORY_REVEAL_MS,
+  getGuidedCategoryRevealRemainingMs,
   hasAuthorCalendarEvents,
   migrateGuidedOnboardingState,
   reduceGuidedOnboardingState,
@@ -38,12 +40,12 @@ import {
 } from "../../lib/category-palette";
 
 const initialState = (): GuidedOnboardingState => ({
-  version: 8,
+  version: 9,
   step: "context_selection",
 });
 
 const completedState = (): GuidedOnboardingState => ({
-  version: 8,
+  version: 9,
   step: "completed",
   context: "personal",
   completedAt: "2026-07-20T10:05:00.000Z",
@@ -52,11 +54,28 @@ const completedState = (): GuidedOnboardingState => ({
 });
 
 test("métrica regional aceita apenas as 27 UFs na versão atual", () => {
-  expect(ONBOARDING_VERSION).toBe(8);
+  expect(ONBOARDING_VERSION).toBe(9);
   expect(BRAZIL_UFS).toHaveLength(27);
   expect(isBrazilUf("RS")).toBe(true);
   expect(isBrazilUf("BR")).toBe(false);
   expect(isBrazilUf("rs")).toBe(false);
+});
+
+test("revelação de categoria dura 900 ms e retoma pelo tempo restante", () => {
+  expect(GUIDED_CATEGORY_REVEAL_MS).toBe(900);
+  expect(
+    getGuidedCategoryRevealRemainingMs(
+      "2026-07-20T10:00:00.000Z",
+      Date.parse("2026-07-20T10:00:00.350Z")
+    )
+  ).toBe(550);
+  expect(
+    getGuidedCategoryRevealRemainingMs(
+      "2026-07-20T10:00:00.000Z",
+      Date.parse("2026-07-20T10:00:01.000Z")
+    )
+  ).toBe(0);
+  expect(getGuidedCategoryRevealRemainingMs(undefined)).toBe(900);
 });
 
 test("organiza 24 cores e mantém padrões distintos no onboarding", () => {
@@ -107,11 +126,17 @@ test("cria contexto, categorias incrementais e quatro eventos", () => {
   let state = reduceGuidedOnboardingState(configured, {
     type: "choose_date_category",
     categoryId: ONBOARDING_CATEGORY_IDS.workDeliveries,
+    at: "2026-07-20T10:00:30.000Z",
   });
   expect(state).toMatchObject({
-    step: "date_instruction",
+    step: "date_category_reveal",
     dateCategoryId: ONBOARDING_CATEGORY_IDS.workDeliveries,
+    categoryRevealStartedAt: "2026-07-20T10:00:30.000Z",
   });
+  state = reduceGuidedOnboardingState(state, {
+    type: "finish_category_reveal",
+  });
+  expect(state.categoryRevealStartedAt).toBeUndefined();
 
   state = reduceGuidedOnboardingState(state, { type: "select_date" });
   state = reduceGuidedOnboardingState(state, {
@@ -136,6 +161,14 @@ test("cria contexto, categorias incrementais e quatro eventos", () => {
   state = reduceGuidedOnboardingState(state, {
     type: "choose_period_category",
     categoryId: ONBOARDING_CATEGORY_IDS.workTrips,
+    at: "2026-07-20T10:02:30.000Z",
+  });
+  expect(state).toMatchObject({
+    step: "period_category_reveal",
+    categoryRevealStartedAt: "2026-07-20T10:02:30.000Z",
+  });
+  state = reduceGuidedOnboardingState(state, {
+    type: "finish_category_reveal",
   });
   state = reduceGuidedOnboardingState(state, { type: "select_period" });
   state = reduceGuidedOnboardingState(state, {
@@ -158,7 +191,11 @@ test("cria contexto, categorias incrementais e quatro eventos", () => {
   });
 
   state = reduceGuidedOnboardingState(state, {
-    type: "continue_from_edit",
+    type: "open_edit_preview",
+  });
+  expect(state.step).toBe("edit_preview");
+  state = reduceGuidedOnboardingState(state, {
+    type: "finish_edit_preview",
   });
   expect(state.step).toBe("calendar_instruction");
 
@@ -243,7 +280,7 @@ test("migra v3 com progresso sem reabrir fluxo incompatível", () => {
       firstDateCreatedAt: "2026-07-20T10:01:00.000Z",
     })
   ).toMatchObject({
-    version: 8,
+    version: 9,
     step: "completed",
     context: "personal",
     dateItemsCreated: 2,
@@ -255,7 +292,7 @@ test("migra v3 com progresso sem reabrir fluxo incompatível", () => {
       step: "completed",
       completedAt: "2026-07-20T10:03:00.000Z",
     })
-  ).toMatchObject({ version: 8, step: "completed" });
+  ).toMatchObject({ version: 9, step: "completed" });
 
   expect(
     migrateGuidedOnboardingState({
@@ -266,7 +303,7 @@ test("migra v3 com progresso sem reabrir fluxo incompatível", () => {
       periodItemsCreated: 2,
     })
   ).toMatchObject({
-    version: 8,
+    version: 9,
     step: "calendar_instruction",
     context: "personal",
   });
@@ -282,7 +319,7 @@ test("migra v6 sem perder períodos e posiciona calendários depois deles", () =
       periodItemsCreated: 0,
     })
   ).toMatchObject({
-    version: 8,
+    version: 9,
     step: "period_category_selection",
     dateItemsCreated: 2,
   });
@@ -296,7 +333,7 @@ test("migra v6 sem perder períodos e posiciona calendários depois deles", () =
       periodItemsCreated: 1,
     })
   ).toMatchObject({
-    version: 8,
+    version: 9,
     step: "period_instruction",
     periodItemsCreated: 1,
   });
@@ -309,7 +346,7 @@ test("migra v6 sem perder períodos e posiciona calendários depois deles", () =
     periodItemsCreated: 2,
   });
   expect(state).toMatchObject({
-    version: 8,
+    version: 9,
     step: "calendar_instruction",
     periodItemsCreated: 2,
   });
@@ -326,7 +363,7 @@ test("migra v6 com tema confirmado e preserva a confirmação", () => {
       themeConfirmedAt: "2026-07-20T10:04:30.000Z",
     })
   ).toMatchObject({
-    version: 8,
+    version: 9,
     step: "calendar_instruction",
     themeConfirmedAt: "2026-07-20T10:04:30.000Z",
   });
@@ -340,7 +377,7 @@ test("migra v7 sem reabrir terminais e consolida o passo de contexto", () => {
       context: "personal",
     })
   ).toMatchObject({
-    version: 8,
+    version: 9,
     step: "date_category_selection",
   });
 
@@ -354,7 +391,7 @@ test("migra v7 sem reabrir terminais e consolida o passo de contexto", () => {
       themeConfirmedAt: "2026-07-20T10:04:30.000Z",
     })
   ).toMatchObject({
-    version: 8,
+    version: 9,
     step: "calendar_instruction",
     themeConfirmedAt: "2026-07-20T10:04:30.000Z",
   });
@@ -365,7 +402,30 @@ test("migra v7 sem reabrir terminais e consolida o passo de contexto", () => {
       step: "completed",
       completedAt: "2026-07-20T10:05:00.000Z",
     })
-  ).toMatchObject({ version: 8, step: "completed" });
+  ).toMatchObject({ version: 9, step: "completed" });
+});
+
+test("migra v8 sem repetir revelações e preserva estados terminais", () => {
+  expect(
+    migrateGuidedOnboardingState({
+      version: 8,
+      step: "date_instruction",
+      context: "work",
+      dateCategoryId: ONBOARDING_CATEGORY_IDS.workDeliveries,
+    })
+  ).toMatchObject({
+    version: 9,
+    step: "date_instruction",
+    context: "work",
+  });
+
+  expect(
+    migrateGuidedOnboardingState({
+      version: 8,
+      step: "completed",
+      completedAt: "2026-07-20T10:05:00.000Z",
+    })
+  ).toMatchObject({ version: 9, step: "completed" });
 });
 
 test("dispensa e conclusão são terminais para a elegibilidade", () => {

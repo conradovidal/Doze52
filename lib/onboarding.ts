@@ -8,7 +8,7 @@ export type OnboardingContext = "personal" | "work";
 export type OnboardingCategoryChoice = "specific" | "generic";
 export type OnboardingFocusTarget =
   | { kind: "profile"; id: string }
-  | { kind: "category"; id: string }
+  | { kind: "category"; id: string; effect?: "focus" | "reveal" }
   | null;
 export type GuidedCreationIntent =
   | "dated_item"
@@ -18,12 +18,15 @@ export type GuidedCreationIntent =
 export type GuidedOnboardingStep =
   | "context_selection"
   | "date_category_selection"
+  | "date_category_reveal"
   | "date_instruction"
   | "date_details"
   | "period_category_selection"
+  | "period_category_reveal"
   | "period_instruction"
   | "period_details"
   | "edit_instruction"
+  | "edit_preview"
   | "calendar_instruction"
   | "calendar_selection"
   | "year_instruction"
@@ -32,13 +35,14 @@ export type GuidedOnboardingStep =
   | "dismissed";
 
 export type GuidedOnboardingState = {
-  version: 8;
+  version: 9;
   step: GuidedOnboardingStep;
   context?: OnboardingContext;
   startedAt?: string;
   profileConfiguredAt?: string;
   dateCategoryId?: string;
   periodCategoryId?: string;
+  categoryRevealStartedAt?: string;
   dateItemsCreated?: number;
   periodItemsCreated?: number;
   firstDateCreatedAt?: string;
@@ -56,13 +60,15 @@ export type GuidedOnboardingState = {
 export type GuidedOnboardingAction =
   | { type: "start"; at?: string }
   | { type: "configure_profile"; context: OnboardingContext; at?: string }
-  | { type: "choose_date_category"; categoryId: string }
+  | { type: "choose_date_category"; categoryId: string; at?: string }
+  | { type: "finish_category_reveal" }
   | { type: "select_date" }
   | { type: "date_saved"; at?: string }
-  | { type: "choose_period_category"; categoryId: string }
+  | { type: "choose_period_category"; categoryId: string; at?: string }
   | { type: "select_period" }
   | { type: "period_saved"; at?: string }
-  | { type: "continue_from_edit" }
+  | { type: "open_edit_preview" }
+  | { type: "finish_edit_preview" }
   | { type: "open_calendar" }
   | { type: "close_calendar" }
   | { type: "calendar_added"; uf?: string; at?: string }
@@ -91,6 +97,7 @@ type LegacyGuidedOnboardingState = {
   firstItemCreatedAt?: string;
   firstDateCreatedAt?: string;
   firstPeriodCreatedAt?: string;
+  categoryRevealStartedAt?: string;
   themeConfirmedAt?: string;
   holidayUf?: string;
   holidayCalendarAddedAt?: string;
@@ -104,9 +111,22 @@ export const PRODUCT_ONBOARDING_STORAGE_KEY = "doze52:onboarding:v1";
 export const GUIDED_ONBOARDING_STORAGE_KEY = "doze52:onboarding:v2";
 export const PRODUCT_ONBOARDING_RESET_EVENT = "doze52:onboarding-reset";
 export const GUIDED_ONBOARDING_CHANGE_EVENT = "doze52:onboarding-change";
+export const GUIDED_CATEGORY_REVEAL_MS = 900;
+
+export const getGuidedCategoryRevealRemainingMs = (
+  startedAt: string | undefined,
+  now = Date.now()
+) => {
+  const parsedStartedAt = Date.parse(startedAt ?? "");
+  if (!Number.isFinite(parsedStartedAt)) return GUIDED_CATEGORY_REVEAL_MS;
+  return Math.max(
+    0,
+    GUIDED_CATEGORY_REVEAL_MS - Math.max(0, now - parsedStartedAt)
+  );
+};
 
 const initialGuidedState = (): GuidedOnboardingState => ({
-  version: 8,
+  version: 9,
   step: "context_selection",
 });
 
@@ -139,12 +159,15 @@ const writePayload = (payload: ProductOnboardingPayload) => {
 const isGuidedStep = (value: unknown): value is GuidedOnboardingStep =>
   value === "context_selection" ||
   value === "date_category_selection" ||
+  value === "date_category_reveal" ||
   value === "date_instruction" ||
   value === "date_details" ||
   value === "period_category_selection" ||
+  value === "period_category_reveal" ||
   value === "period_instruction" ||
   value === "period_details" ||
   value === "edit_instruction" ||
+  value === "edit_preview" ||
   value === "calendar_instruction" ||
   value === "calendar_selection" ||
   value === "year_instruction" ||
@@ -174,11 +197,59 @@ export const migrateGuidedOnboardingState = (
     postOnboardingEventsCreated?: unknown;
     postOnboardingCategoriesCreated?: unknown;
     accountNudgeShownAt?: unknown;
+    categoryRevealStartedAt?: unknown;
   };
+
+  if (candidate.version === 9 && isGuidedStep(candidate.step)) {
+    return {
+      version: 9,
+      step: candidate.step,
+      context: isContext(candidate.context) ? candidate.context : undefined,
+      startedAt: candidate.startedAt,
+      profileConfiguredAt: candidate.profileConfiguredAt,
+      dateCategoryId:
+        typeof candidate.dateCategoryId === "string"
+          ? candidate.dateCategoryId
+          : undefined,
+      periodCategoryId:
+        typeof candidate.periodCategoryId === "string"
+          ? candidate.periodCategoryId
+          : undefined,
+      categoryRevealStartedAt:
+        typeof candidate.categoryRevealStartedAt === "string"
+          ? candidate.categoryRevealStartedAt
+          : undefined,
+      dateItemsCreated:
+        typeof candidate.dateItemsCreated === "number"
+          ? Math.max(0, candidate.dateItemsCreated)
+          : 0,
+      periodItemsCreated:
+        typeof candidate.periodItemsCreated === "number"
+          ? Math.max(0, candidate.periodItemsCreated)
+          : 0,
+      firstDateCreatedAt: candidate.firstDateCreatedAt,
+      firstPeriodCreatedAt: candidate.firstPeriodCreatedAt,
+      themeConfirmedAt: candidate.themeConfirmedAt,
+      holidayUf:
+        typeof candidate.holidayUf === "string" ? candidate.holidayUf : undefined,
+      holidayCalendarAddedAt: candidate.holidayCalendarAddedAt,
+      postOnboardingEventsCreated:
+        typeof candidate.postOnboardingEventsCreated === "number"
+          ? Math.max(0, candidate.postOnboardingEventsCreated)
+          : 0,
+      postOnboardingCategoriesCreated: 0,
+      accountNudgeShownAt:
+        typeof candidate.accountNudgeShownAt === "string"
+          ? candidate.accountNudgeShownAt
+          : undefined,
+      completedAt: candidate.completedAt,
+      dismissedAt: candidate.dismissedAt,
+    };
+  }
 
   if (candidate.version === 8 && isGuidedStep(candidate.step)) {
     return {
-      version: 8,
+      version: 9,
       step: candidate.step,
       context: isContext(candidate.context) ? candidate.context : undefined,
       startedAt: candidate.startedAt,
@@ -270,7 +341,7 @@ export const migrateGuidedOnboardingState = (
     }
 
     return {
-      version: 8,
+      version: 9,
       step,
       context: isContext(candidate.context) ? candidate.context : undefined,
       startedAt: candidate.startedAt,
@@ -307,7 +378,7 @@ export const migrateGuidedOnboardingState = (
       candidate.step === "completed" || candidate.step === "dismissed";
     const preserveAsCompleted = !terminal && hasLegacyProgress(candidate);
     return {
-      version: 8,
+      version: 9,
       step: terminal
         ? (candidate.step as "completed" | "dismissed")
         : preserveAsCompleted
@@ -361,9 +432,26 @@ export const reduceGuidedOnboardingState = (
         ? {
             ...state,
             dateCategoryId: action.categoryId,
-            step: "date_instruction",
+            step: "date_category_reveal",
+            categoryRevealStartedAt: action.at ?? nowIso(),
           }
         : state;
+    case "finish_category_reveal":
+      if (state.step === "date_category_reveal") {
+        return {
+          ...state,
+          step: "date_instruction",
+          categoryRevealStartedAt: undefined,
+        };
+      }
+      if (state.step === "period_category_reveal") {
+        return {
+          ...state,
+          step: "period_instruction",
+          categoryRevealStartedAt: undefined,
+        };
+      }
+      return state;
     case "select_date":
       return state.step === "date_instruction" && Boolean(state.dateCategoryId)
         ? { ...state, step: "date_details" }
@@ -385,7 +473,8 @@ export const reduceGuidedOnboardingState = (
         ? {
             ...state,
             periodCategoryId: action.categoryId,
-            step: "period_instruction",
+            step: "period_category_reveal",
+            categoryRevealStartedAt: action.at ?? nowIso(),
           }
         : state;
     case "select_period":
@@ -405,8 +494,12 @@ export const reduceGuidedOnboardingState = (
         firstPeriodCreatedAt:
           state.firstPeriodCreatedAt ?? action.at ?? nowIso(),
       };
-    case "continue_from_edit":
+    case "open_edit_preview":
       return state.step === "edit_instruction"
+        ? { ...state, step: "edit_preview" }
+        : state;
+    case "finish_edit_preview":
+      return state.step === "edit_preview"
         ? { ...state, step: "calendar_instruction" }
         : state;
     case "open_calendar":
@@ -484,6 +577,7 @@ export const reduceGuidedOnboardingState = (
       return {
         ...state,
         step: "dismissed",
+        categoryRevealStartedAt: undefined,
         dismissedAt: action.at ?? nowIso(),
         completedAt: undefined,
       };

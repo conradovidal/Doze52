@@ -41,7 +41,9 @@ export function GuidedToolbarNoticeCard({
               {notice.stepLabel}
             </p>
           ) : null}
-          <p className="text-base font-semibold leading-5">{notice.title}</p>
+          <p className="text-balance text-base font-semibold leading-5">
+            {notice.title}
+          </p>
           <p className="mt-1 text-sm leading-5 text-muted-foreground">
             {notice.instruction}
           </p>

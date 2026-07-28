@@ -47,6 +47,7 @@ import {
   PRODUCT_ONBOARDING_RESET_EVENT,
   dispatchGuidedOnboarding,
   hasAuthorCalendarEvents,
+  getGuidedCategoryRevealRemainingMs,
   readGuidedOnboardingState,
   readProductOnboardingState,
   resetAllProductOnboarding,
@@ -1088,6 +1089,28 @@ export default function HomePage() {
     []
   );
 
+  React.useEffect(() => {
+    if (
+      guidedOnboarding?.step !== "date_category_reveal" &&
+      guidedOnboarding?.step !== "period_category_reveal"
+    ) {
+      return;
+    }
+
+    const remaining = getGuidedCategoryRevealRemainingMs(
+      guidedOnboarding.categoryRevealStartedAt
+    );
+    const timer = window.setTimeout(() => {
+      updateGuidedOnboarding({ type: "finish_category_reveal" });
+    }, remaining);
+
+    return () => window.clearTimeout(timer);
+  }, [
+    guidedOnboarding?.categoryRevealStartedAt,
+    guidedOnboarding?.step,
+    updateGuidedOnboarding,
+  ]);
+
   const handleConfigureGuidedContext = React.useCallback(
     (context: OnboardingContext) => {
       const configured = configureOnboardingContext({ context });
@@ -1614,19 +1637,35 @@ export default function HomePage() {
     if (!showGuidedOnboarding || !guidedOnboarding) return null;
     if (!guidedOnboarding.context) return null;
     if (
+      guidedOnboarding.step === "date_category_reveal" ||
       guidedOnboarding.step === "date_instruction" ||
       guidedOnboarding.step === "date_details"
     ) {
       return guidedOnboarding.dateCategoryId
-        ? { kind: "category", id: guidedOnboarding.dateCategoryId }
+        ? {
+            kind: "category",
+            id: guidedOnboarding.dateCategoryId,
+            effect:
+              guidedOnboarding.step === "date_category_reveal"
+                ? "reveal"
+                : "focus",
+          }
         : null;
     }
     if (
+      guidedOnboarding.step === "period_category_reveal" ||
       guidedOnboarding.step === "period_instruction" ||
       guidedOnboarding.step === "period_details"
     ) {
       return guidedOnboarding.periodCategoryId
-        ? { kind: "category", id: guidedOnboarding.periodCategoryId }
+        ? {
+            kind: "category",
+            id: guidedOnboarding.periodCategoryId,
+            effect:
+              guidedOnboarding.step === "period_category_reveal"
+                ? "reveal"
+                : "focus",
+          }
         : null;
     }
     return null;
@@ -1654,9 +1693,22 @@ export default function HomePage() {
     if (guidedOnboarding.step === "edit_instruction") {
       return {
         target: "edit",
-        title: "Edite contextos e categorias quando precisar.",
-        instruction: "Aqui você ajusta nomes, cores e organização.",
-        actionLabel: "Continuar",
+        title: "Veja como editar contextos e categorias.",
+        instruction:
+          isMobileCalendarUi === true
+            ? "Toque no lápis para abrir o modo de edição."
+            : "Clique no lápis para abrir o modo de edição.",
+        stepLabel: "Passo 4 de 7",
+      };
+    }
+    if (guidedOnboarding.step === "edit_preview") {
+      return {
+        target: "edit",
+        title: "Este é o modo de edição.",
+        instruction:
+          isMobileCalendarUi === true
+            ? "Aqui você poderá ajustar nomes, cores e organização. Toque em Finalizar para continuar."
+            : "Aqui você poderá ajustar nomes, cores e organização. Clique em Finalizar para continuar.",
         stepLabel: "Passo 4 de 7",
       };
     }
@@ -1671,9 +1723,8 @@ export default function HomePage() {
     if (guidedOnboarding.step === "year_instruction") {
       return {
         target: "year",
-        title: "Navegue entre os anos.",
-        instruction:
-          "Consulte o ano anterior, o atual e o próximo sem perder sua organização.",
+        title: "Explore outros anos.",
+        instruction: "Aqui você consulta o ano anterior, o atual e o próximo.",
         actionLabel: "Continuar",
         stepLabel: "Passo 6 de 7",
       };
@@ -1683,20 +1734,24 @@ export default function HomePage() {
         target: "theme",
         title: "Escolha o clima do seu ano.",
         instruction:
-          "Teste claro e escuro e fique com o que combina com você.",
-        actionLabel: "Continuar",
+          "Teste o tema claro e escuro e fique com o que combina mais com você.",
+        actionLabel: "Explorar meu ano",
         stepLabel: "Passo 7 de 7",
       };
     }
     return null;
-  }, [guidedOnboarding, showGuidedOnboarding]);
+  }, [guidedOnboarding, isMobileCalendarUi, showGuidedOnboarding]);
 
   const handleGuidedToolbarAction = React.useCallback((
     target: GuidedToolbarNotice["target"]
   ) => {
     const current = readGuidedOnboardingState();
     if (target === "edit" && current.step === "edit_instruction") {
-      updateGuidedOnboarding({ type: "continue_from_edit" });
+      updateGuidedOnboarding({ type: "open_edit_preview" });
+      return;
+    }
+    if (target === "edit" && current.step === "edit_preview") {
+      updateGuidedOnboarding({ type: "finish_edit_preview" });
       return;
     }
     if (target === "year" && current.step === "year_instruction") {
@@ -1815,6 +1870,7 @@ export default function HomePage() {
             guidedOnboarding?.step === "calendar_instruction" ||
             guidedOnboarding?.step === "calendar_selection"
           }
+          guidedEditPreviewActive={guidedOnboarding?.step === "edit_preview"}
           onboardingLayoutLocked={showGuidedOnboarding}
           onOpenAuthDialog={(anchorPoint) => {
             setAuthDialogInitialMode("login");

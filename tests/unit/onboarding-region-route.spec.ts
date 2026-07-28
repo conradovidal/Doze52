@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { POST } from "../../app/api/onboarding/region/route";
+import { ONBOARDING_VERSION } from "../../lib/onboarding-region";
 
 const createRequest = (
   body: unknown,
@@ -26,7 +27,9 @@ test("métrica regional não executa fora de produção", async () => {
   const previous = process.env.VERCEL_ENV;
   process.env.VERCEL_ENV = "preview";
   try {
-    const response = await POST(createRequest({ uf: "RS", onboardingVersion: 8 }));
+    const response = await POST(
+      createRequest({ uf: "RS", onboardingVersion: ONBOARDING_VERSION })
+    );
     expect(response.status).toBe(204);
   } finally {
     restoreVercelEnv(previous);
@@ -39,7 +42,7 @@ test("métrica regional exige mesma origem e payload exato", async () => {
   try {
     const crossOrigin = await POST(
       createRequest(
-        { uf: "RS", onboardingVersion: 8 },
+        { uf: "RS", onboardingVersion: ONBOARDING_VERSION },
         { origin: "https://outro.example", "sec-fetch-site": "cross-site" }
       )
     );
@@ -47,7 +50,11 @@ test("métrica regional exige mesma origem e payload exato", async () => {
 
     const invalidPayload = await POST(
       createRequest(
-        { uf: "RS", onboardingVersion: 8, visitorId: "não permitido" },
+        {
+          uf: "RS",
+          onboardingVersion: ONBOARDING_VERSION,
+          visitorId: "não permitido",
+        },
         {
           origin: "https://doze52.example",
           "sec-fetch-site": "same-origin",

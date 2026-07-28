@@ -52,6 +52,7 @@ type AppHeaderProps = {
   onGuidedCalendarClose?: () => void;
   onGuidedCalendarImported?: (uf?: string) => void;
   guidedCalendarSelectionActive?: boolean;
+  guidedEditPreviewActive?: boolean;
   onboardingLayoutLocked?: boolean;
   categoryCreateRequestKey?: number;
   onCategoryCreated?: (categoryId: string) => void;
@@ -79,6 +80,7 @@ export function AppHeader({
   onGuidedCalendarClose,
   onGuidedCalendarImported,
   guidedCalendarSelectionActive = false,
+  guidedEditPreviewActive = false,
   onboardingLayoutLocked = false,
   categoryCreateRequestKey = 0,
   onCategoryCreated,
@@ -101,6 +103,9 @@ export function AppHeader({
   const [areMobileFiltersCollapsed, setAreMobileFiltersCollapsed] =
     React.useState(false);
   const previousOnboardingLayoutLockedRef = React.useRef(false);
+  const effectiveInlineEditMode = onboardingLayoutLocked
+    ? guidedEditPreviewActive
+    : isInlineEditMode;
 
   const pendingProfileCreateRestoreRef = React.useRef<{
     knownProfileIds: string[];
@@ -123,10 +128,17 @@ export function AppHeader({
     onboardingFocusTarget?.kind === "profile" ? onboardingFocusTarget.id : null;
   const highlightedCategoryId =
     onboardingFocusTarget?.kind === "category" ? onboardingFocusTarget.id : null;
+  const highlightedCategoryEffect =
+    onboardingFocusTarget?.kind === "category"
+      ? onboardingFocusTarget.effect ?? "focus"
+      : "focus";
   const effectiveCategoriesExpanded =
-    categoriesExpanded || isInlineEditMode;
-  const filtersLocked = onboardingLayoutLocked && !isInlineEditMode;
-  const inlineEditDisabled = onboardingLayoutLocked;
+    categoriesExpanded ||
+    effectiveInlineEditMode ||
+    highlightedCategoryEffect === "reveal";
+  const filtersLocked = onboardingLayoutLocked;
+  const inlineEditDisabled =
+    onboardingLayoutLocked && guidedToolbarNotice?.target !== "edit";
   const calendarLauncherDisabled =
     onboardingLayoutLocked && !guidedCalendarSelectionActive;
   const yearSelectDisabled = onboardingLayoutLocked;
@@ -137,7 +149,8 @@ export function AppHeader({
   const showMobileFilterPanel =
     !isMobileMode ||
     !areMobileFiltersCollapsed ||
-    isInlineEditMode;
+    effectiveInlineEditMode ||
+    highlightedCategoryEffect === "reveal";
   const selectedProfile = React.useMemo(
     () =>
       profiles.find((profile) => selectedProfileIds.includes(profile.id)) ??
@@ -147,13 +160,13 @@ export function AppHeader({
   );
 
   React.useEffect(() => {
-    if (!isInlineEditMode) return;
+    if (!effectiveInlineEditMode) return;
     const profileIds = profiles.map((profile) => profile.id);
     setEditingProfileId((current) => {
       if (current && profileIds.includes(current)) return current;
       return getPreferredEditingProfileId(selectedProfileIds, profileIds);
     });
-  }, [isInlineEditMode, profiles, selectedProfileIds]);
+  }, [effectiveInlineEditMode, profiles, selectedProfileIds]);
 
   React.useEffect(() => {
     const wasOpen = previousProfileManagerOpenRef.current;
@@ -182,10 +195,10 @@ export function AppHeader({
   }, [profileManagerOpen, profiles, setSelectedProfiles]);
 
   React.useEffect(() => {
-    if (isInlineEditMode) {
+    if (effectiveInlineEditMode) {
       setAreMobileFiltersCollapsed(false);
     }
-  }, [isInlineEditMode]);
+  }, [effectiveInlineEditMode]);
 
   React.useEffect(() => {
     const wasLocked = previousOnboardingLayoutLockedRef.current;
@@ -235,16 +248,24 @@ export function AppHeader({
   }, [categories, highlightedCategoryId, setCategoriesVisibility]);
 
   const toggleInlineEditMode = React.useCallback(() => {
-    const next = !isInlineEditMode;
+    const next = !effectiveInlineEditMode;
     if (next) {
       const profileIds = profiles.map((profile) => profile.id);
       setEditingProfileId(
         getPreferredEditingProfileId(selectedProfileIds, profileIds)
       );
     }
-    setIsInlineEditMode(next);
+    if (!onboardingLayoutLocked) {
+      setIsInlineEditMode(next);
+    }
+    if (guidedToolbarNotice?.target === "edit") {
+      onGuidedToolbarAction?.("edit");
+    }
   }, [
-    isInlineEditMode,
+    guidedToolbarNotice?.target,
+    effectiveInlineEditMode,
+    onboardingLayoutLocked,
+    onGuidedToolbarAction,
     profiles,
     selectedProfileIds,
   ]);
@@ -306,7 +327,7 @@ export function AppHeader({
                 }
                 className="relative shrink-0"
               >
-                {isInlineEditMode ? (
+                {effectiveInlineEditMode ? (
                   <Button
                     type="button"
                     data-onboarding-edit-control
@@ -569,7 +590,7 @@ export function AppHeader({
                       compact
                       mobileDense
                       className="w-full"
-                      isInlineEditMode={isInlineEditMode}
+                      isInlineEditMode={effectiveInlineEditMode}
                       editingProfileId={editingProfileId}
                       onEditingProfileChange={setEditingProfileId}
                       onCreateProfile={openCreateProfile}
@@ -582,11 +603,12 @@ export function AppHeader({
                     <CategoryBar
                       compact
                       mobileDense
-                      isInlineEditMode={isInlineEditMode}
+                      isInlineEditMode={effectiveInlineEditMode}
                       editingProfileId={editingProfileId}
                       onCreateCategory={openCreateCategory}
                       onEditCategory={openEditCategory}
                       highlightedCategoryId={highlightedCategoryId}
+                      highlightedCategoryEffect={highlightedCategoryEffect}
                     />
                   </div>
                 </div>
@@ -600,7 +622,7 @@ export function AppHeader({
                     <ProfileBar
                       compact
                       className="w-max flex-nowrap justify-start sm:w-auto"
-                      isInlineEditMode={isInlineEditMode}
+                      isInlineEditMode={effectiveInlineEditMode}
                       editingProfileId={editingProfileId}
                       onEditingProfileChange={setEditingProfileId}
                       onCreateProfile={openCreateProfile}
@@ -611,16 +633,16 @@ export function AppHeader({
                     <button
                       type="button"
                       className={`${categoryToggleClass} ${
-                        isInlineEditMode
+                        effectiveInlineEditMode
                           ? "cursor-default opacity-70 hover:border-border hover:bg-card hover:text-foreground/70 active:translate-y-0"
                           : ""
                       }`}
-                      disabled={isInlineEditMode}
+                      disabled={effectiveInlineEditMode}
                       onClick={() =>
                         setCategoriesExpanded(!categoriesExpanded)
                       }
                       aria-label={
-                        isInlineEditMode
+                        effectiveInlineEditMode
                           ? "Categorias abertas durante a edicao"
                           : effectiveCategoriesExpanded
                             ? "Recolher categorias"
@@ -633,7 +655,7 @@ export function AppHeader({
                           : undefined
                       }
                       title={
-                        isInlineEditMode
+                        effectiveInlineEditMode
                           ? "Categorias abertas durante a edicao"
                           : effectiveCategoriesExpanded
                             ? "Recolher categorias"
@@ -660,11 +682,12 @@ export function AppHeader({
                     <CategoryBar
                       compact
                       className="w-max min-w-full flex-nowrap justify-start sm:w-full sm:flex-wrap sm:justify-center"
-                      isInlineEditMode={isInlineEditMode}
+                      isInlineEditMode={effectiveInlineEditMode}
                       editingProfileId={editingProfileId}
                       onCreateCategory={openCreateCategory}
                       onEditCategory={openEditCategory}
                       highlightedCategoryId={highlightedCategoryId}
+                      highlightedCategoryEffect={highlightedCategoryEffect}
                     />
                   </div>
                 </div>

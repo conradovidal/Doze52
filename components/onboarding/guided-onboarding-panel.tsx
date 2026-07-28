@@ -78,15 +78,14 @@ const CONTEXT_OPTIONS = [
   {
     value: "personal" as const,
     title: "Pessoal",
-    description:
-      "Relações, saúde, viagens e projetos que fazem parte da sua vida.",
+    description: "Para cuidar de relações, planos e momentos da sua vida.",
     icon: UserRound,
   },
   {
     value: "work" as const,
     title: "Profissional",
     description:
-      "Entregas, compromissos e conquistas que movimentam o seu trabalho.",
+      "Para acompanhar entregas, compromissos e conquistas do seu trabalho.",
     icon: BriefcaseBusiness,
   },
 ];
@@ -124,17 +123,20 @@ const getDateCopy = (
       return {
         title: "Adicione uma entrega importante.",
         description: "Escolha o dia dessa entrega.",
-        prompt: "O que você entregou?",
+        prompt: "Qual é essa entrega?",
         placeholder: "Ex.: Lançamento do produto",
       };
     }
     return {
       title:
         context === "personal"
-          ? "Adicione uma data importante."
-          : "Adicione uma data profissional importante.",
+          ? "Adicione uma data importante para você."
+          : "Adicione uma data importante do seu trabalho.",
       description: "Escolha o dia no calendário.",
-      prompt: "O que torna essa data importante?",
+      prompt:
+        context === "personal"
+          ? "O que torna essa data importante?"
+          : "O que essa data representa para o seu trabalho?",
       placeholder: "Ex.: Uma conquista importante",
     };
   }
@@ -151,7 +153,7 @@ const getDateCopy = (
     return {
       title: "Agora adicione outra entrega importante.",
       description: "Escolha o dia dessa entrega.",
-      prompt: "O que você vai entregar?",
+      prompt: "Qual é essa entrega?",
       placeholder: "Ex.: Lançamento do produto",
     };
   }
@@ -159,9 +161,12 @@ const getDateCopy = (
     title:
       context === "personal"
         ? "Agora adicione outra data importante."
-        : "Agora adicione outra data profissional importante.",
+        : "Agora adicione outra data importante do seu trabalho.",
     description: "Escolha outro dia no calendário.",
-    prompt: "O que torna essa data importante?",
+    prompt:
+      context === "personal"
+        ? "O que torna essa data importante?"
+        : "O que essa data representa para o seu trabalho?",
     placeholder: "Ex.: Uma conquista importante",
   };
 };
@@ -177,9 +182,9 @@ const getPeriodCopy = (
   if (itemCount === 0) {
     if (isTravel) {
       return {
-        title: "Adicione uma viagem ou férias importantes.",
+        title: "Adicione uma viagem ou um período de férias.",
         description: "Marque do primeiro ao último dia.",
-        prompt: "Que viagem foi essa?",
+        prompt: "Que viagem ou férias são essas?",
         placeholder: "Ex.: Viagem em família",
       };
     }
@@ -187,17 +192,20 @@ const getPeriodCopy = (
       return {
         title: "Adicione um projeto importante.",
         description: "Selecione o primeiro e o último dia.",
-        prompt: "Qual foi esse projeto?",
+        prompt: "Qual é esse projeto?",
         placeholder: "Ex.: Projeto concluído",
       };
     }
     return {
       title:
         context === "personal"
-          ? "Adicione um período importante."
-          : "Adicione um período profissional importante.",
+          ? "Adicione um período importante para você."
+          : "Adicione um período importante do seu trabalho.",
       description: "Selecione o primeiro e o último dia desse período.",
-      prompt: "O que ocupou esse período?",
+      prompt:
+        context === "personal"
+          ? "O que torna esse período importante?"
+          : "O que esse período representa no seu trabalho?",
       placeholder: "Ex.: Um período importante",
     };
   }
@@ -222,9 +230,12 @@ const getPeriodCopy = (
     title:
       context === "personal"
         ? "Agora adicione outro período importante."
-        : "Agora adicione outro período profissional importante.",
+        : "Agora adicione outro período importante do seu trabalho.",
     description: "Selecione o primeiro e o último dia.",
-    prompt: "O que vai ocupar esse período?",
+    prompt:
+      context === "personal"
+        ? "O que torna esse período importante?"
+        : "O que esse período representa no seu trabalho?",
     placeholder: "Ex.: Um período importante",
   };
 };
@@ -239,36 +250,29 @@ export const getGuidedSelectionNotice = ({
   mobileRangeStart?: string | null;
 }): GuidedSelectionNotice | null => {
   if (state.step === "date_instruction") {
-    const firstItem = (state.dateItemsCreated ?? 0) === 0;
-    const isBirthday =
-      state.dateCategoryId === ONBOARDING_CATEGORY_IDS.birthday;
+    const copy = getDateCopy(
+      state.context ?? "personal",
+      state.dateCategoryId,
+      state.dateItemsCreated ?? 0
+    );
     return {
       mode: "date",
-      title: isBirthday
-        ? firstItem
-          ? "Adicione o aniversário de alguém importante."
-          : "Agora adicione o aniversário de outra pessoa importante."
-        : firstItem
-          ? "Adicione uma data importante."
-          : "Agora adicione outra data importante.",
+      title: copy.title,
       instruction: isMobile ? "Toque no dia." : "Clique no dia.",
     };
   }
   if (state.step !== "period_instruction") return null;
-  const firstItem = (state.periodItemsCreated ?? 0) === 0;
-  const isTravel = state.periodCategoryId === ONBOARDING_CATEGORY_IDS.travel;
+  const copy = getPeriodCopy(
+    state.context ?? "personal",
+    state.periodCategoryId,
+    state.periodItemsCreated ?? 0
+  );
   return {
     mode: "period",
     title:
       isMobile && mobileRangeStart
         ? "Agora escolha o último dia."
-        : isTravel
-          ? firstItem
-            ? "Adicione uma viagem ou férias importantes."
-            : "Agora adicione outra viagem ou período de férias."
-          : firstItem
-            ? "Adicione um período importante."
-            : "Agora adicione outro período importante.",
+        : copy.title,
     instruction:
       isMobile && mobileRangeStart
         ? `Início em ${formatDate(mobileRangeStart)}.`
@@ -477,13 +481,11 @@ export function GuidedOnboardingPanel({
     if (state.step === "context_selection") {
       return (
         <>
-          <h2 className="mt-4 text-xl font-semibold tracking-[-0.025em]">
-            Qual contexto merece mais a sua atenção agora?
+          <h2 className="mt-4 max-w-[30rem] text-balance text-xl font-semibold tracking-[-0.025em]">
+            Por qual contexto você quer começar?
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Ao fundo está o ano de alguém com prioridades próprias, como você.
-            Escolha onde quer começar e vamos dar visibilidade ao que importa
-            no seu.
+            Escolha onde começar a dar visibilidade ao que importa para você.
           </p>
           <div className="mt-4 grid gap-2">
             {CONTEXT_OPTIONS.map((option) => {
@@ -517,12 +519,13 @@ export function GuidedOnboardingPanel({
     if (state.step === "date_category_selection") {
       return (
         <>
-          <h2 className="mt-4 text-lg font-semibold tracking-[-0.02em]">
-            Como vamos começar a dar vida ao seu ano?
+          <h2 className="mt-4 max-w-[30rem] text-balance text-lg font-semibold tracking-[-0.02em]">
+            O que você quer tornar visível primeiro?
           </h2>
           <p className="mt-1 text-sm leading-5 text-muted-foreground">
-            Seu contexto está pronto. Comece pelo aniversário de alguém querido
-            ou por uma data importante.
+            {context === "personal"
+              ? "Seu contexto Pessoal está pronto. Comece pelo aniversário de alguém importante ou por uma data que você quer lembrar."
+              : "Seu contexto Profissional está pronto. Comece por uma entrega ou por uma data importante do seu trabalho."}
           </p>
           {renderCategoryChoices("date")}
         </>
@@ -532,12 +535,13 @@ export function GuidedOnboardingPanel({
     if (state.step === "period_category_selection") {
       return (
         <>
-          <h2 className="mt-4 text-lg font-semibold tracking-[-0.02em]">
-            Traga visibilidade aos períodos importantes do seu ano.
+          <h2 className="mt-4 max-w-[30rem] text-balance text-lg font-semibold tracking-[-0.02em]">
+            Quais períodos você quer tornar visíveis?
           </h2>
           <p className="mt-1 text-sm leading-5 text-muted-foreground">
-            Férias, viagens e outros períodos também ajudam a contar a história
-            do seu ano.
+            {context === "personal"
+              ? "Férias, viagens e outros períodos também ajudam a contar a história do seu ano."
+              : "Projetos e outros períodos importantes mostram como seu trabalho se distribui ao longo do ano."}
           </p>
           {renderCategoryChoices("period")}
         </>

@@ -413,9 +413,19 @@ export function CalendarPackLauncher({
       <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent className="max-h-[calc(100dvh-1.5rem)] overflow-y-auto p-4 sm:max-w-[600px] sm:p-6">
           <DialogHeader className="pr-8 text-left">
-            <DialogTitle>Calendários</DialogTitle>
+            <DialogTitle>
+              {guidedVariantGroupId
+                ? "Adicione os feriados do seu estado"
+                : "Calendários"}
+            </DialogTitle>
             <DialogDescription>
-              Adicione calendários prontos ao seu ano.
+              {guidedVariantGroupId
+                ? `Escolha sua UF para incluir este calendário no contexto ${
+                    activeProfileId
+                      ? profileNameById.get(activeProfileId) ?? "criado"
+                      : "criado"
+                  }.`
+                : "Adicione calendários prontos ao seu ano."}
             </DialogDescription>
           </DialogHeader>
 

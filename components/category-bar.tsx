@@ -84,6 +84,7 @@ type CategoryBarProps = {
   onCreateCategory?: () => void;
   onEditCategory?: (categoryId: string) => void;
   highlightedCategoryId?: string | null;
+  highlightedCategoryEffect?: "focus" | "reveal";
 };
 
 type DragState = {
@@ -329,6 +330,7 @@ export function CategoryBar({
   onCreateCategory,
   onEditCategory,
   highlightedCategoryId,
+  highlightedCategoryEffect = "focus",
 }: CategoryBarProps) {
   const { mode: themeMode } = useTheme();
   const selectedProfileIds = useStore((s) => s.selectedProfileIds);
@@ -501,6 +503,11 @@ export function CategoryBar({
               data-onboarding-highlighted={
                 highlightedCategoryId === category.id ? "true" : undefined
               }
+              data-onboarding-highlight-effect={
+                highlightedCategoryId === category.id
+                  ? highlightedCategoryEffect
+                  : undefined
+              }
               aria-pressed={category.visible}
               onClick={() => toggleCategoryVisibility(category.id)}
               title={category.name}
@@ -513,7 +520,9 @@ export function CategoryBar({
                   ? "hover:brightness-[0.985]"
                   : "border-dashed bg-card/80 text-muted-foreground/75 hover:border-foreground/18 hover:bg-muted hover:text-foreground",
                 highlightedCategoryId === category.id &&
-                  "relative z-[46] ring-2 ring-primary ring-offset-2 ring-offset-background shadow-[0_0_0_7px_hsl(var(--primary)/0.12)] motion-safe:animate-[pulse_700ms_ease-in-out_2]"
+                  (highlightedCategoryEffect === "reveal"
+                    ? "onboarding-category-reveal relative z-[46]"
+                    : "onboarding-category-focus relative z-[46]")
               )}
               style={{
                 ...(mobileDense ? MOBILE_CHIP_BUTTON_STYLE : {}),

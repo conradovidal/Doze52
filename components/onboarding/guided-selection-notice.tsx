@@ -28,7 +28,7 @@ export function GuidedCalendarNotice({
         <CalendarDays className="size-5" aria-hidden="true" />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-base font-semibold leading-5.5 sm:text-lg">
+        <p className="max-w-[30rem] text-balance text-base font-semibold leading-5.5 sm:text-lg">
           {notice.title}
         </p>
         <p className="mt-1 text-sm leading-5 text-muted-foreground">
