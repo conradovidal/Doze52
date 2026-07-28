@@ -32,6 +32,7 @@ type MobileCalendarExperienceProps = {
   }) => void;
   guidedSelectionMode?: "date" | "period" | null;
   guidedRangeStart?: string | null;
+  guidedSelectionRange?: { startDate: string; endDate: string } | null;
   onGuidedDaySelect?: (dateIso: string) => void;
 };
 
@@ -159,6 +160,7 @@ export function MobileCalendarExperience({
   onEditEvent,
   guidedSelectionMode = null,
   guidedRangeStart = null,
+  guidedSelectionRange = null,
   onGuidedDaySelect,
 }: MobileCalendarExperienceProps) {
   const categories = useStore((s) => s.categories as CategoryItem[]);
@@ -548,6 +550,11 @@ export function MobileCalendarExperience({
             const weekday = WEEKDAY_SHORT_LABELS[day.getDay()];
             const guidedSelectable = Boolean(guidedSelectionMode && onGuidedDaySelect);
             const guidedStart = guidedRangeStart === dayIso;
+            const guidedSelected = Boolean(
+              guidedSelectionRange &&
+                dayIso >= guidedSelectionRange.startDate &&
+                dayIso <= guidedSelectionRange.endDate
+            );
 
             return (
               <article
@@ -556,6 +563,7 @@ export function MobileCalendarExperience({
                 data-date-iso={dayIso}
                 data-month-index={day.getMonth()}
                 data-day-state={today ? "today" : isPast ? "past" : "future"}
+                data-guided-selected={guidedSelected ? "true" : undefined}
                 className={cn(
                   "grid min-h-[4.75rem] grid-cols-[3.75rem_minmax(0,1fr)] gap-2 rounded-[8px] border p-2 transition-[background-color,border-color,box-shadow]",
                   isPast
@@ -569,7 +577,8 @@ export function MobileCalendarExperience({
                     ? "border-foreground/70 shadow-[0_12px_24px_-22px_rgba(15,23,42,0.55)]"
                     : "border-border",
                   guidedSelectable && "ring-1 ring-primary/15",
-                  guidedStart && "border-primary bg-primary/8 ring-2 ring-primary/30"
+                  (guidedStart || guidedSelected) &&
+                    "border-primary bg-primary/8 ring-2 ring-primary/30"
                 )}
               >
                 <button

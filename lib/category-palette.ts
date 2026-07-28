@@ -25,17 +25,21 @@ export const CATEGORY_COLOR_BASE_PINK = "#F09CCF";
 export const CATEGORY_COLOR_BASE_ROSE = "#F4A6B8";
 export const CATEGORY_COLOR_BASE_RED = "#EF8F8F";
 export const CATEGORY_COLOR_BASE_ORANGE = "#EBA16D";
+export const CATEGORY_COLOR_BASE_CORAL = "#EE9275";
 export const CATEGORY_COLOR_BASE_AMBER = "#E7B957";
 export const CATEGORY_COLOR_BASE_YELLOW = "#E1D15D";
 export const CATEGORY_COLOR_BASE_LIME = "#A8CD6C";
 export const CATEGORY_COLOR_BASE_GREEN = "#58B76F";
 export const CATEGORY_COLOR_BASE_EMERALD = "#86C7A0";
 export const CATEGORY_COLOR_BASE_MINT = "#5EC9C5";
+export const CATEGORY_COLOR_BASE_TEAL = "#55B5A8";
 export const CATEGORY_COLOR_BASE_CYAN = "#72CFE3";
 export const CATEGORY_COLOR_BASE_SKY = "#93C5FD";
 export const CATEGORY_COLOR_BASE_SLATE = "#CBD5E1";
 export const CATEGORY_COLOR_BASE_ZINC = "#D0D3DA";
 export const CATEGORY_COLOR_BASE_TERRA = "#D6A060";
+export const CATEGORY_COLOR_BASE_OLIVE = "#B7B86F";
+export const CATEGORY_COLOR_BASE_SAND = "#D9BE8C";
 export const CATEGORY_COLOR_BASE_GRAPHITE = "#9CA6B4";
 
 export const DEFAULT_CATEGORY_COLOR = CATEGORY_COLOR_BASE_BLUE;
@@ -122,6 +126,16 @@ export const CATEGORY_COLOR_TOKENS = [
     text: "#7D3F13",
   },
   {
+    id: "coral",
+    label: "Coral",
+    base: CATEGORY_COLOR_BASE_CORAL,
+    chipSoft: "#FCE5DE",
+    chipBorder: "#F2AA96",
+    eventSoft: "#F2AA96",
+    eventBorder: "#EE9275",
+    text: "#7E3524",
+  },
+  {
     id: "amber",
     label: "Âmbar",
     base: CATEGORY_COLOR_BASE_AMBER,
@@ -182,6 +196,16 @@ export const CATEGORY_COLOR_TOKENS = [
     text: "#0B5E5A",
   },
   {
+    id: "teal",
+    label: "Teal",
+    base: CATEGORY_COLOR_BASE_TEAL,
+    chipSoft: "#DDF2ED",
+    chipBorder: "#82C9BE",
+    eventSoft: "#82C9BE",
+    eventBorder: "#55B5A8",
+    text: "#155A51",
+  },
+  {
     id: "cyan",
     label: "Ciano",
     base: CATEGORY_COLOR_BASE_CYAN,
@@ -232,6 +256,26 @@ export const CATEGORY_COLOR_TOKENS = [
     text: "#704512",
   },
   {
+    id: "olive",
+    label: "Oliva",
+    base: CATEGORY_COLOR_BASE_OLIVE,
+    chipSoft: "#F0F0D9",
+    chipBorder: "#CBCC91",
+    eventSoft: "#CBCC91",
+    eventBorder: "#B7B86F",
+    text: "#555522",
+  },
+  {
+    id: "sand",
+    label: "Areia",
+    base: CATEGORY_COLOR_BASE_SAND,
+    chipSoft: "#F5EDDE",
+    chipBorder: "#E2CAA0",
+    eventSoft: "#E2CAA0",
+    eventBorder: "#D9BE8C",
+    text: "#654D25",
+  },
+  {
     id: "graphite",
     label: "Grafite",
     base: CATEGORY_COLOR_BASE_GRAPHITE,
@@ -248,25 +292,29 @@ export const CATEGORY_COLOR_SETS = [
     id: "pastel",
     label: "Pastel",
     colors: [
-      CATEGORY_COLOR_BASE_BLUE,
-      CATEGORY_COLOR_BASE_INDIGO,
-      CATEGORY_COLOR_BASE_VIOLET,
-      CATEGORY_COLOR_BASE_PURPLE,
-      CATEGORY_COLOR_BASE_PINK,
-      CATEGORY_COLOR_BASE_ROSE,
-      CATEGORY_COLOR_BASE_RED,
-      CATEGORY_COLOR_BASE_ORANGE,
-      CATEGORY_COLOR_BASE_AMBER,
       CATEGORY_COLOR_BASE_YELLOW,
-      CATEGORY_COLOR_BASE_LIME,
-      CATEGORY_COLOR_BASE_GREEN,
-      CATEGORY_COLOR_BASE_EMERALD,
-      CATEGORY_COLOR_BASE_MINT,
-      CATEGORY_COLOR_BASE_CYAN,
+      CATEGORY_COLOR_BASE_AMBER,
+      CATEGORY_COLOR_BASE_ORANGE,
+      CATEGORY_COLOR_BASE_CORAL,
+      CATEGORY_COLOR_BASE_RED,
+      CATEGORY_COLOR_BASE_ROSE,
+      CATEGORY_COLOR_BASE_PINK,
+      CATEGORY_COLOR_BASE_PURPLE,
+      CATEGORY_COLOR_BASE_VIOLET,
+      CATEGORY_COLOR_BASE_INDIGO,
+      CATEGORY_COLOR_BASE_BLUE,
       CATEGORY_COLOR_BASE_SKY,
+      CATEGORY_COLOR_BASE_CYAN,
+      CATEGORY_COLOR_BASE_MINT,
+      CATEGORY_COLOR_BASE_TEAL,
+      CATEGORY_COLOR_BASE_EMERALD,
+      CATEGORY_COLOR_BASE_GREEN,
+      CATEGORY_COLOR_BASE_LIME,
+      CATEGORY_COLOR_BASE_OLIVE,
+      CATEGORY_COLOR_BASE_TERRA,
+      CATEGORY_COLOR_BASE_SAND,
       CATEGORY_COLOR_BASE_SLATE,
       CATEGORY_COLOR_BASE_ZINC,
-      CATEGORY_COLOR_BASE_TERRA,
       CATEGORY_COLOR_BASE_GRAPHITE,
     ],
   },
@@ -291,6 +339,7 @@ const CATEGORY_COLOR_ALIASES = new Map<string, string>([
   ["#e11d48", CATEGORY_COLOR_BASE_ROSE],
   ["#dc2626", CATEGORY_COLOR_BASE_RED],
   ["#ea580c", CATEGORY_COLOR_BASE_ORANGE],
+  ["#f97316", CATEGORY_COLOR_BASE_CORAL],
   ["#d97706", CATEGORY_COLOR_BASE_AMBER],
   ["#ca8a04", CATEGORY_COLOR_BASE_YELLOW],
   ["#65a30d", CATEGORY_COLOR_BASE_LIME],
@@ -298,11 +347,14 @@ const CATEGORY_COLOR_ALIASES = new Map<string, string>([
   ["#059669", CATEGORY_COLOR_BASE_EMERALD],
   ["#0d9488", CATEGORY_COLOR_BASE_MINT],
   ["#0f766e", CATEGORY_COLOR_BASE_MINT],
+  ["#14b8a6", CATEGORY_COLOR_BASE_TEAL],
   ["#0891b2", CATEGORY_COLOR_BASE_CYAN],
   ["#0284c7", CATEGORY_COLOR_BASE_SKY],
   ["#475569", CATEGORY_COLOR_BASE_SLATE],
   ["#52525b", CATEGORY_COLOR_BASE_ZINC],
   ["#a16207", CATEGORY_COLOR_BASE_TERRA],
+  ["#7c8a35", CATEGORY_COLOR_BASE_OLIVE],
+  ["#b08968", CATEGORY_COLOR_BASE_SAND],
   ["#1f2937", CATEGORY_COLOR_BASE_GRAPHITE],
 ]);
 

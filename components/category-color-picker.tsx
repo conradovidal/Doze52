@@ -10,8 +10,9 @@ import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 
 type CategoryColorPickerProps = {
-  value: string;
+  value?: string | null;
   onChange: (color: string) => void;
+  colors?: readonly string[];
   compact?: boolean;
   className?: string;
   ariaLabel?: string;
@@ -20,12 +21,18 @@ type CategoryColorPickerProps = {
 export function CategoryColorPicker({
   value,
   onChange,
+  colors,
   compact = false,
   className,
   ariaLabel = "Cor da categoria",
 }: CategoryColorPickerProps) {
   const { mode } = useTheme();
-  const normalizedValue = getNearestCategoryColor(value).toLowerCase();
+  const normalizedValue = value
+    ? getNearestCategoryColor(value).toLowerCase()
+    : null;
+  const colorSets = colors
+    ? [{ id: "custom", label: "Cores", colors }]
+    : CATEGORY_COLOR_SETS;
 
   return (
     <div
@@ -34,7 +41,7 @@ export function CategoryColorPicker({
       className={cn("w-full space-y-3.5", className)}
       aria-label={ariaLabel}
     >
-      {CATEGORY_COLOR_SETS.map((set, index) => (
+      {colorSets.map((set, index) => (
         <fieldset
           key={set.id}
           className={cn(
@@ -75,9 +82,9 @@ export function CategoryColorPicker({
                     <Check
                       aria-hidden="true"
                       className={cn(
-                        "text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.55)]",
                         compact ? "size-3.5" : "size-4"
                       )}
+                      style={{ color: token.text }}
                       strokeWidth={3}
                     />
                   ) : null}

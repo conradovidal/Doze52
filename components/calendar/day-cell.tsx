@@ -78,6 +78,7 @@ export function DayCell({
     <div
       data-day-cell
       data-day-iso={dateIso}
+      data-range-selected={isRangeSelected ? "true" : undefined}
       className={`group relative flex w-full cursor-pointer flex-col px-1 py-1 ring-1 ring-inset transition-[background-color,box-shadow] duration-150 ${dayToneClass} ${
         today
           ? "ring-neutral-900 shadow-[inset_0_0_0_1px_rgba(23,23,23,0.06)] dark:ring-neutral-100 dark:shadow-none"

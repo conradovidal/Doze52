@@ -67,6 +67,7 @@ import {
 } from "@/lib/snapshot-ownership";
 import { cn } from "@/lib/utils";
 import type { AnchorPoint } from "@/lib/types";
+import { useTheme } from "@/lib/theme";
 
 const toSnapshotHash = (snapshot: CalendarSnapshot) => JSON.stringify(snapshot);
 
@@ -246,6 +247,7 @@ const mergeSnapshots = (
 
 export default function HomePage() {
   const { notify } = useFeedback();
+  const { mode: themeMode, setTheme } = useTheme();
 
   const initialYear = React.useMemo(() => {
     const currentYear = new Date().getFullYear();
@@ -1671,26 +1673,32 @@ export default function HomePage() {
     if (guidedOnboarding.step === "edit_instruction") {
       return {
         target: "edit",
-        title: "Edite do seu jeito.",
-        instruction: "Clique no lápis.",
+        title: "Clique aqui para editar seus contextos e categorias.",
+        instruction: "Você poderá ajustar nomes, cores e organização.",
       };
     }
     if (guidedOnboarding.step === "edit_active") {
       return {
         target: "edit",
-        title: "Contextos e categorias estão liberados.",
-        instruction: "Agora clique em Finalizar.",
+        title:
+          "Agora seus contextos e categorias estão disponíveis para serem editados.",
+        instruction:
+          isMobileCalendarUi === true
+            ? "Toque aqui para finalizar a edição."
+            : "Clique aqui para finalizar a edição.",
       };
     }
     if (guidedOnboarding.step === "theme_instruction") {
       return {
         target: "theme",
         title: "Escolha o clima do seu ano.",
-        instruction: "Alterne entre claro e escuro.",
+        instruction:
+          "Teste claro e escuro e fique com o que combina com você.",
+        actionLabel: "Continuar",
       };
     }
     return null;
-  }, [guidedOnboarding, showGuidedOnboarding]);
+  }, [guidedOnboarding, isMobileCalendarUi, showGuidedOnboarding]);
 
   const handleGuidedEditModeChange = React.useCallback(
     (active: boolean) => {
@@ -1704,12 +1712,13 @@ export default function HomePage() {
     [updateGuidedOnboarding]
   );
 
-  const handleGuidedThemeChange = React.useCallback(() => {
+  const handleGuidedThemeConfirm = React.useCallback(() => {
     const current = readGuidedOnboardingState();
     if (current.step === "theme_instruction") {
-      updateGuidedOnboarding({ type: "choose_theme" });
+      setTheme(themeMode);
+      updateGuidedOnboarding({ type: "confirm_theme" });
     }
-  }, [updateGuidedOnboarding]);
+  }, [setTheme, themeMode, updateGuidedOnboarding]);
 
   const handleYearChange = React.useCallback(
     (nextYear: number) => {
@@ -1772,7 +1781,7 @@ export default function HomePage() {
           guidedToolbarNotice={guidedToolbarNotice}
           onDismissGuidedSelection={dismissGuidedOnboarding}
           onGuidedEditModeChange={handleGuidedEditModeChange}
-          onGuidedThemeChange={handleGuidedThemeChange}
+          onGuidedThemeConfirm={handleGuidedThemeConfirm}
           onboardingLayoutLocked={showGuidedOnboarding}
           categoryCreateRequestKey={categoryCreateRequestKey}
           onCategoryCreated={() =>
@@ -1807,6 +1816,7 @@ export default function HomePage() {
                 : null
           }
           guidedRangeStart={mobileGuidedRangeStart}
+          guidedSelectionRange={guidedDraft}
           onGuidedDaySelect={handleMobileGuidedDaySelect}
         />
       ) : (
@@ -1831,6 +1841,7 @@ export default function HomePage() {
               events={renderEvents}
               onEditEvent={handleEditEvent}
               creatingRange={creatingRange}
+              guidedSelectionRange={guidedDraft}
               onStartCreateRange={handleStartCreateRange}
               onHoverCreateRange={handleHoverCreateRange}
               onFinishCreateRange={handleFinishCreateRange}

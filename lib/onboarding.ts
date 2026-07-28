@@ -32,7 +32,7 @@ export type GuidedOnboardingStep =
   | "dismissed";
 
 export type GuidedOnboardingState = {
-  version: 5;
+  version: 6;
   step: GuidedOnboardingStep;
   context?: OnboardingContext;
   startedAt?: string;
@@ -43,6 +43,7 @@ export type GuidedOnboardingState = {
   periodItemsCreated?: number;
   firstDateCreatedAt?: string;
   firstPeriodCreatedAt?: string;
+  themeConfirmedAt?: string;
   postOnboardingEventsCreated?: number;
   postOnboardingCategoriesCreated?: number;
   accountNudgeShownAt?: string;
@@ -62,7 +63,7 @@ export type GuidedOnboardingAction =
   | { type: "period_saved"; at?: string }
   | { type: "open_inline_edit" }
   | { type: "close_inline_edit" }
-  | { type: "choose_theme" }
+  | { type: "confirm_theme"; at?: string }
   | { type: "complete"; at?: string }
   | { type: "record_post_onboarding_event"; at?: string }
   | { type: "record_post_onboarding_category"; at?: string }
@@ -87,6 +88,7 @@ type LegacyGuidedOnboardingState = {
   firstItemCreatedAt?: string;
   firstDateCreatedAt?: string;
   firstPeriodCreatedAt?: string;
+  themeConfirmedAt?: string;
   dateItemsCreated?: number;
   periodItemsCreated?: number;
   completedAt?: string;
@@ -99,7 +101,7 @@ export const PRODUCT_ONBOARDING_RESET_EVENT = "doze52:onboarding-reset";
 export const GUIDED_ONBOARDING_CHANGE_EVENT = "doze52:onboarding-change";
 
 const initialGuidedState = (): GuidedOnboardingState => ({
-  version: 5,
+  version: 6,
   step: "context_selection",
 });
 
@@ -170,11 +172,13 @@ export const migrateGuidedOnboardingState = (
   };
 
   if (
-    (candidate.version === 4 || candidate.version === 5) &&
+    (candidate.version === 4 ||
+      candidate.version === 5 ||
+      candidate.version === 6) &&
     isGuidedStep(candidate.step)
   ) {
     return {
-      version: 5,
+      version: 6,
       step: candidate.step,
       context: isContext(candidate.context) ? candidate.context : undefined,
       startedAt: candidate.startedAt,
@@ -201,6 +205,12 @@ export const migrateGuidedOnboardingState = (
             : 0,
       firstDateCreatedAt: candidate.firstDateCreatedAt,
       firstPeriodCreatedAt: candidate.firstPeriodCreatedAt,
+      themeConfirmedAt:
+        typeof candidate.themeConfirmedAt === "string"
+          ? candidate.themeConfirmedAt
+          : candidate.version === 5 && candidate.step === "completion_choice"
+            ? candidate.completedAt ?? nowIso()
+            : undefined,
       postOnboardingEventsCreated:
         typeof candidate.postOnboardingEventsCreated === "number"
           ? Math.max(0, candidate.postOnboardingEventsCreated)
@@ -223,7 +233,7 @@ export const migrateGuidedOnboardingState = (
       candidate.step === "completed" || candidate.step === "dismissed";
     const preserveAsCompleted = !terminal && hasLegacyProgress(candidate);
     return {
-      version: 5,
+      version: 6,
       step: terminal
         ? (candidate.step as "completed" | "dismissed")
         : preserveAsCompleted
@@ -295,7 +305,7 @@ export const reduceGuidedOnboardingState = (
         ...state,
         step:
           nextDateCount >= 2
-            ? "period_category_selection"
+            ? "theme_instruction"
             : "date_instruction",
         dateItemsCreated: nextDateCount,
         firstDateCreatedAt: state.firstDateCreatedAt ?? action.at ?? nowIso(),
@@ -328,11 +338,23 @@ export const reduceGuidedOnboardingState = (
         : state;
     case "close_inline_edit":
       return state.step === "edit_active"
-        ? { ...state, step: "theme_instruction" }
+        ? {
+            ...state,
+            step: state.themeConfirmedAt
+              ? "completion_choice"
+              : "theme_instruction",
+          }
         : state;
-    case "choose_theme":
+    case "confirm_theme":
       return state.step === "theme_instruction"
-        ? { ...state, step: "completion_choice" }
+        ? {
+            ...state,
+            step:
+              (state.periodItemsCreated ?? 0) >= 2
+                ? "completion_choice"
+                : "period_category_selection",
+            themeConfirmedAt: action.at ?? nowIso(),
+          }
         : state;
     case "complete":
       if (state.step !== "completion_choice") return state;

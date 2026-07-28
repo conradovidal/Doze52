@@ -8,15 +8,18 @@ export type GuidedToolbarNotice = {
   target: "edit" | "theme";
   title: string;
   instruction: string;
+  actionLabel?: string;
 };
 
 export function GuidedToolbarNoticeCard({
   notice,
   onClose,
+  onAction,
   align = "start",
 }: {
   notice: GuidedToolbarNotice;
   onClose: () => void;
+  onAction?: () => void;
   align?: "start" | "end";
 }) {
   return (
@@ -26,7 +29,7 @@ export function GuidedToolbarNoticeCard({
       aria-label="Instrução do guia inicial"
       aria-live="polite"
       className={cn(
-        "absolute top-[calc(100%+0.6rem)] z-60 w-[min(17rem,calc(100vw-1.5rem))] rounded-2xl border border-primary/25 bg-card/98 p-3.5 text-left text-card-foreground shadow-[0_22px_55px_-26px_rgba(15,23,42,0.75)] backdrop-blur-xl",
+        "onboarding-inverse-surface absolute top-[calc(100%+0.6rem)] z-60 w-[min(20rem,calc(100vw-1.5rem))] rounded-2xl border border-border bg-card p-3.5 text-left text-card-foreground shadow-[0_24px_60px_-20px_rgba(15,23,42,0.85)]",
         align === "start" ? "left-0" : "right-0"
       )}
     >
@@ -48,6 +51,17 @@ export function GuidedToolbarNoticeCard({
           <X />
         </Button>
       </div>
+      {notice.actionLabel && onAction ? (
+        <Button
+          type="button"
+          variant="premium"
+          size="sm"
+          className="mt-3 w-full"
+          onClick={onAction}
+        >
+          {notice.actionLabel}
+        </Button>
+      ) : null}
     </aside>
   );
 }

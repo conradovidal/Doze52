@@ -22,7 +22,7 @@ export function GuidedCalendarNotice({
       data-guided-selection-mode={notice.mode}
       aria-label="Instrução do guia inicial"
       aria-live="polite"
-      className="flex items-start gap-3.5 bg-primary/6 px-4 py-4 text-card-foreground sm:px-5"
+      className="onboarding-inverse-surface flex items-start gap-3.5 bg-card px-4 py-4 text-card-foreground sm:px-5"
     >
       <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/12 text-primary">
         <CalendarDays className="size-5" aria-hidden="true" />

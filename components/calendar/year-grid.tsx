@@ -106,6 +106,7 @@ export function YearGrid({
   events,
   onEditEvent,
   creatingRange,
+  guidedSelectionRange,
   onStartCreateRange,
   onHoverCreateRange,
   onFinishCreateRange,
@@ -122,6 +123,7 @@ export function YearGrid({
     anchorPoint: AnchorPoint;
   }) => void;
   creatingRange: { startIso: string; hoverIso: string; isDragging: boolean } | null;
+  guidedSelectionRange?: { startDate: string; endDate: string } | null;
   onStartCreateRange: (startIso: string) => void;
   onHoverCreateRange: (hoverIso: string) => void;
   onFinishCreateRange: (endIso?: string, anchorPoint?: AnchorPoint) => void;
@@ -620,6 +622,7 @@ export function YearGrid({
                     hasDragContext={hasDragContext}
                     onEditEvent={onEditEvent}
                     creatingRange={creatingRange}
+                    guidedSelectionRange={guidedSelectionRange}
                     onStartCreateRange={onStartCreateRange}
                     onHoverCreateRange={onHoverCreateRange}
                     onFinishCreateRange={onFinishCreateRange}

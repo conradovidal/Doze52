@@ -26,6 +26,27 @@ import type {
   OnboardingCategoryChoice,
   OnboardingContext,
 } from "@/lib/onboarding";
+import {
+  CATEGORY_COLOR_BASE_AMBER,
+  CATEGORY_COLOR_BASE_BLUE,
+  CATEGORY_COLOR_BASE_CYAN,
+  CATEGORY_COLOR_BASE_GRAPHITE,
+  CATEGORY_COLOR_BASE_GREEN,
+  CATEGORY_COLOR_BASE_ORANGE,
+  CATEGORY_COLOR_BASE_RED,
+  CATEGORY_COLOR_BASE_VIOLET,
+} from "@/lib/category-palette";
+
+const ONBOARDING_QUICK_COLORS = [
+  CATEGORY_COLOR_BASE_AMBER,
+  CATEGORY_COLOR_BASE_ORANGE,
+  CATEGORY_COLOR_BASE_RED,
+  CATEGORY_COLOR_BASE_VIOLET,
+  CATEGORY_COLOR_BASE_BLUE,
+  CATEGORY_COLOR_BASE_CYAN,
+  CATEGORY_COLOR_BASE_GREEN,
+  CATEGORY_COLOR_BASE_GRAPHITE,
+] as const;
 
 export type GuidedCalendarDraft = {
   startDate: string;
@@ -86,17 +107,16 @@ const getDateCopy = (
   if (itemCount === 0) {
     if (isBirthday) {
       return {
-        title: "Pense em alguém que faz parte da sua história.",
-        description:
-          "Escolha no calendário um aniversário que já passou neste ano.",
-        prompt: "De quem é esse dia?",
+        title: "Adicione um aniversário importante.",
+        description: "Escolha o dia no calendário.",
+        prompt: "De quem é esse aniversário?",
         placeholder: "Ex.: Aniversário da mãe",
       };
     }
     if (isDelivery) {
       return {
-        title: "Comece pela sua última entrega importante.",
-        description: "Clique no dia em que essa entrega foi concluída.",
+        title: "Adicione uma entrega importante.",
+        description: "Escolha o dia dessa entrega.",
         prompt: "O que você entregou?",
         placeholder: "Ex.: Lançamento do produto",
       };
@@ -104,39 +124,38 @@ const getDateCopy = (
     return {
       title:
         context === "personal"
-          ? "Comece por um dia que merece ser lembrado."
-          : "Comece por uma data profissional importante que já passou.",
-      description: "Escolha no calendário quando isso aconteceu.",
-      prompt: "O que aconteceu nessa data?",
+          ? "Adicione uma data importante."
+          : "Adicione uma data profissional importante.",
+      description: "Escolha o dia no calendário.",
+      prompt: "O que torna essa data importante?",
       placeholder: "Ex.: Uma conquista importante",
     };
   }
 
   if (isBirthday) {
     return {
-      title: "Agora celebre alguém que ainda vai completar o ano.",
-      description:
-        "Escolha um próximo aniversário que você não quer deixar passar.",
-      prompt: "De quem é esse dia?",
+      title: "Agora adicione outro aniversário importante.",
+      description: "Escolha outro dia no calendário.",
+      prompt: "De quem é esse aniversário?",
       placeholder: "Ex.: Aniversário do pai",
     };
   }
   if (isDelivery) {
     return {
-      title: "Agora marque a próxima entrega importante.",
-      description: "Clique no dia em que ela deve acontecer.",
+      title: "Agora adicione outra entrega importante.",
+      description: "Escolha o dia dessa entrega.",
       prompt: "O que você vai entregar?",
-      placeholder: "Ex.: Próximo lançamento",
+      placeholder: "Ex.: Lançamento do produto",
     };
   }
   return {
-      title:
-        context === "personal"
-          ? "Agora escolha algo bom que ainda está por vir."
-          : "Agora marque a próxima data profissional importante.",
-    description: "Clique no dia em que isso deve acontecer.",
-    prompt: "O que vai acontecer nessa data?",
-    placeholder: "Ex.: Um próximo marco",
+    title:
+      context === "personal"
+        ? "Agora adicione outra data importante."
+        : "Agora adicione outra data profissional importante.",
+    description: "Escolha outro dia no calendário.",
+    prompt: "O que torna essa data importante?",
+    placeholder: "Ex.: Uma conquista importante",
   };
 };
 
@@ -151,16 +170,16 @@ const getPeriodCopy = (
   if (itemCount === 0) {
     if (isTravel) {
       return {
-        title: "Que viagem ainda mora na sua memória?",
-        description: "Marque do primeiro ao último dia dessa história.",
+        title: "Adicione uma viagem ou férias importantes.",
+        description: "Marque do primeiro ao último dia.",
         prompt: "Que viagem foi essa?",
         placeholder: "Ex.: Viagem em família",
       };
     }
     if (isProject) {
       return {
-        title: "Agora adicione o período do seu último projeto.",
-        description: "Selecione desde quando ele começou até quando terminou.",
+        title: "Adicione um projeto importante.",
+        description: "Selecione o primeiro e o último dia.",
         prompt: "Qual foi esse projeto?",
         placeholder: "Ex.: Projeto concluído",
       };
@@ -168,8 +187,8 @@ const getPeriodCopy = (
     return {
       title:
         context === "personal"
-          ? "Escolha um período que deixou marca no seu ano."
-          : "Adicione um período profissional que já passou.",
+          ? "Adicione um período importante."
+          : "Adicione um período profissional importante.",
       description: "Selecione o primeiro e o último dia desse período.",
       prompt: "O que ocupou esse período?",
       placeholder: "Ex.: Um período importante",
@@ -178,16 +197,16 @@ const getPeriodCopy = (
 
   if (isTravel) {
     return {
-      title: "Que próxima viagem já merece espaço?",
-      description: "Marque do primeiro ao último dia que você está planejando.",
-      prompt: "Para onde você vai?",
-      placeholder: "Ex.: Próximas férias",
+      title: "Agora adicione outra viagem ou período de férias.",
+      description: "Marque do primeiro ao último dia.",
+      prompt: "Que viagem ou férias são essas?",
+      placeholder: "Ex.: Férias em família",
     };
   }
   if (isProject) {
     return {
-      title: "Agora adicione seu projeto atual ou o próximo.",
-      description: "Selecione desde o início até a conclusão esperada.",
+      title: "Agora adicione outro projeto importante.",
+      description: "Selecione o primeiro e o último dia.",
       prompt: "Qual é esse projeto?",
       placeholder: "Ex.: Reestruturação comercial",
     };
@@ -195,11 +214,11 @@ const getPeriodCopy = (
   return {
     title:
       context === "personal"
-        ? "Agora abra espaço para algo que você espera viver."
-        : "Agora adicione o próximo período profissional importante.",
-    description: "Selecione o primeiro e o último dia planejado.",
+        ? "Agora adicione outro período importante."
+        : "Agora adicione outro período profissional importante.",
+    description: "Selecione o primeiro e o último dia.",
     prompt: "O que vai ocupar esse período?",
-    placeholder: "Ex.: Um próximo período",
+    placeholder: "Ex.: Um período importante",
   };
 };
 
@@ -220,11 +239,11 @@ export const getGuidedSelectionNotice = ({
       mode: "date",
       title: isBirthday
         ? firstItem
-          ? "Comece por um aniversário que já passou."
-          : "Agora escolha um aniversário que ainda vem."
+          ? "Adicione um aniversário importante."
+          : "Agora adicione outro aniversário importante."
         : firstItem
-          ? "Comece por uma data que marcou seu ano."
-          : "Agora marque algo bom que ainda vem.",
+          ? "Adicione uma data importante."
+          : "Agora adicione outra data importante.",
       instruction: isMobile ? "Toque no dia." : "Clique no dia.",
     };
   }
@@ -238,11 +257,11 @@ export const getGuidedSelectionNotice = ({
         ? "Agora escolha o último dia."
         : isTravel
           ? firstItem
-            ? "Reviva uma viagem deste ano."
-            : "Agora abra espaço para a próxima viagem."
+            ? "Adicione uma viagem ou férias importantes."
+            : "Agora adicione outra viagem ou período de férias."
           : firstItem
-            ? "Marque um período que deixou história."
-            : "Agora abra espaço para o próximo período.",
+            ? "Adicione um período importante."
+            : "Agora adicione outro período importante.",
     instruction:
       isMobile && mobileRangeStart
         ? `Início em ${formatDate(mobileRangeStart)}.`
@@ -290,10 +309,10 @@ export function GuidedOnboardingPanel({
         : state.step.startsWith("date")
           ? 3
           : state.step.startsWith("period")
-            ? 4
+            ? 5
             : state.step === "completion_choice"
-              ? 6
-              : 5;
+              ? 7
+              : 6;
 
   React.useEffect(() => {
     setTitle("");
@@ -312,7 +331,7 @@ export function GuidedOnboardingPanel({
           Monte o seu ano
         </p>
         <p className="mt-0.5 text-xs text-muted-foreground">
-          Passo {progressStep} de 6
+          Passo {progressStep} de 7
         </p>
       </div>
       <Button
@@ -380,7 +399,9 @@ export function GuidedOnboardingPanel({
               }`}
               onClick={() => {
                 setSelectedCategoryChoice(option.choice);
-                setSelectedCategoryColor(option.definition.color);
+                setSelectedCategoryColor(
+                  (currentColor) => currentColor ?? option.definition.color
+                );
               }}
             >
               <span
@@ -408,33 +429,40 @@ export function GuidedOnboardingPanel({
             </button>
           );
         })}
-        {selectedOption && selectedCategoryColor ? (
-          <div className="mt-2 rounded-2xl border border-border/70 bg-background/65 p-3">
-            <p className="mb-2.5 text-sm font-semibold">
-              Escolha a cor de {selectedOption.definition.name}
-            </p>
-            <CategoryColorPicker
-              compact
-              value={selectedCategoryColor}
-              onChange={setSelectedCategoryColor}
-              ariaLabel={`Cor de ${selectedOption.definition.name}`}
-            />
-            <Button
-              type="button"
-              variant="premium"
-              className="mt-4 w-full"
-              onClick={() =>
-                onChooseCategory(
-                  intent,
-                  selectedOption.choice,
-                  selectedCategoryColor
-                )
-              }
-            >
-              Criar esta categoria
-            </Button>
-          </div>
-        ) : null}
+        <div className="mt-2 rounded-2xl border border-border/70 bg-background/65 p-3">
+          <p className="mb-2.5 text-sm font-semibold">
+            {selectedOption
+              ? `Cor de ${selectedOption.definition.name}`
+              : "Escolha uma categoria e uma cor"}
+          </p>
+          <CategoryColorPicker
+            compact
+            value={selectedCategoryColor}
+            colors={ONBOARDING_QUICK_COLORS}
+            onChange={setSelectedCategoryColor}
+            ariaLabel={
+              selectedOption
+                ? `Cor de ${selectedOption.definition.name}`
+                : "Cor da nova categoria"
+            }
+          />
+          <Button
+            type="button"
+            variant="premium"
+            className="mt-4 w-full"
+            disabled={!selectedOption || !selectedCategoryColor}
+            onClick={() => {
+              if (!selectedOption || !selectedCategoryColor) return;
+              onChooseCategory(
+                intent,
+                selectedOption.choice,
+                selectedCategoryColor
+              );
+            }}
+          >
+            Criar esta categoria
+          </Button>
+        </div>
       </div>
     );
   };
@@ -664,7 +692,7 @@ export function GuidedOnboardingPanel({
       data-guided-onboarding-step={state.step}
       aria-label="Guia inicial do Doze 52"
       aria-live="polite"
-      className="fixed top-[calc(env(safe-area-inset-top,0px)+4.6rem)] left-1/2 z-50 max-h-[calc(100dvh-6rem)] w-[min(42rem,calc(100vw-1.5rem))] -translate-x-1/2 overflow-y-auto rounded-[1.5rem] border border-foreground/15 bg-card/98 p-4.5 text-card-foreground shadow-[0_28px_90px_-28px_rgba(15,23,42,0.68)] backdrop-blur-xl animate-in fade-in-0 duration-200 motion-reduce:animate-none sm:p-5 md:top-1/2 md:w-[23rem] md:-translate-y-1/2"
+      className="onboarding-inverse-surface fixed top-[calc(env(safe-area-inset-top,0px)+4.6rem)] left-1/2 z-50 max-h-[calc(100dvh-6rem)] w-[min(42rem,calc(100vw-1.5rem))] -translate-x-1/2 overflow-y-auto rounded-[1.5rem] border border-border bg-card p-4.5 text-card-foreground shadow-[0_30px_95px_-20px_rgba(15,23,42,0.82)] animate-in fade-in-0 duration-200 motion-reduce:animate-none sm:p-5 md:top-1/2 md:w-[23rem] md:-translate-y-1/2"
     >
       {header}
       {content}

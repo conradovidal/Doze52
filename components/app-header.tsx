@@ -48,7 +48,7 @@ type AppHeaderProps = {
   guidedToolbarNotice?: GuidedToolbarNotice | null;
   onDismissGuidedSelection?: () => void;
   onGuidedEditModeChange?: (active: boolean) => void;
-  onGuidedThemeChange?: () => void;
+  onGuidedThemeConfirm?: () => void;
   onboardingLayoutLocked?: boolean;
   categoryCreateRequestKey?: number;
   onCategoryCreated?: (categoryId: string) => void;
@@ -72,7 +72,7 @@ export function AppHeader({
   guidedToolbarNotice = null,
   onDismissGuidedSelection,
   onGuidedEditModeChange,
-  onGuidedThemeChange,
+  onGuidedThemeConfirm,
   onboardingLayoutLocked = false,
   categoryCreateRequestKey = 0,
   onCategoryCreated,
@@ -368,13 +368,17 @@ export function AppHeader({
                 <ThemeToggle
                   highlighted={guidedToolbarNotice?.target === "theme"}
                   disabled={themeToggleDisabled}
-                  onThemeChange={() => onGuidedThemeChange?.()}
                 />
                 {guidedToolbarNotice?.target === "theme" &&
                 onDismissGuidedSelection ? (
                   <GuidedToolbarNoticeCard
                     notice={guidedToolbarNotice}
                     onClose={onDismissGuidedSelection}
+                    onAction={
+                      guidedToolbarNotice.actionLabel
+                        ? onGuidedThemeConfirm
+                        : undefined
+                    }
                     align="end"
                   />
                 ) : null}
@@ -594,7 +598,7 @@ export function AppHeader({
             >
               <div
                 data-guided-selection-card
-                className="w-[min(34rem,calc(100%-1rem))] overflow-hidden rounded-2xl border border-primary/20 bg-card/98 shadow-[0_20px_50px_-30px_rgba(15,23,42,0.72)] backdrop-blur-xl"
+                className="onboarding-inverse-surface w-[min(34rem,calc(100%-1rem))] overflow-hidden rounded-2xl border border-border bg-card shadow-[0_24px_60px_-22px_rgba(15,23,42,0.84)]"
               >
                 <GuidedCalendarNotice
                   notice={guidedSelectionNotice}

@@ -19,19 +19,65 @@ import {
   stripOnboardingPersonalDemo,
 } from "../../lib/store";
 import { materializeUserOwnedSnapshot } from "../../lib/snapshot-ownership";
+import {
+  CATEGORY_COLOR_BASE_AMBER,
+  CATEGORY_COLOR_BASE_BLUE,
+  CATEGORY_COLOR_BASE_CORAL,
+  CATEGORY_COLOR_BASE_GREEN,
+  CATEGORY_COLOR_BASE_OLIVE,
+  CATEGORY_COLOR_BASE_ORANGE,
+  CATEGORY_COLOR_BASE_SAND,
+  CATEGORY_COLOR_BASE_TEAL,
+  CATEGORY_COLOR_BASE_VIOLET,
+  CATEGORY_PRESET_COLORS,
+} from "../../lib/category-palette";
 
 const initialState = (): GuidedOnboardingState => ({
-  version: 5,
+  version: 6,
   step: "context_selection",
 });
 
 const completedState = (): GuidedOnboardingState => ({
-  version: 5,
+  version: 6,
   step: "completed",
   context: "personal",
   completedAt: "2026-07-20T10:05:00.000Z",
   postOnboardingEventsCreated: 0,
   postOnboardingCategoriesCreated: 0,
+});
+
+test("organiza 24 cores e mantém padrões distintos no onboarding", () => {
+  expect(CATEGORY_PRESET_COLORS).toHaveLength(24);
+  expect(CATEGORY_PRESET_COLORS).toContain(CATEGORY_COLOR_BASE_CORAL);
+  expect(CATEGORY_PRESET_COLORS).toContain(CATEGORY_COLOR_BASE_TEAL);
+  expect(CATEGORY_PRESET_COLORS).toContain(CATEGORY_COLOR_BASE_OLIVE);
+  expect(CATEGORY_PRESET_COLORS).toContain(CATEGORY_COLOR_BASE_SAND);
+  expect(CATEGORY_PRESET_COLORS).toEqual([
+    "#E1D15D", "#E7B957", "#EBA16D", "#EE9275", "#EF8F8F", "#F4A6B8", "#F09CCF", "#C78AD9",
+    "#B79AEF", "#8EA5F7", "#4F8FD6", "#93C5FD", "#72CFE3", "#5EC9C5", "#55B5A8", "#86C7A0",
+    "#58B76F", "#A8CD6C", "#B7B86F", "#D6A060", "#D9BE8C", "#CBD5E1", "#D0D3DA", "#9CA6B4",
+  ]);
+
+  expect(
+    getOnboardingCategoryDefinition("personal", "date", "specific").color
+  ).toBe(CATEGORY_COLOR_BASE_AMBER);
+  expect(
+    getOnboardingCategoryDefinition("personal", "date", "generic").color
+  ).toBe(CATEGORY_COLOR_BASE_BLUE);
+  expect(
+    getOnboardingCategoryDefinition("personal", "period", "specific").color
+  ).not.toBe(
+    getOnboardingCategoryDefinition("personal", "period", "generic").color
+  );
+  expect(
+    getOnboardingCategoryDefinition("work", "date", "specific").color
+  ).toBe(CATEGORY_COLOR_BASE_ORANGE);
+  expect(
+    getOnboardingCategoryDefinition("work", "period", "generic").color
+  ).toBe(CATEGORY_COLOR_BASE_VIOLET);
+  expect(
+    getOnboardingCategoryDefinition("work", "period", "specific").color
+  ).toBe(CATEGORY_COLOR_BASE_GREEN);
 });
 
 test("cria contexto, categorias incrementais e quatro eventos", () => {
@@ -75,8 +121,17 @@ test("cria contexto, categorias incrementais e quatro eventos", () => {
     at: "2026-07-20T10:02:00.000Z",
   });
   expect(state).toMatchObject({
-    step: "period_category_selection",
+    step: "theme_instruction",
     dateItemsCreated: 2,
+  });
+
+  state = reduceGuidedOnboardingState(state, {
+    type: "confirm_theme",
+    at: "2026-07-20T10:02:30.000Z",
+  });
+  expect(state).toMatchObject({
+    step: "period_category_selection",
+    themeConfirmedAt: "2026-07-20T10:02:30.000Z",
   });
 
   state = reduceGuidedOnboardingState(state, {
@@ -109,10 +164,6 @@ test("cria contexto, categorias incrementais e quatro eventos", () => {
   expect(state.step).toBe("edit_active");
   state = reduceGuidedOnboardingState(state, {
     type: "close_inline_edit",
-  });
-  expect(state.step).toBe("theme_instruction");
-  state = reduceGuidedOnboardingState(state, {
-    type: "choose_theme",
   });
   expect(state.step).toBe("completion_choice");
 
@@ -173,7 +224,7 @@ test("migra v3 com progresso sem reabrir fluxo incompatível", () => {
       firstDateCreatedAt: "2026-07-20T10:01:00.000Z",
     })
   ).toMatchObject({
-    version: 5,
+    version: 6,
     step: "completed",
     context: "personal",
     dateItemsCreated: 2,
@@ -185,7 +236,7 @@ test("migra v3 com progresso sem reabrir fluxo incompatível", () => {
       step: "completed",
       completedAt: "2026-07-20T10:03:00.000Z",
     })
-  ).toMatchObject({ version: 5, step: "completed" });
+  ).toMatchObject({ version: 6, step: "completed" });
 
   expect(
     migrateGuidedOnboardingState({
@@ -196,9 +247,34 @@ test("migra v3 com progresso sem reabrir fluxo incompatível", () => {
       periodItemsCreated: 2,
     })
   ).toMatchObject({
-    version: 5,
+    version: 6,
     step: "completion_choice",
     context: "personal",
+  });
+});
+
+test("migra fluxo v5 avançado sem perder períodos e recupera a etapa de tema", () => {
+  let state = migrateGuidedOnboardingState({
+    version: 5,
+    step: "edit_active",
+    context: "personal",
+    dateItemsCreated: 2,
+    periodItemsCreated: 2,
+  });
+  expect(state).toMatchObject({
+    version: 6,
+    step: "edit_active",
+    periodItemsCreated: 2,
+  });
+  state = reduceGuidedOnboardingState(state, { type: "close_inline_edit" });
+  expect(state.step).toBe("theme_instruction");
+  state = reduceGuidedOnboardingState(state, {
+    type: "confirm_theme",
+    at: "2026-07-20T10:04:30.000Z",
+  });
+  expect(state).toMatchObject({
+    step: "completion_choice",
+    themeConfirmedAt: "2026-07-20T10:04:30.000Z",
   });
 });
 

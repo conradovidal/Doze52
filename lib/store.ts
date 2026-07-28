@@ -10,6 +10,7 @@ import {
   CATEGORY_COLOR_BASE_GREEN,
   CATEGORY_COLOR_BASE_LIME,
   CATEGORY_COLOR_BASE_MINT,
+  CATEGORY_COLOR_BASE_ORANGE,
   CATEGORY_COLOR_BASE_ROSE,
   CATEGORY_COLOR_BASE_VIOLET,
   DEFAULT_CATEGORY_COLOR,
@@ -664,12 +665,12 @@ export const getOnboardingCategoryDefinition = (
       ? {
           id: ONBOARDING_CATEGORY_IDS.customImportantDates,
           name: "Datas importantes",
-          color: CATEGORY_COLOR_BASE_AMBER,
+          color: CATEGORY_COLOR_BASE_BLUE,
         }
       : {
           id: ONBOARDING_CATEGORY_IDS.customPeriods,
           name: "Períodos importantes",
-          color: CATEGORY_COLOR_BASE_BLUE,
+          color: CATEGORY_COLOR_BASE_VIOLET,
         };
   }
   if (context === "personal") {
@@ -689,12 +690,12 @@ export const getOnboardingCategoryDefinition = (
     ? {
         id: ONBOARDING_CATEGORY_IDS.workDeliveries,
         name: "Entregas",
-        color: CATEGORY_COLOR_BASE_VIOLET,
+        color: CATEGORY_COLOR_BASE_ORANGE,
       }
     : {
         id: ONBOARDING_CATEGORY_IDS.workTrips,
         name: "Projetos",
-        color: CATEGORY_COLOR_BASE_BLUE,
+        color: CATEGORY_COLOR_BASE_GREEN,
       };
 };
 

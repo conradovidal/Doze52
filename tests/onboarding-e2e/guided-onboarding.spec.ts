@@ -79,11 +79,15 @@ const completePersonalOnboarding = async (
     "data-guided-onboarding-step",
     "date_category_selection"
   );
-  await panel.getByRole("button", { name: /Aniversários/ }).click();
+  await expect(panel.locator("[data-category-color-swatch]")).toHaveCount(8);
   await expect(panel.locator("[data-category-color-picker]")).toBeVisible();
+  await expect(
+    panel.getByRole("button", { name: "Criar esta categoria" })
+  ).toBeDisabled();
   await panel
-    .locator('[data-category-color-swatch][data-color="#F09CCF"]')
+    .locator('[data-category-color-swatch][data-color="#EF8F8F"]')
     .click();
+  await panel.getByRole("button", { name: /Aniversários/ }).click();
   await panel
     .getByRole("button", { name: "Criar esta categoria" })
     .click();
@@ -97,6 +101,15 @@ const completePersonalOnboarding = async (
     "data-guided-onboarding-step",
     "date_details"
   );
+  if (mobile) {
+    await expect(
+      page.locator('[data-mobile-day][data-date-iso="2026-02-10"]')
+    ).toHaveAttribute("data-guided-selected", "true");
+  } else {
+    await expect(
+      page.locator('[data-day-cell][data-day-iso="2026-02-10"]')
+    ).toHaveAttribute("data-range-selected", "true");
+  }
   await selectGuidedDate(page, mobile, "2026-02-11");
   await expect(panel).toContainText(/11.*fev/i);
   await expect(
@@ -115,6 +128,15 @@ const completePersonalOnboarding = async (
   await panel.getByLabel("Nome da data").fill("Aniversário do pai");
   await panel.getByRole("button", { name: "Salvar", exact: true }).click();
 
+  const toolbarNotice = page.locator("[data-guided-toolbar-notice]");
+  await expect(toolbarNotice).toHaveAttribute(
+    "data-guided-toolbar-target",
+    "theme"
+  );
+  await page.locator("[data-onboarding-theme-control]").click();
+  await page.locator("[data-onboarding-theme-control]").click();
+  await toolbarNotice.getByRole("button", { name: "Continuar" }).click();
+
   await expect(panel).toHaveAttribute(
     "data-guided-onboarding-step",
     "period_category_selection"
@@ -129,6 +151,15 @@ const completePersonalOnboarding = async (
   ).toHaveAttribute("data-guided-selection-mode", "period");
 
   await selectGuidedPeriod(page, mobile, "2026-03-10", "2026-03-16");
+  if (mobile) {
+    await expect(
+      page.locator('[data-mobile-day][data-date-iso="2026-03-13"]')
+    ).toHaveAttribute("data-guided-selected", "true");
+  } else {
+    await expect(
+      page.locator('[data-day-cell][data-day-iso="2026-03-13"]')
+    ).toHaveAttribute("data-range-selected", "true");
+  }
   await panel.getByLabel("Nome do período").fill("Últimas férias");
   await panel.getByRole("button", { name: "Salvar", exact: true }).click();
   await expect(
@@ -139,26 +170,22 @@ const completePersonalOnboarding = async (
   await panel.getByLabel("Nome do período").fill("Próximas férias");
   await panel.getByRole("button", { name: "Salvar", exact: true }).click();
 
-  const toolbarNotice = page.locator("[data-guided-toolbar-notice]");
   await expect(toolbarNotice).toHaveAttribute(
     "data-guided-toolbar-target",
     "edit"
   );
-  await expect(toolbarNotice).toContainText("Clique no lápis");
+  await expect(toolbarNotice).toContainText(
+    "Clique aqui para editar seus contextos e categorias"
+  );
   await page.locator("[data-onboarding-edit-control]").click();
   await expect(toolbarNotice).toContainText(
-    "Contextos e categorias estão liberados"
+    "Agora seus contextos e categorias estão disponíveis para serem editados"
   );
   await page
     .getByRole("button", {
       name: "Finalizar edição de contextos e categorias",
     })
     .click();
-  await expect(toolbarNotice).toHaveAttribute(
-    "data-guided-toolbar-target",
-    "theme"
-  );
-  await page.locator("[data-onboarding-theme-control]").click();
   await expect(panel).toHaveAttribute(
     "data-guided-onboarding-step",
     "completion_choice"
@@ -232,7 +259,7 @@ test("monta contexto Pessoal de forma incremental", async ({ page }, testInfo) =
   }));
 
   expect(stored.onboarding).toMatchObject({
-    version: 5,
+    version: 6,
     step: "completed",
     context: "personal",
   });
@@ -242,7 +269,7 @@ test("monta contexto Pessoal de forma incremental", async ({ page }, testInfo) =
     "Férias e viagens",
   ]);
   expect(stored.store?.state?.categories?.map((item) => item.color)).toEqual([
-    "#F09CCF",
+    "#EF8F8F",
     "#72CFE3",
   ]);
   expect(stored.store?.state?.events).toHaveLength(4);
@@ -280,6 +307,30 @@ test("categorias começam abertas, podem ser recolhidas e reabrem ao recarregar"
   await expect(
     page.getByRole("button", { name: expandedLabel })
   ).toHaveAttribute("aria-expanded", "true");
+});
+
+test("primeira visita segue o sistema e o onboarding usa superfície inversa", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name === "mobile-chromium",
+    "Aparência adaptativa coberta no desktop"
+  );
+  await page.emulateMedia({ colorScheme: "dark" });
+  await page.goto("/?mobileUi=0");
+  await expect(page.locator("html")).toHaveClass(/dark/);
+  const panel = page.locator("[data-onboarding-panel]");
+  await expect(panel).toBeVisible();
+  expect(
+    await panel.evaluate((node) => getComputedStyle(node).backgroundColor)
+  ).toBe("rgb(255, 255, 255)");
+
+  await page.evaluate(() => localStorage.setItem("doze52-theme", "light"));
+  await page.reload();
+  await expect(page.locator("html")).not.toHaveClass(/dark/);
+  expect(
+    await panel.evaluate((node) => getComputedStyle(node).backgroundColor)
+  ).toBe("rgb(23, 34, 51)");
 });
 
 test("o X encerra o guia e a decisão persiste após recarregar", async ({
@@ -387,7 +438,7 @@ test("centraliza cards e sobrepõe a instrução ao cabeçalho sem mover o calen
   const notice = page.locator("header [data-guided-calendar-notice]");
   await expect(notice).toBeVisible();
   await expect(notice).toContainText(
-    "Comece por um aniversário que já passou"
+    "Adicione um aniversário importante"
   );
   await expect(notice).not.toContainText(/\bcadastr/i);
   await expect(
@@ -459,14 +510,14 @@ test("terceira categoria e um evento disparam o convite", async ({
   const regularSwatches = categoryDialog.locator(
     "[data-category-color-swatch]"
   );
-  await expect(regularSwatches).toHaveCount(20);
+  await expect(regularSwatches).toHaveCount(24);
   expect(
     await regularSwatches.first().evaluate((node) => ({
       background: getComputedStyle(node).backgroundColor,
       innerWhiteCenter: node.querySelector("span") !== null,
     }))
   ).toEqual({
-    background: "rgb(79, 143, 214)",
+    background: "rgb(225, 209, 93)",
     innerWhiteCenter: false,
   });
   await categoryDialog.getByLabel("Nome da categoria").fill("Celebrações");
