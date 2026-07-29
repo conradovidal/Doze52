@@ -42,25 +42,25 @@ export const PRO_UPGRADE_COPY: Record<
   { title: string; description: string; cta: string }
 > = {
   profiles: {
-    title: "Perfis múltiplos fazem parte do Doze52 Pro.",
+    title: "Vários contextos fazem parte do Doze 52 Pro.",
     description:
-      "No plano gratuito, você pode usar 1 perfil. O Pro libera mais espaços para organizar trabalho, vida pessoal, viagens e família.",
+      "No plano gratuito, você pode usar 1 contexto. O Pro libera mais espaços para organizar trabalho, vida pessoal, viagens e família.",
     cta: `Assinar Pro por ${FOUNDER_PRICE_LABEL}`,
   },
   categories: {
-    title: "Mais categorias fazem parte do Doze52 Pro.",
+    title: "Mais categorias fazem parte do Doze 52 Pro.",
     description:
       "No plano gratuito, você pode usar até 3 categorias. O Pro libera mais organização para o seu ano.",
     cta: `Assinar Pro por ${FOUNDER_PRICE_LABEL}`,
   },
   "calendar-subscriptions": {
-    title: "Mais calendários fazem parte do Doze52 Pro.",
+    title: "Mais calendários fazem parte do Doze 52 Pro.",
     description:
       "No plano gratuito, você pode usar 1 calendário. O Pro libera mais calendários para acompanhar datas importantes no seu ano.",
     cta: `Assinar Pro por ${FOUNDER_PRICE_LABEL}`,
   },
   generic: {
-    title: "Doze52 Pro",
+    title: "Doze 52 Pro",
     description: "Organize mais partes do seu ano.",
     cta: "Assinar Pro",
   },

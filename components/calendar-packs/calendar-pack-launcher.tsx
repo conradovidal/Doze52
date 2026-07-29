@@ -136,11 +136,27 @@ export function CalendarPackLauncher({
   className,
   mobileDense = false,
   onRequireAuth,
+  disabled = false,
+  highlighted = false,
+  guidedVariantGroupId,
+  requireExplicitVariant = false,
+  onOpen,
+  onClose,
+  onImported,
+  bypassLimits = false,
 }: {
   onFocusYear?: (year: number) => void;
   className?: string;
   mobileDense?: boolean;
   onRequireAuth?: () => void;
+  disabled?: boolean;
+  highlighted?: boolean;
+  guidedVariantGroupId?: string;
+  requireExplicitVariant?: boolean;
+  onOpen?: () => void;
+  onClose?: () => void;
+  onImported?: (pack: CalendarPack) => void;
+  bypassLimits?: boolean;
 }) {
   const { notify } = useFeedback();
   const { isPro, limits } = useBilling();
@@ -188,6 +204,7 @@ export function CalendarPackLauncher({
     [availabilityByPack]
   );
   const isCalendarSubscriptionLimitReached =
+    !bypassLimits &&
     !isPro &&
     isLimitReached(subscribedPackCount, limits.maxCalendarSubscriptions);
   const launcherAriaCopy =
@@ -239,8 +256,9 @@ export function CalendarPackLauncher({
     if (!nextOpen) {
       setFlowByPack({});
       setExpandedPackId(null);
+      onClose?.();
     }
-  }, []);
+  }, [onClose]);
 
   const handleImport = React.useCallback(
     (
@@ -261,7 +279,7 @@ export function CalendarPackLauncher({
       if (!targetProfileId || !profileNameById.has(targetProfileId)) {
         notify({
           tone: "error",
-          title: "Escolha um perfil",
+          title: "Escolha um contexto",
           description: "Selecione onde este calendário deve entrar.",
         });
         return;
@@ -283,6 +301,11 @@ export function CalendarPackLauncher({
 
         if (result.status === "already-exists") {
           setPackFlow(pack.id, "exists");
+          if (guidedVariantGroupId) {
+            setOpen(false);
+            onClose?.();
+          }
+          onImported?.(pack);
           notify({
             tone: "success",
             title: "Calendário já adicionado",
@@ -292,6 +315,11 @@ export function CalendarPackLauncher({
         }
 
         setPackFlow(pack.id, "added");
+        if (guidedVariantGroupId) {
+          setOpen(false);
+          onClose?.();
+        }
+        onImported?.(pack);
         notify({
           tone: "success",
           title:
@@ -314,8 +342,11 @@ export function CalendarPackLauncher({
     [
       availabilityByPack,
       focusPack,
+      guidedVariantGroupId,
       isCalendarSubscriptionLimitReached,
       notify,
+      onClose,
+      onImported,
       profileNameById,
       replaceAllData,
       setPackFlow,
@@ -361,9 +392,16 @@ export function CalendarPackLauncher({
           mobileDense
             ? "h-10 justify-start rounded-[8px] text-left"
             : "h-8 px-2.5 pr-3 md:h-9 md:px-3 md:pr-3.5 md:text-sm",
-          className
+          className,
+          highlighted && "product-spotlight-target"
         )}
-        onClick={() => setOpen(true)}
+        disabled={disabled}
+        data-onboarding-calendar-control
+        data-onboarding-highlighted={highlighted ? "true" : undefined}
+        onClick={() => {
+          onOpen?.();
+          setOpen(true);
+        }}
         aria-label={launcherAriaCopy}
         title="Calendários disponíveis"
       >
@@ -378,14 +416,28 @@ export function CalendarPackLauncher({
       <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent className="max-h-[calc(100dvh-1.5rem)] overflow-y-auto p-4 sm:max-w-[600px] sm:p-6">
           <DialogHeader className="pr-8 text-left">
-            <DialogTitle>Calendários</DialogTitle>
+            <DialogTitle>
+              {guidedVariantGroupId
+                ? "Adicione os feriados do seu estado"
+                : "Calendários"}
+            </DialogTitle>
             <DialogDescription>
-              Adicione calendários prontos ao seu ano.
+              {guidedVariantGroupId
+                ? `Escolha sua UF para incluir este calendário no contexto ${
+                    activeProfileId
+                      ? profileNameById.get(activeProfileId) ?? "criado"
+                      : "criado"
+                  }.`
+                : "Adicione calendários prontos ao seu ano."}
             </DialogDescription>
           </DialogHeader>
 
           <div className="grid gap-2 rounded-[8px] border border-border/75 bg-background p-2.5 shadow-sm sm:p-3">
             {calendarPackCards.map(({ key, variants }) => {
+              const isGuidedCard = guidedVariantGroupId === key;
+              const isGuidedCardDisabled = Boolean(
+                guidedVariantGroupId && !isGuidedCard
+              );
               const selectedPackId = selectedVariantByGroup[key];
               const selectedVariant = variants.find(
                 (candidate) => candidate.id === selectedPackId
@@ -405,6 +457,10 @@ export function CalendarPackLauncher({
                 selectedVariant ??
                 installedVariant ??
                 variants[0];
+              const hasRequiredVariant =
+                !isGuidedCard ||
+                !requireExplicitVariant ||
+                Boolean(selectedVariant || installedVariant);
               const availability = availabilityByPack.get(pack.id);
               const isPresent = groupIsPresent;
               const currentFlow = flowByPack[pack.id] ?? "idle";
@@ -423,14 +479,20 @@ export function CalendarPackLauncher({
               const targetProfileName = targetProfileId
                 ? profileNameById.get(targetProfileId)
                 : null;
-              const showAddDetails = !isPresent && expandedPackId === pack.id;
+              const showAddDetails =
+                !isPresent &&
+                (expandedPackId === pack.id ||
+                  (isGuidedCard && hasRequiredVariant));
               const variantGroup = pack.variantGroup;
 
               return (
                 <article
                   key={key}
+                  data-calendar-pack-group={key}
+                  data-guided-disabled={isGuidedCardDisabled ? "true" : undefined}
                   className={cn(
                     "rounded-[8px] border border-border/60 bg-muted/15 px-3 py-2.5 transition-[background-color,border-color,box-shadow]",
+                    isGuidedCardDisabled && "opacity-45",
                     showAddDetails &&
                       "border-foreground/16 bg-background shadow-[0_12px_24px_-24px_rgba(15,23,42,0.28)]"
                   )}
@@ -451,7 +513,12 @@ export function CalendarPackLauncher({
                         {variantGroup && variants.length > 1 ? (
                           <div className="mt-2">
                             <Select
-                              value={pack.id}
+                              value={
+                                isGuidedCard && requireExplicitVariant
+                                  ? selectedVariant?.id ?? installedVariant?.id ?? ""
+                                  : pack.id
+                              }
+                              disabled={isGuidedCardDisabled}
                               onValueChange={(packId) => {
                                 setSelectedVariantByGroup((current) => ({
                                   ...current,
@@ -465,7 +532,13 @@ export function CalendarPackLauncher({
                                 className="h-7 w-40 max-w-full rounded-[8px] border-border bg-card px-2.5 text-xs shadow-none hover:border-foreground/18 hover:bg-muted sm:w-72"
                                 aria-label={`${variantGroup.label} para ${pack.name}`}
                               >
-                                <SelectValue />
+                                <SelectValue
+                                  placeholder={
+                                    isGuidedCard && requireExplicitVariant
+                                      ? "Escolha seu estado"
+                                      : undefined
+                                  }
+                                />
                               </SelectTrigger>
                               <SelectContent align="start">
                                 {variants.map((variant) => (
@@ -489,7 +562,7 @@ export function CalendarPackLauncher({
                               variant="premium"
                               size="xs"
                               className="rounded-full"
-                              disabled={isBusy}
+                              disabled={isBusy || isGuidedCardDisabled}
                               onClick={() =>
                                 handleImport(
                                   pack,
@@ -513,7 +586,7 @@ export function CalendarPackLauncher({
                             variant="dangerSoft"
                             size="xs"
                             className="rounded-full"
-                            disabled={isBusy}
+                            disabled={isBusy || isGuidedCardDisabled}
                             onClick={() => handleRemove(pack, variants)}
                           >
                             {currentFlow === "removing" ? (
@@ -525,6 +598,25 @@ export function CalendarPackLauncher({
                           </Button>
                         </>
                       ) : showAddDetails ? (
+                        isGuidedCard ? (
+                          <Button
+                            type="button"
+                            variant="premium"
+                            size="xs"
+                            className="rounded-full"
+                            disabled={isBusy || !hasRequiredVariant}
+                            onClick={() =>
+                              handleImport(pack, variants, activeProfileId)
+                            }
+                          >
+                            {currentFlow === "adding" ? (
+                              <Loader2 className="size-3.5 animate-spin" />
+                            ) : (
+                              <Check className="size-3.5" />
+                            )}
+                            Adicionar feriados
+                          </Button>
+                        ) : (
                         <div className="flex min-w-0 items-center justify-end gap-1.5">
                           <Select
                             value={targetProfileId ?? ""}
@@ -538,9 +630,9 @@ export function CalendarPackLauncher({
                             <SelectTrigger
                               size="sm"
                               className="h-7 w-[8.25rem] rounded-[9px] border-border bg-card px-2.5 text-xs font-semibold shadow-none hover:border-foreground/18 hover:bg-muted sm:w-[9rem]"
-                              aria-label={`Perfil para ${pack.name}`}
+                              aria-label={`Contexto para ${pack.name}`}
                             >
-                              <SelectValue placeholder="Perfil" />
+                              <SelectValue placeholder="Contexto" />
                             </SelectTrigger>
                             <SelectContent align="end">
                               {profiles.map((profile) => (
@@ -566,13 +658,13 @@ export function CalendarPackLauncher({
                             }
                             aria-label={
                               targetProfileName
-                                ? `Adicionar calendário ${pack.name} ao perfil ${targetProfileName}`
+                                ? `Adicionar calendário ${pack.name} ao contexto ${targetProfileName}`
                                 : `Adicionar calendário ${pack.name}`
                             }
                             title={
                               targetProfileName
                                 ? `Adicionar em ${targetProfileName}`
-                                : "Escolha um perfil"
+                                : "Escolha um contexto"
                             }
                           >
                             {currentFlow === "adding" ? (
@@ -583,13 +675,18 @@ export function CalendarPackLauncher({
                             <span className="sr-only">Confirmar</span>
                           </Button>
                         </div>
+                        )
                       ) : (
                         <Button
                           type="button"
                           variant="premium"
                           size="xs"
                           className="rounded-full"
-                          disabled={isBusy}
+                          disabled={
+                            isBusy ||
+                            isGuidedCardDisabled ||
+                            !hasRequiredVariant
+                          }
                           onClick={() => {
                             if (isCalendarSubscriptionLimitReached) {
                               setUpgradeDialogOpen(true);

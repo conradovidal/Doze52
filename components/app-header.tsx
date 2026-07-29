@@ -3,6 +3,14 @@
 import * as React from "react";
 import { Check, ChevronDown, PencilLine } from "lucide-react";
 import { BrandLogo } from "@/components/brand-logo";
+import {
+  GuidedCalendarNotice,
+  type GuidedSelectionNotice,
+} from "@/components/onboarding/guided-selection-notice";
+import {
+  GuidedToolbarNoticeCard,
+  type GuidedToolbarNotice,
+} from "@/components/onboarding/guided-toolbar-notice";
 import { CategoryBar } from "@/components/category-bar";
 import { CategoryManager } from "@/components/category-manager";
 import { CalendarPackLauncher } from "@/components/calendar-packs/calendar-pack-launcher";
@@ -23,10 +31,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useStore } from "@/lib/store";
+import type { OnboardingFocusTarget } from "@/lib/onboarding";
 import type { AnchorPoint } from "@/lib/types";
 import { cn } from "@/lib/utils";
-
-const CATEGORY_COLLAPSE_STORAGE_KEY = "doze52-categories-expanded";
 
 type AppHeaderProps = {
   year: number;
@@ -36,6 +43,22 @@ type AppHeaderProps = {
   isMobileCalendarUi?: boolean;
   onOpenAuthDialog: (anchorPoint?: AnchorPoint) => void;
   onCalendarPackFocusYear: (year: number) => void;
+  onboardingFocusTarget?: OnboardingFocusTarget;
+  guidedSelectionNotice?: GuidedSelectionNotice | null;
+  guidedToolbarNotice?: GuidedToolbarNotice | null;
+  onDismissGuidedSelection?: () => void;
+  onGuidedToolbarAction?: (target: GuidedToolbarNotice["target"]) => void;
+  onGuidedCalendarOpen?: () => void;
+  onGuidedCalendarClose?: () => void;
+  onGuidedCalendarImported?: (uf?: string) => void;
+  guidedCalendarSelectionActive?: boolean;
+  guidedEditPreviewActive?: boolean;
+  onboardingLayoutLocked?: boolean;
+  mobileExamplePreviewActive?: boolean;
+  demoExplorationActive?: boolean;
+  categoryCreateRequestKey?: number;
+  onCategoryCreated?: (categoryId: string) => void;
+  onProfileCreated?: (profileId: string) => void;
 };
 
 const getPreferredEditingProfileId = (
@@ -51,10 +74,28 @@ export function AppHeader({
   isMobileCalendarUi = false,
   onOpenAuthDialog,
   onCalendarPackFocusYear,
+  onboardingFocusTarget = null,
+  guidedSelectionNotice = null,
+  guidedToolbarNotice = null,
+  onDismissGuidedSelection,
+  onGuidedToolbarAction,
+  onGuidedCalendarOpen,
+  onGuidedCalendarClose,
+  onGuidedCalendarImported,
+  guidedCalendarSelectionActive = false,
+  guidedEditPreviewActive = false,
+  onboardingLayoutLocked = false,
+  mobileExamplePreviewActive = false,
+  demoExplorationActive = false,
+  categoryCreateRequestKey = 0,
+  onCategoryCreated,
+  onProfileCreated,
 }: AppHeaderProps) {
   const profiles = useStore((s) => s.profiles);
+  const categories = useStore((s) => s.categories);
   const selectedProfileIds = useStore((s) => s.selectedProfileIds);
   const setSelectedProfiles = useStore((s) => s.setSelectedProfiles);
+  const setCategoriesVisibility = useStore((s) => s.setCategoriesVisibility);
 
   const [isInlineEditMode, setIsInlineEditMode] = React.useState(false);
   const [editingProfileId, setEditingProfileId] = React.useState<string | null>(null);
@@ -66,13 +107,18 @@ export function AppHeader({
   const [editingCategoryId, setEditingCategoryId] = React.useState<string | null>(null);
   const [categoriesExpanded, setCategoriesExpanded] = React.useState(true);
   const [areMobileFiltersCollapsed, setAreMobileFiltersCollapsed] =
-    React.useState(true);
+    React.useState(false);
+  const previousOnboardingLayoutLockedRef = React.useRef(false);
+  const effectiveInlineEditMode = onboardingLayoutLocked
+    ? guidedEditPreviewActive
+    : isInlineEditMode;
 
   const pendingProfileCreateRestoreRef = React.useRef<{
     knownProfileIds: string[];
     selectedProfileIds: string[];
   } | null>(null);
   const previousProfileManagerOpenRef = React.useRef(false);
+  const handledCategoryCreateRequestRef = React.useRef(0);
 
   const utilityIconClass =
     "h-8 w-8 rounded-[10px] border-border bg-card text-muted-foreground shadow-none transition-colors hover:border-foreground/18 hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 md:h-9 md:w-9";
@@ -84,11 +130,35 @@ export function AppHeader({
     "h-8 min-w-[82px] rounded-[10px] border-border bg-card px-2.5 text-[0.9rem] font-semibold text-foreground shadow-none hover:border-foreground/18 hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/60 md:h-9 md:min-w-[90px] md:px-3.5 md:text-[1rem] [&_svg]:opacity-70 [&_svg]:text-muted-foreground";
   const categoryToggleClass =
     "inline-flex h-8 w-8 items-center justify-center rounded-[10px] border border-border bg-card text-foreground/70 shadow-none transition-[background-color,border-color,color,box-shadow,transform] duration-150 ease-out hover:border-foreground/18 hover:bg-muted hover:text-foreground active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45";
-  const effectiveCategoriesExpanded = categoriesExpanded || isInlineEditMode;
+  const highlightedProfileId =
+    onboardingFocusTarget?.kind === "profile" ? onboardingFocusTarget.id : null;
+  const highlightedCategoryId =
+    onboardingFocusTarget?.kind === "category" ? onboardingFocusTarget.id : null;
+  const highlightedCategoryEffect =
+    onboardingFocusTarget?.kind === "category"
+      ? onboardingFocusTarget.effect ?? "focus"
+      : "focus";
+  const effectiveCategoriesExpanded =
+    categoriesExpanded ||
+    effectiveInlineEditMode ||
+    highlightedCategoryEffect === "reveal";
+  const filtersLocked = onboardingLayoutLocked;
+  const inlineEditDisabled =
+    mobileExamplePreviewActive ||
+    (onboardingLayoutLocked && guidedToolbarNotice?.target !== "edit");
+  const calendarLauncherDisabled =
+    mobileExamplePreviewActive ||
+    (onboardingLayoutLocked && !guidedCalendarSelectionActive);
+  const yearSelectDisabled = onboardingLayoutLocked;
+  const themeToggleDisabled =
+    onboardingLayoutLocked && guidedToolbarNotice?.target !== "theme";
   const isMobileMode = isMobileCalendarUi === true;
   const filterPanelId = React.useId();
   const showMobileFilterPanel =
-    !isMobileMode || !areMobileFiltersCollapsed || isInlineEditMode;
+    !isMobileMode ||
+    !areMobileFiltersCollapsed ||
+    effectiveInlineEditMode ||
+    highlightedCategoryEffect === "reveal";
   const selectedProfile = React.useMemo(
     () =>
       profiles.find((profile) => selectedProfileIds.includes(profile.id)) ??
@@ -98,13 +168,13 @@ export function AppHeader({
   );
 
   React.useEffect(() => {
-    if (!isInlineEditMode) return;
+    if (!effectiveInlineEditMode) return;
     const profileIds = profiles.map((profile) => profile.id);
     setEditingProfileId((current) => {
       if (current && profileIds.includes(current)) return current;
       return getPreferredEditingProfileId(selectedProfileIds, profileIds);
     });
-  }, [isInlineEditMode, profiles, selectedProfileIds]);
+  }, [effectiveInlineEditMode, profiles, selectedProfileIds]);
 
   React.useEffect(() => {
     const wasOpen = previousProfileManagerOpenRef.current;
@@ -133,41 +203,80 @@ export function AppHeader({
   }, [profileManagerOpen, profiles, setSelectedProfiles]);
 
   React.useEffect(() => {
-    try {
-      const stored = window.localStorage.getItem(CATEGORY_COLLAPSE_STORAGE_KEY);
-      if (stored === "true" || stored === "false") {
-        setCategoriesExpanded(stored === "true");
-      }
-    } catch {
-      // Keep categories visible when storage is unavailable.
-    }
-  }, []);
-
-  React.useEffect(() => {
-    if (isInlineEditMode) {
+    if (effectiveInlineEditMode) {
       setAreMobileFiltersCollapsed(false);
     }
-  }, [isInlineEditMode]);
+  }, [effectiveInlineEditMode]);
 
-  const setPersistedCategoriesExpanded = React.useCallback((expanded: boolean) => {
-    setCategoriesExpanded(expanded);
-    try {
-      window.localStorage.setItem(CATEGORY_COLLAPSE_STORAGE_KEY, String(expanded));
-    } catch {
-      // Ignore storage errors; this is only a local UI preference.
+  React.useEffect(() => {
+    const wasLocked = previousOnboardingLayoutLockedRef.current;
+    previousOnboardingLayoutLockedRef.current = onboardingLayoutLocked;
+    if (wasLocked && !onboardingLayoutLocked) {
+      setIsInlineEditMode(false);
     }
-  }, []);
+  }, [onboardingLayoutLocked]);
+
+  React.useEffect(() => {
+    if (
+      categoryCreateRequestKey <= 0 ||
+      categoryCreateRequestKey === handledCategoryCreateRequestRef.current
+    ) {
+      return;
+    }
+    handledCategoryCreateRequestRef.current = categoryCreateRequestKey;
+    const profileId =
+      selectedProfileIds[0] ?? profiles[0]?.id ?? null;
+    if (!profileId) return;
+    setEditingProfileId(profileId);
+    setCategoryCreateOpen(true);
+  }, [categoryCreateRequestKey, profiles, selectedProfileIds]);
+
+  React.useEffect(() => {
+    if (!highlightedCategoryId) return;
+    const highlightedCategory = useStore
+      .getState()
+      .categories.find((category) => category.id === highlightedCategoryId);
+    if (!highlightedCategory) return;
+    const wasVisible = highlightedCategory.visible;
+    if (!wasVisible) setCategoriesVisibility([highlightedCategoryId], true);
+
+    return () => {
+      if (!wasVisible) setCategoriesVisibility([highlightedCategoryId], false);
+    };
+  }, [highlightedCategoryId, setCategoriesVisibility]);
+
+  React.useEffect(() => {
+    if (!highlightedCategoryId) return;
+    const highlightedCategory = categories.find(
+      (category) => category.id === highlightedCategoryId
+    );
+    if (highlightedCategory && !highlightedCategory.visible) {
+      setCategoriesVisibility([highlightedCategoryId], true);
+    }
+  }, [categories, highlightedCategoryId, setCategoriesVisibility]);
 
   const toggleInlineEditMode = React.useCallback(() => {
-    setIsInlineEditMode((current) => {
-      const next = !current;
-      if (next) {
-        const profileIds = profiles.map((profile) => profile.id);
-        setEditingProfileId(getPreferredEditingProfileId(selectedProfileIds, profileIds));
-      }
-      return next;
-    });
-  }, [profiles, selectedProfileIds]);
+    const next = !effectiveInlineEditMode;
+    if (next) {
+      const profileIds = profiles.map((profile) => profile.id);
+      setEditingProfileId(
+        getPreferredEditingProfileId(selectedProfileIds, profileIds)
+      );
+    }
+    if (!onboardingLayoutLocked) {
+      setIsInlineEditMode(next);
+    }
+    if (guidedToolbarNotice?.target === "edit") {
+      onGuidedToolbarAction?.("edit");
+    }
+  }, [
+    guidedToolbarNotice?.target,
+    effectiveInlineEditMode,
+    onboardingLayoutLocked,
+    onGuidedToolbarAction,
+    profiles,
+    selectedProfileIds,
+  ]);
 
   const openCreateProfile = React.useCallback(() => {
     pendingProfileCreateRestoreRef.current = {
@@ -214,60 +323,187 @@ export function AppHeader({
           </div>
 
           <div className="w-full min-w-0 justify-self-end">
-            <div className="flex min-w-0 flex-wrap items-center justify-end gap-1 sm:gap-2">
-              {isInlineEditMode ? (
-                <Button
-                  type="button"
-                  variant="premium"
-                  size="sm"
-                  className={utilityActiveEditClass}
-                  onClick={toggleInlineEditMode}
-                  aria-label="Finalizar edicao de perfis e categorias"
-                  title="Finalizar edicao de perfis e categorias"
+            <div
+              data-onboarding-toolbar-spotlight={
+                guidedToolbarNotice ? "true" : undefined
+              }
+              className="flex min-w-0 flex-wrap items-center justify-end gap-1 sm:gap-2"
+            >
+              <div
+                data-onboarding-spotlight-target={
+                  guidedToolbarNotice?.target === "edit" ? "true" : undefined
+                }
+                className="relative shrink-0"
+              >
+                {effectiveInlineEditMode ? (
+                  <Button
+                    type="button"
+                    data-onboarding-edit-control
+                    data-onboarding-highlighted={
+                      guidedToolbarNotice?.target === "edit"
+                        ? "true"
+                        : undefined
+                    }
+                    variant="premium"
+                    size="sm"
+                    disabled={inlineEditDisabled}
+                    className={cn(
+                      utilityActiveEditClass,
+                      guidedToolbarNotice?.target === "edit" &&
+                        "product-spotlight-target"
+                    )}
+                    onClick={toggleInlineEditMode}
+                    aria-label="Finalizar edição de contextos e categorias"
+                    title="Finalizar edição de contextos e categorias"
+                  >
+                    <Check className="h-4 w-4" />
+                    <span className="hidden min-[420px]:inline">Finalizar</span>
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    data-onboarding-edit-control
+                    data-onboarding-highlighted={
+                      guidedToolbarNotice?.target === "edit"
+                        ? "true"
+                        : undefined
+                    }
+                    variant="outline"
+                    size="icon-sm"
+                    disabled={inlineEditDisabled}
+                    className={cn(
+                      utilityIconClass,
+                      guidedToolbarNotice?.target === "edit" &&
+                        "product-spotlight-target"
+                    )}
+                    onClick={toggleInlineEditMode}
+                    aria-label="Editar contextos e categorias"
+                    title="Editar contextos e categorias"
+                  >
+                    <PencilLine className="h-4 w-4" />
+                  </Button>
+                )}
+                {guidedToolbarNotice?.target === "edit" &&
+                onDismissGuidedSelection ? (
+                  <GuidedToolbarNoticeCard
+                    notice={guidedToolbarNotice}
+                    onClose={onDismissGuidedSelection}
+                    onAction={() => onGuidedToolbarAction?.("edit")}
+                  />
+                ) : null}
+              </div>
+
+              <div
+                data-onboarding-spotlight-target={
+                  guidedToolbarNotice?.target === "calendars" ? "true" : undefined
+                }
+                className="relative shrink-0"
+              >
+                <CalendarPackLauncher
+                  onFocusYear={onCalendarPackFocusYear}
+                  className="shrink-0"
+                  onRequireAuth={() => onOpenAuthDialog()}
+                  disabled={calendarLauncherDisabled}
+                  bypassLimits={demoExplorationActive}
+                  highlighted={guidedToolbarNotice?.target === "calendars"}
+                  guidedVariantGroupId={
+                    guidedCalendarSelectionActive
+                      ? "holidays-by-state"
+                      : undefined
+                  }
+                  requireExplicitVariant={
+                    guidedCalendarSelectionActive
+                  }
+                  onOpen={onGuidedCalendarOpen}
+                  onClose={onGuidedCalendarClose}
+                  onImported={(pack) =>
+                    onGuidedCalendarImported?.(pack.regionCode)
+                  }
+                />
+                {guidedToolbarNotice?.target === "calendars" &&
+                onDismissGuidedSelection ? (
+                  <GuidedToolbarNoticeCard
+                    notice={guidedToolbarNotice}
+                    onClose={onDismissGuidedSelection}
+                  />
+                ) : null}
+              </div>
+
+              <div
+                data-onboarding-spotlight-target={
+                  guidedToolbarNotice?.target === "year" ? "true" : undefined
+                }
+                className="relative shrink-0"
+              >
+                <Select
+                  value={String(year)}
+                  disabled={yearSelectDisabled}
+                  onValueChange={(v) => onYearChange(Number(v))}
                 >
-                  <Check className="h-4 w-4" />
-                  <span className="hidden min-[420px]:inline">Finalizar</span>
-                </Button>
-              ) : (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon-sm"
-                  className={utilityIconClass}
-                  onClick={toggleInlineEditMode}
-                  aria-label="Editar perfis e categorias"
-                  title="Editar perfis e categorias"
-                >
-                  <PencilLine className="h-4 w-4" />
-                </Button>
-              )}
+                  <SelectTrigger
+                    data-onboarding-year-control
+                    data-onboarding-highlighted={
+                      guidedToolbarNotice?.target === "year" ? "true" : undefined
+                    }
+                    className={cn(
+                      yearSelectClass,
+                      guidedToolbarNotice?.target === "year" &&
+                        "product-spotlight-target"
+                    )}
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={String(year - 1)}>{year - 1}</SelectItem>
+                    <SelectItem value={String(year)}>{year}</SelectItem>
+                    <SelectItem value={String(year + 1)}>{year + 1}</SelectItem>
+                  </SelectContent>
+                </Select>
+                {guidedToolbarNotice?.target === "year" &&
+                onDismissGuidedSelection ? (
+                  <GuidedToolbarNoticeCard
+                    notice={guidedToolbarNotice}
+                    onClose={onDismissGuidedSelection}
+                    onAction={() => onGuidedToolbarAction?.("year")}
+                    align="end"
+                  />
+                ) : null}
+              </div>
 
-              <CalendarPackLauncher
-                onFocusYear={onCalendarPackFocusYear}
-                className="shrink-0"
-                onRequireAuth={() => onOpenAuthDialog()}
-              />
-
-              <Select value={String(year)} onValueChange={(v) => onYearChange(Number(v))}>
-                <SelectTrigger className={yearSelectClass}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="2025">2025</SelectItem>
-                  <SelectItem value="2026">2026</SelectItem>
-                  <SelectItem value="2027">2027</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <ThemeToggle />
+              <div
+                data-onboarding-spotlight-target={
+                  guidedToolbarNotice?.target === "theme" ? "true" : undefined
+                }
+                className="relative shrink-0"
+              >
+                <ThemeToggle
+                  highlighted={guidedToolbarNotice?.target === "theme"}
+                  disabled={themeToggleDisabled}
+                />
+                {guidedToolbarNotice?.target === "theme" &&
+                onDismissGuidedSelection ? (
+                  <GuidedToolbarNoticeCard
+                    notice={guidedToolbarNotice}
+                    onClose={onDismissGuidedSelection}
+                    onAction={
+                      guidedToolbarNotice.actionLabel
+                        ? () => onGuidedToolbarAction?.("theme")
+                        : undefined
+                    }
+                    align="end"
+                  />
+                ) : null}
+              </div>
 
               <div className="flex h-8 items-center justify-end md:h-9">
                 {authLoading ? null : isAuthenticated ? (
                   <UserMenu />
                 ) : (
                   <Button
+                    data-onboarding-auth-entry
                     size="sm"
                     variant="outline"
+                    disabled={onboardingLayoutLocked}
                     className={utilityButtonClass}
                     onClick={(event) => {
                       const rect = event.currentTarget.getBoundingClientRect();
@@ -283,20 +519,36 @@ export function AppHeader({
         </div>
 
         <div
+          data-onboarding-filter-region
           className={cn(
-            "mx-auto flex w-full flex-col items-center gap-1.5 md:gap-2",
+            "relative mx-auto flex w-full flex-col items-center gap-1.5 md:gap-2",
             isMobileMode
               ? "max-w-[31rem]"
-              : "max-w-[62rem] border-t border-border/45 pt-2.5 md:pt-3"
+              : "max-w-[62rem] border-t border-border/45 pt-2.5 md:pt-3",
+            onboardingLayoutLocked &&
+              (isMobileMode ? "min-h-[10.25rem]" : "min-h-[5.6rem]")
           )}
         >
-          {isMobileMode ? (
-            <div className="w-full overflow-hidden rounded-[10px] border border-border bg-card">
+          <div
+            className={cn(
+              "flex w-full flex-col items-center gap-1.5 transition-opacity duration-150 md:gap-2",
+              guidedSelectionNotice && "opacity-0"
+            )}
+            inert={filtersLocked ? true : undefined}
+            aria-hidden={guidedSelectionNotice ? true : undefined}
+          >
+            {isMobileMode ? (
+              <div className="w-full overflow-hidden rounded-[10px] border border-border bg-card">
               <button
                 type="button"
                 className="m-[3px] flex h-10 w-[calc(100%-6px)] items-center justify-between gap-3 rounded-[8px] bg-transparent px-2.5 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/45"
                 aria-expanded={showMobileFilterPanel}
                 aria-controls={filterPanelId}
+                aria-label={
+                  showMobileFilterPanel
+                    ? "Recolher contextos e categorias"
+                    : "Mostrar contextos e categorias"
+                }
                 onClick={() =>
                   setAreMobileFiltersCollapsed((current) => !current)
                 }
@@ -312,7 +564,7 @@ export function AppHeader({
                     </span>
                   ) : null}
                   <span className="block min-w-0 truncate text-[13px] font-semibold leading-4 text-foreground">
-                    {selectedProfile?.name ?? "Perfis"}
+                    {selectedProfile?.name ?? "Contextos"}
                   </span>
                 </span>
 
@@ -347,11 +599,12 @@ export function AppHeader({
                       compact
                       mobileDense
                       className="w-full"
-                      isInlineEditMode={isInlineEditMode}
+                      isInlineEditMode={effectiveInlineEditMode}
                       editingProfileId={editingProfileId}
                       onEditingProfileChange={setEditingProfileId}
                       onCreateProfile={openCreateProfile}
                       onEditProfile={openEditProfile}
+                      highlightedProfileId={highlightedProfileId}
                     />
                   </div>
 
@@ -359,43 +612,46 @@ export function AppHeader({
                     <CategoryBar
                       compact
                       mobileDense
-                      isInlineEditMode={isInlineEditMode}
+                      isInlineEditMode={effectiveInlineEditMode}
                       editingProfileId={editingProfileId}
                       onCreateCategory={openCreateCategory}
                       onEditCategory={openEditCategory}
+                      highlightedCategoryId={highlightedCategoryId}
+                      highlightedCategoryEffect={highlightedCategoryEffect}
                     />
                   </div>
                 </div>
               </div>
-            </div>
-          ) : (
-            <>
+              </div>
+            ) : (
+              <>
               <div className="-mx-4 w-[calc(100%+2rem)] overflow-x-auto px-4 pb-0.5 doze52-scrollbar-none sm:mx-0 sm:w-full sm:px-0 md:overflow-visible">
                 <div className="flex w-max min-w-full flex-nowrap items-center justify-start gap-x-1.5 gap-y-1.5 sm:w-full sm:flex-wrap sm:justify-center sm:gap-x-2">
                   <div className="flex shrink-0 flex-nowrap items-center justify-center gap-1.5 sm:flex-wrap sm:gap-2">
                     <ProfileBar
                       compact
                       className="w-max flex-nowrap justify-start sm:w-auto"
-                      isInlineEditMode={isInlineEditMode}
+                      isInlineEditMode={effectiveInlineEditMode}
                       editingProfileId={editingProfileId}
                       onEditingProfileChange={setEditingProfileId}
                       onCreateProfile={openCreateProfile}
                       onEditProfile={openEditProfile}
+                      highlightedProfileId={highlightedProfileId}
                     />
 
                     <button
                       type="button"
                       className={`${categoryToggleClass} ${
-                        isInlineEditMode
+                        effectiveInlineEditMode
                           ? "cursor-default opacity-70 hover:border-border hover:bg-card hover:text-foreground/70 active:translate-y-0"
                           : ""
                       }`}
-                      disabled={isInlineEditMode}
+                      disabled={effectiveInlineEditMode}
                       onClick={() =>
-                        setPersistedCategoriesExpanded(!categoriesExpanded)
+                        setCategoriesExpanded(!categoriesExpanded)
                       }
                       aria-label={
-                        isInlineEditMode
+                        effectiveInlineEditMode
                           ? "Categorias abertas durante a edicao"
                           : effectiveCategoriesExpanded
                             ? "Recolher categorias"
@@ -408,7 +664,7 @@ export function AppHeader({
                           : undefined
                       }
                       title={
-                        isInlineEditMode
+                        effectiveInlineEditMode
                           ? "Categorias abertas durante a edicao"
                           : effectiveCategoriesExpanded
                             ? "Recolher categorias"
@@ -435,16 +691,36 @@ export function AppHeader({
                     <CategoryBar
                       compact
                       className="w-max min-w-full flex-nowrap justify-start sm:w-full sm:flex-wrap sm:justify-center"
-                      isInlineEditMode={isInlineEditMode}
+                      isInlineEditMode={effectiveInlineEditMode}
                       editingProfileId={editingProfileId}
                       onCreateCategory={openCreateCategory}
                       onEditCategory={openEditCategory}
+                      highlightedCategoryId={highlightedCategoryId}
+                      highlightedCategoryEffect={highlightedCategoryEffect}
                     />
                   </div>
                 </div>
               ) : null}
-            </>
-          )}
+              </>
+            )}
+          </div>
+
+          {guidedSelectionNotice && onDismissGuidedSelection ? (
+            <div
+              data-guided-selection-overlay
+              className="absolute inset-0 z-40 flex items-center justify-center rounded-2xl bg-background"
+            >
+              <div
+                data-guided-selection-card
+                className="inverse-product-surface w-[min(34rem,calc(100%-1rem))] overflow-hidden rounded-2xl border border-border bg-card shadow-[0_24px_60px_-22px_rgba(15,23,42,0.84)]"
+              >
+                <GuidedCalendarNotice
+                  notice={guidedSelectionNotice}
+                  onClose={onDismissGuidedSelection}
+                />
+              </div>
+            </div>
+          ) : null}
         </div>
 
         {isMobileMode ? null : (
@@ -457,6 +733,8 @@ export function AppHeader({
         onOpenChange={handleProfileManagerOpenChange}
         intent={profileManagerIntent}
         onRequireAuth={() => onOpenAuthDialog()}
+        bypassLimits={demoExplorationActive}
+        onCreated={onProfileCreated}
       />
 
       <CategoryManager
@@ -464,7 +742,9 @@ export function AppHeader({
         open={categoryCreateOpen}
         onOpenChange={setCategoryCreateOpen}
         profileId={editingProfileId ?? undefined}
+        onCreated={onCategoryCreated}
         onRequireAuth={() => onOpenAuthDialog()}
+        bypassLimits={demoExplorationActive}
       />
 
       <CategoryManager
@@ -477,6 +757,7 @@ export function AppHeader({
           }
         }}
         categoryId={editingCategoryId ?? undefined}
+        bypassLimits={demoExplorationActive}
       />
     </>
   );

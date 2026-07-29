@@ -116,6 +116,7 @@ export function MonthRow({
   hasDragContext,
   onEditEvent,
   creatingRange,
+  guidedSelectionRange,
   onStartCreateRange,
   onHoverCreateRange,
   onFinishCreateRange,
@@ -147,6 +148,7 @@ export function MonthRow({
     anchorPoint: AnchorPoint;
   }) => void;
   creatingRange: { startIso: string; hoverIso: string; isDragging: boolean } | null;
+  guidedSelectionRange?: { startDate: string; endDate: string } | null;
   onStartCreateRange: (startIso: string) => void;
   onHoverCreateRange: (hoverIso: string) => void;
   onFinishCreateRange: (endIso?: string, anchorPoint?: AnchorPoint) => void;
@@ -322,11 +324,11 @@ export function MonthRow({
   const minHeightPx = Math.max(layoutDensity.monthRowBaseMinHeightPx, contentHeight);
 
   const rangeBounds = React.useMemo(() => {
-    if (!creatingRange) return null;
-    const a = creatingRange.startIso;
-    const b = creatingRange.hoverIso;
+    const a = creatingRange?.startIso ?? guidedSelectionRange?.startDate;
+    const b = creatingRange?.hoverIso ?? guidedSelectionRange?.endDate;
+    if (!a || !b) return null;
     return a <= b ? { startIso: a, endIso: b } : { startIso: b, endIso: a };
-  }, [creatingRange]);
+  }, [creatingRange, guidedSelectionRange]);
   const rangeColumns = (() => {
     if (!rangeBounds) return null;
     const selected = dayInfos

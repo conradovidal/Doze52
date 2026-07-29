@@ -12,23 +12,25 @@ import {
   type SyncOverlayStatus,
 } from "@/components/sync-status-overlay";
 import { AuthDialog } from "@/components/auth/auth-dialog";
-import { Button } from "@/components/ui/button";
 import {
-  Popover,
-  PopoverAnchor,
-  PopoverContent,
-  PopoverDescription,
-  PopoverHeader,
-  PopoverTitle,
-} from "@/components/ui/popover";
+  GuidedOnboardingPanel,
+  getGuidedSelectionNotice,
+  type GuidedCalendarDraft,
+} from "@/components/onboarding/guided-onboarding-panel";
+import { AccountNudge } from "@/components/onboarding/account-nudge";
+import { DemoExplorationInvite } from "@/components/onboarding/demo-exploration-invite";
+import { MobileDesktopFirstGate } from "@/components/onboarding/mobile-desktop-first-gate";
+import { OnboardingTestReset } from "@/components/onboarding/onboarding-test-reset";
+import type { GuidedToolbarNotice } from "@/components/onboarding/guided-toolbar-notice";
+import { Button } from "@/components/ui/button";
 import { useFeedback } from "@/components/ui/feedback-provider";
 import {
-  getOnboardingDefaultProfiles,
-  getOnboardingDefaultCategories,
   isOnboardingProfilesSnapshot,
   isOnboardingCategoriesSnapshot,
-  ONBOARDING_DEFAULT_CATEGORY_ID,
-  ONBOARDING_DEFAULT_PROFILE_ID,
+  isOnboardingPersonalDemoSnapshot,
+  ONBOARDING_CATEGORY_IDS,
+  ONBOARDING_PERSONAL_DEMO_GROUP_ID,
+  stripOnboardingPersonalDemo,
   useStore,
   type EventInput,
 } from "@/lib/store";
@@ -43,22 +45,39 @@ import {
 } from "@/lib/sync";
 import { getTodayIsoInTimeZone } from "@/lib/date";
 import {
+  GUIDED_ONBOARDING_CHANGE_EVENT,
   PRODUCT_ONBOARDING_RESET_EVENT,
+  dispatchGuidedOnboarding,
+  hasAuthorCalendarEvents,
+  getGuidedCategoryRevealRemainingMs,
+  readGuidedOnboardingState,
   readProductOnboardingState,
-  setProductOnboardingState,
+  resetAllProductOnboarding,
+  shouldShowGuidedOnboarding,
+  type GuidedOnboardingAction,
+  type GuidedOnboardingState,
+  type OnboardingCategoryChoice,
+  type OnboardingFocusTarget,
+  type OnboardingContext,
   type ProductOnboardingState,
 } from "@/lib/onboarding";
 import { logDevError, logProdError } from "@/lib/safe-log";
 import { getSupabaseBrowserClient, hasSupabaseEnv } from "@/lib/supabase";
 import { expandEventsForYear } from "@/lib/recurrence";
+import {
+  ensureSnapshotCoverage,
+  materializeUserOwnedSnapshot,
+} from "@/lib/snapshot-ownership";
 import { cn } from "@/lib/utils";
 import type { AnchorPoint } from "@/lib/types";
+import { useTheme } from "@/lib/theme";
+import { trackOnboardingRegion } from "@/lib/onboarding-region";
 
 const toSnapshotHash = (snapshot: CalendarSnapshot) => JSON.stringify(snapshot);
 
 const SYNC_HINT_BY_KIND: Record<SyncError["kind"], string> = {
   missing_relation:
-    "Schema pendente no Supabase (rode as migrations de perfis/icones).",
+    "Schema pendente no Supabase (rode as migrations de contextos/ícones).",
   permission: "RLS/policies sem permissao para seu usuario.",
   not_authenticated: "Sessao expirada. Faca login novamente.",
   network: "Falha de rede. Tente novamente em instantes.",
@@ -100,6 +119,28 @@ const isDetailedSyncDiagnosticsEnabled =
   process.env.NEXT_PUBLIC_APP_ENV === "dev";
 
 const MOBILE_CALENDAR_UI_MAX_WIDTH_PX = 767;
+const MOBILE_EXAMPLE_PREVIEW_SESSION_KEY =
+  "doze52:mobile-example-preview:session";
+
+const readMobileExamplePreviewSession = () => {
+  if (typeof window === "undefined") return false;
+
+  try {
+    return (
+      window.sessionStorage.getItem(MOBILE_EXAMPLE_PREVIEW_SESSION_KEY) === "1"
+    );
+  } catch {
+    return false;
+  }
+};
+
+const writeMobileExamplePreviewSession = () => {
+  try {
+    window.sessionStorage.setItem(MOBILE_EXAMPLE_PREVIEW_SESSION_KEY, "1");
+  } catch {
+    // A prévia continua válida para a página atual quando o storage está indisponível.
+  }
+};
 
 const cloneSnapshot = (snapshot: CalendarSnapshot): CalendarSnapshot => ({
   profiles: snapshot.profiles.map((profile) => ({ ...profile })),
@@ -119,98 +160,6 @@ const isCalendarSnapshotLike = (value: unknown): value is CalendarSnapshot => {
     Array.isArray(record.categories) &&
     Array.isArray(record.events)
   );
-};
-
-const ensureSnapshotCoverage = (
-  snapshot: CalendarSnapshot
-): CalendarSnapshot => {
-  const profiles =
-    snapshot.profiles.length > 0
-      ? snapshot.profiles
-      : getOnboardingDefaultProfiles();
-
-  const profileIds = new Set(profiles.map((profile) => profile.id));
-  const fallbackProfileId = profileIds.has(ONBOARDING_DEFAULT_PROFILE_ID)
-    ? ONBOARDING_DEFAULT_PROFILE_ID
-    : profiles[0]?.id ?? ONBOARDING_DEFAULT_PROFILE_ID;
-
-  const categories =
-    snapshot.categories.length > 0
-      ? snapshot.categories
-      : getOnboardingDefaultCategories();
-
-  const normalizedCategories = categories.map((category) => ({
-    ...category,
-    profileId: profileIds.has(category.profileId)
-      ? category.profileId
-      : fallbackProfileId,
-  }));
-
-  const categoryIds = new Set(
-    normalizedCategories.map((category) => category.id)
-  );
-
-  const fallbackCategoryId = categoryIds.has(ONBOARDING_DEFAULT_CATEGORY_ID)
-    ? ONBOARDING_DEFAULT_CATEGORY_ID
-    : normalizedCategories[0]?.id ?? ONBOARDING_DEFAULT_CATEGORY_ID;
-
-  const colorByCategoryId = new Map(
-    normalizedCategories.map((category) => [category.id, category.color])
-  );
-
-  const events = snapshot.events.map((event) => {
-    const categoryId = categoryIds.has(event.categoryId)
-      ? event.categoryId
-      : fallbackCategoryId;
-
-    const color = colorByCategoryId.get(categoryId) ?? event.color;
-
-    if (categoryId === event.categoryId && color === event.color) {
-      return event;
-    }
-
-    return { ...event, categoryId, color };
-  });
-
-  return { profiles, categories: normalizedCategories, events };
-};
-
-const materializeUserOwnedSnapshot = (
-  snapshot: CalendarSnapshot
-): CalendarSnapshot => {
-  const covered = ensureSnapshotCoverage(snapshot);
-  const profileIdMap = new Map(
-    covered.profiles.map((profile) => [profile.id, crypto.randomUUID()])
-  );
-  const categoryIdMap = new Map(
-    covered.categories.map((category) => [category.id, crypto.randomUUID()])
-  );
-
-  return {
-    profiles: covered.profiles.map((profile) => ({
-      ...profile,
-      id: profileIdMap.get(profile.id) ?? crypto.randomUUID(),
-      userId: undefined,
-    })),
-    categories: covered.categories.map((category) => ({
-      ...category,
-      id: categoryIdMap.get(category.id) ?? crypto.randomUUID(),
-      profileId:
-        profileIdMap.get(category.profileId) ??
-        profileIdMap.values().next().value ??
-        crypto.randomUUID(),
-      userId: undefined,
-    })),
-    events: covered.events.map((event) => ({
-      ...event,
-      id: crypto.randomUUID(),
-      categoryId:
-        categoryIdMap.get(event.categoryId) ??
-        categoryIdMap.values().next().value ??
-        crypto.randomUUID(),
-      userId: undefined,
-    })),
-  };
 };
 
 const readPendingSyncSnapshot = (userId: string): CalendarSnapshot | null => {
@@ -272,11 +221,23 @@ const formatSyncDebugDetail = (error: SyncUiError) => {
   return detail.length > 180 ? `${detail.slice(0, 177)}...` : detail;
 };
 
-const filterAnonymousDraft = (snapshot: CalendarSnapshot): CalendarSnapshot => ({
-  profiles: snapshot.profiles.filter((profile) => !profile.userId),
-  categories: snapshot.categories.filter((category) => !category.userId),
-  events: snapshot.events.filter((event) => !event.userId),
-});
+const filterAnonymousDraft = (
+  snapshot: CalendarSnapshot,
+  discardSandbox = false
+): CalendarSnapshot => {
+  if (discardSandbox) {
+    return {
+      profiles: [],
+      categories: [],
+      events: [],
+    };
+  }
+  return stripOnboardingPersonalDemo({
+    profiles: snapshot.profiles.filter((profile) => !profile.userId),
+    categories: snapshot.categories.filter((category) => !category.userId),
+    events: snapshot.events.filter((event) => !event.userId),
+  });
+};
 
 const hasRelevantLocalDraft = (snapshot: CalendarSnapshot) =>
   snapshot.events.length > 0 ||
@@ -323,6 +284,7 @@ const mergeSnapshots = (
 
 export default function HomePage() {
   const { notify } = useFeedback();
+  const { mode: themeMode, setTheme } = useTheme();
 
   const initialYear = React.useMemo(() => {
     const currentYear = new Date().getFullYear();
@@ -337,6 +299,18 @@ export default function HomePage() {
   const ensureEventMetadata = useStore((s) => s.ensureEventMetadata);
   const replaceAllData = useStore((s) => s.replaceAllData);
   const resetToOnboardingData = useStore((s) => s.resetToOnboardingData);
+  const loadOnboardingPersonalDemo = useStore(
+    (s) => s.loadOnboardingPersonalDemo
+  );
+  const unlockOnboardingPersonalDemo = useStore(
+    (s) => s.unlockOnboardingPersonalDemo
+  );
+  const configureOnboardingContext = useStore(
+    (s) => s.configureOnboardingContext
+  );
+  const createOnboardingCategory = useStore(
+    (s) => s.createOnboardingCategory
+  );
   const markLocalImported = useStore((s) => s.markLocalImported);
   const isLocalImported = useStore((s) => s.isLocalImported);
   const addEvent = useStore((s) => s.addEvent);
@@ -353,6 +327,9 @@ export default function HomePage() {
 
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [authDialogOpen, setAuthDialogOpen] = React.useState(false);
+  const [authDialogInitialMode, setAuthDialogInitialMode] = React.useState<
+    "login" | "signup"
+  >("login");
   const [dialogAnchorPoint, setDialogAnchorPoint] = React.useState<
     AnchorPoint | undefined
   >(undefined);
@@ -383,9 +360,23 @@ export default function HomePage() {
   const [syncBlocked, setSyncBlocked] = React.useState(false);
   const [calendarCreateOnboarding, setCalendarCreateOnboarding] =
     React.useState<ProductOnboardingState | null>(null);
+  const [guidedOnboarding, setGuidedOnboarding] =
+    React.useState<GuidedOnboardingState | null>(null);
+  const [accountNudgeVisible, setAccountNudgeVisible] = React.useState(false);
+  const [demoInviteSuppressed, setDemoInviteSuppressed] = React.useState(false);
+  const [guidedDraft, setGuidedDraft] =
+    React.useState<GuidedCalendarDraft | null>(null);
+  const [mobileGuidedRangeStart, setMobileGuidedRangeStart] = React.useState<
+    string | null
+  >(null);
+  const [highlightedEventId, setHighlightedEventId] = React.useState<
+    string | null
+  >(null);
   const [isMobileCalendarUi, setIsMobileCalendarUi] = React.useState<
     boolean | null
   >(null);
+  const [mobileExamplePreviewDismissed, setMobileExamplePreviewDismissed] =
+    React.useState(readMobileExamplePreviewSession);
   const [mobileActiveDateIso, setMobileActiveDateIso] = React.useState(() =>
     format(new Date(), "yyyy-MM-dd")
   );
@@ -646,22 +637,37 @@ export default function HomePage() {
   React.useEffect(() => {
     if (windowContext !== "main") return;
 
-    const syncCreateOnboarding = () => {
+    const syncOnboarding = () => {
       setCalendarCreateOnboarding(readProductOnboardingState("create-event"));
+      setGuidedOnboarding(readGuidedOnboardingState());
     };
 
-    syncCreateOnboarding();
+    const syncGuidedOnboarding = (event: Event) => {
+      const nextState = (event as CustomEvent<GuidedOnboardingState>).detail;
+      setGuidedOnboarding(nextState ?? readGuidedOnboardingState());
+    };
+
+    syncOnboarding();
 
     window.addEventListener(
       PRODUCT_ONBOARDING_RESET_EVENT,
-      syncCreateOnboarding
+      syncOnboarding
+    );
+    window.addEventListener(
+      GUIDED_ONBOARDING_CHANGE_EVENT,
+      syncGuidedOnboarding
     );
 
-    return () =>
+    return () => {
       window.removeEventListener(
         PRODUCT_ONBOARDING_RESET_EVENT,
-        syncCreateOnboarding
+        syncOnboarding
       );
+      window.removeEventListener(
+        GUIDED_ONBOARDING_CHANGE_EVENT,
+        syncGuidedOnboarding
+      );
+    };
   }, [windowContext]);
 
   React.useLayoutEffect(() => {
@@ -786,6 +792,48 @@ export default function HomePage() {
   React.useEffect(() => {
     if (windowContext !== "main" || authLoading || session?.user.id) return;
     if (
+      guidedOnboarding?.step !== "context_selection" ||
+      calendarCreateOnboarding !== "pending"
+    ) {
+      return;
+    }
+
+    const snapshot = { profiles, categories, events };
+    const hasDemo = isOnboardingPersonalDemoSnapshot(snapshot);
+    const isInitialTemplate =
+      events.length === 0 &&
+      isOnboardingProfilesSnapshot(profiles) &&
+      isOnboardingCategoriesSnapshot(categories);
+
+    if (!hasDemo && !isInitialTemplate) return;
+    if (
+      hasDemo &&
+      events.some(
+        (event) =>
+          event.calendarPackGroupId === ONBOARDING_PERSONAL_DEMO_GROUP_ID &&
+          event.startDate.startsWith(`${year}-`)
+      )
+    ) {
+      return;
+    }
+
+    loadOnboardingPersonalDemo(year);
+  }, [
+    authLoading,
+    calendarCreateOnboarding,
+    categories,
+    events,
+    guidedOnboarding?.step,
+    loadOnboardingPersonalDemo,
+    profiles,
+    session?.user.id,
+    windowContext,
+    year,
+  ]);
+
+  React.useEffect(() => {
+    if (windowContext !== "main" || authLoading || session?.user.id) return;
+    if (
       profiles.some((profile) => Boolean(profile.userId)) ||
       categories.some((category) => Boolean(category.userId)) ||
       events.some((event) => Boolean(event.userId))
@@ -820,15 +868,6 @@ export default function HomePage() {
     windowContext,
   ]);
 
-  React.useEffect(() => {
-    if (windowContext !== "main") return;
-    if (calendarCreateOnboarding !== "pending") return;
-    if (events.length === 0) return;
-
-    setProductOnboardingState("create-event", "completed");
-    setCalendarCreateOnboarding("completed");
-  }, [calendarCreateOnboarding, events.length, windowContext]);
-
   const bootstrapRemote = React.useCallback(() => {
     if (windowContext !== "main") return () => {};
 
@@ -850,7 +889,8 @@ export default function HomePage() {
             profiles: profilesRef.current,
             categories: categoriesRef.current,
             events: eventsRef.current,
-          })
+          }),
+          readGuidedOnboardingState().step === "demo_exploration"
         );
 
         const pendingSnapshot = readPendingSyncSnapshot(userId);
@@ -1050,11 +1090,51 @@ export default function HomePage() {
     windowContext,
   ]);
 
+  const hasAuthorEvents = hasAuthorCalendarEvents(events);
+  const guidedOnboardingEligible = Boolean(
+    guidedOnboarding &&
+      calendarCreateOnboarding &&
+      isMobileCalendarUi !== null &&
+      shouldShowGuidedOnboarding({
+        state: guidedOnboarding,
+        legacyState: calendarCreateOnboarding,
+        hasAuthorEvents,
+        authLoading,
+        isAuthenticated: Boolean(session?.user.id),
+        remoteReady,
+      })
+  );
+  const showGuidedOnboarding = Boolean(
+    guidedOnboardingEligible && isMobileCalendarUi === false
+  );
+  const isMobileOnboardingPending = Boolean(
+    guidedOnboardingEligible && isMobileCalendarUi === true
+  );
+  const isInitialMobileOnboarding =
+    guidedOnboarding?.step === "context_selection";
+  const isMobileExamplePreview = Boolean(
+    isMobileOnboardingPending &&
+      isInitialMobileOnboarding &&
+      mobileExamplePreviewDismissed
+  );
+  const showMobileDesktopFirstGate = Boolean(
+    isMobileOnboardingPending &&
+      (!isInitialMobileOnboarding || !mobileExamplePreviewDismissed)
+  );
+  const isDemoExploration =
+    guidedOnboarding?.step === "demo_exploration" && !session?.user.id;
+  const showDemoInvite = Boolean(
+    isDemoExploration &&
+      guidedOnboarding?.demoInviteEligibleAt &&
+      !demoInviteSuppressed
+  );
+
   const handleEditEvent = (payload: {
     eventId: string;
     sourceEventId: string;
     anchorPoint: AnchorPoint;
   }) => {
+    if (showGuidedOnboarding) return;
     void payload.eventId;
     setEditingId(payload.sourceEventId);
     setDialogAnchorPoint(payload.anchorPoint);
@@ -1063,19 +1143,211 @@ export default function HomePage() {
     setDialogOpen(true);
   };
 
-  const dismissCalendarCreateOnboarding = React.useCallback(() => {
-    setProductOnboardingState("create-event", "dismissed");
-    setCalendarCreateOnboarding("dismissed");
-  }, []);
+  const updateGuidedOnboarding = React.useCallback(
+    (action: GuidedOnboardingAction) => {
+      const next = dispatchGuidedOnboarding(action);
+      setGuidedOnboarding(next);
+      return next;
+    },
+    []
+  );
 
-  const completeCalendarCreateOnboarding = React.useCallback(() => {
-    setProductOnboardingState("create-event", "completed");
-    setCalendarCreateOnboarding("completed");
-  }, []);
+  const recordDemoInteraction = React.useCallback(
+    (key: string) => {
+      if (readGuidedOnboardingState().step !== "demo_exploration") return;
+      updateGuidedOnboarding({ type: "record_demo_interaction", key });
+    },
+    [updateGuidedOnboarding]
+  );
+
+  React.useEffect(() => {
+    if (!isDemoExploration) return;
+    const handleDemoClick = (event: MouseEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const profile = target.closest<HTMLElement>("[data-onboarding-profile-id]");
+      if (profile?.dataset.onboardingProfileId) {
+        recordDemoInteraction(`profile:${profile.dataset.onboardingProfileId}`);
+        return;
+      }
+      const category = target.closest<HTMLElement>("[data-onboarding-category-id]");
+      if (category?.dataset.onboardingCategoryId) {
+        recordDemoInteraction(`category:${category.dataset.onboardingCategoryId}`);
+        return;
+      }
+      const calendarEvent = target.closest<HTMLElement>("[data-calendar-event-id]");
+      if (calendarEvent?.dataset.calendarEventId) {
+        recordDemoInteraction(`event:${calendarEvent.dataset.calendarEventId}`);
+        return;
+      }
+      if (target.closest("[data-onboarding-edit-control]")) {
+        recordDemoInteraction("toolbar:edit");
+        return;
+      }
+      if (target.closest("[data-onboarding-calendar-control]")) {
+        recordDemoInteraction("toolbar:calendars");
+        return;
+      }
+      if (target.closest("[data-onboarding-theme-control]")) {
+        recordDemoInteraction("toolbar:theme");
+      }
+    };
+    document.addEventListener("click", handleDemoClick, true);
+    return () => document.removeEventListener("click", handleDemoClick, true);
+  }, [isDemoExploration, recordDemoInteraction]);
+
+  React.useEffect(() => {
+    if (!session?.user.id || guidedOnboarding?.step !== "demo_exploration") {
+      return;
+    }
+    updateGuidedOnboarding({ type: "dismiss" });
+  }, [guidedOnboarding?.step, session?.user.id, updateGuidedOnboarding]);
+
+  React.useEffect(() => {
+    if (
+      guidedOnboarding?.step !== "date_category_reveal" &&
+      guidedOnboarding?.step !== "period_category_reveal"
+    ) {
+      return;
+    }
+
+    const remaining = getGuidedCategoryRevealRemainingMs(
+      guidedOnboarding.categoryRevealStartedAt
+    );
+    const timer = window.setTimeout(() => {
+      updateGuidedOnboarding({ type: "finish_category_reveal" });
+    }, remaining);
+
+    return () => window.clearTimeout(timer);
+  }, [
+    guidedOnboarding?.categoryRevealStartedAt,
+    guidedOnboarding?.step,
+    updateGuidedOnboarding,
+  ]);
+
+  const handleConfigureGuidedContext = React.useCallback(
+    (context: OnboardingContext) => {
+      const configured = configureOnboardingContext({ context });
+      if (!configured) {
+        notify({
+          tone: "error",
+          title: "Não foi possível configurar este contexto",
+          description: "Confira o nome ou continue usando o calendário atual.",
+        });
+        return;
+      }
+      updateGuidedOnboarding({ type: "configure_profile", context });
+      setGuidedDraft(null);
+      setMobileGuidedRangeStart(null);
+    },
+    [configureOnboardingContext, notify, updateGuidedOnboarding]
+  );
+
+  const handleChooseGuidedCategory = React.useCallback(
+    (
+      intent: "date" | "period",
+      choice: OnboardingCategoryChoice,
+      color: string
+    ) => {
+      const current = readGuidedOnboardingState();
+      if (!current.context) return;
+      const categoryId = createOnboardingCategory({
+        context: current.context,
+        intent,
+        choice,
+        color,
+      });
+      if (!categoryId) {
+        notify({
+          tone: "error",
+          title: "Não foi possível criar esta categoria",
+          description: "Tente novamente ou encerre o guia para continuar.",
+        });
+        return;
+      }
+      updateGuidedOnboarding({
+        type:
+          intent === "date"
+            ? "choose_date_category"
+            : "choose_period_category",
+        categoryId,
+      });
+      setGuidedDraft(null);
+      setMobileGuidedRangeStart(null);
+    },
+    [
+      createOnboardingCategory,
+      notify,
+      updateGuidedOnboarding,
+    ]
+  );
+
+  const announceGuidedCompletion = React.useCallback(() => {
+    notify({
+      tone: "success",
+      title: "Agora o seu ano conta uma história",
+      description: "Continue dando espaço ao que importa para você.",
+      durationMs: 3200,
+    });
+  }, [notify]);
+
+  const dismissGuidedOnboarding = React.useCallback(() => {
+    loadOnboardingPersonalDemo(year);
+    unlockOnboardingPersonalDemo();
+    updateGuidedOnboarding({ type: "enter_demo_exploration" });
+    setGuidedDraft(null);
+    setMobileGuidedRangeStart(null);
+    setAccountNudgeVisible(false);
+    setDemoInviteSuppressed(false);
+  }, [
+    loadOnboardingPersonalDemo,
+    unlockOnboardingPersonalDemo,
+    updateGuidedOnboarding,
+    year,
+  ]);
+
+  const restartGuidedOnboardingFromDemo = React.useCallback(() => {
+    loadOnboardingPersonalDemo(year);
+    updateGuidedOnboarding({ type: "restart_from_demo" });
+    setGuidedDraft(null);
+    setMobileGuidedRangeStart(null);
+    setDemoInviteSuppressed(false);
+  }, [loadOnboardingPersonalDemo, updateGuidedOnboarding, year]);
+
+  const resetGuidedOnboardingForTesting = React.useCallback(() => {
+    if (
+      process.env.NEXT_PUBLIC_ONBOARDING_TEST_CONTROLS !== "1" ||
+      session?.user.id
+    ) {
+      return;
+    }
+    resetAllProductOnboarding();
+    loadOnboardingPersonalDemo(year);
+    setGuidedDraft(null);
+    setMobileGuidedRangeStart(null);
+    setAccountNudgeVisible(false);
+    window.location.reload();
+  }, [loadOnboardingPersonalDemo, session?.user.id, year]);
+
+  const trackPostOnboardingEvent = React.useCallback(
+    () => {
+      if (session?.user.id) return;
+      const current = readGuidedOnboardingState();
+      if (current.step !== "completed" || current.accountNudgeShownAt) return;
+      const next = updateGuidedOnboarding({
+        type: "record_post_onboarding_event",
+      });
+      if (!current.accountNudgeShownAt && next.accountNudgeShownAt) {
+        setAccountNudgeVisible(true);
+      }
+    },
+    [session?.user.id, updateGuidedOnboarding]
+  );
 
   const handleSubmit = async (payload: EventInput) => {
     if (editingId) {
       updateEvent(editingId, payload);
+      recordDemoInteraction(`mutation:event:update:${editingId}`);
 
       notify({
         tone: "success",
@@ -1086,8 +1358,17 @@ export default function HomePage() {
       return;
     }
 
-    addEvent(payload);
-    completeCalendarCreateOnboarding();
+    const eventId = addEvent(payload);
+    if (!eventId) {
+      throw new Error("Não foi possível adicionar este evento à categoria escolhida.");
+    }
+
+    setHighlightedEventId(eventId);
+    if (isDemoExploration) {
+      recordDemoInteraction(`mutation:event:create:${eventId}`);
+    } else {
+      trackPostOnboardingEvent();
+    }
 
     notify({
       tone: "success",
@@ -1113,6 +1394,7 @@ export default function HomePage() {
     if (!editingId) return;
 
     deleteEvent(editingId);
+    recordDemoInteraction(`mutation:event:delete:${editingId}`);
 
     notify({
       tone: "success",
@@ -1122,9 +1404,19 @@ export default function HomePage() {
 
     setDialogAnchorPoint(undefined);
     setDialogOpen(false);
-  }, [deleteEvent, editingId, notify]);
+  }, [deleteEvent, editingId, notify, recordDemoInteraction]);
 
   const handleStartCreateRange = (startIso: string) => {
+    if (isMobileExamplePreview) return;
+    if (
+      showGuidedOnboarding &&
+      guidedOnboarding?.step !== "date_instruction" &&
+      guidedOnboarding?.step !== "date_details" &&
+      guidedOnboarding?.step !== "period_instruction" &&
+      guidedOnboarding?.step !== "period_details"
+    ) {
+      return;
+    }
     setCreatingRange({ startIso, hoverIso: startIso, isDragging: false });
   };
 
@@ -1148,10 +1440,48 @@ export default function HomePage() {
         const normalizedStart = start <= end ? start : end;
         const normalizedEnd = start <= end ? end : start;
 
-        setSeedRange({
+        const nextDraft = {
           startDate: format(normalizedStart, "yyyy-MM-dd"),
           endDate: format(normalizedEnd, "yyyy-MM-dd"),
-        });
+        };
+
+        const currentStep = guidedOnboarding?.step;
+        if (
+          showGuidedOnboarding &&
+          (currentStep === "date_instruction" ||
+            currentStep === "date_details")
+        ) {
+          setGuidedDraft({
+            startDate: nextDraft.startDate,
+            endDate: nextDraft.startDate,
+          });
+          if (currentStep === "date_instruction") {
+            updateGuidedOnboarding({ type: "select_date" });
+          }
+          return null;
+        }
+        if (
+          showGuidedOnboarding &&
+          (currentStep === "period_instruction" ||
+            currentStep === "period_details")
+        ) {
+          if (nextDraft.startDate === nextDraft.endDate) {
+            notify({
+              tone: "info",
+              title: "Selecione um período",
+              description: "Arraste até outro dia para definir o início e o fim.",
+            });
+            return null;
+          }
+          setGuidedDraft(nextDraft);
+          if (currentStep === "period_instruction") {
+            updateGuidedOnboarding({ type: "select_period" });
+          }
+          return null;
+        }
+        if (showGuidedOnboarding) return null;
+
+        setSeedRange(nextDraft);
 
         setEditingId(null);
         setDialogAnchorPoint(anchorPoint);
@@ -1160,7 +1490,95 @@ export default function HomePage() {
         return null;
       });
     },
-    []
+    [
+      guidedOnboarding?.step,
+      notify,
+      showGuidedOnboarding,
+      updateGuidedOnboarding,
+    ]
+  );
+
+  const saveGuidedDraft = React.useCallback(
+    (title: string) => {
+      if (!guidedDraft || !guidedOnboarding?.context || !title.trim()) return;
+      const intent =
+        guidedOnboarding.step === "period_details" ? "period" : "date";
+      const categoryId =
+        intent === "period"
+          ? guidedOnboarding.periodCategoryId
+          : guidedOnboarding.dateCategoryId;
+      if (!categoryId) return;
+      if (
+        guidedDraft.startDate > guidedDraft.endDate ||
+        (intent === "period" && guidedDraft.startDate === guidedDraft.endDate)
+      ) {
+        notify({
+          tone: "error",
+          title: "Confira o período",
+          description: "A data final precisa vir depois da data inicial.",
+        });
+        return;
+      }
+      const eventId = addEvent({
+        title: title.trim(),
+        categoryId,
+        startDate: guidedDraft.startDate,
+        endDate: guidedDraft.endDate,
+        recurrenceType:
+          categoryId === ONBOARDING_CATEGORY_IDS.birthday
+            ? "yearly"
+            : undefined,
+      });
+      if (!eventId) {
+        notify({
+          tone: "error",
+          title: "Não foi possível salvar",
+          description: "Tente selecionar a data novamente.",
+        });
+        return;
+      }
+      setHighlightedEventId(eventId);
+      updateGuidedOnboarding({
+        type: intent === "period" ? "period_saved" : "date_saved",
+      });
+      setGuidedDraft(null);
+      setMobileGuidedRangeStart(null);
+      notify({
+        tone: "success",
+        title: intent === "period" ? "Período adicionado" : "Data adicionada",
+        description: "Já dá para ver isso ocupando espaço no seu ano.",
+      });
+    },
+    [addEvent, guidedDraft, guidedOnboarding, notify, updateGuidedOnboarding]
+  );
+
+  const handleMobileGuidedDaySelect = React.useCallback(
+    (dateIso: string) => {
+      const step = guidedOnboarding?.step;
+      if (step === "date_instruction" || step === "date_details") {
+        setGuidedDraft({ startDate: dateIso, endDate: dateIso });
+        if (step === "date_instruction") {
+          updateGuidedOnboarding({ type: "select_date" });
+        }
+        return;
+      }
+      if (step !== "period_instruction" && step !== "period_details") return;
+      if (!mobileGuidedRangeStart) {
+        setMobileGuidedRangeStart(dateIso);
+        return;
+      }
+      const [startDate, endDate] =
+        mobileGuidedRangeStart <= dateIso
+          ? [mobileGuidedRangeStart, dateIso]
+          : [dateIso, mobileGuidedRangeStart];
+      if (startDate === endDate) return;
+      setGuidedDraft({ startDate, endDate });
+      setMobileGuidedRangeStart(null);
+      if (step === "period_instruction") {
+        updateGuidedOnboarding({ type: "select_period" });
+      }
+    },
+    [guidedOnboarding?.step, mobileGuidedRangeStart, updateGuidedOnboarding]
   );
 
   React.useEffect(() => {
@@ -1321,18 +1739,215 @@ export default function HomePage() {
     };
   }, [clearSyncOverlayTimer]);
 
-  const showDesktopCreateCoachmark =
-    calendarCreateOnboarding === "pending" && isMobileCalendarUi === false;
+  React.useEffect(() => {
+    if (!highlightedEventId) return;
 
-  const showMobileCreateCoachmark =
-    calendarCreateOnboarding === "pending" && isMobileCalendarUi === true;
+    const highlightTimer = window.setTimeout(() => {
+      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      const nodes = document.querySelectorAll<HTMLElement>(
+        `[data-calendar-event-id="${highlightedEventId}"]`
+      );
+      nodes.forEach((node) => {
+        node.animate(
+          [
+            { transform: "scale(1)", boxShadow: "0 0 0 0 rgba(37, 99, 235, 0)" },
+            {
+              transform: "scale(1.035)",
+              boxShadow: "0 0 0 4px rgba(37, 99, 235, 0.2)",
+            },
+            { transform: "scale(1)", boxShadow: "0 0 0 0 rgba(37, 99, 235, 0)" },
+          ],
+          { duration: 900, easing: "ease-out" }
+        );
+      });
+    }, 50);
+
+    const cleanupTimer = window.setTimeout(() => {
+      setHighlightedEventId(null);
+    }, 1200);
+
+    return () => {
+      window.clearTimeout(highlightTimer);
+      window.clearTimeout(cleanupTimer);
+    };
+  }, [highlightedEventId]);
+
+  const onboardingFocusTarget = React.useMemo<OnboardingFocusTarget>(() => {
+    if (!showGuidedOnboarding || !guidedOnboarding) return null;
+    if (!guidedOnboarding.context) return null;
+    if (
+      guidedOnboarding.step === "date_category_reveal" ||
+      guidedOnboarding.step === "date_instruction" ||
+      guidedOnboarding.step === "date_details"
+    ) {
+      return guidedOnboarding.dateCategoryId
+        ? {
+            kind: "category",
+            id: guidedOnboarding.dateCategoryId,
+            effect:
+              guidedOnboarding.step === "date_category_reveal"
+                ? "reveal"
+                : "focus",
+          }
+        : null;
+    }
+    if (
+      guidedOnboarding.step === "period_category_reveal" ||
+      guidedOnboarding.step === "period_instruction" ||
+      guidedOnboarding.step === "period_details"
+    ) {
+      return guidedOnboarding.periodCategoryId
+        ? {
+            kind: "category",
+            id: guidedOnboarding.periodCategoryId,
+            effect:
+              guidedOnboarding.step === "period_category_reveal"
+                ? "reveal"
+                : "focus",
+          }
+        : null;
+    }
+    return null;
+  }, [guidedOnboarding, showGuidedOnboarding]);
+
+  const guidedSelectionNotice = React.useMemo(
+    () =>
+      showGuidedOnboarding && guidedOnboarding
+        ? getGuidedSelectionNotice({
+            state: guidedOnboarding,
+            isMobile: isMobileCalendarUi === true,
+            mobileRangeStart: mobileGuidedRangeStart,
+          })
+        : null,
+    [
+      guidedOnboarding,
+      isMobileCalendarUi,
+      mobileGuidedRangeStart,
+      showGuidedOnboarding,
+    ]
+  );
+
+  const guidedToolbarNotice = React.useMemo<GuidedToolbarNotice | null>(() => {
+    if (!showGuidedOnboarding || !guidedOnboarding) return null;
+    if (guidedOnboarding.step === "edit_instruction") {
+      return {
+        target: "edit",
+        title: "Veja como editar contextos e categorias.",
+        instruction:
+          isMobileCalendarUi === true
+            ? "Toque no lápis para abrir o modo de edição."
+            : "Clique no lápis para abrir o modo de edição.",
+        stepLabel: "Passo 4 de 7",
+      };
+    }
+    if (guidedOnboarding.step === "edit_preview") {
+      return {
+        target: "edit",
+        title: "Este é o modo de edição.",
+        instruction:
+          isMobileCalendarUi === true
+            ? "Aqui você poderá ajustar nomes, cores e organização. Toque em Finalizar para continuar."
+            : "Aqui você poderá ajustar nomes, cores e organização. Clique em Finalizar para continuar.",
+        stepLabel: "Passo 4 de 7",
+      };
+    }
+    if (guidedOnboarding.step === "calendar_instruction") {
+      return {
+        target: "calendars",
+        title: "Complemente seu ano com calendários prontos.",
+        instruction: "Adicione os feriados do seu estado.",
+        stepLabel: "Passo 5 de 7",
+      };
+    }
+    if (guidedOnboarding.step === "year_instruction") {
+      return {
+        target: "year",
+        title: "Explore outros anos.",
+        instruction: "Aqui você consulta o ano anterior, o atual e o próximo.",
+        actionLabel: "Continuar",
+        stepLabel: "Passo 6 de 7",
+      };
+    }
+    if (guidedOnboarding.step === "theme_instruction") {
+      return {
+        target: "theme",
+        title: "Escolha o clima do seu ano.",
+        instruction:
+          "Teste o tema claro e escuro e fique com o que combina mais com você.",
+        actionLabel: "Explorar meu ano",
+        stepLabel: "Passo 7 de 7",
+      };
+    }
+    return null;
+  }, [guidedOnboarding, isMobileCalendarUi, showGuidedOnboarding]);
+
+  const handleGuidedToolbarAction = React.useCallback((
+    target: GuidedToolbarNotice["target"]
+  ) => {
+    const current = readGuidedOnboardingState();
+    if (target === "edit" && current.step === "edit_instruction") {
+      updateGuidedOnboarding({ type: "open_edit_preview" });
+      return;
+    }
+    if (target === "edit" && current.step === "edit_preview") {
+      updateGuidedOnboarding({ type: "finish_edit_preview" });
+      return;
+    }
+    if (target === "year" && current.step === "year_instruction") {
+      const next = updateGuidedOnboarding({ type: "continue_from_year" });
+      if (next.step === "completed") announceGuidedCompletion();
+      return;
+    }
+    if (target === "theme" && current.step === "theme_instruction") {
+      setTheme(themeMode);
+      const next = updateGuidedOnboarding({ type: "confirm_theme" });
+      if (next.step === "completed") announceGuidedCompletion();
+    }
+  }, [announceGuidedCompletion, setTheme, themeMode, updateGuidedOnboarding]);
+
+  const handleGuidedCalendarOpen = React.useCallback(() => {
+    if (readGuidedOnboardingState().step === "calendar_instruction") {
+      updateGuidedOnboarding({ type: "open_calendar" });
+    }
+  }, [updateGuidedOnboarding]);
+
+  const handleGuidedCalendarClose = React.useCallback(() => {
+    if (readGuidedOnboardingState().step === "calendar_selection") {
+      updateGuidedOnboarding({ type: "close_calendar" });
+    }
+  }, [updateGuidedOnboarding]);
+
+  const handleGuidedCalendarImported = React.useCallback((uf?: string) => {
+    const next = updateGuidedOnboarding({ type: "calendar_added", uf });
+    if (next.step === "year_instruction" && uf) {
+      void trackOnboardingRegion(uf);
+    }
+  }, [updateGuidedOnboarding]);
+
+  React.useEffect(() => {
+    if (
+      guidedOnboarding?.step !== "calendar_instruction" &&
+      guidedOnboarding?.step !== "calendar_selection"
+    ) {
+      return;
+    }
+    const holidayCategory = categories.find(
+      (category) => category.calendarPackGroupId === "holidays-by-state"
+    );
+    if (!holidayCategory) return;
+    const pack = calendarPacks.find(
+      (candidate) => candidate.id === holidayCategory.calendarPackVariantId
+    );
+    handleGuidedCalendarImported(pack?.regionCode);
+  }, [categories, guidedOnboarding?.step, handleGuidedCalendarImported]);
 
   const handleYearChange = React.useCallback(
     (nextYear: number) => {
       setYear(nextYear);
       resetCalendarFocusOnYearChange();
+      recordDemoInteraction(`year:${nextYear}`);
     },
-    [resetCalendarFocusOnYearChange]
+    [recordDemoInteraction, resetCalendarFocusOnYearChange]
   );
 
   React.useEffect(() => {
@@ -1383,7 +1998,30 @@ export default function HomePage() {
           isAuthenticated={Boolean(session)}
           isMobileCalendarUi={isMobileCalendarUi === true}
           onCalendarPackFocusYear={handleYearChange}
+          onboardingFocusTarget={onboardingFocusTarget}
+          guidedSelectionNotice={guidedSelectionNotice}
+          guidedToolbarNotice={guidedToolbarNotice}
+          onDismissGuidedSelection={dismissGuidedOnboarding}
+          onGuidedToolbarAction={handleGuidedToolbarAction}
+          onGuidedCalendarOpen={handleGuidedCalendarOpen}
+          onGuidedCalendarClose={handleGuidedCalendarClose}
+          onGuidedCalendarImported={handleGuidedCalendarImported}
+          guidedCalendarSelectionActive={
+            guidedOnboarding?.step === "calendar_instruction" ||
+            guidedOnboarding?.step === "calendar_selection"
+          }
+          guidedEditPreviewActive={guidedOnboarding?.step === "edit_preview"}
+          onboardingLayoutLocked={showGuidedOnboarding}
+          mobileExamplePreviewActive={isMobileExamplePreview}
+          demoExplorationActive={isDemoExploration}
+          onCategoryCreated={(categoryId) =>
+            recordDemoInteraction(`mutation:category:create:${categoryId}`)
+          }
+          onProfileCreated={(profileId) =>
+            recordDemoInteraction(`mutation:profile:create:${profileId}`)
+          }
           onOpenAuthDialog={(anchorPoint) => {
+            setAuthDialogInitialMode("login");
             setAuthDialogAnchorPoint(anchorPoint);
             setAuthDialogOpen(true);
           }}
@@ -1399,13 +2037,36 @@ export default function HomePage() {
           onActiveDateChange={setMobileActiveDateIso}
           onYearChange={handleYearChange}
           onEditEvent={handleEditEvent}
+          guidedSelectionMode={
+            showGuidedOnboarding &&
+            (guidedOnboarding?.step === "date_instruction" ||
+              guidedOnboarding?.step === "date_details")
+              ? "date"
+              : showGuidedOnboarding &&
+                  (guidedOnboarding?.step === "period_instruction" ||
+                    guidedOnboarding?.step === "period_details")
+                ? "period"
+                : null
+          }
+          guidedRangeStart={mobileGuidedRangeStart}
+          guidedSelectionRange={guidedDraft}
+          onGuidedDaySelect={handleMobileGuidedDaySelect}
         />
       ) : (
         <div className="overflow-x-auto pb-1 md:overflow-visible">
           <div
             data-calendar-focus-root
             data-calendar-ui-mode="desktop"
-            className="relative doze52-calendar-mode-transition"
+            className={cn(
+              "relative rounded-xl doze52-calendar-mode-transition",
+              showGuidedOnboarding &&
+                (guidedOnboarding?.step === "date_instruction" ||
+                  guidedOnboarding?.step === "date_details" ||
+                  guidedOnboarding?.step === "period_instruction" ||
+                  guidedOnboarding?.step === "period_details")
+                ? "ring-2 ring-primary/35 ring-offset-4 ring-offset-background shadow-[0_22px_70px_-42px_rgba(37,99,235,0.72)]"
+                : null
+            )}
           >
             <YearGrid
               year={year}
@@ -1413,6 +2074,7 @@ export default function HomePage() {
               events={renderEvents}
               onEditEvent={handleEditEvent}
               creatingRange={creatingRange}
+              guidedSelectionRange={guidedDraft}
               onStartCreateRange={handleStartCreateRange}
               onHoverCreateRange={handleHoverCreateRange}
               onFinishCreateRange={handleFinishCreateRange}
@@ -1424,106 +2086,89 @@ export default function HomePage() {
               }}
               isMobileInteractionMode={false}
             />
-
-            {showDesktopCreateCoachmark ? (
-              <Popover
-                open={showDesktopCreateCoachmark}
-                onOpenChange={(open) => {
-                  if (!open) dismissCalendarCreateOnboarding();
-                }}
-              >
-                <PopoverAnchor asChild>
-                  <div
-                    aria-hidden="true"
-                    className="pointer-events-none absolute top-4 left-[5.5rem] h-px w-px"
-                  />
-                </PopoverAnchor>
-
-                <PopoverContent
-                  align="start"
-                  side="bottom"
-                  sideOffset={14}
-                  className="w-[18.5rem] rounded-[1.4rem] p-4"
-                >
-                  <PopoverHeader className="space-y-1.5">
-                    <PopoverTitle>Crie direto no calendario</PopoverTitle>
-                    <PopoverDescription className="text-sm leading-5">
-                      Clique ou arraste no calendario para criar um evento. Toque
-                      num evento existente para editar.
-                    </PopoverDescription>
-                  </PopoverHeader>
-
-                  <div className="mt-4 flex justify-end">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      className="rounded-full"
-                      onClick={dismissCalendarCreateOnboarding}
-                    >
-                      Entendi
-                    </Button>
-                  </div>
-                </PopoverContent>
-              </Popover>
-            ) : null}
           </div>
         </div>
       )}
 
-      {isMobileCalendarUi ? (
+      {showGuidedOnboarding && guidedOnboarding ? (
+        <GuidedOnboardingPanel
+          state={guidedOnboarding}
+          draft={guidedDraft}
+          onClose={dismissGuidedOnboarding}
+          onConfigureContext={handleConfigureGuidedContext}
+          onChooseCategory={handleChooseGuidedCategory}
+          onChangeDraft={setGuidedDraft}
+          onSaveDraft={saveGuidedDraft}
+        />
+      ) : null}
+
+      {showMobileDesktopFirstGate ? (
+        <MobileDesktopFirstGate
+          allowExample={isInitialMobileOnboarding}
+          onExploreExample={() => {
+            writeMobileExamplePreviewSession();
+            setMobileExamplePreviewDismissed(true);
+          }}
+          onOpenLogin={() => {
+            setAuthDialogInitialMode("login");
+            setAuthDialogAnchorPoint(undefined);
+            setAuthDialogOpen(true);
+          }}
+        />
+      ) : null}
+
+      {isDemoExploration ? (
+        <div
+          data-demo-mode-badge
+          className="pointer-events-none fixed bottom-3 left-1/2 z-30 -translate-x-1/2 rounded-full border border-border/75 bg-card/92 px-3 py-1 text-[11px] font-semibold tracking-wide text-muted-foreground shadow-sm backdrop-blur"
+        >
+          Ano de exemplo
+        </div>
+      ) : null}
+
+      {showDemoInvite ? (
+        <DemoExplorationInvite
+          onCreateYear={restartGuidedOnboardingFromDemo}
+          onContinue={() => setDemoInviteSuppressed(true)}
+        />
+      ) : null}
+
+      {accountNudgeVisible && !session?.user.id ? (
+        <AccountNudge
+          onDismiss={() => setAccountNudgeVisible(false)}
+          onCreateAccount={() => {
+            setAccountNudgeVisible(false);
+            setAuthDialogInitialMode("signup");
+            setAuthDialogAnchorPoint(undefined);
+            setAuthDialogOpen(true);
+          }}
+        />
+      ) : null}
+
+      {process.env.NEXT_PUBLIC_ONBOARDING_TEST_CONTROLS === "1" &&
+      !authLoading &&
+      !session?.user.id ? (
+        <OnboardingTestReset onReset={resetGuidedOnboardingForTesting} />
+      ) : null}
+
+      {isMobileCalendarUi &&
+      !showGuidedOnboarding &&
+      !isMobileExamplePreview &&
+      !showMobileDesktopFirstGate ? (
         <div
           className="fixed right-4 z-40"
           style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 2.75rem)" }}
         >
-          <Popover
-            open={showMobileCreateCoachmark}
-            onOpenChange={(open) => {
-              if (!open) dismissCalendarCreateOnboarding();
-            }}
+          <Button
+            type="button"
+            size="icon-lg"
+            variant="premium"
+            className="rounded-full shadow-[0_20px_40px_-24px_rgba(15,23,42,0.55)]"
+            aria-label="Novo evento"
+            onClick={() => handleMobileFabCreate(mobileActiveDateIso)}
           >
-            <PopoverAnchor asChild>
-              <Button
-                type="button"
-                size="icon-lg"
-                variant="premium"
-                className="rounded-full shadow-[0_20px_40px_-24px_rgba(15,23,42,0.55)]"
-                aria-label="Novo evento"
-                onClick={() => handleMobileFabCreate(mobileActiveDateIso)}
-              >
-                <Plus className="size-5" />
-              </Button>
-            </PopoverAnchor>
-
-            {showMobileCreateCoachmark ? (
-              <PopoverContent
-                align="end"
-                side="top"
-                sideOffset={14}
-                className="w-[17rem] rounded-[1.4rem] p-4"
-              >
-                <PopoverHeader className="space-y-1.5">
-                  <PopoverTitle>Crie pelo botão +</PopoverTitle>
-                  <PopoverDescription className="text-sm leading-5">
-                    Use o + para criar no dia ativo. Toque no calendario para
-                    escolher o dia ou nos meses para saltar rapidamente.
-                  </PopoverDescription>
-                </PopoverHeader>
-
-                <div className="mt-4 flex justify-end">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="rounded-full"
-                    onClick={dismissCalendarCreateOnboarding}
-                  >
-                    Entendi
-                  </Button>
-                </div>
-              </PopoverContent>
-            ) : null}
-          </Popover>
+            <Plus className="size-5" />
+          </Button>
         </div>
       ) : null}
 
@@ -1535,7 +2180,7 @@ export default function HomePage() {
 
       <EventDialog
         open={dialogOpen}
-        onOpenChange={(open) => {
+          onOpenChange={(open) => {
           setDialogOpen(open);
 
           if (!open) {
@@ -1547,6 +2192,7 @@ export default function HomePage() {
         initialEvent={editingEvent}
         seedRange={seedRange}
         anchorPoint={dialogAnchorPoint}
+        guidedIntent={null}
         onSubmit={handleSubmit}
         onDelete={
           editingId && !editingEvent?.calendarPackGroupId
@@ -1557,6 +2203,7 @@ export default function HomePage() {
 
       <AuthDialog
         open={authDialogOpen}
+        initialMode={authDialogInitialMode}
         onOpenChange={(open) => {
           setAuthDialogOpen(open);
 

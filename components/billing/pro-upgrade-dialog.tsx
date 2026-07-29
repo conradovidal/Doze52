@@ -27,7 +27,7 @@ type ProUpgradeDialogProps = {
 };
 
 const PRO_BULLETS = [
-  "Mais perfis para separar trabalho, vida pessoal, viagens e família.",
+  "Mais contextos para separar trabalho, vida pessoal, viagens e família.",
   "Mais categorias para entender melhor como seu tempo está distribuído.",
   "Calendários ilimitados para acompanhar datas importantes.",
   "Acesso às próximas funcionalidades Pro.",
@@ -59,7 +59,7 @@ export function ProUpgradeDialog({
           <div className="mb-1 inline-flex h-9 w-9 items-center justify-center rounded-[10px] border border-border/75 bg-muted/34 text-foreground">
             <Sparkles className="h-4 w-4" />
           </div>
-          <DialogTitle>{isContextual ? copy.title : "Doze52 Pro"}</DialogTitle>
+          <DialogTitle>{isContextual ? copy.title : "Doze 52 Pro"}</DialogTitle>
           <DialogDescription>
             {isContextual ? copy.description : "Organize mais partes do seu ano."}
           </DialogDescription>
@@ -68,7 +68,7 @@ export function ProUpgradeDialog({
         <div className="space-y-4">
           {isContextual ? (
             <div className="rounded-[12px] border border-border/70 bg-muted/24 px-3 py-3">
-              <p className="text-sm font-semibold text-foreground">Doze52 Pro</p>
+              <p className="text-sm font-semibold text-foreground">Doze 52 Pro</p>
               <p className="mt-1 text-sm leading-6 text-muted-foreground">
                 Organize mais partes do seu ano.
               </p>

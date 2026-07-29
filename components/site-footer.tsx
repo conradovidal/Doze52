@@ -40,7 +40,7 @@ export function SiteFooter() {
     {
       label: "X",
       href: "https://x.com/doze_52",
-      ariaLabel: "Perfil do doze52 no X",
+      ariaLabel: "Perfil do Doze 52 no X",
       external: true,
       icon: BrandXIcon,
     },

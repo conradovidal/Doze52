@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { ChevronDown } from "lucide-react";
 import { ProfileIcon } from "@/components/profile-icon";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,9 +20,10 @@ import {
   SelectTrigger,
 } from "@/components/ui/select";
 import { getCategoryColorToken } from "@/lib/category-palette";
-import { useStore } from "@/lib/store";
+import { ONBOARDING_DEFAULT_CATEGORY_ID, useStore } from "@/lib/store";
 import { useTheme } from "@/lib/theme";
 import type { AnchorPoint, CalendarEvent, RecurrenceType } from "@/lib/types";
+import type { GuidedCreationIntent } from "@/lib/onboarding";
 import { logDevError, logProdError } from "@/lib/safe-log";
 import { ValidationError, validateEventInput } from "@/lib/validation";
 
@@ -32,6 +34,30 @@ const FIELD_LABEL_CLASS =
 
 type RecurrenceDraft = "none" | RecurrenceType;
 
+const GUIDED_COPY: Record<
+  GuidedCreationIntent,
+  { title: string; description: string; placeholder: string }
+> = {
+  dated_item: {
+    title: "Algo que já importa",
+    description:
+      "Comece por algo que já tem data: uma viagem, aniversário, entrega, competição ou mudança.",
+    placeholder: "Ex.: Viagem em família",
+  },
+  period: {
+    title: "Adicionar um período",
+    description:
+      "Escolha o início e o fim de algo que ocupa mais de um dia.",
+    placeholder: "Ex.: Curso de especialização",
+  },
+  additional_context: {
+    title: "Mais contexto para o teu ano",
+    description:
+      "Se não houver uma data exata, use o melhor período aproximado que você tem hoje.",
+    placeholder: "Ex.: Preparação para uma mudança",
+  },
+};
+
 export function EventDialog({
   open,
   onOpenChange,
@@ -39,6 +65,7 @@ export function EventDialog({
   seedDate,
   seedRange,
   anchorPoint,
+  guidedIntent,
   onSubmit,
   onDelete,
 }: {
@@ -48,6 +75,7 @@ export function EventDialog({
   seedDate?: string;
   seedRange?: { startDate: string; endDate: string } | null;
   anchorPoint?: AnchorPoint;
+  guidedIntent?: GuidedCreationIntent | null;
   onSubmit: (payload: {
     title: string;
     categoryId: string;
@@ -75,6 +103,8 @@ export function EventDialog({
   const [isSaving, setIsSaving] = React.useState(false);
   const [submitError, setSubmitError] = React.useState<string | null>(null);
   const isManagedEvent = Boolean(initialEvent?.calendarPackGroupId);
+  const isGuidedCreation = Boolean(guidedIntent && !initialEvent && !isManagedEvent);
+  const guidedCopy = guidedIntent ? GUIDED_COPY[guidedIntent] : null;
 
   const categoryById = React.useMemo(
     () => new Map(categories.map((category) => [category.id, category])),
@@ -156,11 +186,14 @@ export function EventDialog({
       (category) => category.profileId === nextProfileId
     );
 
+    const guidedDefaultCategoryId = availableCategories.find(
+      (category) => category.id === ONBOARDING_DEFAULT_CATEGORY_ID
+    )?.id;
     const nextCategoryId =
       initialEvent?.categoryId &&
       availableCategories.some((category) => category.id === initialEvent.categoryId)
         ? initialEvent.categoryId
-        : availableCategories[0]?.id ?? "";
+        : guidedDefaultCategoryId ?? availableCategories[0]?.id ?? "";
 
     setCategoryId(nextCategoryId);
 
@@ -178,6 +211,7 @@ export function EventDialog({
     categories,
     initialEvent,
     initialProfileFromEvent,
+    guidedIntent,
     profileOptions,
     profiles,
     seedDate,
@@ -214,12 +248,13 @@ export function EventDialog({
               ? "Detalhes do evento"
               : initialEvent
                 ? "Editar evento"
-                : "Novo evento"}
+                : guidedCopy?.title ?? "Novo evento"}
           </DialogTitle>
           <DialogDescription>
             {isManagedEvent
               ? "Este evento faz parte de um calendário pronto e é atualizado automaticamente."
-              : "Defina o essencial primeiro: título, datas e categoria. Os detalhes entram depois."}
+              : guidedCopy?.description ??
+                "Defina o essencial primeiro: título, datas e categoria. Os detalhes entram depois."}
           </DialogDescription>
         </DialogHeader>
 
@@ -231,9 +266,10 @@ export function EventDialog({
             <Input
               id="event-title"
               className="h-10 rounded-xl text-[15px]"
-              placeholder="Ex.: Reunião de planejamento"
+              placeholder={guidedCopy?.placeholder ?? "Ex.: Reunião de planejamento"}
               value={title}
               disabled={isManagedEvent}
+              autoFocus={isGuidedCreation}
               onChange={(event) => setTitle(event.target.value)}
             />
           </div>
@@ -275,9 +311,25 @@ export function EventDialog({
             </div>
           </div>
 
+          <details
+            open={isGuidedCreation ? undefined : true}
+            className={isGuidedCreation ? "group rounded-2xl border border-border/70 bg-muted/20" : "contents"}
+          >
+            <summary
+              className={
+                isGuidedCreation
+                  ? "flex cursor-pointer list-none items-center justify-between px-3.5 py-3 text-sm font-medium text-foreground/78 outline-none focus-visible:ring-2 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden"
+                  : "hidden"
+              }
+            >
+              Organização e detalhes
+              <ChevronDown className="size-4 text-muted-foreground transition-transform group-open:rotate-180" />
+            </summary>
+            <div className={isGuidedCreation ? "space-y-5 border-t border-border/60 p-3.5" : "space-y-5"}>
+
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-1">
-              <label className={FIELD_LABEL_CLASS}>Perfil</label>
+              <label className={FIELD_LABEL_CLASS}>Contexto</label>
               <Select
                 value={profileId}
                 onValueChange={handleProfileSelect}
@@ -289,7 +341,7 @@ export function EventDialog({
                 >
                   <span className="inline-flex min-w-0 items-center gap-1.5 pr-2">
                     {currentProfile ? <ProfileIcon icon={currentProfile.icon} size={12} /> : null}
-                    <span className="truncate">{currentProfile?.name ?? "Perfil"}</span>
+                    <span className="truncate">{currentProfile?.name ?? "Contexto"}</span>
                   </span>
                 </SelectTrigger>
                 <SelectContent position="popper" side="bottom" align="start">
@@ -424,6 +476,8 @@ export function EventDialog({
               ) : null}
             </div>
           </div>
+            </div>
+          </details>
         </div>
 
         <DialogFooter className="gap-2 sm:justify-between">

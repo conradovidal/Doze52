@@ -9,7 +9,7 @@ type BrandLogoProps = {
 };
 
 export function BrandLogo({
-  alt = "Doze52",
+  alt = "Doze 52",
   className,
   decorative = false,
 }: BrandLogoProps) {

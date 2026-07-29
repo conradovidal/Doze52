@@ -10,7 +10,9 @@
     "qa:validate:dev": "node scripts/qa/validate-dev.mjs",
     "qa:provision:dev": "node scripts/qa/provision-dev.mjs",
     "qa:reset:dev": "node scripts/qa/reset-dev.mjs",
-    "qa:smoke": "playwright test"
+    "qa:smoke": "playwright test",
+    "test:onboarding": "playwright test --config=playwright.unit.config.ts",
+    "test:onboarding:e2e": "playwright test --config=playwright.onboarding.config.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

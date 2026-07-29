@@ -212,6 +212,7 @@ export function EventBar({
       <button
         ref={buttonRef}
         type="button"
+        data-calendar-event-id={event.id}
         draggable={draggable}
         onClick={(e) => {
           const justDragged = performance.now() - lastDragEndAtRef.current < 180;
