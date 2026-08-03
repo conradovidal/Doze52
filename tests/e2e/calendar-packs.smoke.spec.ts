@@ -48,12 +48,15 @@ test("contexto, sincronizacao e calendario pronto funcionam de ponta a ponta", a
     .getByRole("article")
     .filter({ hasText: "Jogos do seu time favorito" });
   await teamCard.getByRole("button", { name: "Adicionar calendário" }).click();
-  await teamCard.getByRole("combobox", { name: "Contexto para Jogos do seu time favorito" }).click();
-  await page.getByRole("option", { name: "Pessoal" }).click();
+  const targetProfile = teamCard.getByRole("combobox", {
+    name: "Contexto para Jogos do seu time favorito",
+  });
+  const targetProfileName = (await targetProfile.textContent())?.trim();
+  expect(targetProfileName, "O calendário deve herdar o contexto ativo.").toBeTruthy();
   const eventsImported = waitForSupabaseWrite(page, "events", ["POST"]);
   await teamCard
     .getByRole("button", {
-      name: "Adicionar calendário Jogos do seu time favorito ao contexto Pessoal",
+      name: `Adicionar calendário Jogos do seu time favorito ao contexto ${targetProfileName}`,
     })
     .click();
   await expect(teamCard.getByRole("button", { name: "Remover" })).toBeVisible();

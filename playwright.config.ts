@@ -31,6 +31,7 @@ export default defineConfig({
     {
       name: "setup-mobile",
       testMatch: /auth\.mobile\.setup\.ts/,
+      dependencies: ["desktop-chromium"],
     },
     {
       name: "desktop-chromium",
