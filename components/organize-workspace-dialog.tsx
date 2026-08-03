@@ -34,6 +34,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -903,6 +904,9 @@ export function OrganizeWorkspaceDialog({
           <div className="sticky top-0 z-10 border-b border-border/60 bg-background px-5 pb-4 pt-5 backdrop-blur sm:px-6">
             <DialogHeader>
               <DialogTitle>Organizar workspace</DialogTitle>
+              <DialogDescription className="sr-only">
+                Reordene e gerencie os contextos e as categorias do seu ano.
+              </DialogDescription>
             </DialogHeader>
 
             <div className="mt-4 inline-flex rounded-full border border-border/70 bg-muted/35 p-1">
