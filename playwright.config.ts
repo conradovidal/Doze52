@@ -4,6 +4,7 @@ import { getQaBaseUrl } from "./tests/e2e/support/qa-env";
 
 const baseURL = getQaBaseUrl();
 const authStatePath = "playwright/.auth/e2e.json";
+const mobileAuthStatePath = "playwright/.auth/e2e-mobile.json";
 
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -23,17 +24,23 @@ export default defineConfig({
   },
   projects: [
     {
-      name: "setup",
+      name: "setup-desktop",
       testMatch: /auth\.setup\.ts/,
+      testIgnore: /auth\.mobile\.setup\.ts/,
+    },
+    {
+      name: "setup-mobile",
+      testMatch: /auth\.mobile\.setup\.ts/,
+      dependencies: ["desktop-chromium"],
     },
     {
       name: "desktop-chromium",
-      testIgnore: /(auth\.setup|mobile\.smoke\.spec)\.ts/,
+      testIgnore: /(auth\.setup|auth\.mobile\.setup|mobile\.smoke\.spec)\.ts/,
       use: {
         ...devices["Desktop Chrome"],
         storageState: authStatePath,
       },
-      dependencies: ["setup"],
+      dependencies: ["setup-desktop"],
     },
     {
       name: "mobile-chromium",
@@ -44,9 +51,9 @@ export default defineConfig({
         deviceScaleFactor: 1,
         hasTouch: true,
         isMobile: true,
-        storageState: authStatePath,
+        storageState: mobileAuthStatePath,
       },
-      dependencies: ["setup"],
+      dependencies: ["setup-mobile"],
     },
   ],
 });

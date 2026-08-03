@@ -247,7 +247,7 @@ const completePersonalOnboarding = async (
   await page.locator("[data-onboarding-edit-control]").click();
   await expect(toolbarNotice).toContainText("Este é o modo de edição");
   const filterRegion = page.locator("[data-onboarding-filter-region]");
-  await expect(filterRegion.locator(":scope > div").first()).toHaveAttribute(
+  await expect(filterRegion.locator(":scope > div").first()).not.toHaveAttribute(
     "inert",
     ""
   );
@@ -279,14 +279,10 @@ const completePersonalOnboarding = async (
   await expect(calendarDialog).toContainText(
     "Escolha sua UF para incluir este calendário no contexto Pessoal."
   );
-  const lockedCalendarCards = calendarDialog.locator(
-    '[data-guided-disabled="true"]'
-  );
-  await expect(lockedCalendarCards.first()).toBeVisible();
-  expect(await lockedCalendarCards.count()).toBeGreaterThan(0);
-  for (const button of await lockedCalendarCards.getByRole("button").all()) {
-    await expect(button).toBeDisabled();
-  }
+  const calendarCards = calendarDialog.locator("[data-calendar-pack-group]");
+  await expect(calendarCards.first()).toBeVisible();
+  expect(await calendarCards.count()).toBeGreaterThan(1);
+  await expect(calendarDialog.locator('[data-guided-disabled="true"]')).toHaveCount(0);
   const stateSelect = calendarDialog.getByRole("combobox", {
     name: /Estado para Feriados nacionais/i,
   });
@@ -302,7 +298,12 @@ const completePersonalOnboarding = async (
     "data-guided-toolbar-target",
     "year"
   );
-  await expect(page.locator("[data-onboarding-year-control]")).toBeDisabled();
+  const yearControl = page.locator("[data-onboarding-year-control]");
+  await expect(yearControl).toBeEnabled();
+  await yearControl.click();
+  await expect(toolbarNotice).toBeHidden();
+  await page.keyboard.press("Escape");
+  await expect(toolbarNotice).toBeVisible();
   await toolbarNotice.getByRole("button", { name: "Continuar" }).click();
 
   await expect(toolbarNotice).toHaveAttribute(
@@ -405,7 +406,7 @@ test("monta contexto Pessoal de forma incremental", async ({ page }, testInfo) =
   }));
 
   expect(stored.onboarding).toMatchObject({
-    version: 10,
+    version: 11,
     step: "completed",
     context: "personal",
   });
@@ -539,6 +540,9 @@ test("categorias começam abertas, podem ser recolhidas e reabrem ao recarregar"
   await page
     .getByRole("button", { name: "Encerrar guia inicial" })
     .click();
+  await page
+    .getByRole("button", { name: "Encerrar e explorar" })
+    .click();
 
   const expandedLabel = mobile
     ? "Recolher contextos e categorias"
@@ -583,6 +587,86 @@ test("primeira visita segue o sistema e o onboarding usa superfície inversa", a
   ).toBe("rgb(23, 34, 51)");
 });
 
+test("aplicação permanece interativa atrás do primeiro card", async ({ page }, testInfo) => {
+  test.skip(
+    testInfo.project.name === "mobile-chromium",
+    "A jornada guiada começa no desktop"
+  );
+  await page.goto("/?mobileUi=0");
+  const panel = page.getByRole("region", { name: "Guia inicial do Doze 52" });
+  await expect(panel).toBeVisible();
+
+  const professional = page.locator(
+    '[data-onboarding-profile-id][title="Profissional"]'
+  );
+  await professional.click();
+  await expect(professional).toHaveAttribute("aria-pressed", "true");
+
+  const firstCategory = page.locator("[data-onboarding-category-id]").first();
+  const initialVisibility = await firstCategory.getAttribute("aria-pressed");
+  await firstCategory.click();
+  await expect(firstCategory).toHaveAttribute(
+    "aria-pressed",
+    initialVisibility === "true" ? "false" : "true"
+  );
+
+  await page.locator('[data-onboarding-profile-id][title="Pessoal"]').click();
+  const demoEvent = page.getByRole("button", {
+    name: "Feira gastronômica",
+    exact: true,
+  });
+  await expect(demoEvent).toHaveAttribute("draggable", "true");
+  const demoEventId = await demoEvent.getAttribute("data-calendar-event-id");
+  await page.evaluate(
+    ({ eventId, dateIso }) => {
+      const source = document.querySelector<HTMLElement>(
+        `[data-calendar-event-id="${eventId}"]`
+      );
+      const target = document.querySelector<HTMLElement>(
+        `[data-day-cell][data-day-iso="${dateIso}"]`
+      );
+      if (!source || !target) throw new Error("Alvos do arraste não encontrados");
+      const transfer = new DataTransfer();
+      const rect = target.getBoundingClientRect();
+      const eventInit = {
+        bubbles: true,
+        cancelable: true,
+        clientX: rect.left + rect.width / 2,
+        clientY: rect.top + rect.height / 2,
+        dataTransfer: transfer,
+      };
+      source.dispatchEvent(new DragEvent("dragstart", eventInit));
+      target.dispatchEvent(new DragEvent("dragover", eventInit));
+      target.dispatchEvent(new DragEvent("drop", eventInit));
+      source.dispatchEvent(new DragEvent("dragend", eventInit));
+    },
+    { eventId: demoEventId, dateIso: "2026-02-10" }
+  );
+  await expect
+    .poll(() =>
+      page.evaluate((eventId) => {
+        const payload = JSON.parse(localStorage.getItem("yiv-store") ?? "{}");
+        return payload.state?.events?.find(
+          (event: { id: string }) => event.id === eventId
+        )?.startDate;
+      }, demoEventId)
+    )
+    .toBe("2026-02-10");
+  await page.getByRole("button", { name: "Feira gastronômica", exact: true }).click();
+  const demoEventDialog = page.getByRole("dialog", { name: "Editar evento" });
+  await expect(demoEventDialog.getByLabel("Título do evento")).toBeEnabled();
+  await demoEventDialog.getByLabel("Título do evento").fill("Feira da cidade");
+  await demoEventDialog.getByRole("button", { name: "Salvar" }).click();
+  await expect(page.getByRole("button", { name: "Feira da cidade" })).toBeVisible();
+
+  const themeControl = page.locator("[data-onboarding-theme-control]");
+  await expect(themeControl).toBeEnabled();
+  await themeControl.click();
+
+  await panel.getByRole("button", { name: "Entrar na sua conta" }).click();
+  await expect(page.getByRole("dialog", { name: "Entrar" })).toBeVisible();
+});
+
 test("o X libera o ano de exemplo e a decisão persiste após recarregar", async ({
   page,
 }, testInfo) => {
@@ -595,6 +679,15 @@ test("o X libera o ano de exemplo e a decisão persiste após recarregar", async
     name: "Guia inicial do Doze 52",
   });
   await panel.getByRole("button", { name: "Encerrar guia inicial" }).click();
+  const exitDialog = page.getByRole("dialog", {
+    name: "Quer encerrar a montagem guiada?",
+  });
+  await expect(exitDialog).toContainText(
+    "O que você já criou continuará no seu ano"
+  );
+  await exitDialog
+    .getByRole("button", { name: "Encerrar e explorar" })
+    .click();
   await expect(panel).toBeHidden();
   await expect(page.getByText("Dispensar ajuda")).toHaveCount(0);
   const stored = await page.evaluate(() => {
@@ -619,6 +712,54 @@ test("o X libera o ano de exemplo e a decisão persiste após recarregar", async
   await expect(panel).toBeHidden();
   await expect(page.locator("[data-guided-calendar-notice]")).toHaveCount(0);
   await expect(page.locator("[data-demo-mode-badge]")).toBeVisible();
+});
+
+test("saída após criar contexto preserva o ano e convida após três criações", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name === "mobile-chromium",
+    "O encerramento da montagem guiada acontece no desktop"
+  );
+  await page.goto("/?mobileUi=0");
+  const panel = page.getByRole("region", { name: "Guia inicial do Doze 52" });
+  await panel.getByRole("button", { name: /Pessoal/ }).click();
+  await expect(panel).toHaveAttribute(
+    "data-guided-onboarding-step",
+    "date_category_selection"
+  );
+  await panel.getByRole("button", { name: "Encerrar guia inicial" }).click();
+  await page
+    .getByRole("dialog", { name: "Quer encerrar a montagem guiada?" })
+    .getByRole("button", { name: "Encerrar e explorar" })
+    .click();
+  await expect(panel).toBeHidden();
+
+  await page.reload();
+  await expect(panel).toBeHidden();
+  await expect(page.getByRole("button", { name: "Pessoal", exact: true })).toBeVisible();
+  await expect(page.locator("[data-onboarding-category-id]")).toHaveCount(0);
+  const persistedStep = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem("doze52:onboarding:v2") ?? "null")
+  );
+  expect(persistedStep).toMatchObject({
+    version: 11,
+    step: "dismissed_preserved",
+  });
+
+  await page
+    .getByRole("button", { name: "Editar contextos e categorias" })
+    .click();
+  for (const name of ["Saúde", "Família", "Projetos"]) {
+    await page.getByRole("button", { name: "Criar nova categoria" }).click();
+    const dialog = page.getByRole("dialog", { name: "Nova categoria" });
+    await dialog.getByLabel("Nome da categoria").fill(name);
+    await dialog.getByRole("button", { name: "Criar", exact: true }).click();
+    await expect(dialog).toBeHidden();
+  }
+  await expect(
+    page.getByRole("complementary", { name: "Convite para guardar o ano" })
+  ).toBeVisible();
 });
 
 test("substitui automaticamente um exemplo v3 ainda bloqueado", async ({
@@ -668,7 +809,7 @@ test("substitui automaticamente um exemplo v3 ainda bloqueado", async ({
       ...(payload.state.events ?? []),
     ].map((item: { calendarPackGroupId?: string }) => item.calendarPackGroupId);
   });
-  expect(new Set(groupIds)).toEqual(new Set(["onboarding-personal-demo-v4"]));
+  expect(new Set(groupIds)).toEqual(new Set(["onboarding-personal-demo-v5"]));
 });
 
 test("sandbox convida após cinco alvos e retoma o onboarding limpo", async ({
@@ -679,6 +820,9 @@ test("sandbox convida após cinco alvos e retoma o onboarding limpo", async ({
   await page.goto(mobile ? "/?mobileUi=1" : "/?mobileUi=0");
   await page
     .getByRole("button", { name: "Encerrar guia inicial" })
+    .click();
+  await page
+    .getByRole("button", { name: "Encerrar e explorar" })
     .click();
 
   await page.locator('[data-onboarding-category-id][title="Família"]').click();
@@ -946,7 +1090,7 @@ test("Profissional permite categorias específica e genérica", async ({
       "doze52:onboarding:v2",
       JSON.stringify({
         ...current,
-        version: 10,
+        version: 11,
         step: "period_category_selection",
         dateItemsCreated: 2,
         categoryRevealStartedAt: undefined,

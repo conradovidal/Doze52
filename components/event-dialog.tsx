@@ -68,6 +68,7 @@ export function EventDialog({
   guidedIntent,
   onSubmit,
   onDelete,
+  allowManagedMutation = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -86,6 +87,7 @@ export function EventDialog({
     recurrenceUntil?: string;
   }) => Promise<void> | void;
   onDelete?: () => Promise<void> | void;
+  allowManagedMutation?: boolean;
 }) {
   const { mode: themeMode } = useTheme();
   const categories = useStore((s) => s.categories);
@@ -102,7 +104,9 @@ export function EventDialog({
   const [recurrenceUntil, setRecurrenceUntil] = React.useState("");
   const [isSaving, setIsSaving] = React.useState(false);
   const [submitError, setSubmitError] = React.useState<string | null>(null);
-  const isManagedEvent = Boolean(initialEvent?.calendarPackGroupId);
+  const isManagedEvent = Boolean(
+    initialEvent?.calendarPackGroupId && !allowManagedMutation
+  );
   const isGuidedCreation = Boolean(guidedIntent && !initialEvent && !isManagedEvent);
   const guidedCopy = guidedIntent ? GUIDED_COPY[guidedIntent] : null;
 
@@ -129,7 +133,7 @@ export function EventDialog({
             (category) =>
               category.profileId === profile.id &&
               (!category.calendarPackGroupId ||
-                (!initialEvent?.calendarPackGroupId &&
+                (!isManagedEvent &&
                   category.id === initialEvent?.categoryId))
           )
       ),

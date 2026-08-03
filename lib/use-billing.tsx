@@ -3,6 +3,7 @@
 import * as React from "react";
 
 import {
+  FREE_BILLING_STATUS,
   getPlanLimits,
   isProPlan,
   type BillingStatusPayload,
@@ -15,10 +16,7 @@ import {
 } from "@/lib/billing-test-mode";
 import { useAuth } from "@/lib/auth";
 import { logDevError, logProdError } from "@/lib/safe-log";
-import {
-  FREE_BILLING_STATUS,
-  useBillingStatus,
-} from "@/lib/use-billing-status";
+import { useBillingStatus } from "@/lib/use-billing-status";
 import { useFeedback } from "@/components/ui/feedback-provider";
 
 type BillingActionOptions = {

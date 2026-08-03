@@ -54,11 +54,14 @@ type AppHeaderProps = {
   guidedCalendarSelectionActive?: boolean;
   guidedEditPreviewActive?: boolean;
   onboardingLayoutLocked?: boolean;
+  onboardingLayoutReserved?: boolean;
   mobileExamplePreviewActive?: boolean;
   demoExplorationActive?: boolean;
   categoryCreateRequestKey?: number;
   onCategoryCreated?: (categoryId: string) => void;
   onProfileCreated?: (profileId: string) => void;
+  onInlineEditModeChange?: (active: boolean) => void;
+  exitInlineEditRequestKey?: number;
 };
 
 const getPreferredEditingProfileId = (
@@ -85,11 +88,14 @@ export function AppHeader({
   guidedCalendarSelectionActive = false,
   guidedEditPreviewActive = false,
   onboardingLayoutLocked = false,
+  onboardingLayoutReserved = false,
   mobileExamplePreviewActive = false,
   demoExplorationActive = false,
   categoryCreateRequestKey = 0,
   onCategoryCreated,
   onProfileCreated,
+  onInlineEditModeChange,
+  exitInlineEditRequestKey = 0,
 }: AppHeaderProps) {
   const profiles = useStore((s) => s.profiles);
   const categories = useStore((s) => s.categories);
@@ -98,6 +104,7 @@ export function AppHeader({
   const setCategoriesVisibility = useStore((s) => s.setCategoriesVisibility);
 
   const [isInlineEditMode, setIsInlineEditMode] = React.useState(false);
+  const [yearSelectOpen, setYearSelectOpen] = React.useState(false);
   const [editingProfileId, setEditingProfileId] = React.useState<string | null>(null);
   const [profileManagerOpen, setProfileManagerOpen] = React.useState(false);
   const [profileManagerIntent, setProfileManagerIntent] =
@@ -119,6 +126,7 @@ export function AppHeader({
   } | null>(null);
   const previousProfileManagerOpenRef = React.useRef(false);
   const handledCategoryCreateRequestRef = React.useRef(0);
+  const handledExitInlineEditRequestRef = React.useRef(0);
 
   const utilityIconClass =
     "h-8 w-8 rounded-[10px] border-border bg-card text-muted-foreground shadow-none transition-colors hover:border-foreground/18 hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 md:h-9 md:w-9";
@@ -218,6 +226,18 @@ export function AppHeader({
 
   React.useEffect(() => {
     if (
+      exitInlineEditRequestKey <= 0 ||
+      exitInlineEditRequestKey === handledExitInlineEditRequestRef.current
+    ) {
+      return;
+    }
+    handledExitInlineEditRequestRef.current = exitInlineEditRequestKey;
+    setIsInlineEditMode(false);
+    onInlineEditModeChange?.(false);
+  }, [exitInlineEditRequestKey, onInlineEditModeChange]);
+
+  React.useEffect(() => {
+    if (
       categoryCreateRequestKey <= 0 ||
       categoryCreateRequestKey === handledCategoryCreateRequestRef.current
     ) {
@@ -266,6 +286,7 @@ export function AppHeader({
     if (!onboardingLayoutLocked) {
       setIsInlineEditMode(next);
     }
+    onInlineEditModeChange?.(next);
     if (guidedToolbarNotice?.target === "edit") {
       onGuidedToolbarAction?.("edit");
     }
@@ -274,6 +295,7 @@ export function AppHeader({
     effectiveInlineEditMode,
     onboardingLayoutLocked,
     onGuidedToolbarAction,
+    onInlineEditModeChange,
     profiles,
     selectedProfileIds,
   ]);
@@ -411,9 +433,7 @@ export function AppHeader({
                       ? "holidays-by-state"
                       : undefined
                   }
-                  requireExplicitVariant={
-                    guidedCalendarSelectionActive
-                  }
+                  requireExplicitVariant={guidedCalendarSelectionActive}
                   onOpen={onGuidedCalendarOpen}
                   onClose={onGuidedCalendarClose}
                   onImported={(pack) =>
@@ -438,6 +458,8 @@ export function AppHeader({
                 <Select
                   value={String(year)}
                   disabled={yearSelectDisabled}
+                  open={yearSelectOpen}
+                  onOpenChange={setYearSelectOpen}
                   onValueChange={(v) => onYearChange(Number(v))}
                 >
                   <SelectTrigger
@@ -460,6 +482,7 @@ export function AppHeader({
                   </SelectContent>
                 </Select>
                 {guidedToolbarNotice?.target === "year" &&
+                !yearSelectOpen &&
                 onDismissGuidedSelection ? (
                   <GuidedToolbarNoticeCard
                     notice={guidedToolbarNotice}
@@ -525,17 +548,15 @@ export function AppHeader({
             isMobileMode
               ? "max-w-[31rem]"
               : "max-w-[62rem] border-t border-border/45 pt-2.5 md:pt-3",
-            onboardingLayoutLocked &&
+            onboardingLayoutReserved &&
               (isMobileMode ? "min-h-[10.25rem]" : "min-h-[5.6rem]")
           )}
         >
           <div
             className={cn(
-              "flex w-full flex-col items-center gap-1.5 transition-opacity duration-150 md:gap-2",
-              guidedSelectionNotice && "opacity-0"
+              "flex w-full flex-col items-center gap-1.5 transition-opacity duration-150 md:gap-2"
             )}
             inert={filtersLocked ? true : undefined}
-            aria-hidden={guidedSelectionNotice ? true : undefined}
           >
             {isMobileMode ? (
               <div className="w-full overflow-hidden rounded-[10px] border border-border bg-card">
@@ -708,11 +729,11 @@ export function AppHeader({
           {guidedSelectionNotice && onDismissGuidedSelection ? (
             <div
               data-guided-selection-overlay
-              className="absolute inset-0 z-40 flex items-center justify-center rounded-2xl bg-background"
+              className="pointer-events-none absolute left-1/2 top-[calc(100%+0.5rem)] z-40 flex w-full -translate-x-1/2 justify-center"
             >
               <div
                 data-guided-selection-card
-                className="inverse-product-surface w-[min(34rem,calc(100%-1rem))] overflow-hidden rounded-2xl border border-border bg-card shadow-[0_24px_60px_-22px_rgba(15,23,42,0.84)]"
+                className="inverse-product-surface pointer-events-auto w-[min(34rem,calc(100%-1rem))] overflow-hidden rounded-2xl border border-border bg-card shadow-[0_24px_60px_-22px_rgba(15,23,42,0.84)]"
               >
                 <GuidedCalendarNotice
                   notice={guidedSelectionNotice}

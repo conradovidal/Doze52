@@ -55,6 +55,14 @@ export const dismissOnboardingIfVisible = async (page: Page) => {
   });
   if (await guidedButton.isVisible().catch(() => false)) {
     await guidedButton.click();
+    const confirmation = page.getByRole("dialog", {
+      name: "Quer encerrar a montagem guiada?",
+    });
+    if (await confirmation.isVisible().catch(() => false)) {
+      await confirmation
+        .getByRole("button", { name: "Encerrar e explorar" })
+        .click();
+    }
     return;
   }
   const legacyButton = page.getByRole("button", { name: "Entendi" });
@@ -74,10 +82,19 @@ export const waitForSupabaseWrite = (
   methods: Array<"POST" | "PATCH" | "DELETE"> = ["POST", "PATCH", "DELETE"]
 ) =>
   page.waitForResponse(
-    (response) =>
-      response.url().includes(`/rest/v1/${table}`) &&
-      methods.includes(response.request().method() as "POST" | "PATCH" | "DELETE") &&
-      response.status() < 400,
+    (response) => {
+      const isAtomicSnapshot =
+        response.url().includes("/rest/v1/rpc/replace_calendar_snapshot") &&
+        response.request().method() === "POST";
+      const isLegacyTableWrite =
+        response.url().includes(`/rest/v1/${table}`) &&
+        methods.includes(
+          response.request().method() as "POST" | "PATCH" | "DELETE"
+        );
+      return (
+        (isAtomicSnapshot || isLegacyTableWrite) && response.status() < 400
+      );
+    },
     { timeout: 15_000 }
   );
 

@@ -37,6 +37,7 @@ import {
   isRenderableEventDateRange,
 } from "@/lib/event-order";
 import { cn } from "@/lib/utils";
+import { isOnboardingPersonalDemoGroup } from "@/lib/store";
 import {
   LATERAL_KEY_ACTIVE_CLASS,
   LATERAL_KEY_BASE_CLASS,
@@ -719,7 +720,10 @@ export function MonthRow({
                       anchorPoint,
                     })
                   }
-                  draggable={!seg.event.calendarPackGroupId}
+                  draggable={
+                    !seg.event.calendarPackGroupId ||
+                    isOnboardingPersonalDemoGroup(seg.event.calendarPackGroupId)
+                  }
                   isDragging={dragState.draggingEventId === seg.event.id}
                   className={
                     isDraggingAny && dragState.draggingEventId !== seg.event.id
@@ -727,7 +731,10 @@ export function MonthRow({
                       : ""
                   }
                   onDragStart={(e) => {
-                    if (seg.event.calendarPackGroupId) {
+                    if (
+                      seg.event.calendarPackGroupId &&
+                      !isOnboardingPersonalDemoGroup(seg.event.calendarPackGroupId)
+                    ) {
                       e.preventDefault();
                       return;
                     }
@@ -959,7 +966,10 @@ export function MonthRow({
                                   anchorPoint,
                                 })
                               }
-                              draggable={!event.calendarPackGroupId}
+                              draggable={
+                                !event.calendarPackGroupId ||
+                                isOnboardingPersonalDemoGroup(event.calendarPackGroupId)
+                              }
                               isDragging={isDragged}
                               className={
                                 isDragged
@@ -969,7 +979,12 @@ export function MonthRow({
                                     : ""
                               }
                               onDragStart={(e) => {
-                                if (event.calendarPackGroupId) {
+                                if (
+                                  event.calendarPackGroupId &&
+                                  !isOnboardingPersonalDemoGroup(
+                                    event.calendarPackGroupId
+                                  )
+                                ) {
                                   e.preventDefault();
                                   return;
                                 }

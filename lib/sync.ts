@@ -115,7 +115,12 @@ const genericSyncMessage = "Falha de sincronizacao. Tente novamente.";
 
 type QueryAction = "select" | "insert/update" | "delete" | "getUser";
 type QueryMeta = {
-  table: "calendar_profiles" | "categories" | "events" | "auth";
+  table:
+    | "calendar_profiles"
+    | "categories"
+    | "events"
+    | "auth"
+    | "sync_contract";
   action: QueryAction;
 };
 
@@ -324,6 +329,7 @@ const isMissingRelationError = (message: string, code?: string, status?: number)
     code === "42703" ||
     code === "PGRST204" ||
     code === "PGRST205" ||
+    code === "PGRST202" ||
     status === 404 ||
     normalized.includes("does not exist") ||
     normalized.includes("column") ||
@@ -683,105 +689,40 @@ const saveSnapshotInternal = async (snapshot: CalendarSnapshot): Promise<void> =
         calendar_pack_event_key: event.calendarPackEventKey ?? null,
       }));
 
-      const [currentProfiles, currentCategories, currentEvents] = await Promise.all([
-        supabase.from("calendar_profiles").select("id").eq("user_id", userId),
-        supabase.from("categories").select("id").eq("user_id", userId),
-        supabase.from("events").select("id").eq("user_id", userId),
-      ]);
+      const contract = await supabase.rpc("calendar_sync_contract_version");
+      if (contract.error) {
+        logQueryFailure(
+          { table: "sync_contract", action: "select" },
+          contract.error
+        );
+        throw new SyncError(
+          "missing_relation",
+          "Sincronização bloqueada: o banco deste ambiente ainda não possui o contrato necessário.",
+          false,
+          {
+            code: getErrorCode(contract.error),
+            status: getErrorStatus(contract.error),
+            rawMessage: safeSupabaseMessage(getErrorMessage(contract.error)),
+          }
+        );
+      }
+      if (contract.data !== 1) {
+        throw new SyncError(
+          "missing_relation",
+          "Sincronização bloqueada: o contrato do banco é incompatível com esta versão.",
+          false
+        );
+      }
 
-      assertQuerySuccess(currentProfiles.error, {
-        table: "calendar_profiles",
-        action: "select",
+      const { error } = await supabase.rpc("replace_calendar_snapshot", {
+        p_profiles: profileRows,
+        p_categories: categoryRows,
+        p_events: eventRows,
       });
-      assertQuerySuccess(currentCategories.error, {
-        table: "categories",
-        action: "select",
+      assertQuerySuccess(error, {
+        table: "sync_contract",
+        action: "insert/update",
       });
-      assertQuerySuccess(currentEvents.error, {
-        table: "events",
-        action: "select",
-      });
-
-      if (profileRows.length > 0) {
-        const { error } = await supabase
-          .from("calendar_profiles")
-          .upsert(profileRows, { onConflict: "id" });
-        assertQuerySuccess(error, {
-          table: "calendar_profiles",
-          action: "insert/update",
-        });
-      }
-
-      if (categoryRows.length > 0) {
-        const { error } = await supabase
-          .from("categories")
-          .upsert(categoryRows, { onConflict: "id" });
-        assertQuerySuccess(error, {
-          table: "categories",
-          action: "insert/update",
-        });
-      }
-
-      if (eventRows.length > 0) {
-        const { error } = await supabase
-          .from("events")
-          .upsert(eventRows, { onConflict: "id" });
-        assertQuerySuccess(error, {
-          table: "events",
-          action: "insert/update",
-        });
-      }
-
-      const localEventIds = new Set(eventRows.map((row) => row.id));
-      const remoteEventIds = ((currentEvents.data ?? []) as { id: string }[]).map(
-        (row) => row.id
-      );
-      const eventsToDelete = remoteEventIds.filter((id) => !localEventIds.has(id));
-      if (eventsToDelete.length > 0) {
-        const { error } = await supabase
-          .from("events")
-          .delete()
-          .eq("user_id", userId)
-          .in("id", eventsToDelete);
-        assertQuerySuccess(error, {
-          table: "events",
-          action: "delete",
-        });
-      }
-
-      const localCategoryIds = new Set(categoryRows.map((row) => row.id));
-      const remoteCategoryIds = ((currentCategories.data ?? []) as { id: string }[]).map(
-        (row) => row.id
-      );
-      const categoriesToDelete = remoteCategoryIds.filter((id) => !localCategoryIds.has(id));
-      if (categoriesToDelete.length > 0) {
-        const { error } = await supabase
-          .from("categories")
-          .delete()
-          .eq("user_id", userId)
-          .in("id", categoriesToDelete);
-        assertQuerySuccess(error, {
-          table: "categories",
-          action: "delete",
-        });
-      }
-
-      const localProfileIds = new Set(profileRows.map((row) => row.id));
-      const remoteProfileIds = ((currentProfiles.data ?? []) as { id: string }[]).map(
-        (row) => row.id
-      );
-      const profilesToDelete = remoteProfileIds.filter((id) => !localProfileIds.has(id));
-      if (profilesToDelete.length > 0) {
-        const { error } = await supabase
-          .from("calendar_profiles")
-          .delete()
-          .eq("user_id", userId)
-          .in("id", profilesToDelete);
-        assertQuerySuccess(error, {
-          table: "calendar_profiles",
-          action: "delete",
-        });
-      }
     }, 1);
   } catch (error) {
     const syncError = classifySyncError(error);

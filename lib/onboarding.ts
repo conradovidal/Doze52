@@ -32,11 +32,12 @@ export type GuidedOnboardingStep =
   | "year_instruction"
   | "theme_instruction"
   | "demo_exploration"
+  | "dismissed_preserved"
   | "completed"
   | "dismissed";
 
 export type GuidedOnboardingState = {
-  version: 10;
+  version: 11;
   step: GuidedOnboardingStep;
   context?: OnboardingContext;
   startedAt?: string;
@@ -57,6 +58,8 @@ export type GuidedOnboardingState = {
   demoExplorationStartedAt?: string;
   demoInteractionKeys?: string[];
   demoInviteEligibleAt?: string;
+  postExitCreationKeys?: string[];
+  exitConfirmedAt?: string;
   completedAt?: string;
   dismissedAt?: string;
 };
@@ -83,6 +86,8 @@ export type GuidedOnboardingAction =
   | { type: "enter_demo_exploration"; at?: string }
   | { type: "record_demo_interaction"; key: string; at?: string }
   | { type: "restart_from_demo" }
+  | { type: "dismiss_preserving"; at?: string }
+  | { type: "record_post_exit_creation"; key: string; at?: string }
   | { type: "dismiss"; at?: string };
 
 type ProductOnboardingPayload = Partial<
@@ -113,6 +118,8 @@ type LegacyGuidedOnboardingState = {
   demoExplorationStartedAt?: string;
   demoInteractionKeys?: unknown;
   demoInviteEligibleAt?: string;
+  postExitCreationKeys?: unknown;
+  exitConfirmedAt?: string;
   completedAt?: string;
   dismissedAt?: string;
 };
@@ -137,7 +144,7 @@ export const getGuidedCategoryRevealRemainingMs = (
 };
 
 const initialGuidedState = (): GuidedOnboardingState => ({
-  version: 10,
+  version: 11,
   step: "context_selection",
 });
 
@@ -184,6 +191,7 @@ const isGuidedStep = (value: unknown): value is GuidedOnboardingStep =>
   value === "year_instruction" ||
   value === "theme_instruction" ||
   value === "demo_exploration" ||
+  value === "dismissed_preserved" ||
   value === "completed" ||
   value === "dismissed";
 
@@ -213,7 +221,7 @@ export const migrateGuidedOnboardingState = (
   };
 
   if (
-    (candidate.version === 9 || candidate.version === 10) &&
+    (candidate.version === 9 || candidate.version === 10 || candidate.version === 11) &&
     isGuidedStep(candidate.step)
   ) {
     const demoInteractionKeys = Array.isArray(candidate.demoInteractionKeys)
@@ -227,7 +235,7 @@ export const migrateGuidedOnboardingState = (
         ]
       : [];
     return {
-      version: 10,
+      version: 11,
       step: candidate.step,
       context: isContext(candidate.context) ? candidate.context : undefined,
       startedAt: candidate.startedAt,
@@ -270,6 +278,10 @@ export const migrateGuidedOnboardingState = (
       demoExplorationStartedAt: candidate.demoExplorationStartedAt,
       demoInteractionKeys,
       demoInviteEligibleAt: candidate.demoInviteEligibleAt,
+      postExitCreationKeys: Array.isArray(candidate.postExitCreationKeys)
+        ? [...new Set(candidate.postExitCreationKeys.filter((key): key is string => typeof key === "string" && key.length > 0))]
+        : [],
+      exitConfirmedAt: candidate.exitConfirmedAt,
       completedAt: candidate.completedAt,
       dismissedAt: candidate.dismissedAt,
     };
@@ -277,7 +289,7 @@ export const migrateGuidedOnboardingState = (
 
   if (candidate.version === 8 && isGuidedStep(candidate.step)) {
     return {
-      version: 10,
+      version: 11,
       step: candidate.step,
       context: isContext(candidate.context) ? candidate.context : undefined,
       startedAt: candidate.startedAt,
@@ -369,7 +381,7 @@ export const migrateGuidedOnboardingState = (
     }
 
     return {
-      version: 10,
+      version: 11,
       step,
       context: isContext(candidate.context) ? candidate.context : undefined,
       startedAt: candidate.startedAt,
@@ -406,7 +418,7 @@ export const migrateGuidedOnboardingState = (
       candidate.step === "completed" || candidate.step === "dismissed";
     const preserveAsCompleted = !terminal && hasLegacyProgress(candidate);
     return {
-      version: 10,
+      version: 11,
       step: terminal
         ? (candidate.step as "completed" | "dismissed")
         : preserveAsCompleted
@@ -603,7 +615,7 @@ export const reduceGuidedOnboardingState = (
     }
     case "enter_demo_exploration":
       return {
-        version: 10,
+        version: 11,
         step: "demo_exploration",
         demoExplorationStartedAt: action.at ?? nowIso(),
         demoInteractionKeys: [],
@@ -627,6 +639,31 @@ export const reduceGuidedOnboardingState = (
       return state.step === "demo_exploration"
         ? initialGuidedState()
         : state;
+    case "dismiss_preserving":
+      return {
+        ...state,
+        step: "dismissed_preserved",
+        categoryRevealStartedAt: undefined,
+        postExitCreationKeys: [],
+        accountNudgeShownAt: undefined,
+        exitConfirmedAt: action.at ?? nowIso(),
+        dismissedAt: action.at ?? nowIso(),
+        completedAt: undefined,
+      };
+    case "record_post_exit_creation": {
+      if (state.step !== "dismissed_preserved" || state.accountNudgeShownAt) {
+        return state;
+      }
+      const keys = state.postExitCreationKeys ?? [];
+      if (!action.key || keys.includes(action.key)) return state;
+      const postExitCreationKeys = [...keys, action.key];
+      return {
+        ...state,
+        postExitCreationKeys,
+        accountNudgeShownAt:
+          postExitCreationKeys.length >= 3 ? action.at ?? nowIso() : undefined,
+      };
+    }
     case "dismiss":
       return {
         ...state,
@@ -678,6 +715,7 @@ export const dispatchGuidedOnboarding = (
 export const isGuidedOnboardingInProgress = (state: GuidedOnboardingState) =>
   Boolean(state.startedAt) &&
   state.step !== "demo_exploration" &&
+  state.step !== "dismissed_preserved" &&
   state.step !== "completed" &&
   state.step !== "dismissed";
 
@@ -693,7 +731,11 @@ export const shouldShowGuidedOnboarding = (input: {
   isAuthenticated: boolean;
   remoteReady: boolean;
 }) => {
-  if (input.state.step === "completed" || input.state.step === "dismissed") {
+  if (
+    input.state.step === "completed" ||
+    input.state.step === "dismissed" ||
+    input.state.step === "dismissed_preserved"
+  ) {
     return false;
   }
   const inProgress = isGuidedOnboardingInProgress(input.state);

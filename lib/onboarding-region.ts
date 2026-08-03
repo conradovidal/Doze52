@@ -1,4 +1,4 @@
-export const ONBOARDING_VERSION = 10;
+export const ONBOARDING_VERSION = 11;
 export const ONBOARDING_REGION_TRACKED_STORAGE_KEY =
   "doze52:onboarding-region:v10";
 

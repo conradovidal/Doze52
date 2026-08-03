@@ -8,6 +8,14 @@ export type BillingStatusPayload = {
   canManageBilling: boolean;
 };
 
+export const FREE_BILLING_STATUS: BillingStatusPayload = {
+  plan: "free",
+  status: null,
+  currentPeriodEnd: null,
+  cancelAtPeriodEnd: false,
+  canManageBilling: false,
+};
+
 export type PlanLimits = {
   maxProfiles: number | null;
   maxCategories: number | null;
