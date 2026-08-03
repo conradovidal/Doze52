@@ -94,7 +94,6 @@ test("contexto, sincronizacao e calendario pronto funcionam de ponta a ponta", a
   await personalEventSaved;
   await waitForSyncReady(page);
 
-  await page.getByRole("button", { name: "Pessoal", exact: true }).click();
   await page.getByRole("button", { name: "QA pessoal" }).click();
   const personalEventDialog = page.getByRole("dialog", { name: "Editar evento" });
   const editComboboxes = personalEventDialog.getByRole("combobox");
