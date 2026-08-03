@@ -37,6 +37,7 @@ import {
   isRenderableEventDateRange,
 } from "@/lib/event-order";
 import { cn } from "@/lib/utils";
+import { isOnboardingPersonalDemoGroup } from "@/lib/store";
 import {
   LATERAL_KEY_ACTIVE_CLASS,
   LATERAL_KEY_BASE_CLASS,
@@ -116,6 +117,7 @@ export function MonthRow({
   hasDragContext,
   onEditEvent,
   creatingRange,
+  guidedSelectionRange,
   onStartCreateRange,
   onHoverCreateRange,
   onFinishCreateRange,
@@ -147,6 +149,7 @@ export function MonthRow({
     anchorPoint: AnchorPoint;
   }) => void;
   creatingRange: { startIso: string; hoverIso: string; isDragging: boolean } | null;
+  guidedSelectionRange?: { startDate: string; endDate: string } | null;
   onStartCreateRange: (startIso: string) => void;
   onHoverCreateRange: (hoverIso: string) => void;
   onFinishCreateRange: (endIso?: string, anchorPoint?: AnchorPoint) => void;
@@ -322,11 +325,11 @@ export function MonthRow({
   const minHeightPx = Math.max(layoutDensity.monthRowBaseMinHeightPx, contentHeight);
 
   const rangeBounds = React.useMemo(() => {
-    if (!creatingRange) return null;
-    const a = creatingRange.startIso;
-    const b = creatingRange.hoverIso;
+    const a = creatingRange?.startIso ?? guidedSelectionRange?.startDate;
+    const b = creatingRange?.hoverIso ?? guidedSelectionRange?.endDate;
+    if (!a || !b) return null;
     return a <= b ? { startIso: a, endIso: b } : { startIso: b, endIso: a };
-  }, [creatingRange]);
+  }, [creatingRange, guidedSelectionRange]);
   const rangeColumns = (() => {
     if (!rangeBounds) return null;
     const selected = dayInfos
@@ -717,7 +720,10 @@ export function MonthRow({
                       anchorPoint,
                     })
                   }
-                  draggable={!seg.event.calendarPackGroupId}
+                  draggable={
+                    !seg.event.calendarPackGroupId ||
+                    isOnboardingPersonalDemoGroup(seg.event.calendarPackGroupId)
+                  }
                   isDragging={dragState.draggingEventId === seg.event.id}
                   className={
                     isDraggingAny && dragState.draggingEventId !== seg.event.id
@@ -725,7 +731,10 @@ export function MonthRow({
                       : ""
                   }
                   onDragStart={(e) => {
-                    if (seg.event.calendarPackGroupId) {
+                    if (
+                      seg.event.calendarPackGroupId &&
+                      !isOnboardingPersonalDemoGroup(seg.event.calendarPackGroupId)
+                    ) {
                       e.preventDefault();
                       return;
                     }
@@ -957,7 +966,10 @@ export function MonthRow({
                                   anchorPoint,
                                 })
                               }
-                              draggable={!event.calendarPackGroupId}
+                              draggable={
+                                !event.calendarPackGroupId ||
+                                isOnboardingPersonalDemoGroup(event.calendarPackGroupId)
+                              }
                               isDragging={isDragged}
                               className={
                                 isDragged
@@ -967,7 +979,12 @@ export function MonthRow({
                                     : ""
                               }
                               onDragStart={(e) => {
-                                if (event.calendarPackGroupId) {
+                                if (
+                                  event.calendarPackGroupId &&
+                                  !isOnboardingPersonalDemoGroup(
+                                    event.calendarPackGroupId
+                                  )
+                                ) {
                                   e.preventDefault();
                                   return;
                                 }

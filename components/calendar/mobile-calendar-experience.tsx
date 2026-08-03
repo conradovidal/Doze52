@@ -30,6 +30,10 @@ type MobileCalendarExperienceProps = {
     sourceEventId: string;
     anchorPoint: AnchorPoint;
   }) => void;
+  guidedSelectionMode?: "date" | "period" | null;
+  guidedRangeStart?: string | null;
+  guidedSelectionRange?: { startDate: string; endDate: string } | null;
+  onGuidedDaySelect?: (dateIso: string) => void;
 };
 
 const MONTH_LABELS = [
@@ -119,6 +123,7 @@ function MobileEventButton({
   return (
     <button
       type="button"
+      data-calendar-event-id={event.sourceEventId}
       aria-label={getEventAriaLabel(event, dayIso)}
       className="block h-7 w-full overflow-hidden rounded-[8px] border text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.52)] transition-[transform,box-shadow,filter] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 hover:-translate-y-px hover:brightness-[0.99] hover:shadow-[0_10px_18px_-16px_rgba(15,23,42,0.32),inset_0_1px_0_rgba(255,255,255,0.62)]"
       style={{
@@ -153,6 +158,10 @@ export function MobileCalendarExperience({
   onActiveDateChange,
   onYearChange,
   onEditEvent,
+  guidedSelectionMode = null,
+  guidedRangeStart = null,
+  guidedSelectionRange = null,
+  onGuidedDaySelect,
 }: MobileCalendarExperienceProps) {
   const categories = useStore((s) => s.categories as CategoryItem[]);
   const selectedProfileIds = useStore((s) => s.selectedProfileIds);
@@ -539,6 +548,13 @@ export function MobileCalendarExperience({
             const isPast = Boolean(todayIso) && dayIso < todayIso;
             const isWeekend = day.getDay() === 0 || day.getDay() === 6;
             const weekday = WEEKDAY_SHORT_LABELS[day.getDay()];
+            const guidedSelectable = Boolean(guidedSelectionMode && onGuidedDaySelect);
+            const guidedStart = guidedRangeStart === dayIso;
+            const guidedSelected = Boolean(
+              guidedSelectionRange &&
+                dayIso >= guidedSelectionRange.startDate &&
+                dayIso <= guidedSelectionRange.endDate
+            );
 
             return (
               <article
@@ -547,6 +563,7 @@ export function MobileCalendarExperience({
                 data-date-iso={dayIso}
                 data-month-index={day.getMonth()}
                 data-day-state={today ? "today" : isPast ? "past" : "future"}
+                data-guided-selected={guidedSelected ? "true" : undefined}
                 className={cn(
                   "grid min-h-[4.75rem] grid-cols-[3.75rem_minmax(0,1fr)] gap-2 rounded-[8px] border p-2 transition-[background-color,border-color,box-shadow]",
                   isPast
@@ -558,13 +575,24 @@ export function MobileCalendarExperience({
                       : "bg-card",
                   active
                     ? "border-foreground/70 shadow-[0_12px_24px_-22px_rgba(15,23,42,0.55)]"
-                    : "border-border"
+                    : "border-border",
+                  guidedSelectable && "ring-1 ring-primary/15",
+                  (guidedStart || guidedSelected) &&
+                    "border-primary bg-primary/8 ring-2 ring-primary/30"
                 )}
               >
                 <button
                   type="button"
                   className="grid h-full place-items-center rounded-[9px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45"
-                  onClick={() => setActiveFromDate(day)}
+                  aria-label={
+                    guidedSelectable
+                      ? `Selecionar ${dayIso} no guia inicial`
+                      : undefined
+                  }
+                  onClick={() => {
+                    setActiveFromDate(day);
+                    if (guidedSelectable) onGuidedDaySelect?.(dayIso);
+                  }}
                 >
                   <span
                     className={cn(

@@ -31,7 +31,7 @@ export const validateCategoryInput = (category: CategoryItem) => {
     throw new ValidationError("Categoria invalida: id ausente.");
   }
   if (!category.profileId?.trim()) {
-    throw new ValidationError("Categoria invalida: perfil obrigatorio.");
+    throw new ValidationError("Categoria inválida: contexto obrigatório.");
   }
   if (!category.name?.trim()) {
     throw new ValidationError("Categoria invalida: nome obrigatorio.");
@@ -46,22 +46,22 @@ export const validateCategoryInput = (category: CategoryItem) => {
 
 export const validateProfileInput = (profile: CalendarProfile) => {
   if (!profile.id?.trim()) {
-    throw new ValidationError("Perfil invalido: id ausente.");
+    throw new ValidationError("Contexto inválido: id ausente.");
   }
   if (!profile.name?.trim()) {
-    throw new ValidationError("Perfil invalido: nome obrigatorio.");
+    throw new ValidationError("Contexto inválido: nome obrigatório.");
   }
   if (!HEX_COLOR_RE.test(profile.color)) {
-    throw new ValidationError("Perfil invalido: cor fora do padrao.");
+    throw new ValidationError("Contexto inválido: cor fora do padrão.");
   }
   if (!isProfileIconId(profile.icon)) {
-    throw new ValidationError("Perfil invalido: icone fora do padrao.");
+    throw new ValidationError("Contexto inválido: ícone fora do padrão.");
   }
   if (!Number.isFinite(profile.position) || !Number.isInteger(profile.position)) {
-    throw new ValidationError("Perfil invalido: posicao deve ser inteira.");
+    throw new ValidationError("Contexto inválido: posição deve ser inteira.");
   }
   if (profile.position < 0) {
-    throw new ValidationError("Perfil invalido: posicao nao pode ser negativa.");
+    throw new ValidationError("Contexto inválido: posição não pode ser negativa.");
   }
 };
 

@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 
 import { getBillingStatusForUser } from "@/lib/billing";
-import { getAuthenticatedServerUser } from "@/lib/supabase-server";
+import { FREE_BILLING_STATUS } from "@/lib/entitlements";
+import {
+  getAuthenticatedServerUser,
+  hasSupabaseAdminEnv,
+} from "@/lib/supabase-server";
 
 export const runtime = "nodejs";
 
@@ -9,6 +13,10 @@ export async function GET() {
   const user = await getAuthenticatedServerUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!hasSupabaseAdminEnv && process.env.VERCEL_ENV !== "production") {
+    return NextResponse.json(FREE_BILLING_STATUS);
   }
 
   try {

@@ -10,7 +10,7 @@ import {
   waitForSupabaseWrite,
 } from "./support/browser";
 
-test("perfil, sincronizacao e calendario pronto funcionam de ponta a ponta", async ({
+test("contexto, sincronizacao e calendario pronto funcionam de ponta a ponta", async ({
   page,
 }) => {
   await installVercelBypass(page);
@@ -21,17 +21,17 @@ test("perfil, sincronizacao e calendario pronto funcionam de ponta a ponta", asy
   await expectAuthenticated(page);
   await dismissOnboardingIfVisible(page);
 
-  await page.getByRole("button", { name: "Editar perfis e categorias" }).click();
-  await page.getByRole("button", { name: "Criar novo perfil" }).click();
-  const profileDialog = page.getByRole("dialog", { name: "Novo perfil" });
-  await profileDialog.getByLabel("Nome do perfil").fill("QA Smoke");
-  const profileSaved = waitForSupabaseWrite(page, "calendar_profiles", ["POST"]);
-  await profileDialog.getByRole("button", { name: "Criar", exact: true }).click();
-  await expect(profileDialog).toBeHidden();
+  await page.getByRole("button", { name: "Editar contextos e categorias" }).click();
+  await page.getByRole("button", { name: "Criar nova categoria" }).click();
+  const categoryDialog = page.getByRole("dialog", { name: "Nova categoria" });
+  await categoryDialog.getByLabel("Nome da categoria").fill("QA Smoke");
+  const categorySaved = waitForSupabaseWrite(page, "categories", ["POST"]);
+  await categoryDialog.getByRole("button", { name: "Criar", exact: true }).click();
+  await expect(categoryDialog).toBeHidden();
   await page
-    .getByRole("button", { name: "Finalizar edicao de perfis e categorias" })
+    .getByRole("button", { name: "Finalizar edição de contextos e categorias" })
     .click();
-  await profileSaved;
+  await categorySaved;
   await waitForSyncReady(page);
 
   await openQaApp(page);
@@ -48,12 +48,15 @@ test("perfil, sincronizacao e calendario pronto funcionam de ponta a ponta", asy
     .getByRole("article")
     .filter({ hasText: "Jogos do seu time favorito" });
   await teamCard.getByRole("button", { name: "Adicionar calendário" }).click();
-  await teamCard.getByRole("combobox", { name: "Perfil para Jogos do seu time favorito" }).click();
-  await page.getByRole("option", { name: "QA Smoke" }).click();
+  const targetProfile = teamCard.getByRole("combobox", {
+    name: "Contexto para Jogos do seu time favorito",
+  });
+  const targetProfileName = (await targetProfile.textContent())?.trim();
+  expect(targetProfileName, "O calendário deve herdar o contexto ativo.").toBeTruthy();
   const eventsImported = waitForSupabaseWrite(page, "events", ["POST"]);
   await teamCard
     .getByRole("button", {
-      name: "Adicionar calendário Jogos do seu time favorito ao perfil QA Smoke",
+      name: `Adicionar calendário Jogos do seu time favorito ao contexto ${targetProfileName}`,
     })
     .click();
   await expect(teamCard.getByRole("button", { name: "Remover" })).toBeVisible();
@@ -81,9 +84,6 @@ test("perfil, sincronizacao e calendario pronto funcionam de ponta a ponta", asy
   const newEventDialog = page.getByRole("dialog", { name: "Novo evento" });
   const eventComboboxes = newEventDialog.getByRole("combobox");
   await expect(eventComboboxes).toHaveCount(3);
-  await eventComboboxes.nth(0).click();
-  await expect(page.getByRole("option", { name: "QA Smoke" })).toHaveCount(0);
-  await page.keyboard.press("Escape");
   await eventComboboxes.nth(1).click();
   await expect(page.getByRole("option", { name: "Jogos do Grêmio" })).toHaveCount(0);
   await page.keyboard.press("Escape");
@@ -94,13 +94,9 @@ test("perfil, sincronizacao e calendario pronto funcionam de ponta a ponta", asy
   await personalEventSaved;
   await waitForSyncReady(page);
 
-  await page.getByRole("button", { name: "Pessoal", exact: true }).click();
   await page.getByRole("button", { name: "QA pessoal" }).click();
   const personalEventDialog = page.getByRole("dialog", { name: "Editar evento" });
   const editComboboxes = personalEventDialog.getByRole("combobox");
-  await editComboboxes.nth(0).click();
-  await expect(page.getByRole("option", { name: "QA Smoke" })).toHaveCount(0);
-  await page.keyboard.press("Escape");
   await editComboboxes.nth(1).click();
   await expect(page.getByRole("option", { name: "Jogos do Grêmio" })).toHaveCount(0);
   await page.keyboard.press("Escape");

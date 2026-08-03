@@ -3,6 +3,7 @@
 import * as React from "react";
 
 import {
+  FREE_BILLING_STATUS,
   getPlanLimits,
   isProPlan,
   type BillingStatusPayload,
@@ -15,10 +16,7 @@ import {
 } from "@/lib/billing-test-mode";
 import { useAuth } from "@/lib/auth";
 import { logDevError, logProdError } from "@/lib/safe-log";
-import {
-  FREE_BILLING_STATUS,
-  useBillingStatus,
-} from "@/lib/use-billing-status";
+import { useBillingStatus } from "@/lib/use-billing-status";
 import { useFeedback } from "@/components/ui/feedback-provider";
 
 type BillingActionOptions = {
@@ -85,7 +83,7 @@ export function BillingProvider({ children }: { children: React.ReactNode }) {
       notify({
         tone: "info",
         title: "Entre para assinar",
-        description: "Depois do login, você pode ativar o Doze52 Pro.",
+        description: "Depois do login, você pode ativar o Doze 52 Pro.",
       });
       return false;
     },
