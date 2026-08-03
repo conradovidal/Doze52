@@ -44,12 +44,12 @@ import {
 } from "../../lib/category-palette";
 
 const initialState = (): GuidedOnboardingState => ({
-  version: 10,
+  version: 11,
   step: "context_selection",
 });
 
 const completedState = (): GuidedOnboardingState => ({
-  version: 10,
+  version: 11,
   step: "completed",
   context: "personal",
   completedAt: "2026-07-20T10:05:00.000Z",
@@ -58,7 +58,7 @@ const completedState = (): GuidedOnboardingState => ({
 });
 
 test("métrica regional aceita apenas as 27 UFs na versão atual", () => {
-  expect(ONBOARDING_VERSION).toBe(10);
+  expect(ONBOARDING_VERSION).toBe(11);
   expect(BRAZIL_UFS).toHaveLength(27);
   expect(isBrazilUf("RS")).toBe(true);
   expect(isBrazilUf("BR")).toBe(false);
@@ -290,7 +290,7 @@ test("sandbox qualifica o convite com cinco alvos únicos", () => {
     { type: "enter_demo_exploration", at: "2026-07-20T11:00:00.000Z" }
   );
   expect(state).toMatchObject({
-    version: 10,
+    version: 11,
     step: "demo_exploration",
     demoInteractionKeys: [],
   });
@@ -323,6 +323,48 @@ test("sandbox qualifica o convite com cinco alvos únicos", () => {
   ).toEqual(initialState());
 });
 
+test("saída antecipada preserva progresso e convida após três criações únicas", () => {
+  let state = reduceGuidedOnboardingState(initialState(), {
+    type: "configure_profile",
+    context: "personal",
+  });
+  state = reduceGuidedOnboardingState(state, {
+    type: "dismiss_preserving",
+    at: "2026-08-03T10:00:00.000Z",
+  });
+  expect(state).toMatchObject({
+    version: 11,
+    step: "dismissed_preserved",
+    context: "personal",
+    postExitCreationKeys: [],
+  });
+
+  state = reduceGuidedOnboardingState(state, {
+    type: "record_post_exit_creation",
+    key: "category:1",
+  });
+  state = reduceGuidedOnboardingState(state, {
+    type: "record_post_exit_creation",
+    key: "category:1",
+  });
+  state = reduceGuidedOnboardingState(state, {
+    type: "record_post_exit_creation",
+    key: "event:1",
+  });
+  expect(state.accountNudgeShownAt).toBeUndefined();
+  state = reduceGuidedOnboardingState(state, {
+    type: "record_post_exit_creation",
+    key: "profile:1",
+    at: "2026-08-03T10:05:00.000Z",
+  });
+  expect(state.postExitCreationKeys).toEqual([
+    "category:1",
+    "event:1",
+    "profile:1",
+  ]);
+  expect(state.accountNudgeShownAt).toBe("2026-08-03T10:05:00.000Z");
+});
+
 test("migra v3 com progresso sem reabrir fluxo incompatível", () => {
   expect(
     migrateGuidedOnboardingState({
@@ -333,7 +375,7 @@ test("migra v3 com progresso sem reabrir fluxo incompatível", () => {
       firstDateCreatedAt: "2026-07-20T10:01:00.000Z",
     })
   ).toMatchObject({
-    version: 10,
+    version: 11,
     step: "completed",
     context: "personal",
     dateItemsCreated: 2,
@@ -345,7 +387,7 @@ test("migra v3 com progresso sem reabrir fluxo incompatível", () => {
       step: "completed",
       completedAt: "2026-07-20T10:03:00.000Z",
     })
-  ).toMatchObject({ version: 10, step: "completed" });
+  ).toMatchObject({ version: 11, step: "completed" });
 
   expect(
     migrateGuidedOnboardingState({
@@ -356,7 +398,7 @@ test("migra v3 com progresso sem reabrir fluxo incompatível", () => {
       periodItemsCreated: 2,
     })
   ).toMatchObject({
-    version: 10,
+    version: 11,
     step: "calendar_instruction",
     context: "personal",
   });
@@ -372,7 +414,7 @@ test("migra v6 sem perder períodos e posiciona calendários depois deles", () =
       periodItemsCreated: 0,
     })
   ).toMatchObject({
-    version: 10,
+    version: 11,
     step: "period_category_selection",
     dateItemsCreated: 2,
   });
@@ -386,7 +428,7 @@ test("migra v6 sem perder períodos e posiciona calendários depois deles", () =
       periodItemsCreated: 1,
     })
   ).toMatchObject({
-    version: 10,
+    version: 11,
     step: "period_instruction",
     periodItemsCreated: 1,
   });
@@ -399,7 +441,7 @@ test("migra v6 sem perder períodos e posiciona calendários depois deles", () =
     periodItemsCreated: 2,
   });
   expect(state).toMatchObject({
-    version: 10,
+    version: 11,
     step: "calendar_instruction",
     periodItemsCreated: 2,
   });
@@ -416,7 +458,7 @@ test("migra v6 com tema confirmado e preserva a confirmação", () => {
       themeConfirmedAt: "2026-07-20T10:04:30.000Z",
     })
   ).toMatchObject({
-    version: 10,
+    version: 11,
     step: "calendar_instruction",
     themeConfirmedAt: "2026-07-20T10:04:30.000Z",
   });
@@ -430,7 +472,7 @@ test("migra v7 sem reabrir terminais e consolida o passo de contexto", () => {
       context: "personal",
     })
   ).toMatchObject({
-    version: 10,
+    version: 11,
     step: "date_category_selection",
   });
 
@@ -444,7 +486,7 @@ test("migra v7 sem reabrir terminais e consolida o passo de contexto", () => {
       themeConfirmedAt: "2026-07-20T10:04:30.000Z",
     })
   ).toMatchObject({
-    version: 10,
+    version: 11,
     step: "calendar_instruction",
     themeConfirmedAt: "2026-07-20T10:04:30.000Z",
   });
@@ -455,7 +497,7 @@ test("migra v7 sem reabrir terminais e consolida o passo de contexto", () => {
       step: "completed",
       completedAt: "2026-07-20T10:05:00.000Z",
     })
-  ).toMatchObject({ version: 10, step: "completed" });
+  ).toMatchObject({ version: 11, step: "completed" });
 });
 
 test("migra v8 sem repetir revelações e preserva estados terminais", () => {
@@ -467,7 +509,7 @@ test("migra v8 sem repetir revelações e preserva estados terminais", () => {
       dateCategoryId: ONBOARDING_CATEGORY_IDS.workDeliveries,
     })
   ).toMatchObject({
-    version: 10,
+    version: 11,
     step: "date_instruction",
     context: "work",
   });
@@ -478,7 +520,7 @@ test("migra v8 sem repetir revelações e preserva estados terminais", () => {
       step: "completed",
       completedAt: "2026-07-20T10:05:00.000Z",
     })
-  ).toMatchObject({ version: 10, step: "completed" });
+  ).toMatchObject({ version: 11, step: "completed" });
 });
 
 test("dispensa e conclusão são terminais para a elegibilidade", () => {
@@ -632,9 +674,7 @@ test("demonstração monta dois contextos e categorias pessoais e profissionais"
         event.calendarPackGroupId === ONBOARDING_PERSONAL_DEMO_GROUP_ID
     )
   ).toBe(true);
-  expect(
-    snapshot.categories.filter((category) => !category.visible).map((category) => category.name)
-  ).toEqual(["Corridas F1"]);
+  expect(snapshot.categories.filter((category) => !category.visible)).toEqual([]);
   expect(
     snapshot.categories.filter(
       (category) => category.profileId === ONBOARDING_PROFILE_IDS.professional
@@ -654,8 +694,8 @@ test("demonstração monta dois contextos e categorias pessoais e profissionais"
     snapshot.events.filter(
       (event) => event.categoryId === personalCategoryIds.get(name)
     ).length;
-  expect(countCategoryEvents("Eventos")).toBe(12);
-  expect(countCategoryEvents("Família")).toBe(15);
+  expect(countCategoryEvents("Eventos")).toBe(15);
+  expect(countCategoryEvents("Família")).toBe(17);
   expect(countCategoryEvents("Amigos")).toBe(19);
   expect(countCategoryEvents("Viagens")).toBe(6);
   expect(countCategoryEvents("Aniversários")).toBe(10);
@@ -669,8 +709,23 @@ test("demonstração monta dois contextos e categorias pessoais e profissionais"
   const visiblePersonalEvents = expandEventsForYear(snapshot.events, 2026).filter(
     (event) => visiblePersonalCategoryIds.has(event.categoryId)
   );
-  expect(visiblePersonalEvents.length).toBeGreaterThanOrEqual(70);
-  expect(visiblePersonalEvents.length).toBeLessThanOrEqual(85);
+  expect(visiblePersonalEvents.length).toBeGreaterThanOrEqual(95);
+  expect(visiblePersonalEvents.length).toBeLessThanOrEqual(105);
+
+  const authorCategoryIds = new Set(
+    personalCategories
+      .filter(
+        (category) =>
+          category.name !== "Feriados" && category.name !== "Corridas F1"
+      )
+      .map((category) => category.id)
+  );
+  const weekdayAuthorEvents = snapshot.events.filter((event) => {
+    if (!authorCategoryIds.has(event.categoryId)) return false;
+    const weekday = new Date(`${event.startDate}T12:00:00Z`).getUTCDay();
+    return weekday >= 1 && weekday <= 5;
+  });
+  expect(weekdayAuthorEvents.length).toBeGreaterThanOrEqual(12);
 
   expect(snapshot.events).toEqual(
     expect.arrayContaining([
@@ -704,6 +759,7 @@ test("reconhece e remove snapshots demonstrativos v1, v2 e v3", () => {
     "onboarding-personal-demo-v1",
     "onboarding-personal-demo-v2",
     "onboarding-personal-demo-v3",
+    "onboarding-personal-demo-v4",
   ]) {
     const current = getOnboardingPersonalDemoSnapshot(2026);
     const legacy = {

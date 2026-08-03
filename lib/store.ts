@@ -159,11 +159,12 @@ export const ONBOARDING_CATEGORY_IDS = {
 
 export const ONBOARDING_DEFAULT_CATEGORY_ID = ONBOARDING_CATEGORY_IDS.events;
 export const ONBOARDING_PERSONAL_DEMO_GROUP_ID =
-  "onboarding-personal-demo-v4";
+  "onboarding-personal-demo-v5";
 const ONBOARDING_PERSONAL_DEMO_GROUP_IDS = new Set([
   "onboarding-personal-demo-v1",
   "onboarding-personal-demo-v2",
   "onboarding-personal-demo-v3",
+  "onboarding-personal-demo-v4",
   ONBOARDING_PERSONAL_DEMO_GROUP_ID,
 ]);
 
@@ -415,8 +416,7 @@ const getPersonalDemoCategories = (): CategoryItem[] => [
     DEMO_CATEGORY_IDS.formula1,
     ONBOARDING_PROFILE_IDS.personal,
     "Corridas F1",
-    CATEGORY_COLOR_BASE_ORANGE,
-    false
+    CATEGORY_COLOR_BASE_ORANGE
   ),
   demoCategory(
     DEMO_CATEGORY_IDS.workEvents,
@@ -486,6 +486,12 @@ const getPersonalDemoEvents = (year: number): CalendarEvent[] => {
       startDate: toDemoIsoDate(year, 2, 7),
     },
     {
+      key: "photo-exhibition",
+      title: "Exposição de fotografia",
+      categoryId: ONBOARDING_CATEGORY_IDS.events,
+      startDate: toDemoIsoDate(year, 2, 24),
+    },
+    {
       key: "music-festival",
       title: "Festival de música",
       categoryId: ONBOARDING_CATEGORY_IDS.events,
@@ -511,6 +517,12 @@ const getPersonalDemoEvents = (year: number): CalendarEvent[] => {
       startDate: toDemoIsoDate(year, 6, 20),
     },
     {
+      key: "book-launch",
+      title: "Lançamento de livro",
+      categoryId: ONBOARDING_CATEGORY_IDS.events,
+      startDate: toDemoIsoDate(year, 6, 3),
+    },
+    {
       key: "winter-festival",
       title: "Festival de inverno",
       categoryId: ONBOARDING_CATEGORY_IDS.events,
@@ -527,6 +539,12 @@ const getPersonalDemoEvents = (year: number): CalendarEvent[] => {
       title: "Feira de design",
       categoryId: ONBOARDING_CATEGORY_IDS.events,
       startDate: toDemoIsoDate(year, 9, 5),
+    },
+    {
+      key: "museum-talk",
+      title: "Palestra no museu",
+      categoryId: ONBOARDING_CATEGORY_IDS.events,
+      startDate: toDemoIsoDate(year, 9, 17),
     },
     {
       key: "book-fair",
@@ -573,6 +591,12 @@ const getPersonalDemoEvents = (year: number): CalendarEvent[] => {
       startDate: toDemoIsoDate(year, 3, 8),
     },
     {
+      key: "school-meeting",
+      title: "Reunião da escola",
+      categoryId: DEMO_CATEGORY_IDS.family,
+      startDate: toDemoIsoDate(year, 3, 18),
+    },
+    {
       key: "family-easter",
       title: "Páscoa em família",
       categoryId: DEMO_CATEGORY_IDS.family,
@@ -610,6 +634,12 @@ const getPersonalDemoEvents = (year: number): CalendarEvent[] => {
       startDate: toDemoIsoDate(year, 8, 3),
     },
     {
+      key: "pediatric-appointment",
+      title: "Consulta pediátrica",
+      categoryId: DEMO_CATEGORY_IDS.family,
+      startDate: toDemoIsoDate(year, 8, 19),
+    },
+    {
       key: "grandparents-sunday",
       title: "Domingo com os avós",
       categoryId: DEMO_CATEGORY_IDS.family,
@@ -641,24 +671,24 @@ const getPersonalDemoEvents = (year: number): CalendarEvent[] => {
       endDate: toDemoIsoDate(year, 12, 26),
     },
     ...[
-      [1, 10, "Jantar da turma"],
+      [1, 14, "Jantar da turma"],
       [1, 31, "Almoço de verão com os amigos"],
       [2, 7, "Churrasco no parque"],
       [2, 27, "Cinema com os amigos"],
       [3, 6, "Happy hour"],
-      [3, 21, "Noite de jogos"],
-      [4, 11, "Brunch de sábado"],
-      [4, 25, "Encontro da faculdade"],
-      [5, 9, "Jantar em casa"],
-      [5, 30, "Bar com a turma"],
+      [3, 24, "Noite de jogos"],
+      [4, 15, "Café depois do trabalho"],
+      [4, 23, "Encontro da faculdade"],
+      [5, 13, "Jantar em casa"],
+      [5, 28, "Bar com a turma"],
       [6, 13, "Casamento da Ana e do Lucas"],
       [6, 26, "Arraiá dos amigos"],
-      [7, 4, "Café com a Júlia"],
+      [7, 8, "Café com a Júlia"],
       [7, 18, "Piquenique no parque"],
-      [8, 22, "Noite de fondue"],
+      [8, 20, "Noite de fondue"],
       [9, 19, "Churrasco de primavera"],
-      [10, 10, "Reencontro da turma"],
-      [11, 7, "Cinema e jantar"],
+      [10, 14, "Reencontro da turma"],
+      [11, 10, "Cinema e jantar"],
       [12, 19, "Amigo secreto"],
     ].map(([month, day, title], index) => ({
       key: `friends-${index + 1}`,
@@ -1487,7 +1517,13 @@ export const useStore = create<StoreState>()(
           const targetCategory = state.categories.find(
             (category) => category.id === input.categoryId
           );
-          if (!targetCategory || targetCategory.calendarPackGroupId) return state;
+          if (
+            !targetCategory ||
+            (targetCategory.calendarPackGroupId &&
+              !isOnboardingPersonalDemoGroup(targetCategory.calendarPackGroupId))
+          ) {
+            return state;
+          }
           didAdd = true;
           const isSingleDay = input.startDate === input.endDate;
           const dayOrder = isSingleDay
@@ -1516,6 +1552,16 @@ export const useStore = create<StoreState>()(
                 recurrenceUntil,
                 createdAt: new Date().toISOString(),
                 dayOrder,
+                calendarPackGroupId: isOnboardingPersonalDemoGroup(
+                  targetCategory.calendarPackGroupId
+                )
+                  ? ONBOARDING_PERSONAL_DEMO_GROUP_ID
+                  : undefined,
+                calendarPackEventKey: isOnboardingPersonalDemoGroup(
+                  targetCategory.calendarPackGroupId
+                )
+                  ? `sandbox-${id}`
+                  : undefined,
               },
             ],
           };
@@ -1530,9 +1576,11 @@ export const useStore = create<StoreState>()(
           );
           if (
             !currentEvent ||
-            currentEvent.calendarPackGroupId ||
+            (currentEvent.calendarPackGroupId &&
+              !isOnboardingPersonalDemoGroup(currentEvent.calendarPackGroupId)) ||
             !targetCategory ||
             (targetCategory.calendarPackGroupId &&
+              !isOnboardingPersonalDemoGroup(targetCategory.calendarPackGroupId) &&
               targetCategory.id !== currentEvent.categoryId)
           ) {
             return state;
@@ -1578,7 +1626,11 @@ export const useStore = create<StoreState>()(
       moveEventByDelta: (id, deltaDays) =>
         set((state) => {
           if (deltaDays === 0) return state;
-          if (state.events.find((event) => event.id === id)?.calendarPackGroupId) {
+          const currentEvent = state.events.find((event) => event.id === id);
+          if (
+            currentEvent?.calendarPackGroupId &&
+            !isOnboardingPersonalDemoGroup(currentEvent.calendarPackGroupId)
+          ) {
             return state;
           }
           return {
@@ -1600,8 +1652,10 @@ export const useStore = create<StoreState>()(
       reorderEventInDay: ({ eventId, dayIso: _dayIso, toIndex }) =>
         set((state) => {
           void _dayIso;
+          const currentEvent = state.events.find((event) => event.id === eventId);
           if (
-            state.events.find((event) => event.id === eventId)?.calendarPackGroupId
+            currentEvent?.calendarPackGroupId &&
+            !isOnboardingPersonalDemoGroup(currentEvent.calendarPackGroupId)
           ) {
             return state;
           }
@@ -1626,7 +1680,12 @@ export const useStore = create<StoreState>()(
           return {
             events: state.events.map((evt) => {
               if (!eventSet.has(evt.id)) return evt;
-              if (evt.calendarPackGroupId) return evt;
+              if (
+                evt.calendarPackGroupId &&
+                !isOnboardingPersonalDemoGroup(evt.calendarPackGroupId)
+              ) {
+                return evt;
+              }
               return {
                 ...evt,
                 dayOrder: normalized.get(evt.id) ?? 0,
@@ -1636,7 +1695,11 @@ export const useStore = create<StoreState>()(
         }),
       deleteEvent: (id) =>
         set((state) => {
-          if (state.events.find((event) => event.id === id)?.calendarPackGroupId) {
+          const currentEvent = state.events.find((event) => event.id === id);
+          if (
+            currentEvent?.calendarPackGroupId &&
+            !isOnboardingPersonalDemoGroup(currentEvent.calendarPackGroupId)
+          ) {
             return state;
           }
           return { events: state.events.filter((evt) => evt.id !== id) };

@@ -31,6 +31,7 @@ import {
 import { calendarPacks } from "@/lib/calendar-packs";
 import {
   getCalendarPackAvailability,
+  getCalendarPackGroupId,
   importCalendarPackVariant,
   isCalendarPackVariantInstalled,
   removeCalendarPack,
@@ -301,7 +302,7 @@ export function CalendarPackLauncher({
 
         if (result.status === "already-exists") {
           setPackFlow(pack.id, "exists");
-          if (guidedVariantGroupId) {
+          if (guidedVariantGroupId === getCalendarPackGroupId(pack)) {
             setOpen(false);
             onClose?.();
           }
@@ -315,7 +316,7 @@ export function CalendarPackLauncher({
         }
 
         setPackFlow(pack.id, "added");
-        if (guidedVariantGroupId) {
+        if (guidedVariantGroupId === getCalendarPackGroupId(pack)) {
           setOpen(false);
           onClose?.();
         }
@@ -435,9 +436,7 @@ export function CalendarPackLauncher({
           <div className="grid gap-2 rounded-[8px] border border-border/75 bg-background p-2.5 shadow-sm sm:p-3">
             {calendarPackCards.map(({ key, variants }) => {
               const isGuidedCard = guidedVariantGroupId === key;
-              const isGuidedCardDisabled = Boolean(
-                guidedVariantGroupId && !isGuidedCard
-              );
+              const isGuidedCardDisabled = false;
               const selectedPackId = selectedVariantByGroup[key];
               const selectedVariant = variants.find(
                 (candidate) => candidate.id === selectedPackId

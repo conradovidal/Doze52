@@ -169,16 +169,7 @@ const findPackCategoryAnywhere = (
   categories: CategoryItem[],
   packCategory: CalendarPackCategory
 ) => {
-  const byId = categories.find((category) => category.id === packCategory.id);
-  if (byId) return byId;
-
-  const legacyNames = new Set(
-    (packCategory.legacyNames ?? []).map(normalizeLabel)
-  );
-  return (
-    categories.find((category) => legacyNames.has(normalizeLabel(category.name))) ??
-    null
-  );
+  return categories.find((category) => category.id === packCategory.id) ?? null;
 };
 
 const getPackEventIds = (event: CalendarPackEvent) => [
@@ -352,6 +343,85 @@ const hasEquivalentEvent = (
   );
 };
 
+export const isStrictSemanticPackEvent = (
+  event: CalendarEvent,
+  packEvent: CalendarPackEvent,
+  pack: CalendarPack
+) => {
+  if (event.startDate !== packEvent.date || event.endDate !== packEvent.date) {
+    return false;
+  }
+
+  const expectedTitles = new Set([
+    normalizeLabel(getCalendarPackEventTitle(packEvent, pack)),
+    normalizeLabel(packEvent.title),
+  ]);
+  const normalizedEventTitle = normalizeLabel(event.title);
+  const team = normalizeLabel(pack.variantGroup?.optionLabel ?? "");
+  const isSameTeamFixture =
+    pack.id.startsWith("brasileirao-2026") &&
+    team.length > 0 &&
+    (` ${normalizedEventTitle} `).includes(` ${team} `) &&
+    [...expectedTitles].some((expectedTitle) =>
+      (` ${expectedTitle} `).includes(` ${team} `)
+    ) &&
+    /\b\d+\s+x\b|\bx\s+\d+\b/.test(normalizedEventTitle);
+  if (!expectedTitles.has(normalizedEventTitle) && !isSameTeamFixture) {
+    return false;
+  }
+
+  if (isSameTeamFixture) return true;
+
+  const expectedNotes = normalizeLabel(getCalendarPackEventNotes(packEvent, pack));
+  return (
+    expectedNotes.length === 0 ||
+    normalizeLabel(event.notes ?? "") === expectedNotes
+  );
+};
+
+const LEGACY_HOLIDAY_TITLES = new Set(
+  [
+    "Nossa Senhora dos Navegantes",
+    "Dia da Mulher",
+    "Dia do Consumidor",
+    "Dia das Mães",
+    "Dia dos Namorados",
+    "Dia dos Pais",
+    "Dia do Cliente",
+    "Natal",
+  ].map(normalizeLabel)
+);
+
+export const isRecognizedLegacyPackEvent = (
+  event: CalendarEvent,
+  pack: CalendarPack
+) => {
+  if (event.startDate !== event.endDate) return false;
+
+  if (pack.id.startsWith("brasileirao-2026")) {
+    const team = normalizeLabel(pack.variantGroup?.optionLabel ?? "");
+    const title = normalizeLabel(event.title);
+    const isNearbySeason = [pack.year - 1, pack.year].includes(
+      Number(event.startDate.slice(0, 4))
+    );
+    const hasTeam = team.length > 0 && (` ${title} `).includes(` ${team} `);
+    const looksLikeScoredFixture = /\b\d+\s+x\b|\bx\s+\d+\b/.test(title);
+    return isNearbySeason && hasTeam && looksLikeScoredFixture;
+  }
+
+  return (
+    getCalendarPackGroupId(pack) === "holidays-by-state" &&
+    Number(event.startDate.slice(0, 4)) === pack.year &&
+    LEGACY_HOLIDAY_TITLES.has(normalizeLabel(event.title))
+  );
+};
+
+const findStrictSemanticPackEvent = (
+  events: CalendarEvent[],
+  packEvent: CalendarPackEvent,
+  pack: CalendarPack
+) => events.find((event) => isStrictSemanticPackEvent(event, packEvent, pack));
+
 export const getCalendarPackAvailability = (
   snapshot: CalendarSnapshot,
   pack: CalendarPack
@@ -383,12 +453,17 @@ export const getCalendarPackAvailability = (
     if (getPackEventIds(event).some((eventId) => eventsById.has(eventId))) {
       return true;
     }
-    return snapshot.events.some(
-      (candidate) =>
-        candidate.calendarPackGroupId === groupId &&
-        candidate.calendarPackEventKey === event.id
+    return (
+      snapshot.events.some(
+        (candidate) =>
+          candidate.calendarPackGroupId === groupId &&
+          candidate.calendarPackEventKey === event.id
+      ) || Boolean(findStrictSemanticPackEvent(snapshot.events, event, pack))
     );
   });
+  const hasRecognizedLegacyEvent = snapshot.events.some((event) =>
+    isRecognizedLegacyPackEvent(event, pack)
+  );
   const importedBrazilEvents = importedEvents.filter((event) => event.isBrazilMatch);
   const hasMismatchedEvents = pack.events.some((packEvent) => {
     const event =
@@ -397,7 +472,7 @@ export const getCalendarPackAvailability = (
         (candidate) =>
           candidate.calendarPackGroupId === groupId &&
           candidate.calendarPackEventKey === packEvent.id
-      );
+      ) ?? findStrictSemanticPackEvent(snapshot.events, packEvent, pack);
     const legacyEvent = (packEvent.legacyIds ?? [])
       .map((eventId) => eventsById.get(eventId))
       .find(Boolean);
@@ -427,7 +502,7 @@ export const getCalendarPackAvailability = (
     hasProfile: Boolean(profile),
     categoryIds: allPackCategories.map((category) => category.id),
     hasAnyCategory: allPackCategories.length > 0,
-    hasImportedEvents: importedEvents.length > 0,
+    hasImportedEvents: importedEvents.length > 0 || hasRecognizedLegacyEvent,
     hasMismatchedEvents,
     importedEventCount: importedEvents.length,
     totalEventCount: pack.events.length,
@@ -455,6 +530,25 @@ export const isCalendarPackVariantInstalled = (
   );
   if (managedCategory?.calendarPackVariantId) {
     return managedCategory.calendarPackVariantId === pack.id;
+  }
+
+  const legacyEvidenceByVariant = variants.map((variant) => ({
+    id: variant.id,
+    count: snapshot.events.filter((event) =>
+      isRecognizedLegacyPackEvent(event, variant)
+    ).length,
+  }));
+  const strongestLegacyEvidence = [...legacyEvidenceByVariant].sort(
+    (left, right) => right.count - left.count
+  )[0];
+  const secondStrongestLegacyEvidence = [...legacyEvidenceByVariant].sort(
+    (left, right) => right.count - left.count
+  )[1];
+  if (
+    strongestLegacyEvidence?.count > 0 &&
+    strongestLegacyEvidence.count > (secondStrongestLegacyEvidence?.count ?? 0)
+  ) {
+    return strongestLegacyEvidence.id === pack.id;
   }
 
   const siblingEventIds = new Set(
@@ -600,7 +694,14 @@ export const findCalendarPackByCategoryId = (
   const packCategory = profileMatch.pack.categories.find(
     (entry) => normalizeLabel(entry.name) === normalizeLabel(category.name)
   );
-  return packCategory
+  const hasStrictPackEvent = profileMatch.pack.events.some((packEvent) =>
+    snapshot.events
+      .filter((event) => event.categoryId === category.id)
+      .some((event) =>
+        isStrictSemanticPackEvent(event, packEvent, profileMatch.pack)
+      )
+  );
+  return packCategory && hasStrictPackEvent
     ? { ...profileMatch, category, packCategory }
     : null;
 };
@@ -642,12 +743,17 @@ export const importCalendarPack = (
   const packEventIdsBeforeImport = new Set(
     selectedPackEvents.flatMap(getPackEventIds)
   );
-  const hadExistingPackEvent = snapshot.events.some((event) =>
-    packEventIdsBeforeImport.has(event.id) ||
-    (event.calendarPackGroupId === groupId &&
-      Boolean(event.calendarPackEventKey) &&
-      packEventIdsBeforeImport.has(event.calendarPackEventKey ?? ""))
-  );
+  const hadExistingPackEvent =
+    snapshot.events.some(
+      (event) =>
+        packEventIdsBeforeImport.has(event.id) ||
+        (event.calendarPackGroupId === groupId &&
+          Boolean(event.calendarPackEventKey) &&
+          packEventIdsBeforeImport.has(event.calendarPackEventKey ?? ""))
+    ) ||
+    selectedPackEvents.some((event) =>
+      Boolean(findStrictSemanticPackEvent(snapshot.events, event, pack))
+    );
   const nextProfiles = [...snapshot.profiles];
 
   const categoryIdByKey = new Map<string, string>();
@@ -674,10 +780,28 @@ export const importCalendarPack = (
         .filter((event) => event.suggestedCategoryKey === packCategory.key)
         .flatMap(getPackEventIds)
     );
+    const matchingCategoryEvents = nextEvents.filter((event) => {
+      if (packCategoryEventIds.has(event.id)) return true;
+      return (
+        selectedPackEvents
+          .filter((candidate) => candidate.suggestedCategoryKey === packCategory.key)
+          .some((candidate) => isStrictSemanticPackEvent(event, candidate, pack)) ||
+        isRecognizedLegacyPackEvent(event, pack)
+      );
+    });
     const eventLinkedCategoryIds = new Set(
-      nextEvents
-        .filter((event) => packCategoryEventIds.has(event.id))
-        .map((event) => event.categoryId)
+      matchingCategoryEvents.map((event) => event.categoryId)
+    );
+    const dedicatedEventLinkedCategoryIds = new Set(
+      [...eventLinkedCategoryIds].filter((categoryId) => {
+        const eventsInCategory = nextEvents.filter(
+          (event) => event.categoryId === categoryId
+        );
+        return (
+          eventsInCategory.length > 0 &&
+          eventsInCategory.every((event) => matchingCategoryEvents.includes(event))
+        );
+      })
     );
     const legacyNames = (packCategory.legacyNames ?? []).map(normalizeLabel);
     const legacyCategoryIds = pack.legacyCategoryIds ?? [];
@@ -687,9 +811,7 @@ export const importCalendarPack = (
         ((category.calendarPackGroupId === groupId &&
           category.calendarPackCategoryKey === packCategory.key) ||
           legacyCategoryIds.includes(category.id) ||
-          eventLinkedCategoryIds.has(category.id) ||
-          (category.profileId === profileId &&
-            legacyNames.includes(normalizeLabel(category.name))))
+          dedicatedEventLinkedCategoryIds.has(category.id))
     );
     const canonicalCategory = nextCategories.find(
       (category) => category.id === packCategory.id
@@ -811,12 +933,17 @@ export const importCalendarPack = (
     );
     const currentEventIndex = nextEvents.findIndex((event) => event.id === packEvent.id);
     const legacyEventIndex = nextEvents.findIndex((event) => legacyIds.has(event.id));
+    const semanticEventIndex = nextEvents.findIndex((event) =>
+      isStrictSemanticPackEvent(event, packEvent, pack)
+    );
     const existingEventIndex =
       managedEventIndex >= 0
         ? managedEventIndex
         : currentEventIndex >= 0
           ? currentEventIndex
-          : legacyEventIndex;
+          : legacyEventIndex >= 0
+            ? legacyEventIndex
+            : semanticEventIndex;
     for (const legacyId of legacyIds) {
       legacyEventIdsToRemove.add(legacyId);
     }
@@ -878,6 +1005,32 @@ export const importCalendarPack = (
     addedEventCount += 1;
   }
 
+  const fallbackPackCategoryId = selectedPackCategories
+    .map((category) => categoryIdByKey.get(category.key))
+    .find(Boolean);
+  if (fallbackPackCategoryId) {
+    const fallbackPackCategory = categoriesById.get(fallbackPackCategoryId);
+    nextEvents = nextEvents.map((event) => {
+      if (
+        event.calendarPackGroupId === groupId ||
+        !isRecognizedLegacyPackEvent(event, pack)
+      ) {
+        return event;
+      }
+
+      updatedEventCount += 1;
+      return {
+        ...event,
+        categoryId: fallbackPackCategoryId,
+        color: fallbackPackCategory?.color ?? event.color,
+        calendarPackGroupId: groupId,
+        calendarPackEventKey: `legacy:${event.startDate}:${normalizeLabel(event.title)
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-|-$/g, "")}`,
+      };
+    });
+  }
+
   const legacyCategoryIds = new Set([
     ...(pack.legacyCategoryIds ?? []),
     ...migratedLegacyCategoryIds,
@@ -889,6 +1042,7 @@ export const importCalendarPack = (
       !(
         event.calendarPackGroupId === groupId &&
         event.calendarPackEventKey &&
+        !event.calendarPackEventKey.startsWith("legacy:") &&
         !selectedEventKeys.has(event.calendarPackEventKey)
       )
   );
@@ -942,6 +1096,30 @@ export const removeCalendarPack = (
   relatedPacks: readonly CalendarPack[] = [pack]
 ): CalendarPackRemovalResult => {
   const groupIds = new Set(relatedPacks.map(getCalendarPackGroupId));
+  const semanticPackEventIds = new Set(
+    snapshot.events
+      .filter((event) =>
+        relatedPacks.some((relatedPack) =>
+          relatedPack.events.some((packEvent) =>
+            isStrictSemanticPackEvent(event, packEvent, relatedPack)
+          )
+        )
+      )
+      .map((event) => event.id)
+  );
+  const dedicatedSemanticCategoryIds = new Set(
+    snapshot.categories
+      .filter((category) => {
+        const categoryEvents = snapshot.events.filter(
+          (event) => event.categoryId === category.id
+        );
+        return (
+          categoryEvents.length > 0 &&
+          categoryEvents.every((event) => semanticPackEventIds.has(event.id))
+        );
+      })
+      .map((category) => category.id)
+  );
   const categoryIdsToRemove = new Set<string>(
     [
       ...snapshot.categories
@@ -959,6 +1137,7 @@ export const removeCalendarPack = (
         .filter((category): category is CategoryItem => Boolean(category))
         .map((category) => category.id),
       ...relatedPacks.flatMap((relatedPack) => relatedPack.legacyCategoryIds ?? []),
+      ...dedicatedSemanticCategoryIds,
     ]
   );
   const packEventIds = new Set(
@@ -967,6 +1146,7 @@ export const removeCalendarPack = (
   const eventsWithoutPack = snapshot.events.filter(
     (event) =>
       !packEventIds.has(event.id) &&
+      !semanticPackEventIds.has(event.id) &&
       !(event.calendarPackGroupId && groupIds.has(event.calendarPackGroupId))
   );
   const nextCategoriesWithoutPack = snapshot.categories.filter(

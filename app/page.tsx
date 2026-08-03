@@ -21,6 +21,7 @@ import { AccountNudge } from "@/components/onboarding/account-nudge";
 import { DemoExplorationInvite } from "@/components/onboarding/demo-exploration-invite";
 import { MobileDesktopFirstGate } from "@/components/onboarding/mobile-desktop-first-gate";
 import { OnboardingTestReset } from "@/components/onboarding/onboarding-test-reset";
+import { OnboardingExitDialog } from "@/components/onboarding/onboarding-exit-dialog";
 import type { GuidedToolbarNotice } from "@/components/onboarding/guided-toolbar-notice";
 import { Button } from "@/components/ui/button";
 import { useFeedback } from "@/components/ui/feedback-provider";
@@ -30,6 +31,7 @@ import {
   isOnboardingPersonalDemoSnapshot,
   ONBOARDING_CATEGORY_IDS,
   ONBOARDING_PERSONAL_DEMO_GROUP_ID,
+  isOnboardingPersonalDemoGroup,
   stripOnboardingPersonalDemo,
   useStore,
   type EventInput,
@@ -302,9 +304,6 @@ export default function HomePage() {
   const loadOnboardingPersonalDemo = useStore(
     (s) => s.loadOnboardingPersonalDemo
   );
-  const unlockOnboardingPersonalDemo = useStore(
-    (s) => s.unlockOnboardingPersonalDemo
-  );
   const configureOnboardingContext = useStore(
     (s) => s.configureOnboardingContext
   );
@@ -363,6 +362,10 @@ export default function HomePage() {
   const [guidedOnboarding, setGuidedOnboarding] =
     React.useState<GuidedOnboardingState | null>(null);
   const [accountNudgeVisible, setAccountNudgeVisible] = React.useState(false);
+  const [onboardingExitOpen, setOnboardingExitOpen] = React.useState(false);
+  const [inlineEditModeActive, setInlineEditModeActive] = React.useState(false);
+  const [exitInlineEditRequestKey, setExitInlineEditRequestKey] =
+    React.useState(0);
   const [demoInviteSuppressed, setDemoInviteSuppressed] = React.useState(false);
   const [guidedDraft, setGuidedDraft] =
     React.useState<GuidedCalendarDraft | null>(null);
@@ -884,13 +887,15 @@ export default function HomePage() {
       let snapshotToPersistOnFailure: CalendarSnapshot | null = null;
 
       try {
+        const currentGuidedStep = readGuidedOnboardingState().step;
         const localSnapshot = filterAnonymousDraft(
           ensureSnapshotCoverage({
             profiles: profilesRef.current,
             categories: categoriesRef.current,
             events: eventsRef.current,
           }),
-          readGuidedOnboardingState().step === "demo_exploration"
+          currentGuidedStep === "demo_exploration" ||
+            currentGuidedStep === "context_selection"
         );
 
         const pendingSnapshot = readPendingSyncSnapshot(userId);
@@ -1134,7 +1139,6 @@ export default function HomePage() {
     sourceEventId: string;
     anchorPoint: AnchorPoint;
   }) => {
-    if (showGuidedOnboarding) return;
     void payload.eventId;
     setEditingId(payload.sourceEventId);
     setDialogAnchorPoint(payload.anchorPoint);
@@ -1151,6 +1155,15 @@ export default function HomePage() {
     },
     []
   );
+
+  React.useEffect(() => {
+    if (
+      guidedOnboarding?.step === "edit_instruction" &&
+      inlineEditModeActive
+    ) {
+      updateGuidedOnboarding({ type: "open_edit_preview" });
+    }
+  }, [guidedOnboarding?.step, inlineEditModeActive, updateGuidedOnboarding]);
 
   const recordDemoInteraction = React.useCallback(
     (key: string) => {
@@ -1292,19 +1305,25 @@ export default function HomePage() {
   }, [notify]);
 
   const dismissGuidedOnboarding = React.useCallback(() => {
-    loadOnboardingPersonalDemo(year);
-    unlockOnboardingPersonalDemo();
-    updateGuidedOnboarding({ type: "enter_demo_exploration" });
+    setOnboardingExitOpen(true);
+  }, []);
+
+  const confirmDismissGuidedOnboarding = React.useCallback(() => {
+    const current = readGuidedOnboardingState();
+    if (current.step === "context_selection") {
+      updateGuidedOnboarding({ type: "enter_demo_exploration" });
+    } else {
+      updateGuidedOnboarding({ type: "dismiss_preserving" });
+    }
+    if (inlineEditModeActive) {
+      setExitInlineEditRequestKey((key) => key + 1);
+    }
     setGuidedDraft(null);
     setMobileGuidedRangeStart(null);
     setAccountNudgeVisible(false);
     setDemoInviteSuppressed(false);
-  }, [
-    loadOnboardingPersonalDemo,
-    unlockOnboardingPersonalDemo,
-    updateGuidedOnboarding,
-    year,
-  ]);
+    setOnboardingExitOpen(false);
+  }, [inlineEditModeActive, updateGuidedOnboarding]);
 
   const restartGuidedOnboardingFromDemo = React.useCallback(() => {
     loadOnboardingPersonalDemo(year);
@@ -1344,6 +1363,24 @@ export default function HomePage() {
     [session?.user.id, updateGuidedOnboarding]
   );
 
+  const trackPostExitCreation = React.useCallback(
+    (key: string) => {
+      if (session?.user.id) return;
+      const current = readGuidedOnboardingState();
+      if (current.step !== "dismissed_preserved" || current.accountNudgeShownAt) {
+        return;
+      }
+      const next = updateGuidedOnboarding({
+        type: "record_post_exit_creation",
+        key,
+      });
+      if (!current.accountNudgeShownAt && next.accountNudgeShownAt) {
+        setAccountNudgeVisible(true);
+      }
+    },
+    [session?.user.id, updateGuidedOnboarding]
+  );
+
   const handleSubmit = async (payload: EventInput) => {
     if (editingId) {
       updateEvent(editingId, payload);
@@ -1368,6 +1405,7 @@ export default function HomePage() {
       recordDemoInteraction(`mutation:event:create:${eventId}`);
     } else {
       trackPostOnboardingEvent();
+      trackPostExitCreation(`event:${eventId}`);
     }
 
     notify({
@@ -1408,15 +1446,6 @@ export default function HomePage() {
 
   const handleStartCreateRange = (startIso: string) => {
     if (isMobileExamplePreview) return;
-    if (
-      showGuidedOnboarding &&
-      guidedOnboarding?.step !== "date_instruction" &&
-      guidedOnboarding?.step !== "date_details" &&
-      guidedOnboarding?.step !== "period_instruction" &&
-      guidedOnboarding?.step !== "period_details"
-    ) {
-      return;
-    }
     setCreatingRange({ startIso, hoverIso: startIso, isDragging: false });
   };
 
@@ -1479,8 +1508,6 @@ export default function HomePage() {
           }
           return null;
         }
-        if (showGuidedOnboarding) return null;
-
         setSeedRange(nextDraft);
 
         setEditingId(null);
@@ -1918,6 +1945,7 @@ export default function HomePage() {
   }, [updateGuidedOnboarding]);
 
   const handleGuidedCalendarImported = React.useCallback((uf?: string) => {
+    if (!uf) return;
     const next = updateGuidedOnboarding({ type: "calendar_added", uf });
     if (next.step === "year_instruction" && uf) {
       void trackOnboardingRegion(uf);
@@ -2011,15 +2039,20 @@ export default function HomePage() {
             guidedOnboarding?.step === "calendar_selection"
           }
           guidedEditPreviewActive={guidedOnboarding?.step === "edit_preview"}
-          onboardingLayoutLocked={showGuidedOnboarding}
+          onboardingLayoutLocked={false}
+          onboardingLayoutReserved={showGuidedOnboarding}
+          onInlineEditModeChange={setInlineEditModeActive}
+          exitInlineEditRequestKey={exitInlineEditRequestKey}
           mobileExamplePreviewActive={isMobileExamplePreview}
           demoExplorationActive={isDemoExploration}
-          onCategoryCreated={(categoryId) =>
-            recordDemoInteraction(`mutation:category:create:${categoryId}`)
-          }
-          onProfileCreated={(profileId) =>
-            recordDemoInteraction(`mutation:profile:create:${profileId}`)
-          }
+          onCategoryCreated={(categoryId) => {
+            recordDemoInteraction(`mutation:category:create:${categoryId}`);
+            trackPostExitCreation(`category:${categoryId}`);
+          }}
+          onProfileCreated={(profileId) => {
+            recordDemoInteraction(`mutation:profile:create:${profileId}`);
+            trackPostExitCreation(`profile:${profileId}`);
+          }}
           onOpenAuthDialog={(anchorPoint) => {
             setAuthDialogInitialMode("login");
             setAuthDialogAnchorPoint(anchorPoint);
@@ -2099,8 +2132,19 @@ export default function HomePage() {
           onChooseCategory={handleChooseGuidedCategory}
           onChangeDraft={setGuidedDraft}
           onSaveDraft={saveGuidedDraft}
+          onOpenLogin={() => {
+            setAuthDialogInitialMode("login");
+            setAuthDialogAnchorPoint(undefined);
+            setAuthDialogOpen(true);
+          }}
         />
       ) : null}
+
+      <OnboardingExitDialog
+        open={onboardingExitOpen}
+        onOpenChange={setOnboardingExitOpen}
+        onConfirm={confirmDismissGuidedOnboarding}
+      />
 
       {showMobileDesktopFirstGate ? (
         <MobileDesktopFirstGate
@@ -2117,7 +2161,8 @@ export default function HomePage() {
         />
       ) : null}
 
-      {isDemoExploration ? (
+      {isDemoExploration ||
+      (showGuidedOnboarding && guidedOnboarding?.step === "context_selection") ? (
         <div
           data-demo-mode-badge
           className="pointer-events-none fixed bottom-3 left-1/2 z-30 -translate-x-1/2 rounded-full border border-border/75 bg-card/92 px-3 py-1 text-[11px] font-semibold tracking-wide text-muted-foreground shadow-sm backdrop-blur"
@@ -2195,9 +2240,15 @@ export default function HomePage() {
         guidedIntent={null}
         onSubmit={handleSubmit}
         onDelete={
-          editingId && !editingEvent?.calendarPackGroupId
+          editingId &&
+          (!editingEvent?.calendarPackGroupId ||
+            isOnboardingPersonalDemoGroup(editingEvent.calendarPackGroupId))
             ? handleDeleteEvent
             : undefined
+        }
+        allowManagedMutation={
+          isOnboardingPersonalDemoGroup(editingEvent?.calendarPackGroupId) &&
+          !session?.user.id
         }
       />
 

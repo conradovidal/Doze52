@@ -72,6 +72,7 @@ type GuidedOnboardingPanelProps = {
   ) => void;
   onChangeDraft: (draft: GuidedCalendarDraft) => void;
   onSaveDraft: (title: string) => void;
+  onOpenLogin: () => void;
 };
 
 const CONTEXT_OPTIONS = [
@@ -289,6 +290,7 @@ export function GuidedOnboardingPanel({
   onChooseCategory,
   onChangeDraft,
   onSaveDraft,
+  onOpenLogin,
 }: GuidedOnboardingPanelProps) {
   const [title, setTitle] = React.useState("");
   const [showExternalDates, setShowExternalDates] = React.useState(false);
@@ -510,6 +512,14 @@ export function GuidedOnboardingPanel({
                 </button>
               );
             })}
+            <Button
+              type="button"
+              variant="ghost"
+              className="mt-1 w-full"
+              onClick={onOpenLogin}
+            >
+              Entrar na sua conta
+            </Button>
           </div>
         </>
       );
