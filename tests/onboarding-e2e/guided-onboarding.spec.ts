@@ -943,19 +943,37 @@ test("centraliza cards e sobrepõe a instrução ao cabeçalho sem mover o calen
   const filterRegion = page.locator("[data-onboarding-filter-region]");
   const overlay = page.locator("[data-guided-selection-overlay]");
   const noticeCard = page.locator("[data-guided-selection-card]");
-  const [filterBox, overlayBox, noticeBox] = await Promise.all([
+  const filterSeparator = page.locator("[data-onboarding-filter-separator]");
+  const [filterBox, overlayBox, noticeBox, separatorBox] = await Promise.all([
     filterRegion.boundingBox(),
     overlay.boundingBox(),
     noticeCard.boundingBox(),
+    mobile ? Promise.resolve(null) : filterSeparator.boundingBox(),
   ]);
   if (!filterBox || !overlayBox || !noticeBox) {
     throw new Error("Sobreposição do cabeçalho não renderizada");
   }
   expect(Math.abs(filterBox.x - overlayBox.x)).toBeLessThan(1);
-  expect(Math.abs(filterBox.y - overlayBox.y)).toBeLessThanOrEqual(1.1);
   expect(Math.abs(filterBox.width - overlayBox.width)).toBeLessThan(1);
-  expect(Math.abs(filterBox.height - overlayBox.height)).toBeLessThanOrEqual(1.1);
   expect(noticeBox.width).toBeLessThan(overlayBox.width);
+  if (mobile) {
+    expect(Math.abs(filterBox.y - overlayBox.y)).toBeLessThanOrEqual(1.1);
+    expect(Math.abs(filterBox.height - overlayBox.height)).toBeLessThanOrEqual(
+      1.1
+    );
+  } else {
+    if (!separatorBox) {
+      throw new Error("Separador inferior dos filtros não renderizado");
+    }
+    const overlayBottom = overlayBox.y + overlayBox.height;
+    const noticeBottom = noticeBox.y + noticeBox.height;
+    expect(overlayBox.y).toBeGreaterThan(filterBox.y);
+    expect(overlayBottom).toBeLessThan(separatorBox.y);
+    expect(noticeBox.y).toBeGreaterThan(filterBox.y);
+    expect(noticeBottom).toBeLessThan(separatorBox.y);
+    expect(noticeBox.y - filterBox.y).toBeGreaterThanOrEqual(4);
+    expect(separatorBox.y - noticeBottom).toBeGreaterThanOrEqual(4);
+  }
   const filterControls = filterRegion.locator(":scope > div").first();
   await expect(filterControls).toHaveAttribute("inert", "");
   await expect(filterControls).toHaveAttribute("aria-hidden", "true");
