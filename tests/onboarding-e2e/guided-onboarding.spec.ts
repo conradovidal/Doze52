@@ -469,7 +469,7 @@ test("mobile recomenda o desktop e libera uma prévia somente na sessão", async
 
   await page.locator('[data-onboarding-profile-id][title="Profissional"]').click();
   await expect(
-    page.locator('[data-onboarding-category-id][title="Projetos"]')
+    page.locator('[data-onboarding-category-id][title="Produto"]')
   ).toBeVisible();
 
   const persisted = await page.evaluate(() => ({
@@ -702,7 +702,7 @@ test("o X libera o ano de exemplo e a decisão persiste após recarregar", async
     "Pessoal",
     "Profissional",
   ]);
-  expect(stored.categories).toHaveLength(11);
+  expect(stored.categories).toHaveLength(13);
   expect(stored.events?.length).toBeGreaterThan(150);
   await expect(page.locator("[data-demo-mode-badge]")).toContainText(
     "Ano de exemplo"
@@ -809,7 +809,7 @@ test("substitui automaticamente um exemplo v3 ainda bloqueado", async ({
       ...(payload.state.events ?? []),
     ].map((item: { calendarPackGroupId?: string }) => item.calendarPackGroupId);
   });
-  expect(new Set(groupIds)).toEqual(new Set(["onboarding-personal-demo-v5"]));
+  expect(new Set(groupIds)).toEqual(new Set(["onboarding-personal-demo-v6"]));
 });
 
 test("sandbox convida após cinco alvos e retoma o onboarding limpo", async ({
@@ -952,8 +952,17 @@ test("centraliza cards e sobrepõe a instrução ao cabeçalho sem mover o calen
     throw new Error("Sobreposição do cabeçalho não renderizada");
   }
   expect(Math.abs(filterBox.x - overlayBox.x)).toBeLessThan(1);
+  expect(Math.abs(filterBox.y - overlayBox.y)).toBeLessThanOrEqual(1.1);
   expect(Math.abs(filterBox.width - overlayBox.width)).toBeLessThan(1);
+  expect(Math.abs(filterBox.height - overlayBox.height)).toBeLessThanOrEqual(1.1);
   expect(noticeBox.width).toBeLessThan(overlayBox.width);
+  const filterControls = filterRegion.locator(":scope > div").first();
+  await expect(filterControls).toHaveAttribute("inert", "");
+  await expect(filterControls).toHaveAttribute("aria-hidden", "true");
+  await expect(page.locator("[data-onboarding-edit-control]")).toBeEnabled();
+  await expect(page.locator("[data-onboarding-calendar-control]")).toBeEnabled();
+  await expect(page.locator("[data-onboarding-year-control]")).toBeEnabled();
+  await expect(page.locator("[data-onboarding-theme-control]")).toBeEnabled();
   const noticeTitleFontSize = await notice
     .locator("p")
     .first()
