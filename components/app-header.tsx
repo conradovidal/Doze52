@@ -544,7 +544,7 @@ export function AppHeader({
         <div
           data-onboarding-filter-region
           className={cn(
-            "relative mx-auto flex w-full flex-col items-center gap-1.5 md:gap-2",
+            "relative isolate mx-auto flex w-full flex-col items-center gap-1.5 md:gap-2",
             isMobileMode
               ? "max-w-[31rem]"
               : "max-w-[62rem] border-t border-border/45 pt-2.5 md:pt-3",
@@ -730,7 +730,10 @@ export function AppHeader({
           {guidedSelectionNotice && onDismissGuidedSelection ? (
             <div
               data-guided-selection-overlay
-              className="pointer-events-auto absolute inset-0 z-[50] flex w-full items-center justify-center overflow-hidden bg-background"
+              className={cn(
+                "pointer-events-auto absolute inset-x-0 z-[50] flex w-full items-center justify-center overflow-hidden bg-background",
+                isMobileMode ? "inset-y-0" : "top-px -bottom-3"
+              )}
             >
               <div
                 data-guided-selection-card
@@ -746,7 +749,10 @@ export function AppHeader({
         </div>
 
         {isMobileMode ? null : (
-          <div className="mx-auto h-px w-full max-w-[62rem] bg-border/45" />
+          <div
+            data-onboarding-filter-separator
+            className="mx-auto h-px w-full max-w-[62rem] bg-border/45"
+          />
         )}
       </header>
 
