@@ -1,6 +1,6 @@
 import type { CalendarPack, CalendarPackEvent } from "./types";
 
-const VERIFIED_AT = "2026-07-27";
+const VERIFIED_AT = "2026-08-03";
 const SOURCE = {
   label: "Tabela detalhada oficial da CBF",
   url: "https://www.cbf.com.br/futebol-brasileiro/tabelas/campeonato-brasileiro/serie-a/2026?documento=Tabela%20Detalhada",
@@ -70,7 +70,7 @@ const matches: MatchTuple[] = [
   ["832076", 19, "2026-07-22", "21:30", "Internacional", "20011", "1", "Cruzeiro", "59849", "2", "Beira-Rio - Porto Alegre - RS"],
   ["832086", 20, "2026-07-26", "18:30", "Grêmio", "20013", "1", "Fluminense", "20014", "1", "Arena do Grêmio - Porto Alegre - RS"],
   ["832087", 20, "2026-07-25", "18:30", "Athletico Paranaense", "20052", "2", "Internacional", "20011", "0", "Arena da Baixada - Curitiba - PR"],
-  ["832096", 21, "2026-07-29", "19:30", "Internacional", "20011", null, "Flamengo", "20016", null, "Beira-Rio - Porto Alegre - RS"],
+  ["832096", 21, "2026-07-29", "19:30", "Internacional", "20011", "1", "Flamengo", "20016", "1", "Beira-Rio - Porto Alegre - RS"],
   ["832103", 22, "2026-08-09", "16:00", "Palmeiras", "20002", null, "Internacional", "20011", null, "Nubank Parque - São Paulo - SP"],
   ["832106", 22, "2026-08-08", "16:00", "Grêmio", "20013", null, "São Paulo", "20005", null, "Arena do Grêmio - Porto Alegre - RS"],
   ["832115", 23, "2026-08-15", "16:30", "Atlético Mineiro", "62194", null, "Grêmio", "20013", null, "Arena MRV - Belo Horizonte - MG"],
@@ -246,7 +246,7 @@ const createPack = (
   color: string
 ): CalendarPack => ({
   id: `brasileirao-2026-${teamName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")}`,
-  version: 3,
+  version: 4,
   name: "Jogos do seu time favorito",
   eyebrow: teamName,
   icon: "soccer-ball",

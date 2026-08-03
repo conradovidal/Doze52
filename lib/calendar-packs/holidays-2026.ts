@@ -498,6 +498,7 @@ export const holidays2026Packs = stateDefinitions.map((definition, stateIndex): 
 
   return {
     id: `holidays-${definition.slug}`,
+    regionCode: definition.uf,
     version: 1,
     name: "Feriados nacionais + estaduais",
     eyebrow: definition.label,

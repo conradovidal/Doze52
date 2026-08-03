@@ -21,10 +21,12 @@ export function AuthDialog({
   open,
   onOpenChange,
   anchorPoint,
+  initialMode = "login",
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   anchorPoint?: AnchorPoint;
+  initialMode?: "login" | "signup";
 }) {
   const router = useRouter();
   const { notify } = useFeedback();
@@ -36,7 +38,7 @@ export function AuthDialog({
     closeGooglePopupIfOpen,
     isGooglePopupOpen,
   } = useAuth();
-  const [mode, setMode] = React.useState<"login" | "signup">("login");
+  const [mode, setMode] = React.useState<"login" | "signup">(initialMode);
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
@@ -61,6 +63,11 @@ export function AuthDialog({
       popupTimeoutRef.current = null;
     }
   }, []);
+
+  React.useEffect(() => {
+    if (!open) return;
+    setMode(initialMode);
+  }, [initialMode, open]);
 
   const finalizeAuthSuccess = React.useCallback(
     async (alreadyRefreshed = false) => {
@@ -268,7 +275,7 @@ export function AuthDialog({
         title: mode === "login" ? "Login concluído" : "Conta criada",
         description:
           mode === "login"
-            ? "Sua conta já está conectada ao Doze52."
+            ? "Sua conta já está conectada ao Doze 52."
             : "Sua conta foi criada com sucesso.",
       });
       onOpenChange(false);
