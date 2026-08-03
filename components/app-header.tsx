@@ -150,7 +150,7 @@ export function AppHeader({
     categoriesExpanded ||
     effectiveInlineEditMode ||
     highlightedCategoryEffect === "reveal";
-  const filtersLocked = onboardingLayoutLocked;
+  const filtersLocked = onboardingLayoutLocked || Boolean(guidedSelectionNotice);
   const inlineEditDisabled =
     mobileExamplePreviewActive ||
     (onboardingLayoutLocked && guidedToolbarNotice?.target !== "edit");
@@ -557,6 +557,7 @@ export function AppHeader({
               "flex w-full flex-col items-center gap-1.5 transition-opacity duration-150 md:gap-2"
             )}
             inert={filtersLocked ? true : undefined}
+            aria-hidden={filtersLocked ? true : undefined}
           >
             {isMobileMode ? (
               <div className="w-full overflow-hidden rounded-[10px] border border-border bg-card">
@@ -729,7 +730,7 @@ export function AppHeader({
           {guidedSelectionNotice && onDismissGuidedSelection ? (
             <div
               data-guided-selection-overlay
-              className="pointer-events-none absolute left-1/2 top-[calc(100%+0.5rem)] z-40 flex w-full -translate-x-1/2 justify-center"
+              className="pointer-events-auto absolute inset-0 z-[50] flex w-full items-center justify-center overflow-hidden bg-background"
             >
               <div
                 data-guided-selection-card

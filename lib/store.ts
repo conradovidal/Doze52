@@ -6,12 +6,14 @@ import { persist } from "zustand/middleware";
 import {
   CATEGORY_COLOR_BASE_AMBER,
   CATEGORY_COLOR_BASE_BLUE,
+  CATEGORY_COLOR_BASE_CORAL,
   CATEGORY_COLOR_BASE_CYAN,
   CATEGORY_COLOR_BASE_GRAPHITE,
   CATEGORY_COLOR_BASE_GREEN,
   CATEGORY_COLOR_BASE_LIME,
   CATEGORY_COLOR_BASE_ORANGE,
   CATEGORY_COLOR_BASE_RED,
+  CATEGORY_COLOR_BASE_TEAL,
   CATEGORY_COLOR_BASE_VIOLET,
   CATEGORY_COLOR_BASE_YELLOW,
   DEFAULT_CATEGORY_COLOR,
@@ -159,12 +161,13 @@ export const ONBOARDING_CATEGORY_IDS = {
 
 export const ONBOARDING_DEFAULT_CATEGORY_ID = ONBOARDING_CATEGORY_IDS.events;
 export const ONBOARDING_PERSONAL_DEMO_GROUP_ID =
-  "onboarding-personal-demo-v5";
+  "onboarding-personal-demo-v6";
 const ONBOARDING_PERSONAL_DEMO_GROUP_IDS = new Set([
   "onboarding-personal-demo-v1",
   "onboarding-personal-demo-v2",
   "onboarding-personal-demo-v3",
   "onboarding-personal-demo-v4",
+  "onboarding-personal-demo-v5",
   ONBOARDING_PERSONAL_DEMO_GROUP_ID,
 ]);
 
@@ -358,6 +361,8 @@ const DEMO_CATEGORY_IDS = {
   holidays: "99999999-0001-4000-8000-000000000004",
   formula1: "99999999-0001-4000-8000-000000000007",
   workEvents: "99999999-0001-4000-8000-000000000008",
+  workMarketing: "99999999-0001-4000-8000-000000000009",
+  workPerformance: "99999999-0001-4000-8000-000000000010",
 } as const;
 
 const demoCategory = (
@@ -427,14 +432,26 @@ const getPersonalDemoCategories = (): CategoryItem[] => [
   demoCategory(
     ONBOARDING_CATEGORY_IDS.workMeetings,
     ONBOARDING_PROFILE_IDS.professional,
-    "Agendas importantes",
+    "Rituais",
     CATEGORY_COLOR_BASE_BLUE
   ),
   demoCategory(
     ONBOARDING_CATEGORY_IDS.workTrips,
     ONBOARDING_PROFILE_IDS.professional,
-    "Projetos",
+    "Produto",
     CATEGORY_COLOR_BASE_VIOLET
+  ),
+  demoCategory(
+    DEMO_CATEGORY_IDS.workMarketing,
+    ONBOARDING_PROFILE_IDS.professional,
+    "Marketing",
+    CATEGORY_COLOR_BASE_CORAL
+  ),
+  demoCategory(
+    DEMO_CATEGORY_IDS.workPerformance,
+    ONBOARDING_PROFILE_IDS.professional,
+    "Performance Review",
+    CATEGORY_COLOR_BASE_TEAL
   ),
   demoCategory(
     ONBOARDING_CATEGORY_IDS.workDeliveries,
@@ -764,15 +781,16 @@ const getPersonalDemoEvents = (year: number): CalendarEvent[] => {
       endDate: toDemoIsoDate(year, 1, 16),
     },
     ...[
-      [4, 6, "Q1"],
-      [7, 6, "Q2"],
-      [10, 5, "Q3"],
-      [12, 14, "Q4"],
-    ].map(([month, day, quarter]) => ({
-      key: `results-${quarter}`,
-      title: `Revisão de resultados ${quarter}`,
+      [3, 11, "Encontro com clientes", 3, 11],
+      [6, 10, "Conferência de produto", 6, 11],
+      [8, 12, "Workshop comercial", 8, 12],
+      [11, 18, "Offsite de liderança", 11, 19],
+    ].map(([month, day, title, endMonth, endDay]) => ({
+      key: `work-event-${String(title).toLowerCase().replaceAll(" ", "-")}`,
+      title: String(title),
       categoryId: DEMO_CATEGORY_IDS.workEvents,
       startDate: toDemoIsoDate(year, Number(month), Number(day)),
+      endDate: toDemoIsoDate(year, Number(endMonth), Number(endDay)),
     })),
     ...[
       [2, 6],
@@ -789,6 +807,7 @@ const getPersonalDemoEvents = (year: number): CalendarEvent[] => {
       [4, 9],
       [7, 9],
       [10, 8],
+      [12, 10],
     ].map(([month, day], index) => ({
       key: `qbr-${index + 1}`,
       title: "QBR",
@@ -796,32 +815,81 @@ const getPersonalDemoEvents = (year: number): CalendarEvent[] => {
       startDate: toDemoIsoDate(year, month, day),
     })),
     {
-      key: "mobile-experience",
-      title: "Nova experiência mobile",
+      key: "mobile-experience-discovery",
+      title: "Descoberta da experiência mobile",
       categoryId: ONBOARDING_CATEGORY_IDS.workTrips,
       startDate: toDemoIsoDate(year, 2, 2),
-      endDate: toDemoIsoDate(year, 5, 29),
+      endDate: toDemoIsoDate(year, 2, 27),
     },
     {
-      key: "smb-expansion",
-      title: "Expansão para PMEs",
+      key: "mobile-experience-beta",
+      title: "Beta da experiência mobile",
       categoryId: ONBOARDING_CATEGORY_IDS.workTrips,
-      startDate: toDemoIsoDate(year, 4, 13),
-      endDate: toDemoIsoDate(year, 8, 28),
+      startDate: toDemoIsoDate(year, 3, 16),
+      endDate: toDemoIsoDate(year, 4, 24),
     },
     {
       key: "onboarding-evolution",
       title: "Evolução do onboarding",
       categoryId: ONBOARDING_CATEGORY_IDS.workTrips,
-      startDate: toDemoIsoDate(year, 8, 3),
-      endDate: toDemoIsoDate(year, 11, 13),
+      startDate: toDemoIsoDate(year, 6, 8),
+      endDate: toDemoIsoDate(year, 7, 17),
+    },
+    {
+      key: "smb-portal",
+      title: "Portal para PMEs",
+      categoryId: ONBOARDING_CATEGORY_IDS.workTrips,
+      startDate: toDemoIsoDate(year, 9, 14),
+      endDate: toDemoIsoDate(year, 10, 23),
     },
     ...[
+      [4, 27, 6, 5, "Campanha de lançamento mobile"],
+      [8, 17, 9, 25, "Campanha de conteúdo para PMEs"],
+      [11, 9, 12, 11, "Campanha de retrospectiva do ano"],
+    ].map(([month, day, endMonth, endDay, title]) => ({
+      key: `marketing-${String(title).toLowerCase().replaceAll(" ", "-")}`,
+      title: String(title),
+      categoryId: DEMO_CATEGORY_IDS.workMarketing,
+      startDate: toDemoIsoDate(year, Number(month), Number(day)),
+      endDate: toDemoIsoDate(year, Number(endMonth), Number(endDay)),
+    })),
+    ...[
+      ["Q1", 3, 23, 3, 27, 3, 30, 4, 2],
+      ["Q2", 6, 22, 6, 26, 6, 29, 7, 2],
+      ["Q3", 9, 21, 9, 25, 9, 28, 10, 1],
+      ["Q4", 12, 14, 12, 18, 12, 28, 1, 8],
+    ].flatMap(
+      ([quarter, closeMonth, closeDay, closeEndMonth, closeEndDay, alignMonth, alignDay, alignEndMonth, alignEndDay]) => [
+        {
+          key: `performance-close-${quarter}`,
+          title: `Fechamento de performance ${quarter}`,
+          categoryId: DEMO_CATEGORY_IDS.workPerformance,
+          startDate: toDemoIsoDate(year, Number(closeMonth), Number(closeDay)),
+          endDate: toDemoIsoDate(year, Number(closeEndMonth), Number(closeEndDay)),
+        },
+        {
+          key: `performance-alignment-${quarter}`,
+          title: `Calibração e alinhamento ${quarter}`,
+          categoryId: DEMO_CATEGORY_IDS.workPerformance,
+          startDate: toDemoIsoDate(year, Number(alignMonth), Number(alignDay)),
+          endDate: toDemoIsoDate(
+            quarter === "Q4" ? year + 1 : year,
+            Number(alignEndMonth),
+            Number(alignEndDay)
+          ),
+        },
+      ]
+    ),
+    ...[
       [1, 23, "Roadmap do semestre"],
-      [3, 20, "Protótipo validado"],
+      [3, 13, "Protótipo mobile validado"],
+      [4, 24, "Beta mobile liberado"],
       [6, 18, "Lançamento mobile"],
-      [9, 25, "Relatório para o conselho"],
-      [12, 4, "Plano do próximo ano"],
+      [7, 17, "Nova jornada de onboarding"],
+      [9, 25, "Proposta para PMEs"],
+      [10, 23, "Portal para PMEs"],
+      [11, 27, "Relatório para o conselho"],
+      [12, 11, "Plano do próximo ano"],
     ].map(([month, day, title]) => ({
       key: `delivery-${String(title).toLowerCase().replaceAll(" ", "-")}`,
       title: String(title),
@@ -910,6 +978,7 @@ export const isOnboardingPersonalDemoSnapshot = (
 ) =>
   (snapshot.categories.length === 6 ||
     snapshot.categories.length === 11 ||
+    snapshot.categories.length === 13 ||
     snapshot.categories.length === 14) &&
   snapshot.events.length > 0 &&
   snapshot.categories.every((category) =>

@@ -631,8 +631,10 @@ test("demonstração monta dois contextos e categorias pessoais e profissionais"
     "Feriados",
     "Corridas F1",
     "Eventos",
-    "Agendas importantes",
-    "Projetos",
+    "Rituais",
+    "Produto",
+    "Marketing",
+    "Performance Review",
     "Entregas",
   ]);
   expect(snapshot.categories.map((category) => category.color)).toEqual([
@@ -646,6 +648,8 @@ test("demonstração monta dois contextos e categorias pessoais e profissionais"
     "#9CA6B4",
     "#4F8FD6",
     "#B79AEF",
+    "#EE9275",
+    "#55B5A8",
     "#EBA16D",
   ]);
   expect(snapshot.events.length).toBeGreaterThan(150);
@@ -653,15 +657,21 @@ test("demonstração monta dois contextos e categorias pessoais e profissionais"
   expect(snapshot.events.map((event) => event.title)).toEqual(
     expect.arrayContaining([
       "Planejamento estratégico",
-      "Revisão de resultados Q1",
-      "Revisão de resultados Q4",
+      "Encontro com clientes",
+      "Conferência de produto",
       "All Hands",
       "QBR",
-      "Nova experiência mobile",
-      "Expansão para PMEs",
+      "Descoberta da experiência mobile",
+      "Beta da experiência mobile",
       "Evolução do onboarding",
+      "Portal para PMEs",
+      "Campanha de lançamento mobile",
+      "Campanha de conteúdo para PMEs",
+      "Campanha de retrospectiva do ano",
+      "Fechamento de performance Q1",
+      "Calibração e alinhamento Q4",
       "Roadmap do semestre",
-      "Protótipo validado",
+      "Protótipo mobile validado",
       "Lançamento mobile",
       "Relatório para o conselho",
       "Plano do próximo ano",
@@ -679,7 +689,33 @@ test("demonstração monta dois contextos e categorias pessoais e profissionais"
     snapshot.categories.filter(
       (category) => category.profileId === ONBOARDING_PROFILE_IDS.professional
     ).map((category) => category.name)
-  ).toEqual(["Eventos", "Agendas importantes", "Projetos", "Entregas"]);
+  ).toEqual([
+    "Eventos",
+    "Rituais",
+    "Produto",
+    "Marketing",
+    "Performance Review",
+    "Entregas",
+  ]);
+
+  const productCategory = snapshot.categories.find(
+    (category) =>
+      category.profileId === ONBOARDING_PROFILE_IDS.professional &&
+      category.name === "Produto"
+  );
+  const productPeriods = snapshot.events
+    .filter((event) => event.categoryId === productCategory?.id)
+    .toSorted((left, right) => left.startDate.localeCompare(right.startDate));
+  expect(productPeriods).toHaveLength(4);
+  for (const [index, event] of productPeriods.entries()) {
+    const durationMs =
+      Date.parse(`${event.endDate}T12:00:00Z`) -
+      Date.parse(`${event.startDate}T12:00:00Z`);
+    expect(durationMs / 86_400_000).toBeLessThanOrEqual(41);
+    if (index > 0) {
+      expect(productPeriods[index - 1].endDate < event.startDate).toBe(true);
+    }
+  }
   expect(
     snapshot.events.filter((event) => event.recurrenceType === "yearly").length
   ).toBeGreaterThanOrEqual(10);
@@ -754,12 +790,14 @@ test("demonstração monta dois contextos e categorias pessoais e profissionais"
   );
 });
 
-test("reconhece e remove snapshots demonstrativos v1, v2 e v3", () => {
+test("reconhece e remove snapshots demonstrativos v1 a v6", () => {
   for (const groupId of [
     "onboarding-personal-demo-v1",
     "onboarding-personal-demo-v2",
     "onboarding-personal-demo-v3",
     "onboarding-personal-demo-v4",
+    "onboarding-personal-demo-v5",
+    "onboarding-personal-demo-v6",
   ]) {
     const current = getOnboardingPersonalDemoSnapshot(2026);
     const legacy = {
