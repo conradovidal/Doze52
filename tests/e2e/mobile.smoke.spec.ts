@@ -12,7 +12,7 @@ test("modal de calendarios permanece alinhado no mobile", async ({ page }) => {
   await expectAuthenticated(page);
   await page
     .getByRole("button", {
-      name: "Adicionar ou gerenciar calendários. Novos calendários disponíveis.",
+      name: "Adicionar ou gerenciar calendários.",
     })
     .click();
 
@@ -21,13 +21,13 @@ test("modal de calendarios permanece alinhado no mobile", async ({ page }) => {
   await expect(cards).toHaveCount(4);
   await expect(cards.getByRole("heading")).toHaveText([
     "Feriados nacionais + estaduais",
-    "Jogos do seu time favorito",
+    "Jogos do Grêmio",
     "Copa do Mundo de 2026",
     "Corridas F1",
   ]);
 
   const selectorBoxes = await Promise.all(
-    [0, 1, 2].map(async (index) => {
+    [0, 2].map(async (index) => {
       const box = await cards.nth(index).getByRole("combobox").boundingBox();
       if (!box) throw new Error(`Seletor ${index + 1} nao esta visivel no mobile.`);
       return box;

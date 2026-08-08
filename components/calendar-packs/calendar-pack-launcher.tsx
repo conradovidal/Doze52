@@ -33,6 +33,7 @@ import {
   getCalendarPackAvailability,
   getCalendarPackGroupId,
   importCalendarPackVariant,
+  isCalendarPackGroupPresent,
   isCalendarPackVariantInstalled,
   removeCalendarPack,
 } from "@/lib/calendar-packs/import";
@@ -179,6 +180,28 @@ export function CalendarPackLauncher({
   const [expandedPackId, setExpandedPackId] = React.useState<string | null>(null);
   const [upgradeDialogOpen, setUpgradeDialogOpen] = React.useState(false);
 
+  React.useEffect(() => {
+    if (
+      guidedVariantGroupId !== "holidays-by-state" ||
+      !requireExplicitVariant
+    ) {
+      return;
+    }
+
+    const saoPauloPack = calendarPacks.find(
+      (pack) =>
+        getCalendarPackGroupId(pack) === guidedVariantGroupId &&
+        pack.regionCode === "SP"
+    );
+    if (!saoPauloPack) return;
+
+    setSelectedVariantByGroup((current) =>
+      current[guidedVariantGroupId]
+        ? current
+        : { ...current, [guidedVariantGroupId]: saoPauloPack.id }
+    );
+  }, [guidedVariantGroupId, requireExplicitVariant]);
+
   const snapshot = React.useMemo(
     () => ({ profiles, categories, events }),
     [categories, events, profiles]
@@ -208,8 +231,7 @@ export function CalendarPackLauncher({
     !bypassLimits &&
     !isPro &&
     isLimitReached(subscribedPackCount, limits.maxCalendarSubscriptions);
-  const launcherAriaCopy =
-    "Adicionar ou gerenciar calendários. Novos calendários disponíveis.";
+  const launcherAriaCopy = "Adicionar ou gerenciar calendários.";
   const activeProfileId = React.useMemo(
     () =>
       selectedProfileIds.find((profileId) =>
@@ -361,6 +383,15 @@ export function CalendarPackLauncher({
 
       try {
         const result = removeCalendarPack(snapshot, pack, variants);
+        if (
+          result.removedCategoryCount === 0 &&
+          result.removedEventCount === 0
+        ) {
+          throw new Error("Calendar pack removal did not change the snapshot.");
+        }
+        if (isCalendarPackGroupPresent(result.snapshot, variants)) {
+          throw new Error("Calendar pack is still present after removal.");
+        }
         replaceAllData(result.snapshot);
         onFocusYear?.(pack.year);
         setPackFlow(pack.id, "removed");
@@ -408,10 +439,6 @@ export function CalendarPackLauncher({
       >
         <Plus className="size-3.5 text-muted-foreground" />
         <span>Calendários</span>
-        <span
-          aria-hidden="true"
-          className="absolute right-0 top-0 size-2 rounded-full border-[1.5px] border-card bg-rose-500 shadow-[0_0_0_1px_rgba(244,63,94,0.16)] dark:border-background"
-        />
       </Button>
 
       <Dialog open={open} onOpenChange={handleOpenChange}>

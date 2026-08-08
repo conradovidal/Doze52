@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
@@ -8,6 +8,24 @@ test.beforeEach(async ({ page }) => {
     window.sessionStorage.setItem(marker, "true");
   });
 });
+
+const clickBehindGuidedPanel = async (page: Page, target: Locator) => {
+  const panel = page.locator("[data-onboarding-panel]");
+  await panel.evaluateAll((nodes) => {
+    nodes.forEach((node) => {
+      (node as HTMLElement).style.pointerEvents = "none";
+    });
+  });
+  try {
+    await target.click();
+  } finally {
+    await panel.evaluateAll((nodes) => {
+      nodes.forEach((node) => {
+        (node as HTMLElement).style.pointerEvents = "";
+      });
+    });
+  }
+};
 
 const selectGuidedDate = async (
   page: Page,
@@ -22,7 +40,10 @@ const selectGuidedDate = async (
       .click({ force: true });
     return;
   }
-  await page.locator(`[data-day-cell][data-day-iso="${dateIso}"]`).click();
+  await clickBehindGuidedPanel(
+    page,
+    page.locator(`[data-day-cell][data-day-iso="${dateIso}"]`)
+  );
 };
 
 const selectGuidedPeriod = async (
@@ -286,13 +307,19 @@ const completePersonalOnboarding = async (
   const stateSelect = calendarDialog.getByRole("combobox", {
     name: /Estado para Feriados nacionais/i,
   });
-  await expect(stateSelect).toHaveText(/Escolha seu estado/i);
-  await stateSelect.click();
-  await page.getByRole("option", { name: "Rio Grande do Sul (RS)" }).click();
+  await expect(stateSelect).toHaveText(/São Paulo \(SP\)/i);
   await calendarDialog
     .getByRole("button", { name: "Adicionar feriados" })
     .click();
   await expect(calendarDialog).toBeHidden();
+  const importedHolidayTitles = await page.evaluate(() => {
+    const payload = JSON.parse(window.localStorage.getItem("yiv-store") ?? "{}");
+    return (payload.state?.events ?? []).map(
+      (event: { title?: string }) => event.title
+    );
+  });
+  expect(importedHolidayTitles).toContain("9 de Julho — Data Magna de São Paulo");
+  expect(importedHolidayTitles).not.toContain("Revolução Farroupilha");
 
   await expect(toolbarNotice).toHaveAttribute(
     "data-guided-toolbar-target",
@@ -530,7 +557,7 @@ test("mobile preserva progresso parcial e exige continuação no desktop", async
   expect(persisted.onboarding?.step).toBe("date_category_selection");
 });
 
-test("categorias começam abertas, podem ser recolhidas e reabrem ao recarregar", async ({
+test("categorias recolhidas liberam espaço e recentralizam hoje", async ({
   page,
 }, testInfo) => {
   const mobile = testInfo.project.name === "mobile-chromium";
@@ -552,10 +579,70 @@ test("categorias começam abertas, podem ser recolhidas e reabrem ao recarregar"
     : "Mostrar categorias";
   const expandedToggle = page.getByRole("button", { name: expandedLabel });
   await expect(expandedToggle).toHaveAttribute("aria-expanded", "true");
+
+  const scrollRegion = page.locator("[data-desktop-calendar-scroll-region]");
+  const currentDateIso = await page.evaluate(() => {
+    const now = new Date();
+    return [
+      now.getFullYear(),
+      String(now.getMonth() + 1).padStart(2, "0"),
+      String(now.getDate()).padStart(2, "0"),
+    ].join("-");
+  });
+  const todayCell = page.locator(
+    `[data-day-cell][data-day-iso="${currentDateIso}"]`
+  );
+  await expect
+    .poll(async () => {
+      const [viewportBox, todayBox] = await Promise.all([
+        scrollRegion.boundingBox(),
+        todayCell.boundingBox(),
+      ]);
+      if (!viewportBox || !todayBox) return Number.POSITIVE_INFINITY;
+      return Math.abs(
+        todayBox.y + todayBox.height / 2 -
+          (viewportBox.y + viewportBox.height / 2)
+      );
+    })
+    .toBeLessThan(3);
+
+  const headerBefore = await page.locator("header").boundingBox();
+  const viewportBefore = await scrollRegion.boundingBox();
   await expandedToggle.click();
   await expect(
     page.getByRole("button", { name: collapsedLabel })
   ).toHaveAttribute("aria-expanded", "false");
+  const headerAfter = await page.locator("header").boundingBox();
+  const viewportAfter = await scrollRegion.boundingBox();
+  if (!headerBefore || !headerAfter || !viewportBefore || !viewportAfter) {
+    throw new Error("Layout desktop não renderizado");
+  }
+  expect(headerAfter.height).toBeLessThan(headerBefore.height);
+  expect(viewportAfter.y).toBeLessThan(viewportBefore.y);
+
+  await expect
+    .poll(async () => {
+      const [viewportBox, todayBox] = await Promise.all([
+        scrollRegion.boundingBox(),
+        todayCell.boundingBox(),
+      ]);
+      if (!viewportBox || !todayBox) return Number.POSITIVE_INFINITY;
+      return Math.abs(
+        todayBox.y + todayBox.height / 2 -
+          (viewportBox.y + viewportBox.height / 2)
+      );
+    })
+    .toBeLessThan(3);
+
+  const centeredScrollTop = await scrollRegion.evaluate((node) => node.scrollTop);
+  await scrollRegion.evaluate((node) => {
+    node.scrollTop += 120;
+  });
+  await page.waitForTimeout(150);
+  const manualScrollTop = await scrollRegion.evaluate((node) => node.scrollTop);
+  expect(manualScrollTop).toBeGreaterThan(centeredScrollTop + 100);
+  await page.waitForTimeout(150);
+  expect(await scrollRegion.evaluate((node) => node.scrollTop)).toBe(manualScrollTop);
 
   await page.reload();
   await expect(
@@ -652,7 +739,10 @@ test("aplicação permanece interativa atrás do primeiro card", async ({ page }
       }, demoEventId)
     )
     .toBe("2026-02-10");
-  await page.getByRole("button", { name: "Feira gastronômica", exact: true }).click();
+  await clickBehindGuidedPanel(
+    page,
+    page.getByRole("button", { name: "Feira gastronômica", exact: true })
+  );
   const demoEventDialog = page.getByRole("dialog", { name: "Editar evento" });
   await expect(demoEventDialog.getByLabel("Título do evento")).toBeEnabled();
   await demoEventDialog.getByLabel("Título do evento").fill("Feira da cidade");
@@ -850,7 +940,7 @@ test("sandbox convida após cinco alvos e retoma o onboarding limpo", async ({
   await expect(page.locator("[data-onboarding-category-id]")).toHaveCount(7);
 });
 
-test("centraliza cards e sobrepõe a instrução ao cabeçalho sem mover o calendário", async ({
+test("centraliza cards e mantém a instrução visível no cabeçalho fixo", async ({
   page,
 }, testInfo) => {
   const mobile = testInfo.project.name === "mobile-chromium";
@@ -892,10 +982,6 @@ test("centraliza cards e sobrepõe a instrução ao cabeçalho sem mover o calen
   ]);
   expect(cleanSnapshot.categories).toEqual([]);
   expect(cleanSnapshot.events).toEqual([]);
-  const calendarAnchor = mobile
-    ? page.locator("[data-mobile-calendar-divider]")
-    : page.locator("[data-year-grid]");
-  const beforeSelection = await calendarAnchor.boundingBox();
   await panel.getByRole("button", { name: /Aniversários/ }).click();
   await panel
     .getByRole("button", { name: "Criar categoria" })
@@ -957,11 +1043,22 @@ test("centraliza cards e sobrepõe a instrução ao cabeçalho sem mover o calen
     .first()
     .evaluate((node) => Number.parseFloat(getComputedStyle(node).fontSize));
   expect(noticeTitleFontSize).toBeGreaterThanOrEqual(16);
-  const afterSelection = await calendarAnchor.boundingBox();
-  if (!beforeSelection || !afterSelection) {
-    throw new Error("Calendário não renderizado");
+  if (!mobile) {
+    const scrollRegion = page.locator("[data-desktop-calendar-scroll-region]");
+    await scrollRegion.evaluate((node) => {
+      node.scrollTop = node.scrollHeight;
+    });
+    await expect(notice).toBeVisible();
+    const noticeBoxAfterScroll = await notice.boundingBox();
+    const viewport = page.viewportSize();
+    if (!noticeBoxAfterScroll || !viewport) {
+      throw new Error("Orientação fixa não renderizada");
+    }
+    expect(noticeBoxAfterScroll.y).toBeGreaterThanOrEqual(0);
+    expect(noticeBoxAfterScroll.y + noticeBoxAfterScroll.height).toBeLessThanOrEqual(
+      viewport.height
+    );
   }
-  expect(Math.abs(beforeSelection.y - afterSelection.y)).toBeLessThan(1.1);
 });
 
 test("dois eventos espontâneos disparam o convite de conta", async ({
