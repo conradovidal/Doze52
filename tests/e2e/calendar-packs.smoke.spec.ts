@@ -40,23 +40,23 @@ test("contexto, sincronizacao e calendario pronto funcionam de ponta a ponta", a
 
   await page
     .getByRole("button", {
-      name: "Adicionar ou gerenciar calendários. Novos calendários disponíveis.",
+      name: "Adicionar ou gerenciar calendários.",
     })
     .click();
   const calendarsDialog = page.getByRole("dialog", { name: "Calendários" });
   const teamCard = calendarsDialog
     .getByRole("article")
-    .filter({ hasText: "Jogos do seu time favorito" });
+    .filter({ hasText: "Jogos do Grêmio" });
   await teamCard.getByRole("button", { name: "Adicionar calendário" }).click();
   const targetProfile = teamCard.getByRole("combobox", {
-    name: "Contexto para Jogos do seu time favorito",
+    name: "Contexto para Jogos do Grêmio",
   });
   const targetProfileName = (await targetProfile.textContent())?.trim();
   expect(targetProfileName, "O calendário deve herdar o contexto ativo.").toBeTruthy();
   const eventsImported = waitForSupabaseWrite(page, "events", ["POST"]);
   await teamCard
     .getByRole("button", {
-      name: `Adicionar calendário Jogos do seu time favorito ao contexto ${targetProfileName}`,
+      name: `Adicionar calendário Jogos do Grêmio ao contexto ${targetProfileName}`,
     })
     .click();
   await expect(teamCard.getByRole("button", { name: "Remover" })).toBeVisible();
@@ -104,13 +104,13 @@ test("contexto, sincronizacao e calendario pronto funcionam de ponta a ponta", a
 
   await page
     .getByRole("button", {
-      name: "Adicionar ou gerenciar calendários. Novos calendários disponíveis.",
+      name: "Adicionar ou gerenciar calendários.",
     })
     .click();
   const removeCard = page
     .getByRole("dialog", { name: "Calendários" })
     .getByRole("article")
-    .filter({ hasText: "Jogos do seu time favorito" });
+    .filter({ hasText: "Jogos do Grêmio" });
   const eventsRemoved = waitForSupabaseWrite(page, "events", ["DELETE"]);
   await removeCard.getByRole("button", { name: "Remover" }).click();
   await expect(removeCard.getByRole("button", { name: "Adicionar calendário" })).toBeVisible();

@@ -61,6 +61,7 @@ type AppHeaderProps = {
   onCategoryCreated?: (categoryId: string) => void;
   onProfileCreated?: (profileId: string) => void;
   onInlineEditModeChange?: (active: boolean) => void;
+  onFilterLayoutChange?: () => void;
   exitInlineEditRequestKey?: number;
 };
 
@@ -95,6 +96,7 @@ export function AppHeader({
   onCategoryCreated,
   onProfileCreated,
   onInlineEditModeChange,
+  onFilterLayoutChange,
   exitInlineEditRequestKey = 0,
 }: AppHeaderProps) {
   const profiles = useStore((s) => s.profiles);
@@ -669,9 +671,10 @@ export function AppHeader({
                           : ""
                       }`}
                       disabled={effectiveInlineEditMode}
-                      onClick={() =>
-                        setCategoriesExpanded(!categoriesExpanded)
-                      }
+                      onClick={() => {
+                        setCategoriesExpanded((current) => !current);
+                        onFilterLayoutChange?.();
+                      }}
                       aria-label={
                         effectiveInlineEditMode
                           ? "Categorias abertas durante a edicao"
