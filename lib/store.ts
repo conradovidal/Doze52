@@ -106,7 +106,12 @@ type StoreState = {
   createCategory: (input: { name: string; color: string; profileId: string }) => string;
   addCategory: (name: string, color: string, profileId?: string) => void;
   updateCategory: (id: string, patch: Partial<Omit<CategoryItem, "id">>) => void;
-  deleteCategory: (id: string) => void;
+  deleteCategory: (input: {
+    categoryId: string;
+    strategy:
+      | { type: "move"; targetCategoryId: string }
+      | { type: "delete-events" };
+  }) => boolean;
   toggleCategoryVisibility: (id: string) => void;
   setAllCategoriesVisibility: (visible: boolean) => void;
   setCategoriesVisibility: (ids: string[], visible: boolean) => void;
@@ -1852,29 +1857,55 @@ export const useStore = create<StoreState>()(
                 : state.events,
           };
         }),
-      deleteCategory: (id) =>
+      deleteCategory: ({ categoryId, strategy }) => {
+        let didDelete = false;
         set((state) => {
-          if (state.categories.length <= 1) return state;
-          const targetCategory = state.categories.find((category) => category.id === id);
-          if (!targetCategory) return state;
-
-          const nextCategories = state.categories.filter((c) => c.id !== id);
-          const fallbackSameProfile = nextCategories.find(
-            (category) => category.profileId === targetCategory.profileId
+          const category = state.categories.find(
+            (candidate) => candidate.id === categoryId
           );
-          const fallbackCategory = fallbackSameProfile ?? nextCategories[0];
-          const fallbackId = fallbackCategory?.id ?? defaultCategoryId;
-          const fallbackColor = fallbackCategory?.color ?? defaultCategoryColor;
+          if (!category || category.calendarPackGroupId) return state;
 
+          const ordinaryCategories = state.categories.filter(
+            (candidate) => !candidate.calendarPackGroupId
+          );
+          if (ordinaryCategories.length <= 1) return state;
+
+          const nextCategories = state.categories.filter(
+            (candidate) => candidate.id !== categoryId
+          );
+          if (strategy.type === "delete-events") {
+            didDelete = true;
+            return {
+              categories: nextCategories,
+              events: state.events.filter(
+                (event) => event.categoryId !== categoryId
+              ),
+            };
+          }
+
+          const destination = nextCategories.find(
+            (candidate) =>
+              candidate.id === strategy.targetCategoryId &&
+              !candidate.calendarPackGroupId
+          );
+          if (!destination) return state;
+
+          didDelete = true;
           return {
             categories: nextCategories,
-            events: state.events.map((evt) =>
-              evt.categoryId === id
-                ? { ...evt, categoryId: fallbackId, color: fallbackColor }
-                : evt
+            events: state.events.map((event) =>
+              event.categoryId === categoryId
+                ? {
+                    ...event,
+                    categoryId: destination.id,
+                    color: destination.color,
+                  }
+                : event
             ),
           };
-        }),
+        });
+        return didDelete;
+      },
       toggleCategoryVisibility: (id) =>
         set((state) => ({
           categories: state.categories.map((c) =>

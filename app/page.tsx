@@ -405,6 +405,7 @@ export default function HomePage() {
   const profilesRef = React.useRef(profiles);
   const categoriesRef = React.useRef(categories);
   const eventsRef = React.useRef(events);
+  const desktopCalendarScrollRef = React.useRef<HTMLDivElement | null>(null);
 
   React.useEffect(() => {
     profilesRef.current = profiles;
@@ -418,6 +419,37 @@ export default function HomePage() {
     () => expandEventsForYear(events, year),
     [events, year]
   );
+
+  const centerTodayInDesktopCalendar = React.useCallback(() => {
+    if (isMobileCalendarUi !== false || !todayIso) return;
+    if (Number(todayIso.slice(0, 4)) !== year) return;
+
+    const viewport = desktopCalendarScrollRef.current;
+    const todayCell = viewport?.querySelector<HTMLElement>(
+      `[data-day-cell][data-day-iso="${todayIso}"]`
+    );
+    if (!viewport || !todayCell) return;
+
+    const viewportRect = viewport.getBoundingClientRect();
+    const todayRect = todayCell.getBoundingClientRect();
+    const nextScrollTop =
+      viewport.scrollTop +
+      todayRect.top +
+      todayRect.height / 2 -
+      (viewportRect.top + viewportRect.height / 2);
+
+    viewport.scrollTop = Math.max(0, nextScrollTop);
+  }, [isMobileCalendarUi, todayIso, year]);
+
+  const requestDesktopTodayCenter = React.useCallback(() => {
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(centerTodayInDesktopCalendar);
+    });
+  }, [centerTodayInDesktopCalendar]);
+
+  React.useLayoutEffect(() => {
+    requestDesktopTodayCenter();
+  }, [requestDesktopTodayCenter]);
 
   React.useEffect(() => {
     if (windowContext !== "popup") return;
@@ -2001,7 +2033,7 @@ export default function HomePage() {
         "mx-auto w-full max-w-none",
         isMobileCalendarUi
           ? "flex h-[100dvh] min-h-0 flex-col overflow-hidden px-3 pt-2 pb-1"
-          : "min-h-full px-4 pt-3 pb-2 md:pb-4"
+          : "flex h-full min-h-0 flex-col overflow-hidden px-4 pt-3 pb-2 md:pb-4"
       )}
     >
       <SyncStatusOverlay
@@ -2013,10 +2045,10 @@ export default function HomePage() {
 
       <div
         className={cn(
-          "z-30 bg-background",
+          "z-30 shrink-0 bg-background",
           isMobileCalendarUi
             ? "shrink-0 pb-2"
-            : "sticky top-0 -mx-4 px-4 pb-2 backdrop-blur supports-[backdrop-filter]:bg-background/82 md:static md:mx-0 md:bg-transparent md:px-0 md:pb-0 md:backdrop-blur-none"
+            : "pb-2"
         )}
       >
         <AppHeader
@@ -2040,8 +2072,9 @@ export default function HomePage() {
           }
           guidedEditPreviewActive={guidedOnboarding?.step === "edit_preview"}
           onboardingLayoutLocked={false}
-          onboardingLayoutReserved={showGuidedOnboarding}
+          onboardingLayoutReserved={Boolean(guidedSelectionNotice)}
           onInlineEditModeChange={setInlineEditModeActive}
+          onFilterLayoutChange={requestDesktopTodayCenter}
           exitInlineEditRequestKey={exitInlineEditRequestKey}
           mobileExamplePreviewActive={isMobileExamplePreview}
           demoExplorationActive={isDemoExploration}
@@ -2086,7 +2119,11 @@ export default function HomePage() {
           onGuidedDaySelect={handleMobileGuidedDaySelect}
         />
       ) : (
-        <div className="overflow-x-auto pb-1 md:overflow-visible">
+        <div
+          ref={desktopCalendarScrollRef}
+          data-desktop-calendar-scroll-region
+          className="min-h-0 flex-1 overflow-auto pb-1"
+        >
           <div
             data-calendar-focus-root
             data-calendar-ui-mode="desktop"
