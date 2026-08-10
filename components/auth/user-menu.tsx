@@ -1,24 +1,36 @@
 "use client";
 
 import { type ComponentProps, type ReactNode, useState } from "react";
+import dynamic from "next/dynamic";
 import {
   CreditCard,
   Download,
+  FileSpreadsheet,
   LogOut,
   RotateCcw,
   Sparkles,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ProUpgradeDialog } from "@/components/billing/pro-upgrade-dialog";
 import { useFeedback } from "@/components/ui/feedback-provider";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useAuth } from "@/lib/auth";
+import { isCalendarSpreadsheetProGateEnabled } from "@/lib/entitlements";
 import { resetAllProductOnboarding } from "@/lib/onboarding";
 import { exportUserData, saveSnapshot } from "@/lib/sync";
 import { logDevError, logProdError } from "@/lib/safe-log";
 import { useStore } from "@/lib/store";
 import { useBilling } from "@/lib/use-billing";
 import { cn } from "@/lib/utils";
+
+const CalendarSpreadsheetDialog = dynamic(
+  () =>
+    import("@/components/calendar-spreadsheet-dialog").then(
+      (module) => module.CalendarSpreadsheetDialog
+    ),
+  { ssr: false }
+);
 
 function MenuSection({
   title,
@@ -68,7 +80,9 @@ function MenuAction({
           danger && "text-rose-500 dark:text-rose-300"
         )}
       />
-      <span className="min-w-0 flex-1 truncate text-left">{children}</span>
+      <span className="flex min-w-0 flex-1 items-center gap-2 truncate text-left">
+        {children}
+      </span>
     </Button>
   );
 }
@@ -94,6 +108,9 @@ export function UserMenu() {
   const [brokenAvatar, setBrokenAvatar] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [spreadsheetOpen, setSpreadsheetOpen] = useState(false);
+  const [spreadsheetUpgradeOpen, setSpreadsheetUpgradeOpen] = useState(false);
+  const spreadsheetRequiresPro = isCalendarSpreadsheetProGateEnabled();
 
   const metadata = session?.user.metadata ?? {};
   const fullName =
@@ -189,6 +206,7 @@ export function UserMenu() {
   };
 
   return (
+    <>
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
@@ -265,6 +283,25 @@ export function UserMenu() {
 
           <MenuSection title="Dados">
             <MenuAction
+              icon={FileSpreadsheet}
+              disabled={spreadsheetRequiresPro && isBillingLoading}
+              onClick={() => {
+                setOpen(false);
+                if (!spreadsheetRequiresPro || isPro) {
+                  setSpreadsheetOpen(true);
+                } else {
+                  setSpreadsheetUpgradeOpen(true);
+                }
+              }}
+            >
+              Importar/exportar Excel
+              {spreadsheetRequiresPro && !isPro && !isBillingLoading ? (
+                <span className="ml-auto rounded-full border border-amber-500/20 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:border-amber-300/20 dark:bg-amber-300/10 dark:text-amber-100">
+                  Pro
+                </span>
+              ) : null}
+            </MenuAction>
+            <MenuAction
               icon={Download}
               disabled={isExporting}
               onClick={async () => {
@@ -294,7 +331,7 @@ export function UserMenu() {
                 }
               }}
             >
-              {isExporting ? "Exportando..." : "Exportar dados"}
+              {isExporting ? "Exportando..." : "Baixar backup tecnico"}
             </MenuAction>
           </MenuSection>
 
@@ -328,5 +365,15 @@ export function UserMenu() {
         </div>
       </PopoverContent>
     </Popover>
+    <CalendarSpreadsheetDialog
+      open={spreadsheetOpen}
+      onOpenChange={setSpreadsheetOpen}
+    />
+    <ProUpgradeDialog
+      open={spreadsheetUpgradeOpen}
+      onOpenChange={setSpreadsheetUpgradeOpen}
+      reason="calendar-import-export"
+    />
+    </>
   );
 }
