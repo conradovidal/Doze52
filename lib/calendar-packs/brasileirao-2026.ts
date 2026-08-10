@@ -9,7 +9,7 @@ const SOURCE = {
 const CATEGORY = {
   id: "2026ba00-0000-4000-8000-000000000002",
   key: "favorite-team-2026",
-  name: "Jogos do seu time favorito",
+  name: "Jogos do Grêmio",
   color: "#2563EB",
   legacyNames: ["Brasileirão 2026"],
 };
@@ -247,10 +247,10 @@ const createPack = (
 ): CalendarPack => ({
   id: `brasileirao-2026-${teamName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")}`,
   version: 4,
-  name: "Jogos do seu time favorito",
+  name: `Jogos do ${teamName}`,
   eyebrow: teamName,
   icon: "soccer-ball",
-  description: "Jogos oficiais de 2026 em todas as competições. Selecione seu time abaixo.",
+  description: "Jogos oficiais de 2026 em todas as competições.",
   variantGroup: {
     id: "brasileirao-2026-by-team",
     label: "Time",
@@ -263,7 +263,7 @@ const createPack = (
   source: SOURCE,
   profile: {
     id: "2026ba00-0000-4000-8000-000000000001",
-    name: "Jogos do seu time favorito",
+    name: `Jogos do ${teamName}`,
     icon: "calendar-days",
   },
   categories: [{
@@ -279,5 +279,4 @@ const createPack = (
 
 export const brasileirao2026Packs = [
   createPack(GREMIO_ID, "Grêmio", "#2563EB"),
-  createPack(INTERNACIONAL_ID, "Internacional", "#DC2626"),
 ] as const;

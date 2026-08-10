@@ -24,6 +24,13 @@ import {
 } from "../../lib/store";
 import { materializeUserOwnedSnapshot } from "../../lib/snapshot-ownership";
 import { expandEventsForYear } from "../../lib/recurrence";
+import { formula12026Pack } from "../../lib/calendar-packs/formula-1-2026";
+import { holidays2026Packs } from "../../lib/calendar-packs/holidays-2026";
+import {
+  getCalendarPackAvailability,
+  importCalendarPackVariant,
+  removeCalendarPack,
+} from "../../lib/calendar-packs/import";
 import {
   BRAZIL_UFS,
   isBrazilUf,
@@ -678,11 +685,35 @@ test("demonstração monta dois contextos e categorias pessoais e profissionais"
     ])
   );
   expect(isOnboardingPersonalDemoSnapshot(snapshot)).toBe(true);
+  const holidayPack = holidays2026Packs.find(
+    (pack) => pack.regionCode === "RS"
+  );
+  if (!holidayPack) throw new Error("Pacote de feriados do RS ausente");
+  const holidayCategory = snapshot.categories.find(
+    (category) => category.name === "Feriados"
+  );
+  const formulaCategory = snapshot.categories.find(
+    (category) => category.name === "Corridas F1"
+  );
+  expect(holidayCategory).toMatchObject({
+    calendarPackGroupId: "holidays-by-state",
+    calendarPackVariantId: holidayPack.id,
+  });
+  expect(formulaCategory).toMatchObject({
+    calendarPackGroupId: formula12026Pack.id,
+    calendarPackVariantId: formula12026Pack.id,
+  });
   expect(
-    snapshot.events.every(
-      (event) =>
-        event.calendarPackGroupId === ONBOARDING_PERSONAL_DEMO_GROUP_ID
-    )
+    snapshot.events
+      .filter(
+        (event) =>
+          event.categoryId !== holidayCategory?.id &&
+          event.categoryId !== formulaCategory?.id
+      )
+      .every(
+        (event) =>
+          event.calendarPackGroupId === ONBOARDING_PERSONAL_DEMO_GROUP_ID
+      )
   ).toBe(true);
   expect(snapshot.categories.filter((category) => !category.visible)).toEqual([]);
   expect(
@@ -790,7 +821,7 @@ test("demonstração monta dois contextos e categorias pessoais e profissionais"
   );
 });
 
-test("reconhece e remove snapshots demonstrativos v1 a v6", () => {
+test("reconhece e remove snapshots demonstrativos v1 a v7", () => {
   for (const groupId of [
     "onboarding-personal-demo-v1",
     "onboarding-personal-demo-v2",
@@ -798,6 +829,7 @@ test("reconhece e remove snapshots demonstrativos v1 a v6", () => {
     "onboarding-personal-demo-v4",
     "onboarding-personal-demo-v5",
     "onboarding-personal-demo-v6",
+    "onboarding-personal-demo-v7",
   ]) {
     const current = getOnboardingPersonalDemoSnapshot(2026);
     const legacy = {
@@ -816,6 +848,29 @@ test("reconhece e remove snapshots demonstrativos v1 a v6", () => {
   }
 });
 
+test("reconhece demonstração antiga parcialmente reconciliada", () => {
+  const snapshot = getOnboardingPersonalDemoSnapshot(2026);
+  const legacy = {
+    ...snapshot,
+    categories: snapshot.categories.map((category) => ({
+      ...category,
+      calendarPackGroupId:
+        category.name === "Corridas F1"
+          ? formula12026Pack.id
+          : "onboarding-personal-demo-v3",
+    })),
+    events: snapshot.events.map((event) => ({
+      ...event,
+      calendarPackGroupId:
+        event.calendarPackGroupId === formula12026Pack.id
+          ? formula12026Pack.id
+          : "onboarding-personal-demo-v3",
+    })),
+  };
+
+  expect(isOnboardingPersonalDemoSnapshot(legacy)).toBe(true);
+});
+
 test("demonstração é removida antes de qualquer importação", () => {
   const stripped = stripOnboardingPersonalDemo(
     getOnboardingPersonalDemoSnapshot(2026)
@@ -825,6 +880,93 @@ test("demonstração é removida antes de qualquer importação", () => {
   expect(stripped.events).toEqual([]);
 });
 
+test("descarta calendários da demonstração e preserva conteúdo autoral", () => {
+  const snapshot = getOnboardingPersonalDemoSnapshot(2026);
+  const personalProfile = snapshot.profiles.find(
+    (profile) => profile.id === ONBOARDING_PROFILE_IDS.personal
+  );
+  if (!personalProfile) throw new Error("Contexto pessoal ausente");
+  const personalCategory = {
+    id: "77777777-7777-4777-8777-777777777779",
+    profileId: personalProfile.id,
+    name: "Minha categoria",
+    color: "#4F8FD6",
+    visible: true,
+  };
+  const stripped = stripOnboardingPersonalDemo({
+    ...snapshot,
+    categories: [...snapshot.categories, personalCategory],
+    events: [
+      ...snapshot.events,
+      {
+        id: "88888888-7777-4777-8777-777777777779",
+        title: "Meu evento",
+        categoryId: personalCategory.id,
+        color: personalCategory.color,
+        startDate: "2026-08-20",
+        endDate: "2026-08-20",
+        createdAt: "2026-08-08T12:00:00.000Z",
+        dayOrder: 0,
+      },
+    ],
+  });
+
+  expect(stripped.categories).toEqual([personalCategory]);
+  expect(stripped.events.map((event) => event.title)).toEqual(["Meu evento"]);
+});
+
+test("troca e remove os feriados gerenciados do exemplo sem duplicar", () => {
+  const rioGrandeDoSul = holidays2026Packs.find(
+    (pack) => pack.regionCode === "RS"
+  );
+  const saoPaulo = holidays2026Packs.find(
+    (pack) => pack.regionCode === "SP"
+  );
+  if (!rioGrandeDoSul || !saoPaulo) {
+    throw new Error("Variantes de feriados ausentes");
+  }
+
+  const snapshot = getOnboardingPersonalDemoSnapshot(2026);
+  expect(getCalendarPackAvailability(snapshot, rioGrandeDoSul)).toMatchObject({
+    hasAnyCategory: true,
+    hasImportedEvents: true,
+  });
+
+  const switched = importCalendarPackVariant(
+    snapshot,
+    saoPaulo,
+    holidays2026Packs,
+    "all",
+    ONBOARDING_PROFILE_IDS.personal
+  ).snapshot;
+  expect(
+    switched.categories.filter(
+      (category) => category.calendarPackGroupId === "holidays-by-state"
+    )
+  ).toHaveLength(1);
+  expect(switched.events.map((event) => event.title)).toContain(
+    "9 de Julho — Data Magna de São Paulo"
+  );
+  expect(switched.events.map((event) => event.title)).not.toContain(
+    "Revolução Farroupilha"
+  );
+
+  const removed = removeCalendarPack(
+    switched,
+    saoPaulo,
+    holidays2026Packs
+  ).snapshot;
+  expect(
+    removed.categories.some(
+      (category) => category.calendarPackGroupId === "holidays-by-state"
+    )
+  ).toBe(false);
+  expect(
+    removed.categories.some((category) => category.name === "Eventos pessoais")
+  ).toBe(false);
+  expect(isOnboardingPersonalDemoSnapshot(removed)).toBe(true);
+});
+
 test("sandbox libera criação, edição e exclusão sem preservar a origem demonstrativa", () => {
   const store = useStore.getState();
   store.loadOnboardingPersonalDemo(2026);
@@ -832,9 +974,20 @@ test("sandbox libera criação, edição e exclusão sem preservar a origem demo
 
   const sandbox = useStore.getState();
   expect(
-    sandbox.categories.every((category) => !category.calendarPackGroupId)
+    sandbox.categories
+      .filter(
+        (category) =>
+          category.name !== "Feriados" && category.name !== "Corridas F1"
+      )
+      .every((category) => !category.calendarPackGroupId)
   ).toBe(true);
-  expect(sandbox.events.every((event) => !event.calendarPackGroupId)).toBe(true);
+  expect(
+    new Set(
+      sandbox.categories
+        .map((category) => category.calendarPackGroupId)
+        .filter(Boolean)
+    )
+  ).toEqual(new Set(["holidays-by-state", formula12026Pack.id]));
 
   const categoryId = sandbox.categories[0]?.id;
   expect(categoryId).toBeTruthy();

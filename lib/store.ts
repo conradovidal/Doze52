@@ -29,6 +29,7 @@ import type {
   OnboardingCategoryChoice,
   OnboardingContext,
 } from "./onboarding";
+import { importCalendarPackVariant } from "./calendar-packs/import";
 import { formula12026Pack } from "./calendar-packs/formula-1-2026";
 import { holidays2026Packs } from "./calendar-packs/holidays-2026";
 
@@ -106,7 +107,12 @@ type StoreState = {
   createCategory: (input: { name: string; color: string; profileId: string }) => string;
   addCategory: (name: string, color: string, profileId?: string) => void;
   updateCategory: (id: string, patch: Partial<Omit<CategoryItem, "id">>) => void;
-  deleteCategory: (id: string) => void;
+  deleteCategory: (input: {
+    categoryId: string;
+    strategy:
+      | { type: "move"; targetCategoryId: string }
+      | { type: "delete-events" };
+  }) => boolean;
   toggleCategoryVisibility: (id: string) => void;
   setAllCategoriesVisibility: (visible: boolean) => void;
   setCategoriesVisibility: (ids: string[], visible: boolean) => void;
@@ -161,13 +167,14 @@ export const ONBOARDING_CATEGORY_IDS = {
 
 export const ONBOARDING_DEFAULT_CATEGORY_ID = ONBOARDING_CATEGORY_IDS.events;
 export const ONBOARDING_PERSONAL_DEMO_GROUP_ID =
-  "onboarding-personal-demo-v6";
+  "onboarding-personal-demo-v7";
 const ONBOARDING_PERSONAL_DEMO_GROUP_IDS = new Set([
   "onboarding-personal-demo-v1",
   "onboarding-personal-demo-v2",
   "onboarding-personal-demo-v3",
   "onboarding-personal-demo-v4",
   "onboarding-personal-demo-v5",
+  "onboarding-personal-demo-v6",
   ONBOARDING_PERSONAL_DEMO_GROUP_ID,
 ]);
 
@@ -358,8 +365,12 @@ const getFeatureDefaultCategories = (): CategoryItem[] => [
 const DEMO_CATEGORY_IDS = {
   friends: "99999999-0001-4000-8000-000000000002",
   family: "99999999-0001-4000-8000-000000000003",
-  holidays: "99999999-0001-4000-8000-000000000004",
-  formula1: "99999999-0001-4000-8000-000000000007",
+  holidays:
+    holidays2026Packs[0]?.categories[0]?.id ??
+    "99999999-0001-4000-8000-000000000004",
+  formula1:
+    formula12026Pack.categories[0]?.id ??
+    "99999999-0001-4000-8000-000000000007",
   workEvents: "99999999-0001-4000-8000-000000000008",
   workMarketing: "99999999-0001-4000-8000-000000000009",
   workPerformance: "99999999-0001-4000-8000-000000000010",
@@ -967,35 +978,89 @@ export type OnboardingPersonalDemoSnapshot = {
 
 export const getOnboardingPersonalDemoSnapshot = (
   year: number
-): OnboardingPersonalDemoSnapshot => ({
-  profiles: getPersonalDemoProfiles().map((profile) => ({ ...profile })),
-  categories: getPersonalDemoCategories().map((category) => ({ ...category })),
-  events: getPersonalDemoEvents(year).map((event) => ({ ...event })),
-});
+): OnboardingPersonalDemoSnapshot => {
+  const baseSnapshot: OnboardingPersonalDemoSnapshot = {
+    profiles: getPersonalDemoProfiles().map((profile) => ({ ...profile })),
+    categories: getPersonalDemoCategories().map((category) => ({ ...category })),
+    events: getPersonalDemoEvents(year).map((event) => ({ ...event })),
+  };
+  const calendarPackCategoryIds = new Set([
+    DEMO_CATEGORY_IDS.holidays,
+    DEMO_CATEGORY_IDS.formula1,
+  ]);
+  const personalDemoEvents = baseSnapshot.events.filter(
+    (event) => !calendarPackCategoryIds.has(event.categoryId)
+  );
+  let snapshot: OnboardingPersonalDemoSnapshot = {
+    ...baseSnapshot,
+    events: [],
+  };
+
+  const rioGrandeDoSulHolidays = holidays2026Packs.find(
+    (pack) => pack.regionCode === "RS" && pack.year === year
+  );
+  if (rioGrandeDoSulHolidays) {
+    snapshot = importCalendarPackVariant(
+      snapshot,
+      rioGrandeDoSulHolidays,
+      holidays2026Packs,
+      "all",
+      ONBOARDING_PROFILE_IDS.personal
+    ).snapshot;
+  }
+
+  if (formula12026Pack.year === year) {
+    snapshot = importCalendarPackVariant(
+      snapshot,
+      formula12026Pack,
+      [formula12026Pack],
+      "all",
+      ONBOARDING_PROFILE_IDS.personal
+    ).snapshot;
+  }
+
+  return {
+    ...snapshot,
+    events: [...personalDemoEvents, ...snapshot.events],
+  };
+};
 
 export const isOnboardingPersonalDemoSnapshot = (
   snapshot: OnboardingPersonalDemoSnapshot
-) =>
-  (snapshot.categories.length === 6 ||
-    snapshot.categories.length === 11 ||
-    snapshot.categories.length === 13 ||
-    snapshot.categories.length === 14) &&
-  snapshot.events.length > 0 &&
-  snapshot.categories.every((category) =>
+) => {
+  const demoCategories = snapshot.categories.filter((category) =>
     isOnboardingPersonalDemoGroup(category.calendarPackGroupId)
-  ) &&
-  snapshot.events.every((event) =>
+  );
+  const demoEvents = snapshot.events.filter((event) =>
     isOnboardingPersonalDemoGroup(event.calendarPackGroupId)
   );
+
+  return (
+    demoCategories.length >= 6 &&
+    demoCategories.length <= 14 &&
+    demoEvents.length > 0
+  );
+};
 
 export const stripOnboardingPersonalDemo = (
   snapshot: OnboardingPersonalDemoSnapshot
 ): OnboardingPersonalDemoSnapshot => {
+  const hasDemoMarker =
+    snapshot.categories.some((category) =>
+      isOnboardingPersonalDemoGroup(category.calendarPackGroupId)
+    ) ||
+    snapshot.events.some((event) =>
+      isOnboardingPersonalDemoGroup(event.calendarPackGroupId)
+    );
   const categories = snapshot.categories.filter(
-    (category) => !isOnboardingPersonalDemoGroup(category.calendarPackGroupId)
+    (category) =>
+      !isOnboardingPersonalDemoGroup(category.calendarPackGroupId) &&
+      !(hasDemoMarker && category.calendarPackGroupId)
   );
   const events = snapshot.events.filter(
-    (event) => !isOnboardingPersonalDemoGroup(event.calendarPackGroupId)
+    (event) =>
+      !isOnboardingPersonalDemoGroup(event.calendarPackGroupId) &&
+      !(hasDemoMarker && event.calendarPackGroupId)
   );
 
   if (
@@ -1852,29 +1917,55 @@ export const useStore = create<StoreState>()(
                 : state.events,
           };
         }),
-      deleteCategory: (id) =>
+      deleteCategory: ({ categoryId, strategy }) => {
+        let didDelete = false;
         set((state) => {
-          if (state.categories.length <= 1) return state;
-          const targetCategory = state.categories.find((category) => category.id === id);
-          if (!targetCategory) return state;
-
-          const nextCategories = state.categories.filter((c) => c.id !== id);
-          const fallbackSameProfile = nextCategories.find(
-            (category) => category.profileId === targetCategory.profileId
+          const category = state.categories.find(
+            (candidate) => candidate.id === categoryId
           );
-          const fallbackCategory = fallbackSameProfile ?? nextCategories[0];
-          const fallbackId = fallbackCategory?.id ?? defaultCategoryId;
-          const fallbackColor = fallbackCategory?.color ?? defaultCategoryColor;
+          if (!category || category.calendarPackGroupId) return state;
 
+          const ordinaryCategories = state.categories.filter(
+            (candidate) => !candidate.calendarPackGroupId
+          );
+          if (ordinaryCategories.length <= 1) return state;
+
+          const nextCategories = state.categories.filter(
+            (candidate) => candidate.id !== categoryId
+          );
+          if (strategy.type === "delete-events") {
+            didDelete = true;
+            return {
+              categories: nextCategories,
+              events: state.events.filter(
+                (event) => event.categoryId !== categoryId
+              ),
+            };
+          }
+
+          const destination = nextCategories.find(
+            (candidate) =>
+              candidate.id === strategy.targetCategoryId &&
+              !candidate.calendarPackGroupId
+          );
+          if (!destination) return state;
+
+          didDelete = true;
           return {
             categories: nextCategories,
-            events: state.events.map((evt) =>
-              evt.categoryId === id
-                ? { ...evt, categoryId: fallbackId, color: fallbackColor }
-                : evt
+            events: state.events.map((event) =>
+              event.categoryId === categoryId
+                ? {
+                    ...event,
+                    categoryId: destination.id,
+                    color: destination.color,
+                  }
+                : event
             ),
           };
-        }),
+        });
+        return didDelete;
+      },
       toggleCategoryVisibility: (id) =>
         set((state) => ({
           categories: state.categories.map((c) =>

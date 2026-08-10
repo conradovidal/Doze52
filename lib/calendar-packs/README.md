@@ -13,8 +13,8 @@ read-only. Provenance fields on categories and events drive automatic reconcilia
 - `holidays-2026.ts`: recurring national holidays plus all Brazilian state and Federal
   District variants. Fixed dates recur yearly from 2025 and mobile dates are calculated
   through 2100. Optional government closure dates are intentionally excluded.
-- `brasileirao-2026.ts`: official 2026 matches for Grêmio and Internacional across the
-  supported competitions, exposed as exclusive team variants.
+- `brasileirao-2026.ts`: official 2026 matches for Grêmio across the supported
+  competitions.
 
 Keep pack `profile.id`, category `id`s, and event `id`s stable. Importing the same pack
 must remain idempotent for users who already added it. Packs are tracked by stable IDs and
