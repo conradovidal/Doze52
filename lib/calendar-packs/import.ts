@@ -49,6 +49,9 @@ const normalizeLabel = (value: string) =>
     .toLowerCase()
     .trim();
 
+const isOnboardingDemoGroupId = (groupId?: string) =>
+  Boolean(groupId?.startsWith("onboarding-personal-demo-"));
+
 export const getCalendarPackGroupId = (pack: CalendarPack) =>
   pack.variantGroup?.id ?? pack.id;
 
@@ -1260,7 +1263,9 @@ export const removeCalendarPack = (
   );
   const nextCategories = [...nextCategoriesWithoutPack];
   const hasOrdinaryCategory = nextCategories.some(
-    (category) => !category.calendarPackGroupId
+    (category) =>
+      !category.calendarPackGroupId ||
+      isOnboardingDemoGroupId(category.calendarPackGroupId)
   );
   if (!hasOrdinaryCategory) {
     const fallbackProfileId =

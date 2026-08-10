@@ -470,45 +470,46 @@ export function CategoryManager({
 
         {categoryEventCount > 0 ? (
           <div className="space-y-3" role="radiogroup" aria-label="Destino dos eventos">
-            <label
+            <div
               className={cn(
-                "block w-full cursor-pointer rounded-xl border px-4 py-3 text-left transition-colors",
+                "grid w-full grid-cols-1 items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors sm:grid-cols-[minmax(0,1fr)_minmax(10rem,14rem)]",
                 deleteStrategy === "move"
                   ? "border-primary/45 bg-primary/5"
                   : "border-border hover:bg-muted/45"
               )}
             >
-              <input
-                type="radio"
-                name="category-delete-strategy"
-                value="move"
-                checked={deleteStrategy === "move"}
-                onChange={() => {
-                  setDeleteStrategy("move");
-                  setDeleteError(null);
-                }}
-                className="sr-only"
-              />
-              <span className="block text-sm font-semibold text-foreground">
-                Mover eventos
-              </span>
-              <span className="mt-1 block text-xs leading-5 text-muted-foreground">
-                Preserve os eventos em outra categoria.
-              </span>
-            </label>
+              <label className="min-w-0 cursor-pointer">
+                <input
+                  type="radio"
+                  name="category-delete-strategy"
+                  value="move"
+                  checked={deleteStrategy === "move"}
+                  onChange={() => {
+                    setDeleteStrategy("move");
+                    setDeleteError(null);
+                  }}
+                  className="sr-only"
+                />
+                <span className="block text-sm font-semibold text-foreground">
+                  Mover eventos
+                </span>
+                <span className="mt-1 block text-xs leading-5 text-muted-foreground">
+                  Preserve os eventos em outra categoria.
+                </span>
+              </label>
 
-            {deleteStrategy === "move" ? (
               <Select
                 value={deleteTargetCategoryId}
                 onValueChange={(nextCategoryId) => {
                   setDeleteTargetCategoryId(nextCategoryId);
+                  setDeleteStrategy("move");
                   setDeleteError(null);
                 }}
               >
                 <SelectTrigger
                   size="sm"
                   aria-label="Categoria de destino dos eventos"
-                  className="h-10 w-full rounded-xl"
+                  className="h-9 w-full rounded-[9px] bg-card text-xs font-semibold shadow-none"
                 >
                   <span className="truncate">
                     {deleteTargetCategory
@@ -524,7 +525,7 @@ export function CategoryManager({
                   ))}
                 </SelectContent>
               </Select>
-            ) : null}
+            </div>
 
             <label
               className={cn(

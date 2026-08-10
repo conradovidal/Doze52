@@ -455,6 +455,225 @@ test("monta contexto Pessoal de forma incremental", async ({ page }, testInfo) =
   ).toBe(true);
 });
 
+test("ano de exemplo gerencia Feriados do RS e Corridas F1 sem duplicar", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name === "mobile-chromium",
+    "Catálogo completo do exemplo validado no desktop"
+  );
+  await page.goto("/?mobileUi=0");
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const payload = JSON.parse(
+          window.localStorage.getItem("yiv-store") ?? "{}"
+        );
+        return new Set(
+          (payload.state?.categories ?? [])
+            .map(
+              (category: { calendarPackGroupId?: string }) =>
+                category.calendarPackGroupId
+            )
+            .filter(Boolean)
+        ).size;
+      })
+    )
+    .toBeGreaterThanOrEqual(3);
+
+  const openCalendars = () =>
+    page
+      .getByRole("button", { name: "Adicionar ou gerenciar calendários." })
+      .click();
+  const waitForHolidayVariant = (variantId: string | null) =>
+    expect
+      .poll(() =>
+        page.evaluate(() => {
+          const payload = JSON.parse(
+            window.localStorage.getItem("yiv-store") ?? "{}"
+          );
+          return (
+            (payload.state?.categories ?? []).find(
+              (category: { calendarPackGroupId?: string }) =>
+                category.calendarPackGroupId === "holidays-by-state"
+            )?.calendarPackVariantId ?? null
+          );
+        })
+      )
+      .toBe(variantId);
+  await openCalendars();
+  const dialog = page.getByRole("dialog", { name: "Calendários" });
+  const holidayCard = dialog.locator(
+    '[data-calendar-pack-group="holidays-by-state"]'
+  );
+  const formulaCard = dialog.locator(
+    '[data-calendar-pack-group="formula-1-2026"]'
+  );
+  await expect(holidayCard.getByRole("button", { name: "Remover" })).toBeVisible();
+  await expect(formulaCard.getByRole("button", { name: "Remover" })).toBeVisible();
+
+  const stateSelect = holidayCard.getByRole("combobox", {
+    name: /Estado para Feriados nacionais/i,
+  });
+  await expect(stateSelect).toHaveText(/Rio Grande do Sul \(RS\)/i);
+  await stateSelect.click();
+  await page.getByRole("option", { name: /São Paulo \(SP\)/i }).click();
+  await holidayCard.getByRole("button", { name: "Trocar estado" }).click();
+
+  const switchedState = await page.evaluate(() => {
+    const payload = JSON.parse(window.localStorage.getItem("yiv-store") ?? "{}");
+    const categories = payload.state?.categories ?? [];
+    const events = payload.state?.events ?? [];
+    return {
+      holidayCategories: categories.filter(
+        (category: { calendarPackGroupId?: string }) =>
+          category.calendarPackGroupId === "holidays-by-state"
+      ),
+      titles: events.map((event: { title?: string }) => event.title),
+    };
+  });
+  expect(switchedState.holidayCategories).toHaveLength(1);
+  expect(switchedState.holidayCategories[0]?.calendarPackVariantId).toBe(
+    "holidays-sao-paulo"
+  );
+  expect(switchedState.titles).toContain(
+    "9 de Julho — Data Magna de São Paulo"
+  );
+  expect(switchedState.titles).not.toContain("Revolução Farroupilha");
+
+  await page.keyboard.press("Escape");
+  await page.reload();
+  await waitForHolidayVariant("holidays-sao-paulo");
+  await openCalendars();
+  await expect(stateSelect).toHaveText(/São Paulo \(SP\)/i);
+  await holidayCard.getByRole("button", { name: "Remover" }).click();
+  await page.keyboard.press("Escape");
+  await page.reload();
+  await waitForHolidayVariant(null);
+  await expect(
+    page.getByRole("button", { name: "Feriados", exact: true })
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Corridas F1", exact: true })
+  ).toBeVisible();
+  await openCalendars();
+  await expect(
+    holidayCard.getByRole("button", { name: "Adicionar calendário" })
+  ).toBeVisible();
+  await expect(formulaCard.getByRole("button", { name: "Remover" })).toBeVisible();
+});
+
+test("seletor de destino integra o card de mover eventos", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name === "mobile-chromium",
+    "Responsividade do diálogo validada no mesmo viewport controlado"
+  );
+  await page.goto("/?mobileUi=0");
+  await page.getByRole("button", { name: "Encerrar guia inicial" }).click();
+  await page.getByRole("button", { name: "Encerrar e explorar" }).click();
+  await page.evaluate(() => {
+    const payload = JSON.parse(window.localStorage.getItem("yiv-store") ?? "{}");
+    payload.state.categories = (payload.state.categories ?? []).map(
+      (category: {
+        calendarPackGroupId?: string;
+        calendarPackVariantId?: string;
+        calendarPackCategoryKey?: string;
+        calendarPackVersion?: number;
+      }) =>
+        category.calendarPackGroupId?.startsWith("onboarding-personal-demo-")
+          ? {
+              ...category,
+              calendarPackGroupId: undefined,
+              calendarPackVariantId: undefined,
+              calendarPackCategoryKey: undefined,
+              calendarPackVersion: undefined,
+            }
+          : category
+    );
+    payload.state.events = (payload.state.events ?? []).map(
+      (event: {
+        calendarPackGroupId?: string;
+        calendarPackEventKey?: string;
+      }) =>
+        event.calendarPackGroupId?.startsWith("onboarding-personal-demo-")
+          ? {
+              ...event,
+              calendarPackGroupId: undefined,
+              calendarPackEventKey: undefined,
+            }
+          : event
+    );
+    window.localStorage.setItem("yiv-store", JSON.stringify(payload));
+  });
+  await page.reload();
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const payload = JSON.parse(
+          window.localStorage.getItem("yiv-store") ?? "{}"
+        );
+        return (
+          (payload.state?.categories ?? []).find(
+            (category: { name?: string }) => category.name === "Família"
+          )?.calendarPackGroupId ?? null
+        );
+      })
+    )
+    .toBeNull();
+  const editWorkspace = page.getByRole("button", {
+    name: "Editar contextos e categorias",
+  });
+  const finishWorkspaceEdit = page.getByRole("button", {
+    name: "Finalizar edição de contextos e categorias",
+  });
+  await expect(async () => {
+    await editWorkspace.click();
+    await expect(finishWorkspaceEdit).toBeVisible({ timeout: 1_500 });
+  }).toPass({ timeout: 10_000 });
+  await page
+    .getByRole("button", { name: "Editar categoria Família" })
+    .first()
+    .click();
+  const categoryDialog = page.getByRole("dialog", { name: "Editar categoria" });
+  await categoryDialog.getByRole("button", { name: "Deletar" }).click();
+
+  const deleteDialog = page.getByRole("dialog", { name: "Excluir categoria" });
+  const moveLabel = deleteDialog.getByText("Mover eventos", { exact: true });
+  const destination = deleteDialog.getByRole("combobox", {
+    name: "Categoria de destino dos eventos",
+  });
+  const [desktopLabelBox, desktopSelectBox] = await Promise.all([
+    moveLabel.boundingBox(),
+    destination.boundingBox(),
+  ]);
+  if (!desktopLabelBox || !desktopSelectBox) {
+    throw new Error("Opção de movimentação não renderizada");
+  }
+  expect(desktopSelectBox.x).toBeGreaterThan(desktopLabelBox.x);
+
+  await deleteDialog
+    .getByText(/Excluir categoria e \d+ eventos/, { exact: true })
+    .click();
+  await destination.click();
+  await page.getByRole("option", { name: "Aniversários · Pessoal" }).click();
+  await expect(
+    deleteDialog.locator('input[value="move"]')
+  ).toBeChecked();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  const [mobileLabelBox, mobileSelectBox] = await Promise.all([
+    moveLabel.boundingBox(),
+    destination.boundingBox(),
+  ]);
+  if (!mobileLabelBox || !mobileSelectBox) {
+    throw new Error("Opção responsiva de movimentação não renderizada");
+  }
+  expect(mobileSelectBox.y).toBeGreaterThan(mobileLabelBox.y);
+  await deleteDialog.getByRole("button", { name: "Cancelar" }).click();
+});
+
 test("mobile recomenda o desktop e libera uma prévia somente na sessão", async ({
   page,
 }, testInfo) => {
@@ -892,14 +1111,34 @@ test("substitui automaticamente um exemplo v3 ainda bloqueado", async ({
 
   await page.reload();
   await expect(page.locator('[data-onboarding-category-id][title="Viagens"]')).toBeVisible();
-  const groupIds = await page.evaluate(() => {
-    const payload = JSON.parse(window.localStorage.getItem("yiv-store") ?? "{}");
-    return [
-      ...(payload.state.categories ?? []),
-      ...(payload.state.events ?? []),
-    ].map((item: { calendarPackGroupId?: string }) => item.calendarPackGroupId);
-  });
-  expect(new Set(groupIds)).toEqual(new Set(["onboarding-personal-demo-v6"]));
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const payload = JSON.parse(
+          window.localStorage.getItem("yiv-store") ?? "{}"
+        );
+        return [
+          ...new Set(
+            [
+              ...(payload.state.categories ?? []),
+              ...(payload.state.events ?? []),
+            ]
+              .map(
+                (item: { calendarPackGroupId?: string }) =>
+                  item.calendarPackGroupId
+              )
+              .filter(Boolean)
+          ),
+        ].sort();
+      })
+    )
+    .toEqual(
+      [
+        "formula-1-2026",
+        "holidays-by-state",
+        "onboarding-personal-demo-v7",
+      ].sort()
+    );
 });
 
 test("sandbox convida após cinco alvos e retoma o onboarding limpo", async ({
