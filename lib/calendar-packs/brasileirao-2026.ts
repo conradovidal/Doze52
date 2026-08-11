@@ -11,7 +11,12 @@ const slug = (value: string) => value.toLowerCase().normalize("NFD")
 
 const teams = [...clubs].sort((left, right) => left.name.localeCompare(right.name, "pt-BR"));
 
-const toEvent = (match: (typeof seed.events)[number]): CalendarPackEvent => ({
+type SeedMatch = (typeof seed.events)[number] & {
+  resultProvider?: string;
+  penaltyResult?: string;
+};
+
+const toEvent = (match: SeedMatch): CalendarPackEvent => ({
   id: match.id,
   title: match.result
     ? `${match.homeTeam} ${match.result} ${match.awayTeam}`
@@ -30,13 +35,17 @@ const toEvent = (match: (typeof seed.events)[number]): CalendarPackEvent => ({
   sourceUrl: match.sourceUrl,
   lastVerified: seed.verifiedAt,
   result: match.result,
-  notes: [`Referência oficial ${match.sourceId}: ${match.externalId}.`],
+  notes: [
+    `Referência oficial ${match.sourceId}: ${match.externalId}.`,
+    ...(match.resultProvider ? [`Resultado operacional: ${match.resultProvider}.`] : []),
+    ...(match.penaltyResult ? [`Pênaltis: ${match.penaltyResult}.`] : []),
+  ],
   isBrazilMatch: false,
 });
 
 const createPack = (teamId: string, teamName: string): CalendarPack => ({
   id: `brasileirao-2026-${slug(teamName)}`,
-  version: teamId === GREMIO_ID ? 6 : 2,
+  version: seed.packVersions[teamId as keyof typeof seed.packVersions] ?? (teamId === GREMIO_ID ? 6 : 2),
   name: `Jogos do ${teamName}`,
   eyebrow: teamName,
   icon: "soccer-ball",

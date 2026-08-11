@@ -30,6 +30,11 @@ const toPackEvent = (
 ): CalendarPackEvent => {
   const homeTeam = canonicalTeamName(event.homeTeam);
   const awayTeam = canonicalTeamName(event.awayTeam);
+  const notes = [
+    `Referência oficial da partida: ${event.externalId}.`,
+    ...(event.resultProvider ? [`Resultado operacional: ${event.resultProvider}.`] : []),
+    ...(event.penaltyResult ? [`Pênaltis: ${event.penaltyResult}.`] : []),
+  ];
   return ({
   id: canonicalEventId(source, event.externalId),
   legacyIds: [`${slug(source.competition)}-${source.season}-${event.externalId}`],
@@ -52,7 +57,7 @@ const toPackEvent = (
   sourceUrl: source.official_url,
   lastVerified: new Date().toISOString().slice(0, 10),
   result: event.result,
-  notes: [`Referência oficial da partida: ${event.externalId}.`],
+  notes,
   isBrazilMatch: homeTeam === "Brasil" || awayTeam === "Brasil",
   });
 };
@@ -129,6 +134,9 @@ export const applyOfficialSourceToCatalog = (
           (relevant.filter((event) => event.date === newEvent.date).length === 1
             ? pack.events.find((event) => event.date === newEvent.date)
             : undefined);
+        const preservedNotes = oldEvent?.notes?.filter((note) =>
+          !/^(Referência oficial|Resultado operacional|Pênaltis):?/.test(note)
+        ) ?? [];
         return oldEvent ? {
           ...newEvent,
           id: oldEvent.id,
@@ -138,7 +146,7 @@ export const applyOfficialSourceToCatalog = (
             ? oldEvent.timezone : newEvent.timezone,
           city: newEvent.city || oldEvent.city,
           venue: newEvent.venue || oldEvent.venue,
-          notes: oldEvent.notes ?? newEvent.notes,
+          notes: Array.from(new Set([...preservedNotes, ...(newEvent.notes ?? [])])),
           recurrenceType: oldEvent.recurrenceType,
           recurrenceUntil: oldEvent.recurrenceUntil,
         } : newEvent;

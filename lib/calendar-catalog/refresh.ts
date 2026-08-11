@@ -4,9 +4,10 @@ import type { CalendarPack } from "@/lib/calendar-packs/types";
 import { applyOfficialSourceToCatalog } from "./catalog-builder";
 import { canonicalEventId } from "./catalog-builder";
 import { diffCatalogs, materialHash } from "./material";
+import { fetchGeFootballFeed, reconcileGeFootballFeed } from "./ge-feed";
 import { parseOfficialSource } from "./parsers";
 import { fallbackCatalog, getPublishedCatalog, listRunnableSources } from "./repository";
-import type { OfficialCalendarEvent } from "./types";
+import type { FootballCandidatePayload, OfficialCalendarEvent } from "./types";
 import { validateOfficialCandidate } from "./validation";
 
 export type RefreshTrigger = "scheduled_midnight" | "scheduled_closing" | "manual";
@@ -40,6 +41,12 @@ const fetchOfficialEvents = async (source: Parameters<typeof parseOfficialSource
     .sort((left, right) => `${left.date}T${left.time}`.localeCompare(`${right.date}T${right.time}`));
 };
 
+const candidateOfficialEvents = (payload: unknown) => {
+  if (Array.isArray(payload)) return payload as OfficialCalendarEvent[];
+  const candidate = payload as Partial<FootballCandidatePayload> | null;
+  return Array.isArray(candidate?.officialEvents) ? candidate.officialEvents : [];
+};
+
 export const refreshCalendarCatalog = async ({
   trigger,
   requestedBy,
@@ -58,14 +65,39 @@ export const refreshCalendarCatalog = async ({
   const published = (await getPublishedCatalog()) ?? fallbackCatalog();
   let candidatePacks: CalendarPack[] = published.packs;
   const sources = await listRunnableSources();
-  const summary = { checked: 0, unchanged: 0, shadow: 0, publishable: 0, quarantined: 0, failed: 0 };
+  const summary = { checked: 0, unchanged: 0, shadow: 0, publishable: 0, quarantined: 0, failed: 0, unmatched: 0 };
   const publishableCandidateIds: string[] = [];
 
   try {
     for (const source of sources) {
       summary.checked += 1;
       try {
-        const events = await fetchOfficialEvents(source);
+        const [officialEvents, feedEvents, mappingResult] = await Promise.all([
+          fetchOfficialEvents(source),
+          fetchGeFootballFeed(source),
+          admin.from("calendar_pack_external_ids")
+            .select("authority, external_id, canonical_id")
+            .eq("competition", source.competition)
+            .eq("season", source.season)
+            .in("authority", [source.authority, "GE"]),
+        ]);
+        if (mappingResult.error) throw mappingResult.error;
+        const officialMappings = new Map<string, string>();
+        const geMappings = new Map<string, string>();
+        for (const mapping of mappingResult.data ?? []) {
+          (mapping.authority === "GE" ? geMappings : officialMappings)
+            .set(mapping.external_id, mapping.canonical_id);
+        }
+        const reconciliation = source.feed_provider === "GE"
+          ? reconcileGeFootballFeed({ source, officialEvents, feedEvents, officialMappings, geMappings })
+          : {
+              reconciledEvents: officialEvents,
+              unmatchedFeedEvents: [],
+              issues: [],
+              providerMappings: [],
+            };
+        const events = reconciliation.reconciledEvents;
+        summary.unmatched += reconciliation.unmatchedFeedEvents.length;
 
         const { data: previousCandidate } = await admin
           .from("calendar_pack_candidates")
@@ -75,8 +107,11 @@ export const refreshCalendarCatalog = async ({
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle();
-        const previousEvents = (previousCandidate?.payload ?? []) as OfficialCalendarEvent[];
-        const issues = validateOfficialCandidate({ previous: previousEvents, candidate: events });
+        const previousEvents = candidateOfficialEvents(previousCandidate?.payload);
+        const issues = [
+          ...validateOfficialCandidate({ previous: previousEvents, candidate: officialEvents }),
+          ...reconciliation.issues,
+        ];
         const proposed = issues.length === 0
           ? applyOfficialSourceToCatalog(candidatePacks, source, events)
           : candidatePacks;
@@ -96,7 +131,13 @@ export const refreshCalendarCatalog = async ({
             source_id: source.id,
             base_release_id: published.releaseId,
             material_hash: materialHash(proposed),
-            payload: events,
+            payload: source.feed_provider === "GE" ? {
+              provider: "GE",
+              feedEvents,
+              officialEvents,
+              reconciledEvents: events,
+              unmatchedFeedEvents: reconciliation.unmatchedFeedEvents,
+            } satisfies FootballCandidatePayload : events,
             diff,
             validation_issues: issues,
             status,
@@ -124,7 +165,14 @@ export const refreshCalendarCatalog = async ({
               canonical_id: relevant[0]?.id ?? deterministicId,
               participant_fingerprint: `${event.homeTeamId ?? event.homeTeam}|${event.awayTeamId ?? event.awayTeam}`,
             };
-          });
+          }).concat(reconciliation.providerMappings.map((mapping) => ({
+            authority: "GE",
+            competition: source.competition,
+            season: source.season,
+            external_id: mapping.providerExternalId,
+            canonical_id: mapping.canonicalId,
+            participant_fingerprint: mapping.participantFingerprint,
+          })));
           if (mappings.length > 0) {
             const { error: mappingError } = await admin.from("calendar_pack_external_ids")
               .upsert(mappings, { onConflict: "authority,competition,season,external_id", ignoreDuplicates: true });

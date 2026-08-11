@@ -25,6 +25,11 @@ test("fallback compilado exige a escolha explícita entre os 20 clubes", async (
   const catalog = await page.evaluate(async () => (await fetch("/api/calendar-packs")).json());
   const palmeiras = catalog.packs.find((pack: { variantGroup?: { optionLabel?: string } }) => pack.variantGroup?.optionLabel === "Palmeiras");
   expect(new Set(palmeiras.events.map((event: { competition?: string }) => event.competition)).has("CONMEBOL Libertadores")).toBe(true);
+  expect(palmeiras.events.some((event: { competition?: string; result?: string; notes?: string[] }) =>
+    event.competition === "CONMEBOL Libertadores" && Boolean(event.result) && event.notes?.includes("Resultado operacional: GE.")
+  )).toBe(true);
+  expect(palmeiras.events.filter((event: { competition?: string }) => event.competition?.includes("CONMEBOL"))
+    .every((event: { sourceUrl?: string }) => event.sourceUrl?.includes("conmebol.com"))).toBe(true);
   const athletico = catalog.packs.find((pack: { variantGroup?: { optionLabel?: string } }) => pack.variantGroup?.optionLabel === "Athletico Paranaense");
   expect(athletico.events.some((event: { competition?: string }) => event.competition?.includes("CONMEBOL"))).toBe(false);
 });
@@ -35,6 +40,7 @@ test("catálogo remoto oferece 20 clubes e consulta uma nova versão sem deploy"
     competition: "Campeonato Brasileiro Serie A", season: 2026,
     official_url: "https://www.cbf.com.br/futebol-brasileiro/tabelas/campeonato-brasileiro/serie-a/2026",
     parser_key: "cbf", rollout_status: "active" as const, freshness_hours: 28,
+    feed_provider: null, feed_url: null,
     last_checked_at: null, last_successful_at: null, last_error: null,
   };
   const makeMatch = (index: number, homeTeam: string, awayTeam: string): OfficialCalendarEvent => ({

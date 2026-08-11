@@ -18,6 +18,8 @@ export type CalendarCatalogSource = {
   season: number;
   official_url: string;
   parser_key: string;
+  feed_provider: string | null;
+  feed_url: string | null;
   rollout_status: SourceRolloutStatus;
   freshness_hours: number;
   last_checked_at: string | null;
@@ -40,7 +42,23 @@ export type OfficialCalendarEvent = {
   homeTeamId?: string;
   awayTeamId?: string;
   result?: string;
+  penaltyResult?: string;
+  resultProvider?: string;
   placeholder?: boolean;
+};
+
+export type FeedCalendarEvent = OfficialCalendarEvent & {
+  provider: string;
+  providerExternalId: string;
+  status: "scheduled" | "in_progress" | "finished";
+};
+
+export type FootballCandidatePayload = {
+  provider: string;
+  feedEvents: FeedCalendarEvent[];
+  officialEvents: OfficialCalendarEvent[];
+  reconciledEvents: OfficialCalendarEvent[];
+  unmatchedFeedEvents: FeedCalendarEvent[];
 };
 
 export type CandidateValidationIssue = {
@@ -49,7 +67,8 @@ export type CandidateValidationIssue = {
     | "invalid_shape"
     | "excessive_removal"
     | "external_id_reused"
-    | "participants_changed";
+    | "participants_changed"
+    | "result_conflict";
   message: string;
   eventId?: string;
 };

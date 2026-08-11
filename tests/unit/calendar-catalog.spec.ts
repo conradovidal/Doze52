@@ -4,6 +4,12 @@ import { diffCatalogs, incrementChangedPackVersions, materialHash } from "../../
 import { parseOfficialSource } from "../../lib/calendar-catalog/parsers";
 import { validateOfficialCandidate } from "../../lib/calendar-catalog/validation";
 import { applyOfficialSourceToCatalog } from "../../lib/calendar-catalog/catalog-builder";
+import {
+  fetchGeFootballFeed,
+  parseGeBootstrap,
+  parseGeMatches,
+  reconcileGeFootballFeed,
+} from "../../lib/calendar-catalog/ge-feed";
 import type { CalendarCatalogSource, OfficialCalendarEvent } from "../../lib/calendar-catalog/types";
 import type { CalendarPack } from "../../lib/calendar-packs/types";
 import clubs from "../../lib/calendar-packs/brazilian-clubs-2026.json";
@@ -11,6 +17,7 @@ import clubs from "../../lib/calendar-packs/brazilian-clubs-2026.json";
 const source = (parser_key: string): CalendarCatalogSource => ({
   id: `source-${parser_key}`, authority: "Autoridade", competition: "Competição",
   season: 2026, official_url: "https://oficial.example/calendario", parser_key,
+  feed_provider: null, feed_url: null,
   rollout_status: "shadow", freshness_hours: 28, last_checked_at: null,
   last_successful_at: null, last_error: null,
 });
@@ -23,6 +30,75 @@ test("parser CBF aceita a tabela oficial e descarta placeholders", () => {
   const parsed = parseOfficialSource(body, "application/json", source("cbf"));
   expect(parsed).toHaveLength(1);
   expect(parsed[0]).toMatchObject({ externalId: "831894", date: "2026-01-28", time: "19:00", homeTeamId: "62194", awayTeamId: "20002", result: "2 x 2" });
+});
+
+test("parser GE descobre tabela e fases no bootstrap público", () => {
+  const bootstrap = parseGeBootstrap(`<script>const contentResource = {
+    const fase = {"slug":"fase-de-grupos"};
+    const classificacao = {"fase":{"slug":"fase-de-grupos"},"fases_navegacao":[{"nome":"Fase de grupos","slug":"fase-de-grupos"},{"nome":"Oitavas","slug":"oitavas"}]};
+    };</script><script>const x = 1; tUUID: "table-2026"</script>`);
+  expect(bootstrap.tableId).toBe("table-2026");
+  expect(bootstrap.phases).toEqual([
+    { name: "Fase de grupos", slug: "fase-de-grupos" },
+    { name: "Oitavas", slug: "oitavas" },
+  ]);
+});
+
+test("parser GE aceita encerrado e pênaltis, mas ignora placar em andamento", () => {
+  const geSource = { ...source("cbf"), feed_provider: "GE", feed_url: "https://ge.example/tabela" };
+  const matches = parseGeMatches({ jogos: [
+    { id: 101, data_realizacao: "2026-08-11T21:30", hora_realizacao: "21:30", jogo_ja_comecou: true, placar_oficial_mandante: 2, placar_oficial_visitante: 2, placar_penaltis_mandante: 5, placar_penaltis_visitante: 4, equipes: { mandante: { id: 1, nome_popular: "Palmeiras" }, visitante: { id: 2, nome_popular: "Tolima" } }, sede: { nome_popular: "Allianz Parque" }, transmissao: { broadcast: { id: "ENCERRADA" } } },
+    { id: 102, data_realizacao: "2026-08-12T19:00", hora_realizacao: "19:00", jogo_ja_comecou: true, placar_oficial_mandante: 1, placar_oficial_visitante: 0, equipes: { mandante: { id: 3, nome_popular: "Flamengo" }, visitante: { id: 4, nome_popular: "Estudiantes" } }, sede: { nome_popular: "Maracanã" }, transmissao: { broadcast: { id: "AO_VIVO" } } },
+  ] }, geSource, "Oitavas");
+  expect(matches[0]).toMatchObject({ providerExternalId: "101", status: "finished", result: "2 x 2", penaltyResult: "5 x 4", homeTeam: "Palmeiras" });
+  expect(matches[1]).toMatchObject({ providerExternalId: "102", status: "in_progress", result: undefined });
+});
+
+test("feed GE navega grupos, rodadas e mata-mata com concorrência limitada", async () => {
+  const geSource = { ...source("cbf"), feed_provider: "GE", feed_url: "https://ge.example/tabela" };
+  const game = (id: number) => ({ id, data_realizacao: "2026-08-11T21:30", hora_realizacao: "21:30", jogo_ja_comecou: false, equipes: { mandante: { nome_popular: "Palmeiras" }, visitante: { nome_popular: `Time ${id}` } }, sede: { nome_popular: "Estádio" } });
+  const responses = new Map<string, unknown>([
+    ["https://ge.example/tabela", `<script>const classificacao = {"fase":{"slug":"grupos"},"fases_navegacao":[{"nome":"Grupos","slug":"grupos"},{"nome":"Oitavas","slug":"oitavas"}]}; const resource = { tUUID: "table-1" };</script>`],
+    ["https://api.globoesporte.globo.com/tabela/table-1/fase/grupos/classificacao/", { lista_tipo_unica: false, grupos: [{ grupo_id: 10, rodada: { ultima: 2 } }] }],
+    ["https://api.globoesporte.globo.com/tabela/table-1/fase/grupos/rodada/1/grupo/10/jogos/", [game(1)]],
+    ["https://api.globoesporte.globo.com/tabela/table-1/fase/grupos/rodada/2/grupo/10/jogos/", [game(2)]],
+    ["https://api.globoesporte.globo.com/tabela/table-1/fase/oitavas/classificacao/", { secao: [{ jogos: [game(3)] }] }],
+  ]);
+  const fetchMock = (async (input: string | URL | Request) => {
+    const url = String(input);
+    const value = responses.get(url);
+    if (value === undefined) return new Response("not found", { status: 404 });
+    return typeof value === "string"
+      ? new Response(value, { status: 200, headers: { "content-type": "text/html" } })
+      : Response.json(value);
+  }) as typeof fetch;
+  const matches = await fetchGeFootballFeed(geSource, fetchMock);
+  expect(matches.map((match) => match.providerExternalId)).toEqual(["1", "2", "3"]);
+  expect(matches.find((match) => match.providerExternalId === "2")?.phase).toBe("Grupos — Rodada 2");
+});
+
+test("reconciliação preserva dados oficiais, acrescenta resultado final e isola divergência", () => {
+  const geSource = { ...source("conmebol"), id: "conmebol-libertadores-2026", feed_provider: "GE", feed_url: "https://ge.example/tabela" };
+  const official = event({ externalId: "official-1", homeTeam: "Palmeiras", awayTeam: "Tolima", venue: "Local oficial" });
+  const officialWithoutGe = event({ externalId: "official-2", date: "2026-08-18", homeTeam: "Flamengo", awayTeam: "Estudiantes" });
+  const [feed] = parseGeMatches({ jogos: [{ id: 501, data_realizacao: "2026-08-11T21:30", hora_realizacao: "21:30", jogo_ja_comecou: true, placar_oficial_mandante: 2, placar_oficial_visitante: 0, equipes: { mandante: { nome_popular: "Palmeiras" }, visitante: { nome_popular: "Tolima" } }, sede: { nome_popular: "Outro local" }, transmissao: { broadcast: { id: "ENCERRADA" } } }] }, geSource, "Oitavas");
+  const reconciled = reconcileGeFootballFeed({ source: geSource, officialEvents: [official, officialWithoutGe], feedEvents: [feed] });
+  expect(reconciled.reconciledEvents[0]).toMatchObject({ result: "2 x 0", resultProvider: "GE", venue: "Local oficial" });
+  expect(reconciled.reconciledEvents[1]).toEqual(officialWithoutGe);
+  expect(reconciled.providerMappings).toHaveLength(1);
+
+  const conflict = reconcileGeFootballFeed({ source: geSource, officialEvents: [{ ...official, result: "1 x 0" }], feedEvents: [feed] });
+  expect(conflict.issues.map((issue) => issue.code)).toContain("result_conflict");
+  expect(conflict.reconciledEvents[0].result).toBe("1 x 0");
+
+  const mappedConflict = reconcileGeFootballFeed({
+    source: geSource,
+    officialEvents: [official],
+    feedEvents: [{ ...feed, homeTeam: "Flamengo" }],
+    officialMappings: new Map([[official.externalId, "canonical-1"]]),
+    geMappings: new Map([[feed.providerExternalId, "canonical-1"]]),
+  });
+  expect(mappedConflict.issues.map((issue) => issue.code)).toContain("participants_changed");
 });
 
 const event = (overrides: Partial<OfficialCalendarEvent> = {}): OfficialCalendarEvent => ({

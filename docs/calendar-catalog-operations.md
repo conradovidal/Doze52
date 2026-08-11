@@ -6,7 +6,8 @@ há release válido, Supabase está indisponível ou a resposta remota é rejeit
 
 ## Configuração
 
-1. Aplique `supabase/migrations/20260811184227_dynamic_calendar_catalog.sql`.
+1. Aplique as migrations do catálogo em ordem, incluindo a configuração forward-only
+   do feed GE.
 2. Defina `CALENDAR_PACK_REFRESH_SECRET` no ambiente do Next.js.
 3. No Vault do Supabase, crie:
    - `calendar_pack_refresh_url`: URL completa de
@@ -32,7 +33,15 @@ Brasileirão, Copa do Brasil, Libertadores e Sul-Americana começam em `shadow`.
 O fallback já agrega as quatro competições; as fontes em sombra apenas geram candidatos
 e diferenças, sem substituir o release publicado. Os endpoints técnicos da CBF e os
 documentos oficiais por fase da CONMEBOL ficam no código de ingestão, enquanto
-`official_url` permanece como a página pública de proveniência.
+`official_url` permanece como a página pública de proveniência. Para o futebol, o GE é
+o feed operacional comum de datas e resultados: `feed_provider` e `feed_url` registram
+essa dependência separadamente, sem transformar o agregador em autoridade.
+
+Cada execução descobre a tabela pública do GE, percorre suas fases e rodadas e reconcilia
+os IDs do fornecedor com os IDs oficiais. CBF e CONMEBOL continuam prevalecendo para
+participantes, data, horário, fase e local. Somente placares marcados como encerrados são
+aceitos; jogos em andamento são ignorados. Jogos encontrados apenas no GE ficam visíveis
+como não reconciliados e não entram no catálogo.
 Uma fonte em sombra gera candidatos, diferenças e quarentenas sem publicar. Depois de
 14 dias sem regressões contratuais, altere a fonte para `active` pelo banco e acompanhe
 ao menos dois ciclos antes de ativar a próxima, nesta ordem:
@@ -42,13 +51,14 @@ ao menos dois ciclos antes de ativar a próxima, nesta ordem:
 3. Fórmula 1 e FIFA;
 4. feriados governamentais.
 
-`paused` interrompe uma fonte sem apagar histórico. Nunca use páginas de clubes,
-portais esportivos ou agregadores como substitutos autoritativos.
+`paused` interrompe uma fonte sem apagar histórico. O GE pode ser trocado como feed
+operacional sem alterar a autoridade, a proveniência pública ou os UUIDs canônicos.
 
 ## Quarentena e recuperação
 
 Uma carga é bloqueada se vier vazia ou inválida, retirar mais de dois jogos e mais de
-5% do calendário, reutilizar um ID ou trocar participantes de um jogo não-placeholder.
+5% do calendário, reutilizar um ID, trocar participantes de um jogo não-placeholder ou
+divergir do placar já publicado pela fonte oficial.
 O release publicado não muda nessas situações. O painel mostra a diferença e permite
 voltar o ponteiro do catálogo a qualquer release anterior, registrando justificativa e
 operador.
