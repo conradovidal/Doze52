@@ -153,11 +153,54 @@ const parseFormula1Html = (body: string, source: CalendarCatalogSource) => {
   return events;
 };
 
+const cbfTeam = (value: unknown) => {
+  const record = asRecord(value);
+  const shield = text(record?.url_escudo);
+  return {
+    name: text(record?.nome),
+    id: shield.match(/\/clubes\/(\d+)\/escudo/i)?.[1],
+    goals: record?.gols === null || record?.gols === "" ? "" : text(record?.gols),
+  };
+};
+
+const parseCbfPayload = (body: string, source: CalendarCatalogSource) => {
+  let payload: unknown;
+  try { payload = JSON.parse(body); } catch { return []; }
+  const root = asRecord(payload);
+  if (!root) return [];
+  const records = Object.values(root).flatMap((phase) => {
+    const games = asRecord(phase)?.jogos;
+    return Array.isArray(games) ? games : [];
+  });
+  return records.flatMap((value): OfficialCalendarEvent[] => {
+    const record = asRecord(value);
+    if (!record) return [];
+    const externalId = text(record.ref_jogo);
+    const date = normalizeDate(record.data);
+    const rawTime = text(record.hora);
+    const home = cbfTeam(record.mandante);
+    const away = cbfTeam(record.visitante);
+    if (!externalId || !date || date === "1900-01-01" || !/^\d{1,2}:\d{2}$/.test(rawTime) || !home.name || !away.name || !home.id || !away.id) return [];
+    return [{
+      externalId, competition: source.competition, season: source.season,
+      date, time: normalizeTime(rawTime), timezone: "America/Sao_Paulo",
+      city: [text(record.cidade), text(record.uf)].filter(Boolean).join(" - "),
+      venue: text(record.estadio), phase: `Rodada ${text(record.rodada)}`,
+      homeTeam: home.name, awayTeam: away.name, homeTeamId: home.id, awayTeamId: away.id,
+      result: home.goals !== "" && away.goals !== "" ? `${home.goals} x ${away.goals}` : undefined,
+      placeholder: false,
+    }];
+  }).sort((left, right) => `${left.date}T${left.time}`.localeCompare(`${right.date}T${right.time}`));
+};
+
 export const parseOfficialSource = (
   body: string,
   contentType: string,
   source: CalendarCatalogSource
 ) => {
+  if (source.parser_key === "cbf" && contentType.includes("json")) {
+    return parseCbfPayload(body, source);
+  }
   if (source.parser_key === "formula1" && contentType.includes("html")) {
     return parseFormula1Html(body, source);
   }
