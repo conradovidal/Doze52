@@ -62,6 +62,11 @@ import {
   type ProductOnboardingState,
 } from "@/lib/onboarding";
 import { logDevError, logProdError } from "@/lib/safe-log";
+import {
+  captureFirstTouchAttribution,
+  recordProductActivityDay,
+  syncProductFunnelState,
+} from "@/lib/product-metrics";
 import { getSupabaseBrowserClient, hasSupabaseEnv } from "@/lib/supabase";
 import { expandEventsForYear } from "@/lib/recurrence";
 import {
@@ -657,6 +662,18 @@ export default function HomePage() {
 
   React.useEffect(() => {
     if (windowContext !== "main") return;
+    captureFirstTouchAttribution();
+  }, [windowContext]);
+
+  React.useEffect(() => {
+    if (windowContext !== "main" || !session?.user.id || !guidedOnboarding) {
+      return;
+    }
+    void syncProductFunnelState(session.user.id, guidedOnboarding);
+  }, [guidedOnboarding, session?.user.id, windowContext]);
+
+  React.useEffect(() => {
+    if (windowContext !== "main") return;
 
     if (hasSupabaseEnv) return;
 
@@ -1070,6 +1087,7 @@ export default function HomePage() {
 
       try {
         await saveSnapshot(nextSnapshot);
+        void recordProductActivityDay(session.user.id);
         clearPendingSyncSnapshot(session.user.id);
         lastSyncedHashRef.current = nextHash;
       } catch (error) {
