@@ -28,7 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { calendarPacks } from "@/lib/calendar-packs";
+import { useCalendarCatalog } from "@/lib/calendar-catalog/runtime";
 import {
   getCalendarPackAvailability,
   getCalendarPackGroupId,
@@ -109,7 +109,7 @@ function CalendarPackIcon({
   return <CalendarDays aria-hidden="true" className={className} />;
 }
 
-const calendarPackCards = (() => {
+const buildCalendarPackCards = (calendarPacks: readonly CalendarPack[]) => {
   const cards: Array<{ key: string; variants: CalendarPack[] }> = [];
   const groupedPackIds = new Set<string>();
 
@@ -131,7 +131,7 @@ const calendarPackCards = (() => {
   });
 
   return cards;
-})();
+};
 
 export function CalendarPackLauncher({
   onFocusYear,
@@ -160,6 +160,11 @@ export function CalendarPackLauncher({
   onImported?: (pack: CalendarPack) => void;
   bypassLimits?: boolean;
 }) {
+  const { calendarPacks } = useCalendarCatalog();
+  const calendarPackCards = React.useMemo(
+    () => buildCalendarPackCards(calendarPacks),
+    [calendarPacks]
+  );
   const { notify } = useFeedback();
   const { isPro, limits } = useBilling();
   const profiles = useStore((state) => state.profiles);
@@ -200,7 +205,7 @@ export function CalendarPackLauncher({
         ? current
         : { ...current, [guidedVariantGroupId]: saoPauloPack.id }
     );
-  }, [guidedVariantGroupId, requireExplicitVariant]);
+  }, [calendarPacks, guidedVariantGroupId, requireExplicitVariant]);
 
   const snapshot = React.useMemo(
     () => ({ profiles, categories, events }),
@@ -215,7 +220,7 @@ export function CalendarPackLauncher({
           getCalendarPackAvailability(snapshot, pack),
         ])
       ),
-    [snapshot]
+    [calendarPacks, snapshot]
   );
   const subscribedPackCount = React.useMemo(
     () =>
@@ -225,7 +230,7 @@ export function CalendarPackLauncher({
           return availability?.hasAnyCategory || availability?.hasImportedEvents;
         });
       }).length,
-    [availabilityByPack]
+    [availabilityByPack, calendarPackCards]
   );
   const isCalendarSubscriptionLimitReached =
     !bypassLimits &&
@@ -483,9 +488,11 @@ export function CalendarPackLauncher({
                 selectedVariant ??
                 installedVariant ??
                 variants[0];
+              const isTeamGroup = key === "brasileirao-2026-by-team";
+              const requiresExplicitSelection =
+                (isGuidedCard && requireExplicitVariant) || isTeamGroup;
               const hasRequiredVariant =
-                !isGuidedCard ||
-                !requireExplicitVariant ||
+                !requiresExplicitSelection ||
                 Boolean(selectedVariant || installedVariant);
               const availability = availabilityByPack.get(pack.id);
               const isPresent = groupIsPresent;
@@ -531,7 +538,9 @@ export function CalendarPackLauncher({
                       />
                       <div className="min-w-0">
                         <h4 className="text-sm font-medium text-foreground">
-                          {pack.name}
+                          {isTeamGroup && !selectedVariant && !installedVariant
+                            ? "Jogos do seu time"
+                            : pack.name}
                         </h4>
                         <p className="mt-1.5 text-xs leading-5 text-muted-foreground">
                           {pack.description}
@@ -540,7 +549,7 @@ export function CalendarPackLauncher({
                           <div className="mt-2">
                             <Select
                               value={
-                                isGuidedCard && requireExplicitVariant
+                                requiresExplicitSelection
                                   ? selectedVariant?.id ?? installedVariant?.id ?? ""
                                   : pack.id
                               }
@@ -560,8 +569,8 @@ export function CalendarPackLauncher({
                               >
                                 <SelectValue
                                   placeholder={
-                                    isGuidedCard && requireExplicitVariant
-                                      ? "Escolha seu estado"
+                                    requiresExplicitSelection
+                                      ? isTeamGroup ? "Escolha seu time" : "Escolha seu estado"
                                       : undefined
                                   }
                                 />
@@ -678,7 +687,7 @@ export function CalendarPackLauncher({
                             variant="premium"
                             size="icon-xs"
                             className="rounded-[9px]"
-                            disabled={isBusy || !targetProfileId}
+                            disabled={isBusy || !targetProfileId || !hasRequiredVariant}
                             onClick={() =>
                               handleImport(pack, variants, targetProfileId)
                             }
