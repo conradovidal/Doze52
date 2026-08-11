@@ -17,7 +17,6 @@ export type CalendarCatalogSource = {
   competition: string;
   season: number;
   official_url: string;
-  fetch_url: string | null;
   parser_key: string;
   rollout_status: SourceRolloutStatus;
   freshness_hours: number;

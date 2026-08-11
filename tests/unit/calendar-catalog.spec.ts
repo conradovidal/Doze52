@@ -9,7 +9,7 @@ import type { CalendarPack } from "../../lib/calendar-packs/types";
 
 const source = (parser_key: string): CalendarCatalogSource => ({
   id: `source-${parser_key}`, authority: "Autoridade", competition: "Competição",
-  season: 2026, official_url: "https://oficial.example/calendario", fetch_url: null, parser_key,
+  season: 2026, official_url: "https://oficial.example/calendario", parser_key,
   rollout_status: "shadow", freshness_hours: 28, last_checked_at: null,
   last_successful_at: null, last_error: null,
 });

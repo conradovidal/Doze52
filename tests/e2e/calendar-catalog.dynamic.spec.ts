@@ -23,7 +23,7 @@ test("catálogo remoto oferece 20 clubes e recebe nova opção sem deploy", asyn
     id: "cbf-brasileirao-2026", authority: "CBF",
     competition: "Campeonato Brasileiro Serie A", season: 2026,
     official_url: "https://www.cbf.com.br/futebol-brasileiro/tabelas/campeonato-brasileiro/serie-a/2026",
-    fetch_url: null, parser_key: "cbf", rollout_status: "active" as const, freshness_hours: 28,
+    parser_key: "cbf", rollout_status: "active" as const, freshness_hours: 28,
     last_checked_at: null, last_successful_at: null, last_error: null,
   };
   const makeMatch = (index: number, homeTeam: string, awayTeam: string): OfficialCalendarEvent => ({

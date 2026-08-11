@@ -9,7 +9,6 @@ create table if not exists public.calendar_pack_sources (
   competition text not null,
   season integer not null,
   official_url text not null,
-  fetch_url text,
   parser_key text not null,
   rollout_status text not null default 'shadow'
     check (rollout_status in ('pending', 'shadow', 'active', 'paused')),
@@ -213,25 +212,24 @@ grant execute on function public.publish_calendar_pack_release(text, jsonb, uuid
 grant execute on function public.rollback_calendar_pack_release(uuid, uuid, text) to service_role;
 
 insert into public.calendar_pack_sources
-  (id, authority, competition, season, official_url, fetch_url, parser_key, rollout_status)
+  (id, authority, competition, season, official_url, parser_key, rollout_status)
 values
   ('cbf-brasileirao-2026', 'CBF', 'Campeonato Brasileiro Serie A', 2026,
-   'https://www.cbf.com.br/futebol-brasileiro/tabelas/campeonato-brasileiro/serie-a/2026?documento=Tabela%20Detalhada', 'https://www.cbf.com.br/api/cbf/jogos/tabela-detalhada/campeonato/1260611', 'cbf', 'shadow'),
+   'https://www.cbf.com.br/futebol-brasileiro/tabelas/campeonato-brasileiro/serie-a/2026?documento=Tabela%20Detalhada', 'cbf', 'shadow'),
   ('cbf-copa-do-brasil-2026', 'CBF', 'Copa do Brasil', 2026,
-   'https://www.cbf.com.br/futebol-brasileiro/tabelas/copa-do-brasil/masculino/2026?documento=Tabela%20Detalhada', 'https://www.cbf.com.br/api/cbf/jogos/tabela-detalhada/campeonato/1260615', 'cbf', 'pending'),
+   'https://www.cbf.com.br/futebol-brasileiro/tabelas/copa-do-brasil/masculino/2026?documento=Tabela%20Detalhada', 'cbf', 'pending'),
   ('conmebol-libertadores-2026', 'CONMEBOL', 'CONMEBOL Libertadores', 2026,
-   'https://gol.conmebol.com/libertadores/es/tournament/103', null, 'conmebol', 'pending'),
+   'https://gol.conmebol.com/libertadores/es/tournament/103', 'conmebol', 'pending'),
   ('conmebol-sudamericana-2026', 'CONMEBOL', 'CONMEBOL Sudamericana', 2026,
-   'https://gol.conmebol.com/sudamericana/es/tournament/104', null, 'conmebol', 'pending'),
+   'https://gol.conmebol.com/sudamericana/es/tournament/104', 'conmebol', 'pending'),
   ('formula1-2026', 'Formula 1', 'Formula 1', 2026,
-   'https://www.formula1.com/en/racing/2026', null, 'formula1', 'pending'),
+   'https://www.formula1.com/en/racing/2026', 'formula1', 'pending'),
   ('fifa-world-cup-2026', 'FIFA', 'FIFA World Cup', 2026,
-   'https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums', null, 'fifa', 'pending'),
+   'https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/match-schedule-fixtures-results-teams-stadiums', 'fifa', 'pending'),
   ('brazil-holidays-2026', 'Governo do Brasil', 'Feriados nacionais', 2026,
-   'https://www.gov.br/gestao/pt-br/assuntos/noticias/2025/dezembro/governo-federal-divulga-calendario-de-feriados-e-pontos-facultativos-de-2026', null, 'government_holidays', 'pending')
+   'https://www.gov.br/gestao/pt-br/assuntos/noticias/2025/dezembro/governo-federal-divulga-calendario-de-feriados-e-pontos-facultativos-de-2026', 'government_holidays', 'pending')
 on conflict (id) do update set
   official_url = excluded.official_url,
-  fetch_url = excluded.fetch_url,
   parser_key = excluded.parser_key;
 
 alter table public.calendar_pack_sources enable row level security;

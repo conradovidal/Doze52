@@ -11,6 +11,11 @@ import { validateOfficialCandidate } from "./validation";
 
 export type RefreshTrigger = "scheduled_midnight" | "scheduled_closing" | "manual";
 
+const OFFICIAL_FETCH_URLS: Record<string, string> = {
+  "cbf-brasileirao-2026": "https://www.cbf.com.br/api/cbf/jogos/tabela-detalhada/campeonato/1260611",
+  "cbf-copa-do-brasil-2026": "https://www.cbf.com.br/api/cbf/jogos/tabela-detalhada/campeonato/1260615",
+};
+
 export const refreshCalendarCatalog = async ({
   trigger,
   requestedBy,
@@ -36,7 +41,7 @@ export const refreshCalendarCatalog = async ({
     for (const source of sources) {
       summary.checked += 1;
       try {
-        const response = await fetch(source.fetch_url ?? source.official_url, {
+        const response = await fetch(OFFICIAL_FETCH_URLS[source.id] ?? source.official_url, {
           headers: { "user-agent": "Doze52-Calendar-Updater/1.0 (+https://doze52.com)" },
           signal: AbortSignal.timeout(20_000),
           cache: "no-store",
