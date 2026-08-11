@@ -36,7 +36,7 @@ import {
   type EventInput,
 } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
-import { calendarPacks } from "@/lib/calendar-packs";
+import { useCalendarCatalog } from "@/lib/calendar-catalog/runtime";
 import { reconcileInstalledCalendarPacks } from "@/lib/calendar-packs/import";
 import {
   loadRemoteData,
@@ -288,6 +288,7 @@ const mergeSnapshots = (
 };
 
 export default function HomePage() {
+  const { calendarPacks } = useCalendarCatalog();
   const { notify } = useFeedback();
   const { mode: themeMode, setTheme } = useTheme();
 
@@ -909,6 +910,7 @@ export default function HomePage() {
     }
   }, [
     authLoading,
+    calendarPacks,
     categories,
     events,
     notify,
@@ -1048,6 +1050,7 @@ export default function HomePage() {
       cancelled = true;
     };
   }, [
+    calendarPacks,
     isLocalImported,
     markLocalImported,
     notify,
@@ -2000,7 +2003,7 @@ export default function HomePage() {
       (candidate) => candidate.id === holidayCategory.calendarPackVariantId
     );
     handleGuidedCalendarImported(pack?.regionCode);
-  }, [categories, guidedOnboarding?.step, handleGuidedCalendarImported]);
+  }, [calendarPacks, categories, guidedOnboarding?.step, handleGuidedCalendarImported]);
 
   const handleYearChange = React.useCallback(
     (nextYear: number) => {

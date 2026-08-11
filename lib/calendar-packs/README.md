@@ -4,6 +4,10 @@ Calendar Packs are structured, versioned seeds that import into the existing Doz
 data model. Categories remain customizable, while imported events are managed and
 read-only. Provenance fields on categories and events drive automatic reconciliation.
 
+The compiled files in this directory are now the disaster-recovery fallback. The live
+catalog is stored as immutable Supabase releases and served by `/api/calendar-packs`.
+See `docs/calendar-catalog-operations.md` for sources, schedules, quarantine and rollout.
+
 ## Current packs
 
 - `world-cup-2026-pack.json`: tournament events exposed as two exclusive coverage
@@ -13,8 +17,11 @@ read-only. Provenance fields on categories and events drive automatic reconcilia
 - `holidays-2026.ts`: recurring national holidays plus all Brazilian state and Federal
   District variants. Fixed dates recur yearly from 2025 and mobile dates are calculated
   through 2100. Optional government closure dates are intentionally excluded.
-- `brasileirao-2026.ts`: official 2026 matches for Grêmio across the supported
-  competitions.
+- `brasileirao-2026.ts`: 20 club variants in alphabetical order, aggregating officially
+  confirmed 2026 matches from Brasileirão, Copa do Brasil, Libertadores and
+  Sul-Americana according to each club's participation. GE supplies the normalized
+  operational result feed, while CBF and CONMEBOL remain the authorities and public
+  provenance.
 
 Keep pack `profile.id`, category `id`s, and event `id`s stable. Importing the same pack
 must remain idempotent for users who already added it. Packs are tracked by stable IDs and
