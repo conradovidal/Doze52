@@ -44,6 +44,15 @@ weekly_activity as (
   select count(distinct user_id)::bigint as weekly_active_planners
   from public.product_activity_days, bounds
   where activity_date between active_cutoff - 6 and active_cutoff
+),
+feedback as (
+  select
+    count(*)::bigint as submissions,
+    count(distinct user_id)::bigint as participating_users,
+    count(*) filter (where status <> 'new')::bigint as reviewed
+  from public.product_feedback_submissions, bounds
+  where created_at >= period_start::timestamptz
+    and created_at < period_end::timestamptz
 )
 select
   bounds.period_start,
@@ -51,12 +60,15 @@ select
   bounds.active_cutoff,
   accounts.accounts_created,
   activations.activated,
-  weekly_activity.weekly_active_planners
+  weekly_activity.weekly_active_planners,
+  feedback.submissions as feedback_submissions,
+  feedback.participating_users as feedback_participating_users,
+  feedback.reviewed as feedback_reviewed
 from bounds
 cross join accounts
 cross join activations
-cross join weekly_activity;
+cross join weekly_activity
+cross join feedback;
 
--- Feedback permanece indisponível até que a superfície de feedback seja
--- implementada e as tabelas product_feedback_submissions e
--- product_feedback_votes estejam presentes. Não substituir a lacuna por zero.
+-- Feedback só é comparável após a superfície estar disponível durante todo o
+-- período. Antes disso, registrar a fonte como parcial ou indisponível.
