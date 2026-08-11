@@ -2,6 +2,7 @@ import type { CalendarPack, CalendarPackEvent } from "@/lib/calendar-packs/types
 import { deterministicCalendarUuid } from "./ids";
 import { incrementChangedPackVersions } from "./material";
 import type { CalendarCatalogSource, OfficialCalendarEvent } from "./types";
+import { brazilianClubs2026, canonicalTeamName } from "./team-identities";
 
 const TEAM_GROUP = "brasileirao-2026-by-team";
 const PROFILE_ID = "2026ba00-0000-4000-8000-000000000001";
@@ -26,14 +27,17 @@ export const canonicalEventId = (source: CalendarCatalogSource, externalId: stri
 const toPackEvent = (
   source: CalendarCatalogSource,
   event: OfficialCalendarEvent
-): CalendarPackEvent => ({
+): CalendarPackEvent => {
+  const homeTeam = canonicalTeamName(event.homeTeam);
+  const awayTeam = canonicalTeamName(event.awayTeam);
+  return ({
   id: canonicalEventId(source, event.externalId),
   legacyIds: [`${slug(source.competition)}-${source.season}-${event.externalId}`],
   title: source.parser_key === "formula1"
     ? `F1 ${event.externalId}: GP ${event.homeTeam}`
     : event.result
-      ? `${event.homeTeam} ${event.result.replace(" x ", ` x `)} ${event.awayTeam}`
-      : `${event.homeTeam} x ${event.awayTeam}`,
+      ? `${homeTeam} ${event.result.replace(" x ", ` x `)} ${awayTeam}`
+      : `${homeTeam} x ${awayTeam}`,
   date: event.date,
   time: event.time,
   timezone: event.timezone || "America/Sao_Paulo",
@@ -41,22 +45,25 @@ const toPackEvent = (
   venue: event.venue,
   phase: event.phase,
   competition: source.competition,
-  homeTeam: event.homeTeam,
-  awayTeam: event.awayTeam,
+  homeTeam,
+  awayTeam,
   suggestedCategoryKey: "favorite-team-2026",
   source: `${source.authority} — ${source.competition}`,
   sourceUrl: source.official_url,
   lastVerified: new Date().toISOString().slice(0, 10),
   result: event.result,
   notes: [`Referência oficial da partida: ${event.externalId}.`],
-  isBrazilMatch: event.homeTeam === "Brasil" || event.awayTeam === "Brasil",
-});
+  isBrazilMatch: homeTeam === "Brasil" || awayTeam === "Brasil",
+  });
+};
 
 const buildBrazilianLeaguePacks = (
   source: CalendarCatalogSource,
   events: readonly OfficialCalendarEvent[]
 ): CalendarPack[] => {
-  const teams = Array.from(new Set(events.flatMap((event) => [event.homeTeam, event.awayTeam])))
+  const participating = new Set(events.flatMap((event) => [canonicalTeamName(event.homeTeam), canonicalTeamName(event.awayTeam)]));
+  const teams = brazilianClubs2026.map((club) => club.name)
+    .filter((team) => participating.has(team))
     .sort((left, right) => left.localeCompare(right, "pt-BR"));
   return teams.map((team) => ({
     id: `brasileirao-${source.season}-${slug(team)}`,
@@ -64,7 +71,7 @@ const buildBrazilianLeaguePacks = (
     name: `Jogos do ${team}`,
     eyebrow: team,
     icon: "soccer-ball",
-    description: `Jogos oficiais de ${source.season} nas competições cobertas.`,
+    description: `Jogos oficiais de ${source.season} nas competições nacionais e continentais cobertas.`,
     variantGroup: { id: TEAM_GROUP, label: "Time", optionLabel: team, selectionMode: "replace" },
     year: source.season,
     datasetStatus: "complete",
@@ -73,7 +80,7 @@ const buildBrazilianLeaguePacks = (
     profile: { id: PROFILE_ID, name: `Jogos do ${team}`, icon: "calendar-days" },
     categories: [{ id: CATEGORY_ID, key: "favorite-team-2026", name: `Jogos do ${team}`, color: "#2563EB", legacyNames: ["Brasileirão 2026"] }],
     legacyCategoryIds: ["brasileirao-2026-category"],
-    events: events.filter((event) => event.homeTeam === team || event.awayTeam === team).map((event) => toPackEvent(source, event)),
+    events: events.filter((event) => canonicalTeamName(event.homeTeam) === team || canonicalTeamName(event.awayTeam) === team).map((event) => toPackEvent(source, event)),
   }));
 };
 
@@ -83,7 +90,8 @@ export const applyOfficialSourceToCatalog = (
   events: readonly OfficialCalendarEvent[]
 ) => {
   let candidate: CalendarPack[];
-  if (source.id === "cbf-brasileirao-2026") {
+  const hasTeamPacks = current.some((pack) => pack.variantGroup?.id === TEAM_GROUP);
+  if (source.id === "cbf-brasileirao-2026" && !hasTeamPacks) {
     const generated = buildBrazilianLeaguePacks(source, events);
     candidate = [
       ...current.filter((pack) => pack.variantGroup?.id !== TEAM_GROUP),
@@ -95,7 +103,7 @@ export const applyOfficialSourceToCatalog = (
       let relevant: CalendarPackEvent[] = [];
       if (pack.variantGroup?.id === TEAM_GROUP) {
         const team = pack.variantGroup.optionLabel;
-        relevant = officialEvents.filter((event) => event.homeTeam === team || event.awayTeam === team);
+        relevant = officialEvents.filter((event) => canonicalTeamName(event.homeTeam) === team || canonicalTeamName(event.awayTeam) === team);
       } else if (source.parser_key === "formula1" && pack.id === "formula-1-2026") {
         relevant = officialEvents;
       } else if (source.parser_key === "fifa" && pack.variantGroup?.id === "world-cup-2026-coverage") {
@@ -135,10 +143,7 @@ export const applyOfficialSourceToCatalog = (
           recurrenceUntil: oldEvent.recurrenceUntil,
         } : newEvent;
       });
-      const relevantIds = new Set(merged.map((event) => event.id));
-      const untouched = pack.events.filter((event) =>
-        !relevantIds.has(event.id) && event.competition !== source.competition && event.sourceUrl !== source.official_url
-      );
+      const untouched = pack.events.filter((event) => event.competition !== source.competition);
       return { ...pack, events: [...untouched, ...merged].sort((a, b) => `${a.date}T${a.time}`.localeCompare(`${b.date}T${b.time}`)) };
     });
   }

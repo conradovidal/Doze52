@@ -6,6 +6,7 @@ import { validateOfficialCandidate } from "../../lib/calendar-catalog/validation
 import { applyOfficialSourceToCatalog } from "../../lib/calendar-catalog/catalog-builder";
 import type { CalendarCatalogSource, OfficialCalendarEvent } from "../../lib/calendar-catalog/types";
 import type { CalendarPack } from "../../lib/calendar-packs/types";
+import clubs from "../../lib/calendar-packs/brazilian-clubs-2026.json";
 
 const source = (parser_key: string): CalendarCatalogSource => ({
   id: `source-${parser_key}`, authority: "Autoridade", competition: "Competição",
@@ -69,6 +70,37 @@ test("parser normaliza contrato CONMEBOL/FIFA", () => {
   }
 });
 
+test("parser CONMEBOL reconhece fase de grupos, mata-mata e aliases", () => {
+  const conmebol = { ...source("conmebol"), id: "conmebol-sudamericana-2026", competition: "CONMEBOL Sul-Americana" };
+  const group = parseOfficialSource(
+    '<h2><strong>FECHA 1</strong></h2><p><strong><u>Miércoles, 08 de abril</u></strong></p><p><strong>21:30h - Montevideo City Torque (URU) vs Gremio (BRA)</strong> - Grupo F - Estadio Centenario, Montevideo</p>',
+    "text/html", conmebol
+  );
+  expect(group[0]).toMatchObject({ date: "2026-04-08", time: "21:30", awayTeam: "Grêmio", awayTeamId: "20013", phase: "Fase de grupos — Rodada 1" });
+
+  const knockout = parseOfficialSource(
+    '<h1>CALENDÁRIO DOS PLAYOFFS</h1><h2><strong>Sporting Cristal x RB Bragantino</strong></h2><p>Ida: quarta-feira, 22/7, às 19h30, no Estádio Nacional do Peru, Lima</p><p>Volta: quarta-feira, 29/7, às 21h30, no Estádio Municipal Cícero de Souza Marques, Bragança Paulista</p>',
+    "text/html", conmebol
+  );
+  expect(knockout).toHaveLength(2);
+  expect(knockout[1]).toMatchObject({ homeTeam: "Red Bull Bragantino", homeTeamId: "20007", phase: "Playoff das oitavas" });
+});
+
+test("atualizar uma fonte preserva as outras competições do clube", () => {
+  const brasileirao = { ...source("cbf"), id: "cbf-brasileirao-2026", competition: "Campeonato Brasileiro Serie A" };
+  const copa = { ...source("cbf"), id: "cbf-copa-do-brasil-2026", competition: "Copa do Brasil" };
+  const conmebol = { ...source("conmebol"), id: "conmebol-libertadores-2026", competition: "CONMEBOL Libertadores" };
+  let packs = applyOfficialSourceToCatalog([], brasileirao, [event({ externalId: "1", homeTeam: "Palmeiras", awayTeam: "Corinthians" })]);
+  packs = applyOfficialSourceToCatalog(packs, copa, [event({ externalId: "2", competition: copa.competition, homeTeam: "Palmeiras", awayTeam: "Remo" })]);
+  packs = applyOfficialSourceToCatalog(packs, conmebol, [event({ externalId: "3", competition: conmebol.competition, homeTeam: "Palmeiras", awayTeam: "Junior" })]);
+  packs = applyOfficialSourceToCatalog(packs, copa, [event({ externalId: "2", competition: copa.competition, homeTeam: "Palmeiras", awayTeam: "Remo", result: "2 x 0" })]);
+  const palmeiras = packs.find((candidate) => candidate.variantGroup?.optionLabel === "Palmeiras")!;
+  expect(new Set(palmeiras.events.map((item) => item.competition))).toEqual(new Set([
+    brasileirao.competition, copa.competition, conmebol.competition,
+  ]));
+  expect(palmeiras.events.find((item) => item.competition === copa.competition)?.result).toBe("2 x 0");
+});
+
 test("parser normaliza contratos de F1 e feriados governamentais", () => {
   const f1 = parseOfficialSource(JSON.stringify({ races: [{ round: 1, startDate: "2026-03-08T15:00:00", raceName: "GP da Austrália", circuit: "Albert Park" }] }), "application/json", source("formula1"));
   expect(f1[0]).toMatchObject({ externalId: "1", homeTeam: "GP da Austrália", awayTeam: "Fórmula 1" });
@@ -84,7 +116,7 @@ test("parser reconhece os cards HTML do calendário oficial da F1", () => {
 });
 
 test("uma carga oficial do Brasileirão produz as 20 opções de clubes sem deploy", () => {
-  const teams = Array.from({ length: 20 }, (_, index) => `Clube ${index + 1}`);
+  const teams = clubs.map((club) => club.name);
   const matches = Array.from({ length: 10 }, (_, index) => event({
     externalId: String(100 + index), homeTeam: teams[index * 2], awayTeam: teams[index * 2 + 1],
   }));

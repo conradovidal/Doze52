@@ -15,7 +15,7 @@
     "test:onboarding": "playwright test --config=playwright.unit.config.ts",
     "test:onboarding:e2e": "playwright test --config=playwright.onboarding.config.ts",
     "repair:calendar-packs": "tsx scripts/repair-calendar-packs.ts",
-    "generate:brasileirao-seed": "node scripts/generate-brasileirao-seed.mjs"
+    "generate:team-calendar-seed": "tsx scripts/generate-team-calendar-seed.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

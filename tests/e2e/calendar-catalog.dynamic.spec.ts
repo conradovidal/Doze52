@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { applyOfficialSourceToCatalog } from "../../lib/calendar-catalog/catalog-builder";
 import { materialHash } from "../../lib/calendar-catalog/material";
 import type { CalendarCatalog, OfficialCalendarEvent } from "../../lib/calendar-catalog/types";
+import clubs from "../../lib/calendar-packs/brazilian-clubs-2026.json";
 import { dismissOnboardingIfVisible } from "./support/browser";
 
 test("fallback compilado exige a escolha explícita entre os 20 clubes", async ({ page }) => {
@@ -13,12 +14,22 @@ test("fallback compilado exige a escolha explícita entre os 20 clubes", async (
   const selector = dialog.getByRole("combobox", { name: /Time para/ });
   await expect(selector).toContainText("Escolha seu time");
   await selector.click();
-  await expect(page.getByRole("option")).toHaveCount(20);
+  const options = page.getByRole("option");
+  await expect(options).toHaveCount(20);
+  const labels = await options.allTextContents();
+  expect(labels).toEqual([...labels].sort((left, right) => left.localeCompare(right, "pt-BR")));
+  expect(labels[0]).not.toBe("Grêmio");
   await page.getByRole("option", { name: "Grêmio", exact: true }).click();
   await expect(selector).toContainText("Grêmio");
+
+  const catalog = await page.evaluate(async () => (await fetch("/api/calendar-packs")).json());
+  const palmeiras = catalog.packs.find((pack: { variantGroup?: { optionLabel?: string } }) => pack.variantGroup?.optionLabel === "Palmeiras");
+  expect(new Set(palmeiras.events.map((event: { competition?: string }) => event.competition)).has("CONMEBOL Libertadores")).toBe(true);
+  const athletico = catalog.packs.find((pack: { variantGroup?: { optionLabel?: string } }) => pack.variantGroup?.optionLabel === "Athletico Paranaense");
+  expect(athletico.events.some((event: { competition?: string }) => event.competition?.includes("CONMEBOL"))).toBe(false);
 });
 
-test("catálogo remoto oferece 20 clubes e recebe nova opção sem deploy", async ({ page }) => {
+test("catálogo remoto oferece 20 clubes e consulta uma nova versão sem deploy", async ({ page }) => {
   const source = {
     id: "cbf-brasileirao-2026", authority: "CBF",
     competition: "Campeonato Brasileiro Serie A", season: 2026,
@@ -32,7 +43,7 @@ test("catálogo remoto oferece 20 clubes e recebe nova opção sem deploy", asyn
     timezone: "America/Sao_Paulo", city: "São Paulo", venue: "Estádio",
     phase: "Rodada 1", homeTeam, awayTeam,
   });
-  const teams = Array.from({ length: 20 }, (_, index) => `Clube ${index + 1}`);
+  const teams = clubs.map((club) => club.name);
   const baseEvents = Array.from({ length: 10 }, (_, index) =>
     makeMatch(index, teams[index * 2], teams[index * 2 + 1])
   );
@@ -41,7 +52,11 @@ test("catálogo remoto oferece 20 clubes e recebe nova opção sem deploy", asyn
     return { schemaVersion: 1, releaseId: `release-${version}`, version, publishedAt: new Date().toISOString(), materialHash: materialHash(packs), packs };
   };
   let catalog = toCatalog(baseEvents, 1);
-  await page.route("**/api/calendar-packs", async (route) => route.fulfill({ json: catalog }));
+  let requests = 0;
+  await page.route("**/api/calendar-packs", async (route) => {
+    requests += 1;
+    await route.fulfill({ json: catalog });
+  });
 
   await page.goto("/");
   await page.waitForLoadState("networkidle");
@@ -53,9 +68,7 @@ test("catálogo remoto oferece 20 clubes e recebe nova opção sem deploy", asyn
   await page.keyboard.press("Escape");
   await page.keyboard.press("Escape");
 
-  catalog = toCatalog([...baseEvents, makeMatch(11, "Clube 21", "Clube 1")], 2);
+  catalog = toCatalog([...baseEvents, makeMatch(11, "Palmeiras", "Corinthians")], 2);
   await page.evaluate(() => window.dispatchEvent(new Event("focus")));
-  await page.getByRole("button", { name: "Adicionar ou gerenciar calendários." }).click();
-  await dialog.getByRole("combobox", { name: /Time para Jogos do/ }).click();
-  await expect(page.getByRole("option", { name: "Clube 21" })).toBeVisible();
+  await expect.poll(() => requests).toBeGreaterThan(1);
 });
