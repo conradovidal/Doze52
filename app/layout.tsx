@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth";
 import { BillingProvider } from "@/lib/use-billing";
@@ -78,6 +79,7 @@ export default function RootLayout({
             </AuthProvider>
           </FeedbackProvider>
         </ThemeProvider>
+        <Analytics />
       </body>
     </html>
   );

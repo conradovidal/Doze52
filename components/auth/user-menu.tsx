@@ -2,16 +2,19 @@
 
 import { type ComponentProps, type ReactNode, useState } from "react";
 import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
 import {
   CreditCard,
   Download,
   FileSpreadsheet,
   LogOut,
+  MessageSquareText,
   RotateCcw,
   Sparkles,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { FeedbackDialog } from "@/components/feedback/feedback-dialog";
 import { ProUpgradeDialog } from "@/components/billing/pro-upgrade-dialog";
 import { useFeedback } from "@/components/ui/feedback-provider";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -88,6 +91,7 @@ function MenuAction({
 }
 
 export function UserMenu() {
+  const router = useRouter();
   const { notify } = useFeedback();
   const { session, signOut } = useAuth();
   const profiles = useStore((state) => state.profiles);
@@ -110,6 +114,8 @@ export function UserMenu() {
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [spreadsheetOpen, setSpreadsheetOpen] = useState(false);
   const [spreadsheetUpgradeOpen, setSpreadsheetUpgradeOpen] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [isFeedbackAdmin, setIsFeedbackAdmin] = useState(false);
   const spreadsheetRequiresPro = isCalendarSpreadsheetProGateEnabled();
 
   const metadata = session?.user.metadata ?? {};
@@ -170,6 +176,18 @@ export function UserMenu() {
           : "Assinar Pro";
   const isPlanActionDisabled = isPlanActionLoading || hasBillingError;
 
+  const handleMenuOpenChange = (nextOpen: boolean) => {
+    setOpen(nextOpen);
+    if (nextOpen) {
+      void fetch("/api/admin/feedback/access")
+        .then((response) => response.json())
+        .then((result: { isAdmin?: boolean }) =>
+          setIsFeedbackAdmin(Boolean(result.isAdmin))
+        )
+        .catch(() => setIsFeedbackAdmin(false));
+    }
+  };
+
   if (!session) return null;
 
   const handlePlanAction = async () => {
@@ -207,7 +225,7 @@ export function UserMenu() {
 
   return (
     <>
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={handleMenuOpenChange}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
@@ -337,6 +355,23 @@ export function UserMenu() {
 
           <MenuSection title="Ajuda">
             <MenuAction
+              icon={MessageSquareText}
+              onClick={() => {
+                setOpen(false);
+                setFeedbackOpen(true);
+              }}
+            >
+              Enviar feedback
+            </MenuAction>
+            {isFeedbackAdmin ? (
+              <MenuAction
+                icon={MessageSquareText}
+                onClick={() => router.push("/admin/feedback")}
+              >
+                Painel de feedback
+              </MenuAction>
+            ) : null}
+            <MenuAction
               icon={RotateCcw}
               onClick={() => {
                 resetAllProductOnboarding();
@@ -374,6 +409,7 @@ export function UserMenu() {
       onOpenChange={setSpreadsheetUpgradeOpen}
       reason="calendar-import-export"
     />
+    <FeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />
     </>
   );
 }
