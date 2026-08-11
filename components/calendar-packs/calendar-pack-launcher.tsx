@@ -28,7 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { calendarPacks } from "@/lib/calendar-packs";
+import { useCalendarCatalog } from "@/lib/calendar-catalog/runtime";
 import {
   getCalendarPackAvailability,
   getCalendarPackGroupId,
@@ -109,7 +109,7 @@ function CalendarPackIcon({
   return <CalendarDays aria-hidden="true" className={className} />;
 }
 
-const calendarPackCards = (() => {
+const buildCalendarPackCards = (calendarPacks: readonly CalendarPack[]) => {
   const cards: Array<{ key: string; variants: CalendarPack[] }> = [];
   const groupedPackIds = new Set<string>();
 
@@ -131,7 +131,8 @@ const calendarPackCards = (() => {
   });
 
   return cards;
-})();
+  return cards;
+};
 
 export function CalendarPackLauncher({
   onFocusYear,
@@ -160,6 +161,11 @@ export function CalendarPackLauncher({
   onImported?: (pack: CalendarPack) => void;
   bypassLimits?: boolean;
 }) {
+  const { calendarPacks } = useCalendarCatalog();
+  const calendarPackCards = React.useMemo(
+    () => buildCalendarPackCards(calendarPacks),
+    [calendarPacks]
+  );
   const { notify } = useFeedback();
   const { isPro, limits } = useBilling();
   const profiles = useStore((state) => state.profiles);
@@ -200,7 +206,7 @@ export function CalendarPackLauncher({
         ? current
         : { ...current, [guidedVariantGroupId]: saoPauloPack.id }
     );
-  }, [guidedVariantGroupId, requireExplicitVariant]);
+  }, [calendarPacks, guidedVariantGroupId, requireExplicitVariant]);
 
   const snapshot = React.useMemo(
     () => ({ profiles, categories, events }),
@@ -215,7 +221,7 @@ export function CalendarPackLauncher({
           getCalendarPackAvailability(snapshot, pack),
         ])
       ),
-    [snapshot]
+    [calendarPacks, snapshot]
   );
   const subscribedPackCount = React.useMemo(
     () =>
@@ -225,7 +231,7 @@ export function CalendarPackLauncher({
           return availability?.hasAnyCategory || availability?.hasImportedEvents;
         });
       }).length,
-    [availabilityByPack]
+    [availabilityByPack, calendarPackCards]
   );
   const isCalendarSubscriptionLimitReached =
     !bypassLimits &&
