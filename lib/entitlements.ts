@@ -26,6 +26,7 @@ export type ProUpgradeReason =
   | "profiles"
   | "categories"
   | "calendar-subscriptions"
+  | "calendar-import-export"
   | "generic";
 
 export const PRO_SUBSCRIPTION_STATUSES = ["active", "trialing"] as const;
@@ -67,6 +68,12 @@ export const PRO_UPGRADE_COPY: Record<
       "No plano gratuito, você pode usar 1 calendário. O Pro libera mais calendários para acompanhar datas importantes no seu ano.",
     cta: `Assinar Pro por ${FOUNDER_PRICE_LABEL}`,
   },
+  "calendar-import-export": {
+    title: "Planilhas de calendario fazem parte do Doze52 Pro.",
+    description:
+      "O Pro permite baixar o template, exportar o calendario e importar eventos com validacao e pre-visualizacao.",
+    cta: `Assinar Pro por ${FOUNDER_PRICE_LABEL}`,
+  },
   generic: {
     title: "Doze 52 Pro",
     description: "Organize mais partes do seu ano.",
@@ -78,6 +85,16 @@ export const isProSubscriptionStatus = (status: string | null | undefined) =>
   PRO_SUBSCRIPTION_STATUSES.some((proStatus) => proStatus === status);
 
 export const isProPlan = (plan: BillingPlan) => plan === "pro";
+
+export const isCalendarSpreadsheetProGateEnabled = (input?: {
+  nodeEnv?: string;
+  deploymentEnv?: string;
+}) => {
+  const nodeEnv = input?.nodeEnv ?? process.env.NODE_ENV;
+  const deploymentEnv =
+    input?.deploymentEnv ?? process.env.NEXT_PUBLIC_VERCEL_ENV;
+  return deploymentEnv ? deploymentEnv === "production" : nodeEnv === "production";
+};
 
 export const getPlanLimits = (plan: BillingPlan) => PLAN_LIMITS[plan];
 
