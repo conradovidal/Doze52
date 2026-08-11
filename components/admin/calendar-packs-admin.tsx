@@ -7,11 +7,12 @@ import { Input } from "@/components/ui/input";
 
 type Source = {
   id: string; authority: string; competition: string; rollout_status: string;
+  official_url: string; feed_provider: string | null; feed_url: string | null;
   freshness_hours: number; last_successful_at: string | null; last_error: string | null;
 };
 type Run = { id: string; trigger_kind: string; status: string; started_at: string; finished_at: string | null; summary: Record<string, number> };
 type Release = { id: string; version: number; release_kind: string; published_at: string };
-type Candidate = { id: string; source_id: string; status: string; diff: { added?: string[]; changed?: string[]; removed?: string[] }; validation_issues: Array<{ message: string }> };
+type Candidate = { id: string; source_id: string; status: string; diff: { added?: string[]; changed?: string[]; removed?: string[] }; validation_issues: Array<{ message: string }>; payload?: { unmatchedFeedEvents?: unknown[] } };
 type AdminData = { sources: Source[]; runs: Run[]; releases: Release[]; candidates: Candidate[]; currentReleaseId: string | null };
 
 const dateTime = (value: string | null) => value
@@ -71,7 +72,7 @@ export function CalendarPacksAdmin() {
           {data?.sources.map((source) => {
             const stale = !source.last_successful_at || Date.now() - new Date(source.last_successful_at).getTime() > source.freshness_hours * 3_600_000;
             return <article key={source.id} className="rounded-xl border bg-card p-4">
-              <div className="flex items-start justify-between gap-3"><div><p className="font-medium">{source.competition}</p><p className="text-sm text-muted-foreground">{source.authority} · {source.rollout_status}</p></div>{stale ? <AlertTriangle className="text-amber-500" /> : <CheckCircle2 className="text-emerald-500" />}</div>
+              <div className="flex items-start justify-between gap-3"><div><p className="font-medium">{source.competition}</p><p className="text-sm text-muted-foreground">Autoridade: {source.authority} · {source.rollout_status}</p>{source.feed_provider && <p className="text-sm text-muted-foreground">Feed operacional: {source.feed_provider}</p>}</div>{stale ? <AlertTriangle className="text-amber-500" /> : <CheckCircle2 className="text-emerald-500" />}</div>
               <p className="mt-3 text-sm"><Clock3 className="mr-1 inline size-4" />Último sucesso: {dateTime(source.last_successful_at)}</p>
               {source.last_error && <p className="mt-2 text-sm text-destructive">{source.last_error}</p>}
             </article>;
@@ -84,7 +85,7 @@ export function CalendarPacksAdmin() {
       </section>
 
       <section className="space-y-3"><h2 className="text-lg font-medium">Diferenças e quarentena</h2>
-        <div className="space-y-2">{data?.candidates.filter((candidate) => candidate.status !== "unchanged").slice(0, 20).map((candidate) => <article key={candidate.id} className="rounded-xl border p-3 text-sm"><p className="font-medium">{candidate.source_id} · {candidate.status}</p><p className="text-muted-foreground">+{candidate.diff.added?.length ?? 0} · ~{candidate.diff.changed?.length ?? 0} · −{candidate.diff.removed?.length ?? 0}</p>{candidate.validation_issues.map((issue, index) => <p className="text-destructive" key={index}>{issue.message}</p>)}</article>)}</div>
+        <div className="space-y-2">{data?.candidates.filter((candidate) => candidate.status !== "unchanged").slice(0, 20).map((candidate) => <article key={candidate.id} className="rounded-xl border p-3 text-sm"><p className="font-medium">{candidate.source_id} · {candidate.status}</p><p className="text-muted-foreground">+{candidate.diff.added?.length ?? 0} · ~{candidate.diff.changed?.length ?? 0} · −{candidate.diff.removed?.length ?? 0}</p>{(candidate.payload?.unmatchedFeedEvents?.length ?? 0) > 0 && <p className="text-amber-600">{candidate.payload?.unmatchedFeedEvents?.length} jogo(s) do GE ainda sem confirmação oficial.</p>}{candidate.validation_issues.map((issue, index) => <p className="text-destructive" key={index}>{issue.message}</p>)}</article>)}</div>
       </section>
 
       <section className="space-y-3"><h2 className="text-lg font-medium">Releases e rollback</h2>

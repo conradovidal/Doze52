@@ -1,5 +1,27 @@
 {
   "verifiedAt": "2026-08-11",
+  "packVersions": {
+    "20001": 3,
+    "20002": 3,
+    "20005": 3,
+    "20007": 3,
+    "20008": 3,
+    "20011": 2,
+    "20013": 7,
+    "20014": 3,
+    "20016": 3,
+    "20018": 2,
+    "20022": 2,
+    "20052": 2,
+    "20086": 2,
+    "20385": 3,
+    "59849": 3,
+    "60175": 3,
+    "60646": 3,
+    "61377": 2,
+    "61590": 2,
+    "62194": 3
+  },
   "sources": [
     {
       "id": "cbf-brasileirao-2026",
@@ -2074,10 +2096,12 @@
       "awayTeam": "Fluminense",
       "awayTeamId": "20014",
       "placeholder": false,
+      "result": "0 x 0",
+      "resultProvider": "GE",
       "id": "d70915be-b9ad-5388-8ac2-70409a4a375c",
       "sourceId": "conmebol-libertadores-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Libertadores",
-      "sourceUrl": "https://gol.conmebol.com/libertadores/es/news/calendario-conmebol-libertadores-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/libertadores/pt-br/tournament/15"
     },
     {
       "externalId": "group-1-barcelona-cruzeiro",
@@ -2093,10 +2117,12 @@
       "awayTeam": "Cruzeiro",
       "awayTeamId": "59849",
       "placeholder": false,
+      "result": "0 x 1",
+      "resultProvider": "GE",
       "id": "4b54ef46-4dec-5bab-be69-8baaf4a2621d",
       "sourceId": "conmebol-libertadores-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Libertadores",
-      "sourceUrl": "https://gol.conmebol.com/libertadores/es/news/calendario-conmebol-libertadores-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/libertadores/pt-br/tournament/15"
     },
     {
       "externalId": "group-1-barracas-central-vasco-da-gama",
@@ -2112,10 +2138,12 @@
       "awayTeam": "Vasco da Gama",
       "awayTeamId": "60646",
       "placeholder": false,
+      "result": "0 x 0",
+      "resultProvider": "GE",
       "id": "fc28342a-689d-55c8-a9f9-a3ff8695b598",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/es/news/calendario-conmebol-sudamericana-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "group-1-boston-river-sao-paulo",
@@ -2131,10 +2159,12 @@
       "awayTeam": "São Paulo",
       "awayTeamId": "20005",
       "placeholder": false,
+      "result": "0 x 1",
+      "resultProvider": "GE",
       "id": "44d8126a-1e4d-548f-b8e9-3a3de90979b6",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/es/news/calendario-conmebol-sudamericana-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "group-1-deportivo-cuenca-santos",
@@ -2150,10 +2180,12 @@
       "awayTeam": "Santos",
       "awayTeamId": "20008",
       "placeholder": false,
+      "result": "1 x 0",
+      "resultProvider": "GE",
       "id": "1766f449-6080-59d2-b44d-51c268d1f235",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/es/news/calendario-conmebol-sudamericana-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "group-1-mirassol-lanus",
@@ -2169,10 +2201,12 @@
       "awayTeam": "Lanús",
       "homeTeamId": "20385",
       "placeholder": false,
+      "result": "1 x 0",
+      "resultProvider": "GE",
       "id": "8720c9ca-34d8-5cee-a07d-bb66a83f3121",
       "sourceId": "conmebol-libertadores-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Libertadores",
-      "sourceUrl": "https://gol.conmebol.com/libertadores/es/news/calendario-conmebol-libertadores-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/libertadores/pt-br/tournament/15"
     },
     {
       "externalId": "group-1-cusco-flamengo",
@@ -2188,10 +2222,12 @@
       "awayTeam": "Flamengo",
       "awayTeamId": "20016",
       "placeholder": false,
+      "result": "0 x 2",
+      "resultProvider": "GE",
       "id": "ab3d3087-b549-58ab-b687-fbf6ba1444e5",
       "sourceId": "conmebol-libertadores-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Libertadores",
-      "sourceUrl": "https://gol.conmebol.com/libertadores/es/news/calendario-conmebol-libertadores-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/libertadores/pt-br/tournament/15"
     },
     {
       "externalId": "group-1-junior-palmeiras",
@@ -2207,10 +2243,12 @@
       "awayTeam": "Palmeiras",
       "awayTeamId": "20002",
       "placeholder": false,
+      "result": "1 x 1",
+      "resultProvider": "GE",
       "id": "5fa5025b-46dc-51b8-9ed7-719aaf447a05",
       "sourceId": "conmebol-libertadores-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Libertadores",
-      "sourceUrl": "https://gol.conmebol.com/libertadores/es/news/calendario-conmebol-libertadores-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/libertadores/pt-br/tournament/15"
     },
     {
       "externalId": "group-1-montevideo-city-torque-gremio",
@@ -2226,10 +2264,12 @@
       "awayTeam": "Grêmio",
       "awayTeamId": "20013",
       "placeholder": false,
+      "result": "1 x 0",
+      "resultProvider": "GE",
       "id": "6d26be6c-ec88-5044-bd65-494528762991",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/es/news/calendario-conmebol-sudamericana-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "group-1-academia-puerto-cabello-atletico-mineiro",
@@ -2248,7 +2288,7 @@
       "id": "9c2cdcc1-6b3c-514e-9537-30e7d178e5b6",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/es/news/calendario-conmebol-sudamericana-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "group-1-botafogo-caracas",
@@ -2264,10 +2304,12 @@
       "awayTeam": "Caracas",
       "homeTeamId": "60175",
       "placeholder": false,
+      "result": "1 x 1",
+      "resultProvider": "GE",
       "id": "155b6979-b976-5daa-b32b-604227e3e571",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/es/news/calendario-conmebol-sudamericana-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "group-1-carabobo-rb-bragantino",
@@ -2283,10 +2325,12 @@
       "awayTeam": "Red Bull Bragantino",
       "awayTeamId": "20007",
       "placeholder": false,
+      "result": "1 x 0",
+      "resultProvider": "GE",
       "id": "c6fa8266-2671-59d8-99d3-e4ec462399b9",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/es/news/calendario-conmebol-sudamericana-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "group-1-platense-corinthians",
@@ -2302,10 +2346,12 @@
       "awayTeam": "Corinthians",
       "awayTeamId": "20001",
       "placeholder": false,
+      "result": "0 x 2",
+      "resultProvider": "GE",
       "id": "c7460334-c87e-5dc9-9f3b-1ef9b023a4f9",
       "sourceId": "conmebol-libertadores-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Libertadores",
-      "sourceUrl": "https://gol.conmebol.com/libertadores/es/news/calendario-conmebol-libertadores-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/libertadores/pt-br/tournament/15"
     },
     {
       "externalId": "831998",
@@ -2531,10 +2577,12 @@
       "awayTeam": "Deportivo Riestra",
       "homeTeamId": "20013",
       "placeholder": false,
+      "result": "1 x 0",
+      "resultProvider": "GE",
       "id": "75fb5492-b6cb-54cf-a037-222ca3ef2ff5",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/es/news/calendario-conmebol-sudamericana-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "group-2-sao-paulo-o-higgins",
@@ -2550,10 +2598,12 @@
       "awayTeam": "O'Higgins",
       "homeTeamId": "20005",
       "placeholder": false,
+      "result": "2 x 0",
+      "resultProvider": "GE",
       "id": "05cf027b-c7c2-5d2f-abd1-0bc4fb722276",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/es/news/calendario-conmebol-sudamericana-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "group-2-l-d-u-quito-mirassol",
@@ -2569,10 +2619,12 @@
       "awayTeam": "Mirassol",
       "awayTeamId": "20385",
       "placeholder": false,
+      "result": "2 x 0",
+      "resultProvider": "GE",
       "id": "255fe9b1-a4c0-5d9b-b1e3-7d1cd15fc38a",
       "sourceId": "conmebol-libertadores-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Libertadores",
-      "sourceUrl": "https://gol.conmebol.com/libertadores/es/news/calendario-conmebol-libertadores-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/libertadores/pt-br/tournament/15"
     },
     {
       "externalId": "group-2-vasco-da-gama-audax-italiano",
@@ -2588,10 +2640,12 @@
       "awayTeam": "Audax Italiano",
       "homeTeamId": "60646",
       "placeholder": false,
+      "result": "1 x 2",
+      "resultProvider": "GE",
       "id": "78b128c0-06d2-5b54-84ea-93159a23bf1c",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/es/news/calendario-conmebol-sudamericana-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "group-2-santos-recoleta",
@@ -2607,10 +2661,12 @@
       "awayTeam": "Recoleta",
       "homeTeamId": "20008",
       "placeholder": false,
+      "result": "1 x 1",
+      "resultProvider": "GE",
       "id": "a7fb46f6-7283-52a1-8b21-4c7997e45d74",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/es/news/calendario-conmebol-sudamericana-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "group-2-cruzeiro-universidad-catolica",
@@ -2626,10 +2682,12 @@
       "awayTeam": "Universidad Católica",
       "homeTeamId": "59849",
       "placeholder": false,
+      "result": "1 x 2",
+      "resultProvider": "GE",
       "id": "aaf4776d-6783-5dae-9c46-ce3c96974865",
       "sourceId": "conmebol-libertadores-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Libertadores",
-      "sourceUrl": "https://gol.conmebol.com/libertadores/es/news/calendario-conmebol-libertadores-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/libertadores/pt-br/tournament/15"
     },
     {
       "externalId": "group-2-racing-botafogo",
@@ -2645,10 +2703,12 @@
       "awayTeam": "Botafogo",
       "awayTeamId": "60175",
       "placeholder": false,
+      "result": "2 x 3",
+      "resultProvider": "GE",
       "id": "580d0250-165b-5fc8-89a5-8272ca169a9f",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/es/news/calendario-conmebol-sudamericana-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "group-2-corinthians-santa-fe",
@@ -2664,10 +2724,12 @@
       "awayTeam": "Santa Fe",
       "homeTeamId": "20001",
       "placeholder": false,
+      "result": "2 x 0",
+      "resultProvider": "GE",
       "id": "71f5c5ec-dc50-5a4b-ba99-002600eb97ac",
       "sourceId": "conmebol-libertadores-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Libertadores",
-      "sourceUrl": "https://gol.conmebol.com/libertadores/es/news/calendario-conmebol-libertadores-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/libertadores/pt-br/tournament/15"
     },
     {
       "externalId": "group-2-fluminense-independiente-rivadavia",
@@ -2683,10 +2745,12 @@
       "awayTeam": "Independiente Rivadavia",
       "homeTeamId": "20014",
       "placeholder": false,
+      "result": "1 x 2",
+      "resultProvider": "GE",
       "id": "737a2ad6-5596-53a6-ba50-1fec194e72b3",
       "sourceId": "conmebol-libertadores-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Libertadores",
-      "sourceUrl": "https://gol.conmebol.com/libertadores/es/news/calendario-conmebol-libertadores-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/libertadores/pt-br/tournament/15"
     },
     {
       "externalId": "group-2-atletico-mineiro-juventud",
@@ -2702,10 +2766,12 @@
       "awayTeam": "Juventud",
       "homeTeamId": "62194",
       "placeholder": false,
+      "result": "2 x 1",
+      "resultProvider": "GE",
       "id": "09a5c590-79c7-5479-8704-ebd624e254b0",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/es/news/calendario-conmebol-sudamericana-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "group-2-palmeiras-sporting-cristal",
@@ -2721,10 +2787,12 @@
       "awayTeam": "Sporting Cristal",
       "homeTeamId": "20002",
       "placeholder": false,
+      "result": "2 x 1",
+      "resultProvider": "GE",
       "id": "326f76b8-87de-5066-a8b8-47504f178b26",
       "sourceId": "conmebol-libertadores-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Libertadores",
-      "sourceUrl": "https://gol.conmebol.com/libertadores/es/news/calendario-conmebol-libertadores-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/libertadores/pt-br/tournament/15"
     },
     {
       "externalId": "group-2-flamengo-independiente-medellin",
@@ -2740,10 +2808,12 @@
       "awayTeam": "Independiente Medellín",
       "homeTeamId": "20016",
       "placeholder": false,
+      "result": "4 x 1",
+      "resultProvider": "GE",
       "id": "59cfee4c-25ac-5088-baab-5f6523322688",
       "sourceId": "conmebol-libertadores-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Libertadores",
-      "sourceUrl": "https://gol.conmebol.com/libertadores/es/news/calendario-conmebol-libertadores-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/libertadores/pt-br/tournament/15"
     },
     {
       "externalId": "group-2-rb-bragantino-blooming",
@@ -2759,10 +2829,12 @@
       "awayTeam": "Blooming",
       "homeTeamId": "20007",
       "placeholder": false,
+      "result": "3 x 2",
+      "resultProvider": "GE",
       "id": "fee5ee65-ad0a-531d-9b86-c481b00394ac",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/es/news/calendario-conmebol-sudamericana-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "832001",
@@ -3513,10 +3585,12 @@
       "awayTeam": "Independiente",
       "homeTeamId": "60175",
       "placeholder": false,
+      "result": "3 x 0",
+      "resultProvider": "GE",
       "id": "78abcff1-bb9b-5725-8652-21620d2c8543",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/es/news/calendario-conmebol-sudamericana-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "group-3-san-lorenzo-santos",
@@ -3532,10 +3606,12 @@
       "awayTeam": "Santos",
       "awayTeamId": "20008",
       "placeholder": false,
+      "result": "1 x 1",
+      "resultProvider": "GE",
       "id": "b9d47897-48e2-5d77-8127-bfc377a7884b",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/es/news/calendario-conmebol-sudamericana-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "group-3-millonarios-sao-paulo",
@@ -3551,10 +3627,12 @@
       "awayTeam": "São Paulo",
       "awayTeamId": "20005",
       "placeholder": false,
+      "result": "0 x 0",
+      "resultProvider": "GE",
       "id": "24843d22-85d2-5eff-838d-c6611c73407c",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/es/news/calendario-conmebol-sudamericana-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "group-3-cruzeiro-boca-juniors",
@@ -3570,10 +3648,12 @@
       "awayTeam": "Boca Juniors",
       "homeTeamId": "59849",
       "placeholder": false,
+      "result": "1 x 0",
+      "resultProvider": "GE",
       "id": "02ed7efe-6500-5528-b56f-170e02e30df8",
       "sourceId": "conmebol-libertadores-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Libertadores",
-      "sourceUrl": "https://gol.conmebol.com/libertadores/es/news/calendario-conmebol-libertadores-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/libertadores/pt-br/tournament/15"
     },
     {
       "externalId": "group-3-mirassol-always-ready",
@@ -3589,10 +3669,12 @@
       "awayTeam": "Always Ready",
       "homeTeamId": "20385",
       "placeholder": false,
+      "result": "2 x 0",
+      "resultProvider": "GE",
       "id": "ec1aefe5-ef13-50c0-8919-3236bf800742",
       "sourceId": "conmebol-libertadores-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Libertadores",
-      "sourceUrl": "https://gol.conmebol.com/libertadores/es/news/calendario-conmebol-libertadores-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/libertadores/pt-br/tournament/15"
     },
     {
       "externalId": "group-3-cienciano-atletico-mineiro",
@@ -3608,10 +3690,12 @@
       "awayTeam": "Atlético Mineiro",
       "awayTeamId": "62194",
       "placeholder": false,
+      "result": "1 x 0",
+      "resultProvider": "GE",
       "id": "b5411a86-38f2-53ee-9d36-3d89977ae152",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/es/news/calendario-conmebol-sudamericana-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "group-3-palestino-gremio",
@@ -3627,10 +3711,12 @@
       "awayTeam": "Grêmio",
       "awayTeamId": "20013",
       "placeholder": false,
+      "result": "0 x 0",
+      "resultProvider": "GE",
       "id": "ea1afd05-2a0e-59ec-a97b-ca32536db4b4",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/es/news/calendario-conmebol-sudamericana-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "group-3-cerro-porteno-palmeiras",
@@ -3646,10 +3732,12 @@
       "awayTeam": "Palmeiras",
       "awayTeamId": "20002",
       "placeholder": false,
+      "result": "1 x 1",
+      "resultProvider": "GE",
       "id": "2a4fd28d-47e1-5773-8f43-33c2dc0c7558",
       "sourceId": "conmebol-libertadores-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Libertadores",
-      "sourceUrl": "https://gol.conmebol.com/libertadores/es/news/calendario-conmebol-libertadores-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/libertadores/pt-br/tournament/15"
     },
     {
       "externalId": "group-3-estudiantes-de-la-plata-flamengo",
@@ -3665,10 +3753,12 @@
       "awayTeam": "Flamengo",
       "awayTeamId": "20016",
       "placeholder": false,
+      "result": "1 x 1",
+      "resultProvider": "GE",
       "id": "770b3584-0b6a-593e-b0f1-86f7857b1aaa",
       "sourceId": "conmebol-libertadores-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Libertadores",
-      "sourceUrl": "https://gol.conmebol.com/libertadores/es/news/calendario-conmebol-libertadores-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/libertadores/pt-br/tournament/15"
     },
     {
       "externalId": "group-3-bolivar-fluminense",
@@ -3684,10 +3774,12 @@
       "awayTeam": "Fluminense",
       "awayTeamId": "20014",
       "placeholder": false,
+      "result": "2 x 0",
+      "resultProvider": "GE",
       "id": "1a015c25-d9ef-5f4a-a451-8011f184c45a",
       "sourceId": "conmebol-libertadores-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Libertadores",
-      "sourceUrl": "https://gol.conmebol.com/libertadores/es/news/calendario-conmebol-libertadores-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/libertadores/pt-br/tournament/15"
     },
     {
       "externalId": "group-3-vasco-da-gama-olimpia",
@@ -3703,10 +3795,12 @@
       "awayTeam": "Olimpia",
       "homeTeamId": "60646",
       "placeholder": false,
+      "result": "3 x 0",
+      "resultProvider": "GE",
       "id": "982accf3-4244-5669-8f03-9dbed7eec7af",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/es/news/calendario-conmebol-sudamericana-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "group-3-corinthians-penarol",
@@ -3722,10 +3816,12 @@
       "awayTeam": "Peñarol",
       "homeTeamId": "20001",
       "placeholder": false,
+      "result": "2 x 0",
+      "resultProvider": "GE",
       "id": "8cae27b4-306d-5ad6-8f3b-20483f6a4a80",
       "sourceId": "conmebol-libertadores-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Libertadores",
-      "sourceUrl": "https://gol.conmebol.com/libertadores/es/news/calendario-conmebol-libertadores-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/libertadores/pt-br/tournament/15"
     },
     {
       "externalId": "group-3-rb-bragantino-river-plate",
@@ -3741,10 +3837,12 @@
       "awayTeam": "River Plate",
       "homeTeamId": "20007",
       "placeholder": false,
+      "result": "0 x 1",
+      "resultProvider": "GE",
       "id": "af024738-ab53-5e9f-bd92-80697637c15e",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/es/news/calendario-conmebol-sudamericana-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "832021",
@@ -3970,10 +4068,12 @@
       "awayTeam": "Palmeiras",
       "awayTeamId": "20002",
       "placeholder": false,
+      "result": "0 x 2",
+      "resultProvider": "GE",
       "id": "7877c75d-5cd0-5447-95d0-706aa44035eb",
       "sourceId": "conmebol-libertadores-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Libertadores",
-      "sourceUrl": "https://gol.conmebol.com/libertadores/es/news/calendario-conmebol-libertadores-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/libertadores/pt-br/tournament/15"
     },
     {
       "externalId": "group-4-deportivo-riestra-gremio",
@@ -3989,10 +4089,12 @@
       "awayTeam": "Grêmio",
       "awayTeamId": "20013",
       "placeholder": false,
+      "result": "0 x 3",
+      "resultProvider": "GE",
       "id": "26f18d10-8abb-5282-9797-5eb3785ef923",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/es/news/calendario-conmebol-sudamericana-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "group-4-juventud-atletico-mineiro",
@@ -4008,10 +4110,12 @@
       "awayTeam": "Atlético Mineiro",
       "awayTeamId": "62194",
       "placeholder": false,
+      "result": "2 x 2",
+      "resultProvider": "GE",
       "id": "4f099ff4-2168-5572-a1f5-b02a402c3914",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/es/news/calendario-conmebol-sudamericana-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "group-4-recoleta-santos",
@@ -4027,10 +4131,12 @@
       "awayTeam": "Santos",
       "awayTeamId": "20008",
       "placeholder": false,
+      "result": "1 x 1",
+      "resultProvider": "GE",
       "id": "be7e184d-8c5c-52ca-84ef-0571c3accfc9",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/es/news/calendario-conmebol-sudamericana-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "group-4-audax-italiano-vasco-da-gama",
@@ -4046,10 +4152,12 @@
       "awayTeam": "Vasco da Gama",
       "awayTeamId": "60646",
       "placeholder": false,
+      "result": "1 x 2",
+      "resultProvider": "GE",
       "id": "ffb0ec9a-ed41-5b55-a799-fa3253ca7c5c",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/es/news/calendario-conmebol-sudamericana-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "group-4-santa-fe-corinthians",
@@ -4065,10 +4173,12 @@
       "awayTeam": "Corinthians",
       "awayTeamId": "20001",
       "placeholder": false,
+      "result": "1 x 1",
+      "resultProvider": "GE",
       "id": "7cafa499-fa11-5dbb-83ec-06c569b48d68",
       "sourceId": "conmebol-libertadores-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Libertadores",
-      "sourceUrl": "https://gol.conmebol.com/libertadores/es/news/calendario-conmebol-libertadores-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/libertadores/pt-br/tournament/15"
     },
     {
       "externalId": "group-4-botafogo-racing",
@@ -4084,10 +4194,12 @@
       "awayTeam": "Racing",
       "homeTeamId": "60175",
       "placeholder": false,
+      "result": "2 x 1",
+      "resultProvider": "GE",
       "id": "2233456d-13f4-5ccd-bc71-9e7fd606c0fc",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/es/news/calendario-conmebol-sudamericana-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "group-4-independiente-rivadavia-fluminense",
@@ -4103,10 +4215,12 @@
       "awayTeam": "Fluminense",
       "awayTeamId": "20014",
       "placeholder": false,
+      "result": "1 x 1",
+      "resultProvider": "GE",
       "id": "567e9161-2457-55ab-b17d-67952f651f3c",
       "sourceId": "conmebol-libertadores-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Libertadores",
-      "sourceUrl": "https://gol.conmebol.com/libertadores/es/news/calendario-conmebol-libertadores-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/libertadores/pt-br/tournament/15"
     },
     {
       "externalId": "group-4-universidad-catolica-cruzeiro",
@@ -4122,10 +4236,12 @@
       "awayTeam": "Cruzeiro",
       "awayTeamId": "59849",
       "placeholder": false,
+      "result": "0 x 0",
+      "resultProvider": "GE",
       "id": "6d68c516-9542-55a6-af0b-f19f9d390012",
       "sourceId": "conmebol-libertadores-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Libertadores",
-      "sourceUrl": "https://gol.conmebol.com/libertadores/es/news/calendario-conmebol-libertadores-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/libertadores/pt-br/tournament/15"
     },
     {
       "externalId": "group-4-o-higgins-sao-paulo",
@@ -4141,10 +4257,12 @@
       "awayTeam": "São Paulo",
       "awayTeamId": "20005",
       "placeholder": false,
+      "result": "0 x 0",
+      "resultProvider": "GE",
       "id": "963a6a34-49c8-5390-95c4-15c39a4ae7cf",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/es/news/calendario-conmebol-sudamericana-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "group-4-mirassol-l-d-u-quito",
@@ -4160,10 +4278,12 @@
       "awayTeam": "L.D.U. Quito",
       "homeTeamId": "20385",
       "placeholder": false,
+      "result": "2 x 0",
+      "resultProvider": "GE",
       "id": "31e5404a-e216-53c2-a6cc-585d83343c36",
       "sourceId": "conmebol-libertadores-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Libertadores",
-      "sourceUrl": "https://gol.conmebol.com/libertadores/es/news/calendario-conmebol-libertadores-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/libertadores/pt-br/tournament/15"
     },
     {
       "externalId": "group-4-independiente-medellin-flamengo",
@@ -4179,10 +4299,12 @@
       "awayTeam": "Flamengo",
       "awayTeamId": "20016",
       "placeholder": false,
+      "result": "0 x 3",
+      "resultProvider": "GE",
       "id": "a2664ce8-37f5-5976-991e-6fa20bd1c844",
       "sourceId": "conmebol-libertadores-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Libertadores",
-      "sourceUrl": "https://gol.conmebol.com/libertadores/es/news/calendario-conmebol-libertadores-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/libertadores/pt-br/tournament/15"
     },
     {
       "externalId": "group-4-blooming-rb-bragantino",
@@ -4198,10 +4320,12 @@
       "awayTeam": "Red Bull Bragantino",
       "awayTeamId": "20007",
       "placeholder": false,
+      "result": "0 x 6",
+      "resultProvider": "GE",
       "id": "6ee159bf-9106-5d4f-a854-71f5e2d9a5a8",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/es/news/calendario-conmebol-sudamericana-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "832037",
@@ -4576,6 +4700,7 @@
       "awayTeamId": "62194",
       "result": "2 x 1",
       "placeholder": false,
+      "penaltyResult": "2 x 4",
       "id": "c8586970-7739-5a86-ba3a-9978d7a82fa8",
       "sourceId": "cbf-copa-do-brasil-2026",
       "sourceLabel": "CBF — Copa do Brasil",
@@ -4952,10 +5077,12 @@
       "awayTeam": "Bolivar",
       "homeTeamId": "20014",
       "placeholder": false,
+      "result": "2 x 1",
+      "resultProvider": "GE",
       "id": "9a6a91f9-0391-5103-9660-c44f0fc7e476",
       "sourceId": "conmebol-libertadores-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Libertadores",
-      "sourceUrl": "https://gol.conmebol.com/libertadores/es/news/calendario-conmebol-libertadores-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/libertadores/pt-br/tournament/15"
     },
     {
       "externalId": "group-5-always-ready-mirassol",
@@ -4971,10 +5098,12 @@
       "awayTeam": "Mirassol",
       "awayTeamId": "20385",
       "placeholder": false,
+      "result": "1 x 2",
+      "resultProvider": "GE",
       "id": "e1010fe3-3272-5c38-8898-fe606bcc305d",
       "sourceId": "conmebol-libertadores-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Libertadores",
-      "sourceUrl": "https://gol.conmebol.com/libertadores/es/news/calendario-conmebol-libertadores-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/libertadores/pt-br/tournament/15"
     },
     {
       "externalId": "group-5-boca-juniors-cruzeiro",
@@ -4990,10 +5119,12 @@
       "awayTeam": "Cruzeiro",
       "awayTeamId": "59849",
       "placeholder": false,
+      "result": "1 x 1",
+      "resultProvider": "GE",
       "id": "9074671a-7457-5c9a-ba0c-c78bfe9f824c",
       "sourceId": "conmebol-libertadores-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Libertadores",
-      "sourceUrl": "https://gol.conmebol.com/libertadores/es/news/calendario-conmebol-libertadores-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/libertadores/pt-br/tournament/15"
     },
     {
       "externalId": "group-5-sao-paulo-millonarios",
@@ -5009,10 +5140,12 @@
       "awayTeam": "Millonarios",
       "homeTeamId": "20005",
       "placeholder": false,
+      "result": "1 x 1",
+      "resultProvider": "GE",
       "id": "715543b9-f6dd-507a-8a87-edf7d7bffb8e",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/es/news/calendario-conmebol-sudamericana-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "group-5-olimpia-vasco-da-gama",
@@ -5028,10 +5161,12 @@
       "awayTeam": "Vasco da Gama",
       "awayTeamId": "60646",
       "placeholder": false,
+      "result": "3 x 1",
+      "resultProvider": "GE",
       "id": "e286a3ab-0f20-55e0-871a-444482d37792",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/es/news/calendario-conmebol-sudamericana-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "group-5-santos-san-lorenzo",
@@ -5047,10 +5182,12 @@
       "awayTeam": "San Lorenzo",
       "homeTeamId": "20008",
       "placeholder": false,
+      "result": "2 x 2",
+      "resultProvider": "GE",
       "id": "d49eb457-1c1e-5003-91c0-442865e5d59e",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/es/news/calendario-conmebol-sudamericana-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "group-5-independiente-botafogo",
@@ -5066,10 +5203,12 @@
       "awayTeam": "Botafogo",
       "awayTeamId": "60175",
       "placeholder": false,
+      "result": "0 x 3",
+      "resultProvider": "GE",
       "id": "1c788186-ea9f-56e0-af56-59cf4531b9b4",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/es/news/calendario-conmebol-sudamericana-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "group-5-gremio-palestino",
@@ -5085,10 +5224,12 @@
       "awayTeam": "Palestino",
       "homeTeamId": "20013",
       "placeholder": false,
+      "result": "2 x 0",
+      "resultProvider": "GE",
       "id": "ad43c5e1-190a-5a08-9078-b2c1f2aad6a0",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/es/news/calendario-conmebol-sudamericana-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "group-5-flamengo-estudiantes-de-la-plata",
@@ -5104,10 +5245,12 @@
       "awayTeam": "Estudiantes de La Plata",
       "homeTeamId": "20016",
       "placeholder": false,
+      "result": "1 x 0",
+      "resultProvider": "GE",
       "id": "6fc37811-8d1f-58ce-8374-2f88e4c3786e",
       "sourceId": "conmebol-libertadores-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Libertadores",
-      "sourceUrl": "https://gol.conmebol.com/libertadores/es/news/calendario-conmebol-libertadores-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/libertadores/pt-br/tournament/15"
     },
     {
       "externalId": "group-5-palmeiras-cerro-porteno",
@@ -5123,10 +5266,12 @@
       "awayTeam": "Cerro Porteño",
       "homeTeamId": "20002",
       "placeholder": false,
+      "result": "0 x 1",
+      "resultProvider": "GE",
       "id": "9f540372-5cbb-5513-a5b9-d14db4d3f6c1",
       "sourceId": "conmebol-libertadores-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Libertadores",
-      "sourceUrl": "https://gol.conmebol.com/libertadores/es/news/calendario-conmebol-libertadores-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/libertadores/pt-br/tournament/15"
     },
     {
       "externalId": "group-5-river-plate-rb-bragantino",
@@ -5142,10 +5287,12 @@
       "awayTeam": "Red Bull Bragantino",
       "awayTeamId": "20007",
       "placeholder": false,
+      "result": "1 x 1",
+      "resultProvider": "GE",
       "id": "8b7372cb-6707-5b43-a839-0a45803c8358",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/es/news/calendario-conmebol-sudamericana-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "group-5-atletico-mineiro-cienciano",
@@ -5161,10 +5308,12 @@
       "awayTeam": "Cienciano",
       "homeTeamId": "62194",
       "placeholder": false,
+      "result": "2 x 0",
+      "resultProvider": "GE",
       "id": "4c55b858-6cfb-5ec1-97ee-d43a8f128928",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/es/news/calendario-conmebol-sudamericana-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "group-5-penarol-corinthians",
@@ -5180,10 +5329,12 @@
       "awayTeam": "Corinthians",
       "awayTeamId": "20001",
       "placeholder": false,
+      "result": "1 x 1",
+      "resultProvider": "GE",
       "id": "66cdab38-e267-53b0-9e32-0389982b5be3",
       "sourceId": "conmebol-libertadores-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Libertadores",
-      "sourceUrl": "https://gol.conmebol.com/libertadores/es/news/calendario-conmebol-libertadores-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/libertadores/pt-br/tournament/15"
     },
     {
       "externalId": "832052",
@@ -5409,10 +5560,12 @@
       "awayTeam": "Montevideo City Torque",
       "homeTeamId": "20013",
       "placeholder": false,
+      "result": "2 x 2",
+      "resultProvider": "GE",
       "id": "c5fda27b-76ec-5bcb-8045-82c7c4ef6052",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/es/news/calendario-conmebol-sudamericana-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "group-6-lanus-mirassol",
@@ -5428,10 +5581,12 @@
       "awayTeam": "Mirassol",
       "awayTeamId": "20385",
       "placeholder": false,
+      "result": "1 x 0",
+      "resultProvider": "GE",
       "id": "77baa8cb-a962-565b-9a58-ef58c6b7e9df",
       "sourceId": "conmebol-libertadores-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Libertadores",
-      "sourceUrl": "https://gol.conmebol.com/libertadores/es/news/calendario-conmebol-libertadores-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/libertadores/pt-br/tournament/15"
     },
     {
       "externalId": "group-6-sao-paulo-boston-river",
@@ -5447,10 +5602,12 @@
       "awayTeam": "Boston River",
       "homeTeamId": "20005",
       "placeholder": false,
+      "result": "2 x 0",
+      "resultProvider": "GE",
       "id": "556ebf46-4034-58fb-ad81-b6e035570576",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/es/news/calendario-conmebol-sudamericana-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "group-6-flamengo-cusco",
@@ -5466,10 +5623,12 @@
       "awayTeam": "Cusco",
       "homeTeamId": "20016",
       "placeholder": false,
+      "result": "3 x 0",
+      "resultProvider": "GE",
       "id": "58b27841-2c86-5086-9038-b1f42f074177",
       "sourceId": "conmebol-libertadores-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Libertadores",
-      "sourceUrl": "https://gol.conmebol.com/libertadores/es/news/calendario-conmebol-libertadores-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/libertadores/pt-br/tournament/15"
     },
     {
       "externalId": "group-6-santos-deportivo-cuenca",
@@ -5485,10 +5644,12 @@
       "awayTeam": "Deportivo Cuenca",
       "homeTeamId": "20008",
       "placeholder": false,
+      "result": "3 x 0",
+      "resultProvider": "GE",
       "id": "d180c47f-5c30-57a4-9c0b-93a7573d7837",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/es/news/calendario-conmebol-sudamericana-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "group-6-caracas-botafogo",
@@ -5504,10 +5665,12 @@
       "awayTeam": "Botafogo",
       "awayTeamId": "60175",
       "placeholder": false,
+      "result": "1 x 3",
+      "resultProvider": "GE",
       "id": "e42c9a0c-3c01-5f3d-bcf7-68d111b48b15",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/es/news/calendario-conmebol-sudamericana-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "group-6-atletico-mineiro-academia-puerto-cabello",
@@ -5526,7 +5689,7 @@
       "id": "676e7b88-e226-581f-8075-9ca6b35f419e",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/es/news/calendario-conmebol-sudamericana-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "group-6-corinthians-platense",
@@ -5542,10 +5705,12 @@
       "awayTeam": "Platense",
       "homeTeamId": "20001",
       "placeholder": false,
+      "result": "0 x 2",
+      "resultProvider": "GE",
       "id": "7be4d4ea-9f6c-5724-9d50-a54d0c387dc2",
       "sourceId": "conmebol-libertadores-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Libertadores",
-      "sourceUrl": "https://gol.conmebol.com/libertadores/es/news/calendario-conmebol-libertadores-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/libertadores/pt-br/tournament/15"
     },
     {
       "externalId": "group-6-fluminense-deportivo-la-guaira",
@@ -5561,10 +5726,12 @@
       "awayTeam": "Deportivo La Guaira",
       "homeTeamId": "20014",
       "placeholder": false,
+      "result": "3 x 1",
+      "resultProvider": "GE",
       "id": "5df5b3e6-0505-50d5-9099-10fc27cae968",
       "sourceId": "conmebol-libertadores-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Libertadores",
-      "sourceUrl": "https://gol.conmebol.com/libertadores/es/news/calendario-conmebol-libertadores-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/libertadores/pt-br/tournament/15"
     },
     {
       "externalId": "group-6-rb-bragantino-carabobo",
@@ -5580,10 +5747,12 @@
       "awayTeam": "Carabobo",
       "homeTeamId": "20007",
       "placeholder": false,
+      "result": "2 x 0",
+      "resultProvider": "GE",
       "id": "6fafd211-40c5-5891-a3be-51521b3dac8e",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/es/news/calendario-conmebol-sudamericana-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "group-6-vasco-da-gama-barracas-central",
@@ -5599,10 +5768,12 @@
       "awayTeam": "Barracas Central",
       "homeTeamId": "60646",
       "placeholder": false,
+      "result": "3 x 0",
+      "resultProvider": "GE",
       "id": "2f5915be-f32f-5f65-bfbb-b3e0ef0d28be",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/es/news/calendario-conmebol-sudamericana-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "group-6-palmeiras-junior",
@@ -5618,10 +5789,12 @@
       "awayTeam": "Junior",
       "homeTeamId": "20002",
       "placeholder": false,
+      "result": "4 x 1",
+      "resultProvider": "GE",
       "id": "93fc7206-4ad2-53c2-a110-95237a84498f",
       "sourceId": "conmebol-libertadores-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Libertadores",
-      "sourceUrl": "https://gol.conmebol.com/libertadores/es/news/calendario-conmebol-libertadores-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/libertadores/pt-br/tournament/15"
     },
     {
       "externalId": "group-6-cruzeiro-barcelona",
@@ -5637,10 +5810,12 @@
       "awayTeam": "Barcelona",
       "homeTeamId": "59849",
       "placeholder": false,
+      "result": "4 x 0",
+      "resultProvider": "GE",
       "id": "ee5307b8-d76a-54d4-b340-42ae58824a4d",
       "sourceId": "conmebol-libertadores-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Libertadores",
-      "sourceUrl": "https://gol.conmebol.com/libertadores/es/news/calendario-conmebol-libertadores-2026-dias-horarios-y-sedes-de-la-fase-de-grupos"
+      "sourceUrl": "https://gol.conmebol.com/libertadores/pt-br/tournament/15"
     },
     {
       "externalId": "832060",
@@ -5992,10 +6167,12 @@
       "awayTeam": "Santos",
       "awayTeamId": "20008",
       "placeholder": false,
+      "result": "1 x 4",
+      "resultProvider": "GE",
       "id": "6d89f7ad-0b79-5c97-b33c-78ec6869df03",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/news/para-tomar-nota-assim-serao-disputados-os-playoffs-das-oitavas-de-final-da-conmebol"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "playoff-das-oitavas-2026-07-22-independiente-medellin-vasco-da-gama",
@@ -6011,10 +6188,12 @@
       "awayTeam": "Vasco da Gama",
       "awayTeamId": "60646",
       "placeholder": false,
+      "result": "2 x 2",
+      "resultProvider": "GE",
       "id": "d0d20402-8860-59a1-91da-e94156952eb5",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/news/para-tomar-nota-assim-serao-disputados-os-playoffs-das-oitavas-de-final-da-conmebol"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "832077",
@@ -6051,10 +6230,12 @@
       "awayTeam": "Red Bull Bragantino",
       "awayTeamId": "20007",
       "placeholder": false,
+      "result": "0 x 0",
+      "resultProvider": "GE",
       "id": "399c6eb7-5e39-5ff4-ab93-ddddc061d092",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/news/para-tomar-nota-assim-serao-disputados-os-playoffs-das-oitavas-de-final-da-conmebol"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "832072",
@@ -6133,10 +6314,12 @@
       "awayTeam": "Grêmio",
       "awayTeamId": "20013",
       "placeholder": false,
+      "result": "3 x 2",
+      "resultProvider": "GE",
       "id": "bceb4a5d-f24d-582f-81d7-2ef5f909267d",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/news/para-tomar-nota-assim-serao-disputados-os-playoffs-das-oitavas-de-final-da-conmebol"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "831920",
@@ -6404,10 +6587,12 @@
       "awayTeam": "UCV FC",
       "homeTeamId": "20008",
       "placeholder": false,
+      "result": "4 x 2",
+      "resultProvider": "GE",
       "id": "e151ea8e-5232-531c-a77e-24471a257da4",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/news/para-tomar-nota-assim-serao-disputados-os-playoffs-das-oitavas-de-final-da-conmebol"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "playoff-das-oitavas-2026-07-29-vasco-da-gama-independiente-medellin",
@@ -6423,10 +6608,12 @@
       "awayTeam": "Independiente Medellín",
       "homeTeamId": "60646",
       "placeholder": false,
+      "result": "1 x 0",
+      "resultProvider": "GE",
       "id": "30851f62-3909-513c-9339-f4a1d7506006",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/news/para-tomar-nota-assim-serao-disputados-os-playoffs-das-oitavas-de-final-da-conmebol"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "832094",
@@ -6526,10 +6713,12 @@
       "awayTeam": "Sporting Cristal",
       "homeTeamId": "20007",
       "placeholder": false,
+      "result": "1 x 0",
+      "resultProvider": "GE",
       "id": "283280c1-bbcc-5e62-9baa-334bd089d78b",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/news/para-tomar-nota-assim-serao-disputados-os-playoffs-das-oitavas-de-final-da-conmebol"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "playoff-das-oitavas-2026-07-30-gremio-bolivar",
@@ -6545,10 +6734,12 @@
       "awayTeam": "Bolívar",
       "homeTeamId": "20013",
       "placeholder": false,
+      "result": "0 x 1",
+      "resultProvider": "GE",
       "id": "0674866d-3b97-5569-b662-511eb7a2d1d4",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/news/para-tomar-nota-assim-serao-disputados-os-playoffs-das-oitavas-de-final-da-conmebol"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "832093",
@@ -7155,7 +7346,7 @@
       "id": "18f398e7-3bb0-55ba-a59e-09675d3844de",
       "sourceId": "conmebol-libertadores-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Libertadores",
-      "sourceUrl": "https://gol.conmebol.com/libertadores/pt-br/news/datas-e-horarios-assim-serao-disputadas-oitavas-de-final-da-conmebol-libertadores"
+      "sourceUrl": "https://gol.conmebol.com/libertadores/pt-br/tournament/15"
     },
     {
       "externalId": "oitavas-de-final-2026-08-11-bolivar-sao-paulo",
@@ -7174,7 +7365,7 @@
       "id": "38b910f2-1392-58b3-a923-4c85f7d43385",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/news/assim-serao-disputadas-oitavas-de-final-da-conmebol-sudamericana"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "oitavas-de-final-2026-08-12-palmeiras-cerro-porteno",
@@ -7193,7 +7384,7 @@
       "id": "a85b768c-2429-568a-b036-946af258117b",
       "sourceId": "conmebol-libertadores-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Libertadores",
-      "sourceUrl": "https://gol.conmebol.com/libertadores/pt-br/news/datas-e-horarios-assim-serao-disputadas-oitavas-de-final-da-conmebol-libertadores"
+      "sourceUrl": "https://gol.conmebol.com/libertadores/pt-br/tournament/15"
     },
     {
       "externalId": "oitavas-de-final-2026-08-12-rb-bragantino-atletico-mineiro",
@@ -7213,7 +7404,7 @@
       "id": "517d4909-6d2f-5c47-95a9-ae1dd22cdd85",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/news/assim-serao-disputadas-oitavas-de-final-da-conmebol-sudamericana"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "oitavas-de-final-2026-08-12-cruzeiro-flamengo",
@@ -7233,7 +7424,7 @@
       "id": "84a5b7b2-22ec-528b-ada4-b69af77c701b",
       "sourceId": "conmebol-libertadores-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Libertadores",
-      "sourceUrl": "https://gol.conmebol.com/libertadores/pt-br/news/datas-e-horarios-assim-serao-disputadas-oitavas-de-final-da-conmebol-libertadores"
+      "sourceUrl": "https://gol.conmebol.com/libertadores/pt-br/tournament/15"
     },
     {
       "externalId": "oitavas-de-final-2026-08-13-mirassol-l-d-u-quito",
@@ -7252,7 +7443,7 @@
       "id": "09953781-4d2d-5b2d-8b36-df7a00bd6c99",
       "sourceId": "conmebol-libertadores-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Libertadores",
-      "sourceUrl": "https://gol.conmebol.com/libertadores/pt-br/news/datas-e-horarios-assim-serao-disputadas-oitavas-de-final-da-conmebol-libertadores"
+      "sourceUrl": "https://gol.conmebol.com/libertadores/pt-br/tournament/15"
     },
     {
       "externalId": "oitavas-de-final-2026-08-13-santos-macara",
@@ -7271,7 +7462,7 @@
       "id": "bf7d3c39-c2e4-5fae-b654-83ef81a0ab71",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/news/assim-serao-disputadas-oitavas-de-final-da-conmebol-sudamericana"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "oitavas-de-final-2026-08-13-vasco-da-gama-olimpia",
@@ -7290,7 +7481,7 @@
       "id": "9f7c59f5-550b-556f-9a5b-28480c52fe22",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/news/assim-serao-disputadas-oitavas-de-final-da-conmebol-sudamericana"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "oitavas-de-final-2026-08-13-cienciano-botafogo",
@@ -7309,7 +7500,7 @@
       "id": "3de73e64-c7db-5483-b2d0-3e6a7d42f651",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/news/assim-serao-disputadas-oitavas-de-final-da-conmebol-sudamericana"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "oitavas-de-final-2026-08-13-rosario-central-corinthians",
@@ -7328,7 +7519,7 @@
       "id": "fa135048-aa8a-5bce-bee2-47fc64f3e429",
       "sourceId": "conmebol-libertadores-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Libertadores",
-      "sourceUrl": "https://gol.conmebol.com/libertadores/pt-br/news/datas-e-horarios-assim-serao-disputadas-oitavas-de-final-da-conmebol-libertadores"
+      "sourceUrl": "https://gol.conmebol.com/libertadores/pt-br/tournament/15"
     },
     {
       "externalId": "832110",
@@ -7547,7 +7738,7 @@
       "id": "42d5ca0a-14d2-507f-978d-c6ec76b97a7b",
       "sourceId": "conmebol-libertadores-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Libertadores",
-      "sourceUrl": "https://gol.conmebol.com/libertadores/pt-br/news/datas-e-horarios-assim-serao-disputadas-oitavas-de-final-da-conmebol-libertadores"
+      "sourceUrl": "https://gol.conmebol.com/libertadores/pt-br/tournament/15"
     },
     {
       "externalId": "oitavas-de-final-2026-08-18-sao-paulo-bolivar",
@@ -7566,7 +7757,7 @@
       "id": "b60068e8-abf5-5bbf-96e0-3d399e4139e6",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/news/assim-serao-disputadas-oitavas-de-final-da-conmebol-sudamericana"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "oitavas-de-final-2026-08-19-atletico-mineiro-rb-bragantino",
@@ -7586,7 +7777,7 @@
       "id": "81fd794d-1b20-5162-9306-deb1e6f21d35",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/news/assim-serao-disputadas-oitavas-de-final-da-conmebol-sudamericana"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "oitavas-de-final-2026-08-19-cerro-porteno-palmeiras",
@@ -7605,7 +7796,7 @@
       "id": "334d8287-e64a-5475-87ef-0f54f69af3eb",
       "sourceId": "conmebol-libertadores-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Libertadores",
-      "sourceUrl": "https://gol.conmebol.com/libertadores/pt-br/news/datas-e-horarios-assim-serao-disputadas-oitavas-de-final-da-conmebol-libertadores"
+      "sourceUrl": "https://gol.conmebol.com/libertadores/pt-br/tournament/15"
     },
     {
       "externalId": "oitavas-de-final-2026-08-19-flamengo-cruzeiro",
@@ -7625,7 +7816,7 @@
       "id": "c9d3f91b-58d4-5d9e-907a-ea81f9ee8df8",
       "sourceId": "conmebol-libertadores-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Libertadores",
-      "sourceUrl": "https://gol.conmebol.com/libertadores/pt-br/news/datas-e-horarios-assim-serao-disputadas-oitavas-de-final-da-conmebol-libertadores"
+      "sourceUrl": "https://gol.conmebol.com/libertadores/pt-br/tournament/15"
     },
     {
       "externalId": "oitavas-de-final-2026-08-20-l-d-u-quito-mirassol",
@@ -7644,7 +7835,7 @@
       "id": "7edd0009-a4ab-507d-8d8e-25a65450e6fd",
       "sourceId": "conmebol-libertadores-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Libertadores",
-      "sourceUrl": "https://gol.conmebol.com/libertadores/pt-br/news/datas-e-horarios-assim-serao-disputadas-oitavas-de-final-da-conmebol-libertadores"
+      "sourceUrl": "https://gol.conmebol.com/libertadores/pt-br/tournament/15"
     },
     {
       "externalId": "oitavas-de-final-2026-08-20-macara-santos",
@@ -7663,7 +7854,7 @@
       "id": "24c7110e-8887-59bb-bde8-25865a789c55",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/news/assim-serao-disputadas-oitavas-de-final-da-conmebol-sudamericana"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "oitavas-de-final-2026-08-20-olimpia-vasco-da-gama",
@@ -7682,7 +7873,7 @@
       "id": "9b5fd4b1-b3c8-5b20-b15c-29f0947a8f61",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/news/assim-serao-disputadas-oitavas-de-final-da-conmebol-sudamericana"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "oitavas-de-final-2026-08-20-botafogo-cienciano",
@@ -7701,7 +7892,7 @@
       "id": "963cc402-f4a1-5935-818c-d0511475c87f",
       "sourceId": "conmebol-sudamericana-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Sul-Americana",
-      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/news/assim-serao-disputadas-oitavas-de-final-da-conmebol-sudamericana"
+      "sourceUrl": "https://gol.conmebol.com/sudamericana/pt-br/tournament/104"
     },
     {
       "externalId": "oitavas-de-final-2026-08-20-corinthians-rosario-central",
@@ -7720,7 +7911,7 @@
       "id": "ca070ba5-dd12-5873-ac31-d9470b6fab48",
       "sourceId": "conmebol-libertadores-2026",
       "sourceLabel": "CONMEBOL — CONMEBOL Libertadores",
-      "sourceUrl": "https://gol.conmebol.com/libertadores/pt-br/news/datas-e-horarios-assim-serao-disputadas-oitavas-de-final-da-conmebol-libertadores"
+      "sourceUrl": "https://gol.conmebol.com/libertadores/pt-br/tournament/15"
     },
     {
       "externalId": "832120",

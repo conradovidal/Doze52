@@ -19,7 +19,9 @@ See `docs/calendar-catalog-operations.md` for sources, schedules, quarantine and
   through 2100. Optional government closure dates are intentionally excluded.
 - `brasileirao-2026.ts`: 20 club variants in alphabetical order, aggregating officially
   confirmed 2026 matches from Brasileirão, Copa do Brasil, Libertadores and
-  Sul-Americana according to each club's participation.
+  Sul-Americana according to each club's participation. GE supplies the normalized
+  operational result feed, while CBF and CONMEBOL remain the authorities and public
+  provenance.
 
 Keep pack `profile.id`, category `id`s, and event `id`s stable. Importing the same pack
 must remain idempotent for users who already added it. Packs are tracked by stable IDs and

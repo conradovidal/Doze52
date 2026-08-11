@@ -44,6 +44,10 @@ test("oferece os 20 clubes com partidas oficiais válidas e IDs estáveis", () =
   expect(gremioPack.events.find((event) => event.id.endsWith("000000831889"))).toBeTruthy();
   expect(gremioPack.events.some((event) => event.competition === "CONMEBOL Sul-Americana")).toBe(true);
   expect(brasileirao2026Packs.find((pack) => pack.variantGroup?.optionLabel === "Palmeiras")?.events.some((event) => event.competition === "CONMEBOL Libertadores")).toBe(true);
+  const continentalResults = allEvents.filter((event) => event.competition?.includes("CONMEBOL") && event.result);
+  expect(continentalResults.length).toBeGreaterThan(0);
+  expect(continentalResults.some((event) => event.notes?.includes("Resultado operacional: GE."))).toBe(true);
+  expect(continentalResults.every((event) => event.sourceUrl.includes("conmebol.com"))).toBe(true);
 });
 
 const corruptedSnapshot = (

@@ -14,7 +14,7 @@ export async function GET() {
     admin.from("calendar_pack_sources").select("*").order("id"),
     admin.from("calendar_pack_update_runs").select("*").order("started_at", { ascending: false }).limit(30),
     admin.from("calendar_pack_releases").select("id, version, material_hash, release_kind, published_at").order("published_at", { ascending: false }).limit(20),
-    admin.from("calendar_pack_candidates").select("id, run_id, source_id, diff, validation_issues, status, created_at").order("created_at", { ascending: false }).limit(60),
+    admin.from("calendar_pack_candidates").select("id, run_id, source_id, payload, diff, validation_issues, status, created_at").order("created_at", { ascending: false }).limit(60),
     admin.from("calendar_pack_catalog_state").select("current_release_id").eq("singleton", true).single(),
   ]);
   const error = [sources, runs, releases, candidates, state].find((result) => result.error)?.error;
