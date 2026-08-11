@@ -28,7 +28,11 @@ Os jobs verificam o horário local a cada hora. Eles disparam exatamente às 00:
 
 ## Rollout
 
-As fontes começam como `pending`, exceto o Brasileirão/CBF, que começa em `shadow`.
+Brasileirão, Copa do Brasil, Libertadores e Sul-Americana começam em `shadow`.
+O fallback já agrega as quatro competições; as fontes em sombra apenas geram candidatos
+e diferenças, sem substituir o release publicado. Os endpoints técnicos da CBF e os
+documentos oficiais por fase da CONMEBOL ficam no código de ingestão, enquanto
+`official_url` permanece como a página pública de proveniência.
 Uma fonte em sombra gera candidatos, diferenças e quarentenas sem publicar. Depois de
 14 dias sem regressões contratuais, altere a fonte para `active` pelo banco e acompanhe
 ao menos dois ciclos antes de ativar a próxima, nesta ordem:

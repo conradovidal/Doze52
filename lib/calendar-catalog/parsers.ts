@@ -1,4 +1,5 @@
 import type { CalendarCatalogSource, OfficialCalendarEvent } from "./types";
+import { canonicalBrazilianClubById, canonicalTeamId, canonicalTeamName } from "./team-identities";
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -153,6 +154,135 @@ const parseFormula1Html = (body: string, source: CalendarCatalogSource) => {
   return events;
 };
 
+const ARTICLE_MONTHS: Record<string, string> = {
+  janeiro: "01", enero: "01", fevereiro: "02", febrero: "02", marco: "03", marzo: "03",
+  abril: "04", maio: "05", mayo: "05", junho: "06", junio: "06", julho: "07", julio: "07",
+  agosto: "08", setembro: "09", septiembre: "09", outubro: "10", octubre: "10",
+  novembro: "11", noviembre: "11", dezembro: "12", diciembre: "12",
+};
+
+const decodeHtml = (value: string) => value
+  .replace(/<br\s*\/?>/gi, " ")
+  .replace(/<[^>]+>/g, "")
+  .replace(/&nbsp;|&#160;/gi, " ")
+  .replace(/&amp;/gi, "&")
+  .replace(/&quot;|&#34;/gi, '"')
+  .replace(/&#039;|&apos;/gi, "'")
+  .replace(/\s+/g, " ")
+  .trim();
+
+const normalizedWord = (value: string) => value.normalize("NFD")
+  .replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+const articleElements = (body: string) => Array.from(
+  body.matchAll(/<(h[12]|p)(?:\s[^>]*)?>([\s\S]*?)<\/\1>/gi),
+  (match) => ({ tag: match[1].toLowerCase(), text: decodeHtml(match[2]) })
+);
+
+const slugIdentity = (value: string) => normalizedWord(value)
+  .replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+
+const timezoneForCity = (city: string) => {
+  const normalized = normalizedWord(city);
+  if (/la paz|el alto|sucre|santa cruz/.test(normalized)) return "America/La_Paz";
+  if (/santiago|rancagua|coquimbo/.test(normalized)) return "America/Santiago";
+  if (/bogota|ibague|medellin|cartagena|cali/.test(normalized)) return "America/Bogota";
+  if (/quito|guayaquil|cuenca/.test(normalized)) return "America/Guayaquil";
+  if (/lima|cusco|callao/.test(normalized)) return "America/Lima";
+  if (/caracas|valencia/.test(normalized)) return "America/Caracas";
+  if (/asuncion/.test(normalized)) return "America/Asuncion";
+  if (/montevideo/.test(normalized)) return "America/Montevideo";
+  if (/buenos aires|la plata|mendoza|rosario|victoria|avellaneda|banfield/.test(normalized)) return "America/Argentina/Buenos_Aires";
+  return "America/Sao_Paulo";
+};
+
+const conmebolEvent = ({
+  source, externalId, date, time, city, venue, phase, homeTeam, awayTeam,
+}: {
+  source: CalendarCatalogSource; externalId: string; date: string; time: string;
+  city: string; venue: string; phase: string; homeTeam: string; awayTeam: string;
+}): OfficialCalendarEvent => {
+  const canonicalHome = canonicalTeamName(homeTeam);
+  const canonicalAway = canonicalTeamName(awayTeam);
+  return {
+    externalId, competition: source.competition, season: source.season, date, time,
+    timezone: timezoneForCity(city), city, venue, phase,
+    homeTeam: canonicalHome, awayTeam: canonicalAway,
+    homeTeamId: canonicalTeamId(canonicalHome), awayTeamId: canonicalTeamId(canonicalAway),
+    placeholder: false,
+  };
+};
+
+const parseConmebolGroupArticle = (body: string, source: CalendarCatalogSource) => {
+  let round = "";
+  let date = "";
+  const events: OfficialCalendarEvent[] = [];
+  for (const element of articleElements(body)) {
+    const roundMatch = element.text.match(/(?:FECHA|RODADA)\s*(\d+)/i);
+    if (roundMatch) round = roundMatch[1];
+    const dateMatch = normalizedWord(element.text).match(/(\d{1,2})\s+de\s+([a-z]+)/);
+    if (dateMatch && ARTICLE_MONTHS[dateMatch[2]]) {
+      date = `2026-${ARTICLE_MONTHS[dateMatch[2]]}-${dateMatch[1].padStart(2, "0")}`;
+    }
+    if (element.tag !== "p" || !date || !round) continue;
+    const match = element.text.match(/(\d{1,2}:\d{2})h?\s*(?:-\s*)?(.+?)\s+\(([^)]+)\)\s+(?:vs\.?|x|-)\s+(.+?)\s+\(([^)]+)\)(.*)$/i);
+    if (!match) continue;
+    const homeTeam = match[2].replace(/\s+-\s*$/, "").trim();
+    const awayTeam = match[4].replace(/\s+-\s*$/, "").trim();
+    const remainder = match[6].replace(/^\s*-?\s*/, "");
+    const location = remainder.replace(/^Grupo\s+[A-Z]\s*[-,]?\s*/i, "").trim();
+    const locationParts = location.split(",").map((part) => part.trim()).filter(Boolean);
+    const city = locationParts.at(-1) ?? "";
+    const venue = locationParts.slice(0, -1).join(", ").replace(/^Estadio\s+/i, "Estádio ");
+    events.push(conmebolEvent({
+      source,
+      externalId: `group-${round}-${slugIdentity(homeTeam)}-${slugIdentity(awayTeam)}`,
+      date, time: match[1], city, venue, phase: `Fase de grupos — Rodada ${round}`,
+      homeTeam, awayTeam,
+    }));
+  }
+  return events;
+};
+
+const parseConmebolKnockoutArticle = (body: string, source: CalendarCatalogSource) => {
+  let matchup: { home: string; away: string } | null = null;
+  const events: OfficialCalendarEvent[] = [];
+  const phase = /CALEND[ÁA]RIO DOS PLAYOFFS/i.test(body) ? "Playoff das oitavas" : "Oitavas de final";
+  for (const element of articleElements(body)) {
+    if (element.tag === "h2") {
+      const match = element.text.match(/^(.+?)\s+(?:x|vs\.?)\s+(.+)$/i);
+      matchup = match ? { home: match[1].trim(), away: match[2].trim() } : null;
+      continue;
+    }
+    if (element.tag !== "p" || !matchup) continue;
+    const match = element.text.match(/^(Ida|Volta):.*?(\d{1,2})\/(\d{1,2}).*?(\d{1,2})h(?:(\d{2}))?\s*,\s*(?:(?:no|na|em)\s+)?(.+)$/i);
+    if (!match) continue;
+    const isReturn = normalizedWord(match[1]) === "volta";
+    const homeTeam = isReturn ? matchup.away : matchup.home;
+    const awayTeam = isReturn ? matchup.home : matchup.away;
+    const locationParts = match[6].replace(/^(?:estadio|estádio)\s+/i, "Estádio ")
+      .split(",").map((part) => part.trim()).filter(Boolean);
+    const city = locationParts.at(-1) ?? "";
+    const venue = locationParts.slice(0, -1).join(", ");
+    const date = `2026-${match[3].padStart(2, "0")}-${match[2].padStart(2, "0")}`;
+    events.push(conmebolEvent({
+      source,
+      externalId: `${slugIdentity(phase)}-${date}-${slugIdentity(homeTeam)}-${slugIdentity(awayTeam)}`,
+      date, time: `${match[4].padStart(2, "0")}:${match[5] ?? "00"}`,
+      city, venue, phase, homeTeam, awayTeam,
+    }));
+  }
+  return events;
+};
+
+const parseConmebolHtml = (body: string, source: CalendarCatalogSource) => {
+  const events = /\b(?:Ida|Volta):/i.test(body)
+    ? parseConmebolKnockoutArticle(body, source)
+    : parseConmebolGroupArticle(body, source);
+  return Array.from(new Map(events.map((event) => [event.externalId, event])).values())
+    .sort((left, right) => `${left.date}T${left.time}`.localeCompare(`${right.date}T${right.time}`));
+};
+
 const cbfTeam = (value: unknown) => {
   const record = asRecord(value);
   const shield = text(record?.url_escudo);
@@ -168,11 +298,11 @@ const parseCbfPayload = (body: string, source: CalendarCatalogSource) => {
   try { payload = JSON.parse(body); } catch { return []; }
   const root = asRecord(payload);
   if (!root) return [];
-  const records = Object.values(root).flatMap((phase) => {
+  const records = Object.entries(root).flatMap(([phaseName, phase]) => {
     const games = asRecord(phase)?.jogos;
-    return Array.isArray(games) ? games : [];
+    return Array.isArray(games) ? games.map((record) => ({ phaseName, record })) : [];
   });
-  return records.flatMap((value): OfficialCalendarEvent[] => {
+  return records.flatMap(({ phaseName, record: value }): OfficialCalendarEvent[] => {
     const record = asRecord(value);
     if (!record) return [];
     const externalId = text(record.ref_jogo);
@@ -185,8 +315,11 @@ const parseCbfPayload = (body: string, source: CalendarCatalogSource) => {
       externalId, competition: source.competition, season: source.season,
       date, time: normalizeTime(rawTime), timezone: "America/Sao_Paulo",
       city: [text(record.cidade), text(record.uf)].filter(Boolean).join(" - "),
-      venue: text(record.estadio), phase: `Rodada ${text(record.rodada)}`,
-      homeTeam: home.name, awayTeam: away.name, homeTeamId: home.id, awayTeamId: away.id,
+      venue: text(record.estadio),
+      phase: source.id === "cbf-copa-do-brasil-2026" ? phaseName : `Rodada ${text(record.rodada)}`,
+      homeTeam: canonicalBrazilianClubById(home.id ?? "")?.name ?? home.name,
+      awayTeam: canonicalBrazilianClubById(away.id ?? "")?.name ?? away.name,
+      homeTeamId: home.id, awayTeamId: away.id,
       result: home.goals !== "" && away.goals !== "" ? `${home.goals} x ${away.goals}` : undefined,
       placeholder: false,
     }];
@@ -203,6 +336,9 @@ export const parseOfficialSource = (
   }
   if (source.parser_key === "formula1" && contentType.includes("html")) {
     return parseFormula1Html(body, source);
+  }
+  if (source.parser_key === "conmebol" && contentType.includes("html")) {
+    return parseConmebolHtml(body, source);
   }
   const records: UnknownRecord[] = [];
   jsonPayloads(body, contentType).forEach((payload) =>

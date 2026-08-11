@@ -1,0 +1,22 @@
+[
+  { "id": "20052", "name": "Athletico Paranaense", "aliases": ["Athletico Paranaense"] },
+  { "id": "62194", "name": "Atlético Mineiro", "aliases": ["Atlético Mineiro", "Atletico Mineiro"] },
+  { "id": "61377", "name": "Bahia", "aliases": ["Bahia"] },
+  { "id": "60175", "name": "Botafogo", "aliases": ["Botafogo"] },
+  { "id": "20086", "name": "Chapecoense", "aliases": ["Chapecoense"] },
+  { "id": "20001", "name": "Corinthians", "aliases": ["Corinthians"] },
+  { "id": "61590", "name": "Coritiba", "aliases": ["Coritiba", "Coritiba SAF"] },
+  { "id": "59849", "name": "Cruzeiro", "aliases": ["Cruzeiro"] },
+  { "id": "20016", "name": "Flamengo", "aliases": ["Flamengo"] },
+  { "id": "20014", "name": "Fluminense", "aliases": ["Fluminense"] },
+  { "id": "20013", "name": "Grêmio", "aliases": ["Grêmio", "Gremio"] },
+  { "id": "20011", "name": "Internacional", "aliases": ["Internacional"] },
+  { "id": "20385", "name": "Mirassol", "aliases": ["Mirassol"] },
+  { "id": "20002", "name": "Palmeiras", "aliases": ["Palmeiras"] },
+  { "id": "20007", "name": "Red Bull Bragantino", "aliases": ["Red Bull Bragantino", "RB Bragantino", "Bragantino"] },
+  { "id": "20022", "name": "Remo", "aliases": ["Remo"] },
+  { "id": "20008", "name": "Santos", "aliases": ["Santos", "Santos FC"] },
+  { "id": "20005", "name": "São Paulo", "aliases": ["São Paulo", "Sao Paulo"] },
+  { "id": "60646", "name": "Vasco da Gama", "aliases": ["Vasco", "Vasco da Gama", "Vasco da Gama SAF", "Vasco da Gama Saf"] },
+  { "id": "20018", "name": "Vitória", "aliases": ["Vitória", "Vitoria"] }
+]

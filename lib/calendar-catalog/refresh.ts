@@ -11,9 +11,33 @@ import { validateOfficialCandidate } from "./validation";
 
 export type RefreshTrigger = "scheduled_midnight" | "scheduled_closing" | "manual";
 
-const OFFICIAL_FETCH_URLS: Record<string, string> = {
-  "cbf-brasileirao-2026": "https://www.cbf.com.br/api/cbf/jogos/tabela-detalhada/campeonato/1260611",
-  "cbf-copa-do-brasil-2026": "https://www.cbf.com.br/api/cbf/jogos/tabela-detalhada/campeonato/1260615",
+const OFFICIAL_FETCH_URLS: Record<string, readonly string[]> = {
+  "cbf-brasileirao-2026": ["https://www.cbf.com.br/api/cbf/jogos/tabela-detalhada/campeonato/1260611"],
+  "cbf-copa-do-brasil-2026": ["https://www.cbf.com.br/api/cbf/jogos/tabela-detalhada/campeonato/1260615"],
+  "conmebol-libertadores-2026": [
+    "https://gol.conmebol.com/libertadores/es/news/calendario-conmebol-libertadores-2026-dias-horarios-y-sedes-de-la-fase-de-grupos",
+    "https://gol.conmebol.com/libertadores/pt-br/news/datas-e-horarios-assim-serao-disputadas-oitavas-de-final-da-conmebol-libertadores",
+  ],
+  "conmebol-sudamericana-2026": [
+    "https://gol.conmebol.com/sudamericana/es/news/calendario-conmebol-sudamericana-2026-dias-horarios-y-sedes-de-la-fase-de-grupos",
+    "https://gol.conmebol.com/sudamericana/pt-br/news/para-tomar-nota-assim-serao-disputados-os-playoffs-das-oitavas-de-final-da-conmebol",
+    "https://gol.conmebol.com/sudamericana/pt-br/news/assim-serao-disputadas-oitavas-de-final-da-conmebol-sudamericana",
+  ],
+};
+
+const fetchOfficialEvents = async (source: Parameters<typeof parseOfficialSource>[2]) => {
+  const urls = OFFICIAL_FETCH_URLS[source.id] ?? [source.official_url];
+  const batches = await Promise.all(urls.map(async (url) => {
+    const response = await fetch(url, {
+      headers: { "user-agent": "Doze52-Calendar-Updater/1.0 (+https://doze52.com)" },
+      signal: AbortSignal.timeout(20_000),
+      cache: "no-store",
+    });
+    if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`);
+    return parseOfficialSource(await response.text(), response.headers.get("content-type") ?? "", source);
+  }));
+  return Array.from(new Map(batches.flat().map((event) => [event.externalId, event])).values())
+    .sort((left, right) => `${left.date}T${left.time}`.localeCompare(`${right.date}T${right.time}`));
 };
 
 export const refreshCalendarCatalog = async ({
@@ -41,14 +65,7 @@ export const refreshCalendarCatalog = async ({
     for (const source of sources) {
       summary.checked += 1;
       try {
-        const response = await fetch(OFFICIAL_FETCH_URLS[source.id] ?? source.official_url, {
-          headers: { "user-agent": "Doze52-Calendar-Updater/1.0 (+https://doze52.com)" },
-          signal: AbortSignal.timeout(20_000),
-          cache: "no-store",
-        });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const body = await response.text();
-        const events = parseOfficialSource(body, response.headers.get("content-type") ?? "", source);
+        const events = await fetchOfficialEvents(source);
 
         const { data: previousCandidate } = await admin
           .from("calendar_pack_candidates")
