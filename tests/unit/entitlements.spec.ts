@@ -14,7 +14,6 @@ test("status gratuito compartilhado não concede benefícios de assinatura", () 
     canManageBilling: false,
   });
 });
-
 test("importação por Excel exige Pro apenas em produção", () => {
   expect(
     isCalendarSpreadsheetProGateEnabled({

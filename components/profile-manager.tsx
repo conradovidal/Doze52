@@ -238,6 +238,11 @@ export function ProfileManager({
       <DialogContent className="sm:max-w-[480px] p-5 sm:p-6">
         <DialogHeader>
           <DialogTitle>{isEditMode ? "Editar contexto" : "Novo contexto"}</DialogTitle>
+          <DialogDescription className="sr-only">
+            {isEditMode
+              ? "Ajuste o nome e o ícone deste contexto."
+              : "Defina o nome e o ícone do novo contexto."}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-5">

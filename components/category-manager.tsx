@@ -360,6 +360,11 @@ export function CategoryManager({
       >
         <DialogHeader>
           <DialogTitle>{isEdit ? "Editar categoria" : "Nova categoria"}</DialogTitle>
+          <DialogDescription className="sr-only">
+            {isEdit
+              ? "Ajuste o nome, o contexto e a cor desta categoria."
+              : "Defina o nome, o contexto e a cor da nova categoria."}
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-5">
           <Input

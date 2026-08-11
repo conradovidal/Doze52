@@ -20,7 +20,6 @@ import {
 import { AccountNudge } from "@/components/onboarding/account-nudge";
 import { DemoExplorationInvite } from "@/components/onboarding/demo-exploration-invite";
 import { MobileDesktopFirstGate } from "@/components/onboarding/mobile-desktop-first-gate";
-import { OnboardingTestReset } from "@/components/onboarding/onboarding-test-reset";
 import { OnboardingExitDialog } from "@/components/onboarding/onboarding-exit-dialog";
 import type { GuidedToolbarNotice } from "@/components/onboarding/guided-toolbar-notice";
 import { Button } from "@/components/ui/button";
@@ -54,7 +53,6 @@ import {
   getGuidedCategoryRevealRemainingMs,
   readGuidedOnboardingState,
   readProductOnboardingState,
-  resetAllProductOnboarding,
   shouldShowGuidedOnboarding,
   type GuidedOnboardingAction,
   type GuidedOnboardingState,
@@ -1365,21 +1363,6 @@ export default function HomePage() {
     setDemoInviteSuppressed(false);
   }, [loadOnboardingPersonalDemo, updateGuidedOnboarding, year]);
 
-  const resetGuidedOnboardingForTesting = React.useCallback(() => {
-    if (
-      process.env.NEXT_PUBLIC_ONBOARDING_TEST_CONTROLS !== "1" ||
-      session?.user.id
-    ) {
-      return;
-    }
-    resetAllProductOnboarding();
-    loadOnboardingPersonalDemo(year);
-    setGuidedDraft(null);
-    setMobileGuidedRangeStart(null);
-    setAccountNudgeVisible(false);
-    window.location.reload();
-  }, [loadOnboardingPersonalDemo, session?.user.id, year]);
-
   const trackPostOnboardingEvent = React.useCallback(
     () => {
       if (session?.user.id) return;
@@ -2225,12 +2208,6 @@ export default function HomePage() {
             setAuthDialogOpen(true);
           }}
         />
-      ) : null}
-
-      {process.env.NEXT_PUBLIC_ONBOARDING_TEST_CONTROLS === "1" &&
-      !authLoading &&
-      !session?.user.id ? (
-        <OnboardingTestReset onReset={resetGuidedOnboardingForTesting} />
       ) : null}
 
       {isMobileCalendarUi &&

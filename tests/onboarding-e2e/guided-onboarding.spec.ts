@@ -1179,35 +1179,6 @@ test("sandbox convida após cinco alvos e retoma o onboarding limpo", async ({
   await expect(page.locator("[data-onboarding-category-id]")).toHaveCount(7);
 });
 
-test("controle temporário reinicia dados locais e restaura a demonstração", async ({
-  page,
-}, testInfo) => {
-  test.skip(
-    testInfo.project.name === "mobile-chromium",
-    "Controle temporário validado no desktop"
-  );
-  await page.goto("/?mobileUi=0");
-  const panel = page.getByRole("region", {
-    name: "Guia inicial do Doze 52",
-  });
-  await panel.getByRole("button", { name: /Pessoal/ }).click();
-  await panel.getByRole("button", { name: /Aniversários/ }).click();
-  await panel
-    .getByRole("button", { name: "Criar categoria" })
-    .click();
-  await expect(page.locator("[data-onboarding-category-id]")).toHaveCount(1);
-
-  await page.locator("[data-onboarding-test-reset]").click();
-  await page.waitForLoadState("domcontentloaded");
-
-  await expect(panel).toHaveAttribute(
-    "data-guided-onboarding-step",
-    "context_selection"
-  );
-  await expect(page.locator("[data-onboarding-profile-id]")).toHaveCount(2);
-  await expect(page.locator("[data-onboarding-category-id]")).toHaveCount(7);
-});
-
 test("centraliza cards e mantém a instrução visível no cabeçalho fixo", async ({
   page,
 }, testInfo) => {
