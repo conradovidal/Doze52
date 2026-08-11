@@ -9,9 +9,19 @@ import type { CalendarPack } from "../../lib/calendar-packs/types";
 
 const source = (parser_key: string): CalendarCatalogSource => ({
   id: `source-${parser_key}`, authority: "Autoridade", competition: "Competição",
-  season: 2026, official_url: "https://oficial.example/calendario", parser_key,
+  season: 2026, official_url: "https://oficial.example/calendario", fetch_url: null, parser_key,
   rollout_status: "shadow", freshness_hours: 28, last_checked_at: null,
   last_successful_at: null, last_error: null,
+});
+
+test("parser CBF aceita a tabela oficial e descarta placeholders", () => {
+  const body = JSON.stringify({ fase: { jogos: [
+    { ref_jogo: "831894", rodada: "1", data: " 28/01/2026", hora: "19:00", estadio: "ARENA MRV", cidade: "Belo Horizonte", uf: "MG", mandante: { nome: "Atlético Mineiro", url_escudo: "https://conteudo.cbf.com.br/clubes/62194/escudo.jpg", gols: "2" }, visitante: { nome: "Palmeiras", url_escudo: "https://conteudo.cbf.com.br/clubes/20002/escudo.jpg", gols: "2" } },
+    { ref_jogo: "999999", rodada: "38", data: " 01/01/1900", hora: null, mandante: { nome: "A", url_escudo: "https://conteudo.cbf.com.br/clubes/1/escudo.jpg" }, visitante: { nome: "B", url_escudo: "https://conteudo.cbf.com.br/clubes/2/escudo.jpg" } },
+  ] } });
+  const parsed = parseOfficialSource(body, "application/json", source("cbf"));
+  expect(parsed).toHaveLength(1);
+  expect(parsed[0]).toMatchObject({ externalId: "831894", date: "2026-01-28", time: "19:00", homeTeamId: "62194", awayTeamId: "20002", result: "2 x 2" });
 });
 
 const event = (overrides: Partial<OfficialCalendarEvent> = {}): OfficialCalendarEvent => ({
@@ -51,8 +61,8 @@ test("quarentena bloqueia vazio, remoção excessiva e troca de participantes", 
   expect(validateOfficialCandidate({ previous: [event({ placeholder: true })], candidate: [event({ awayTeam: "Time C" })] })).toEqual([]);
 });
 
-test("parser normaliza contrato CBF/CONMEBOL/FIFA", () => {
-  for (const parser of ["cbf", "conmebol", "fifa"]) {
+test("parser normaliza contrato CONMEBOL/FIFA", () => {
+  for (const parser of ["conmebol", "fifa"]) {
     const events = parseOfficialSource(JSON.stringify({ matches: [{ id: 42, date: "2026-08-11", time: "21:30", homeTeam: { id: 1, name: "Time A" }, awayTeam: { id: 2, name: "Time B" }, homeScore: 2, awayScore: 1, venue: { name: "Estádio", city: "São Paulo" }, round: "Oitavas" }] }), "application/json", source(parser));
     expect(events).toHaveLength(1);
     expect(events[0]).toMatchObject({ externalId: "42", result: "2 x 1", homeTeam: "Time A", awayTeam: "Time B" });

@@ -4,12 +4,26 @@ import { materialHash } from "../../lib/calendar-catalog/material";
 import type { CalendarCatalog, OfficialCalendarEvent } from "../../lib/calendar-catalog/types";
 import { dismissOnboardingIfVisible } from "./support/browser";
 
+test("fallback compilado exige a escolha explícita entre os 20 clubes", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForLoadState("networkidle");
+  await dismissOnboardingIfVisible(page);
+  await page.getByRole("button", { name: "Adicionar ou gerenciar calendários." }).click();
+  const dialog = page.getByRole("dialog", { name: "Calendários" });
+  const selector = dialog.getByRole("combobox", { name: /Time para/ });
+  await expect(selector).toContainText("Escolha seu time");
+  await selector.click();
+  await expect(page.getByRole("option")).toHaveCount(20);
+  await page.getByRole("option", { name: "Grêmio", exact: true }).click();
+  await expect(selector).toContainText("Grêmio");
+});
+
 test("catálogo remoto oferece 20 clubes e recebe nova opção sem deploy", async ({ page }) => {
   const source = {
     id: "cbf-brasileirao-2026", authority: "CBF",
     competition: "Campeonato Brasileiro Serie A", season: 2026,
     official_url: "https://www.cbf.com.br/futebol-brasileiro/tabelas/campeonato-brasileiro/serie-a/2026",
-    parser_key: "cbf", rollout_status: "active" as const, freshness_hours: 28,
+    fetch_url: null, parser_key: "cbf", rollout_status: "active" as const, freshness_hours: 28,
     last_checked_at: null, last_successful_at: null, last_error: null,
   };
   const makeMatch = (index: number, homeTeam: string, awayTeam: string): OfficialCalendarEvent => ({

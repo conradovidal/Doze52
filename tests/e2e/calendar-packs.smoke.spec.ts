@@ -44,6 +44,8 @@ test("contexto, sincronizacao e calendario pronto funcionam de ponta a ponta", a
     })
     .click();
   const calendarsDialog = page.getByRole("dialog", { name: "Calendários" });
+  await calendarsDialog.getByRole("combobox", { name: /Time para/ }).click();
+  await page.getByRole("option", { name: "Grêmio", exact: true }).click();
   const teamCard = calendarsDialog
     .getByRole("article")
     .filter({ hasText: "Jogos do Grêmio" });
@@ -62,13 +64,13 @@ test("contexto, sincronizacao e calendario pronto funcionam de ponta a ponta", a
   await expect(teamCard.getByRole("button", { name: "Remover" })).toBeVisible();
   await page.keyboard.press("Escape");
 
-  await expect(page.getByRole("button", { name: "Grêmio 5 x 0 São Luiz" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Grêmio 5 x 3 Botafogo" })).toBeVisible();
   await eventsImported;
   await waitForSyncReady(page);
   await openQaApp(page);
   await expectAuthenticated(page);
   await expect(page.getByText("Jogos do Grêmio", { exact: true })).toBeVisible();
-  const managedEvent = page.getByRole("button", { name: "Grêmio 5 x 0 São Luiz" });
+  const managedEvent = page.getByRole("button", { name: "Grêmio 5 x 3 Botafogo" });
   await expect(managedEvent).toBeVisible();
   await managedEvent.click();
 

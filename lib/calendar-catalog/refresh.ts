@@ -36,7 +36,7 @@ export const refreshCalendarCatalog = async ({
     for (const source of sources) {
       summary.checked += 1;
       try {
-        const response = await fetch(source.official_url, {
+        const response = await fetch(source.fetch_url ?? source.official_url, {
           headers: { "user-agent": "Doze52-Calendar-Updater/1.0 (+https://doze52.com)" },
           signal: AbortSignal.timeout(20_000),
           cache: "no-store",
