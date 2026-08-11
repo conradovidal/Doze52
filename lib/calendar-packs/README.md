@@ -4,6 +4,10 @@ Calendar Packs are structured, versioned seeds that import into the existing Doz
 data model. Categories remain customizable, while imported events are managed and
 read-only. Provenance fields on categories and events drive automatic reconciliation.
 
+The compiled files in this directory are now the disaster-recovery fallback. The live
+catalog is stored as immutable Supabase releases and served by `/api/calendar-packs`.
+See `docs/calendar-catalog-operations.md` for sources, schedules, quarantine and rollout.
+
 ## Current packs
 
 - `world-cup-2026-pack.json`: tournament events exposed as two exclusive coverage

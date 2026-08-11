@@ -26,7 +26,7 @@ import {
   getCategoryColorToken,
   getNearestCategoryColor,
 } from "@/lib/category-palette";
-import { calendarPacks } from "@/lib/calendar-packs";
+import { useCalendarCatalog } from "@/lib/calendar-catalog/runtime";
 import { isLimitReached } from "@/lib/entitlements";
 import {
   findCalendarPackByCategoryId,
@@ -67,6 +67,7 @@ export function CategoryManager({
   onRequireAuth,
   bypassLimits = false,
 }: CategoryManagerProps) {
+  const { calendarPacks } = useCalendarCatalog();
   const { notify } = useFeedback();
   const { isPro, limits } = useBilling();
   const { mode: themeMode } = useTheme();
@@ -107,7 +108,7 @@ export function CategoryManager({
       categoryId
         ? findCalendarPackByCategoryId(snapshot, calendarPacks, categoryId)
         : null,
-    [categoryId, snapshot]
+    [calendarPacks, categoryId, snapshot]
   );
   const calendarPackCategoryIds = React.useMemo(
     () =>
@@ -118,7 +119,7 @@ export function CategoryManager({
           )
           .map((candidate) => candidate.id)
       ),
-    [categories, snapshot]
+    [calendarPacks, categories, snapshot]
   );
   const categoryEventCount = React.useMemo(
     () => events.filter((event) => event.categoryId === categoryId).length,
