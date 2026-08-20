@@ -20,7 +20,12 @@ import {
   SelectTrigger,
 } from "@/components/ui/select";
 import { getCategoryColorToken } from "@/lib/category-palette";
-import { ONBOARDING_DEFAULT_CATEGORY_ID, useStore } from "@/lib/store";
+import {
+  ONBOARDING_DEFAULT_CATEGORY_ID,
+  useStore,
+  type EventInput,
+  type EventUpdatePatch,
+} from "@/lib/store";
 import { useTheme } from "@/lib/theme";
 import type { AnchorPoint, CalendarEvent, RecurrenceType } from "@/lib/types";
 import type { GuidedCreationIntent } from "@/lib/onboarding";
@@ -33,6 +38,11 @@ const FIELD_LABEL_CLASS =
   "text-[12px] font-semibold tracking-[-0.01em] text-foreground/78";
 
 type RecurrenceDraft = "none" | RecurrenceType;
+type EventInputField = keyof EventInput;
+
+export type EventDialogSubmission =
+  | { mode: "create"; input: EventInput }
+  | { mode: "update"; patch: EventUpdatePatch };
 
 const GUIDED_COPY: Record<
   GuidedCreationIntent,
@@ -77,15 +87,7 @@ export function EventDialog({
   seedRange?: { startDate: string; endDate: string } | null;
   anchorPoint?: AnchorPoint;
   guidedIntent?: GuidedCreationIntent | null;
-  onSubmit: (payload: {
-    title: string;
-    categoryId: string;
-    startDate: string;
-    endDate: string;
-    notes?: string;
-    recurrenceType?: RecurrenceType;
-    recurrenceUntil?: string;
-  }) => Promise<void> | void;
+  onSubmit: (submission: EventDialogSubmission) => Promise<void> | void;
   onDelete?: () => Promise<void> | void;
   allowManagedMutation?: boolean;
 }) {
@@ -104,6 +106,8 @@ export function EventDialog({
   const [recurrenceUntil, setRecurrenceUntil] = React.useState("");
   const [isSaving, setIsSaving] = React.useState(false);
   const [submitError, setSubmitError] = React.useState<string | null>(null);
+  const initializedSessionRef = React.useRef<string | null>(null);
+  const changedFieldsRef = React.useRef<Set<EventInputField>>(new Set());
   const isManagedEvent = Boolean(
     initialEvent?.calendarPackGroupId && !allowManagedMutation
   );
@@ -160,30 +164,48 @@ export function EventDialog({
     (nextProfileId: string) => {
       setProfileId(nextProfileId);
       const nextCategories = categories.filter(
-        (category) => category.profileId === nextProfileId
+        (category) =>
+          category.profileId === nextProfileId &&
+          (!category.calendarPackGroupId ||
+            category.id === initialEvent?.categoryId)
       );
       setCategoryId((currentCategoryId) => {
-        if (nextCategories.some((category) => category.id === currentCategoryId)) {
-          return currentCategoryId;
+        const nextCategoryId = nextCategories.some(
+          (category) => category.id === currentCategoryId
+        )
+          ? currentCategoryId
+          : nextCategories[0]?.id ?? "";
+        if (nextCategoryId !== currentCategoryId) {
+          changedFieldsRef.current.add("categoryId");
         }
-        return nextCategories[0]?.id ?? "";
+        return nextCategoryId;
       });
     },
-    [categories]
+    [categories, initialEvent?.categoryId]
   );
 
+  const initializationSession = initialEvent
+    ? `edit:${initialEvent.id}`
+    : `create:${seedRange?.startDate ?? seedDate ?? ""}:${seedRange?.endDate ?? ""}:${guidedIntent ?? ""}`;
+
   React.useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      initializedSessionRef.current = null;
+      return;
+    }
+    if (initializedSessionRef.current === initializationSession) return;
+    initializedSessionRef.current = initializationSession;
+    changedFieldsRef.current.clear();
 
     setTitle(initialEvent?.title ?? "");
 
-    const nextProfileId =
-      initialProfileFromEvent ||
-      (profileOptions.some((profile) => profile.id === selectedProfileId)
-        ? selectedProfileId
-        : "") ||
-      profileOptions[0]?.id ||
-      "";
+    const nextProfileId = initialEvent
+      ? initialProfileFromEvent
+      : (profileOptions.some((profile) => profile.id === selectedProfileId)
+          ? selectedProfileId
+          : "") ||
+        profileOptions[0]?.id ||
+        "";
     setProfileId(nextProfileId);
 
     const availableCategories = categories.filter(
@@ -193,11 +215,9 @@ export function EventDialog({
     const guidedDefaultCategoryId = availableCategories.find(
       (category) => category.id === ONBOARDING_DEFAULT_CATEGORY_ID
     )?.id;
-    const nextCategoryId =
-      initialEvent?.categoryId &&
-      availableCategories.some((category) => category.id === initialEvent.categoryId)
-        ? initialEvent.categoryId
-        : guidedDefaultCategoryId ?? availableCategories[0]?.id ?? "";
+    const nextCategoryId = initialEvent
+      ? initialEvent.categoryId
+      : guidedDefaultCategoryId ?? availableCategories[0]?.id ?? "";
 
     setCategoryId(nextCategoryId);
 
@@ -213,6 +233,7 @@ export function EventDialog({
   }, [
     open,
     categories,
+    initializationSession,
     initialEvent,
     initialProfileFromEvent,
     guidedIntent,
@@ -223,20 +244,20 @@ export function EventDialog({
     selectedProfileId,
   ]);
 
-  React.useEffect(() => {
-    if (!open) return;
-    if (!categoriesForProfile.some((category) => category.id === categoryId)) {
-      setCategoryId(categoriesForProfile[0]?.id ?? "");
-    }
-  }, [open, categoryId, categoriesForProfile]);
-
   const isRecurring = recurrenceType !== "none";
+  const hasValidCategory = Boolean(
+    currentCategory &&
+      currentCategory.profileId === profileId &&
+      categoriesForProfile.some((category) => category.id === currentCategory.id)
+  );
+  const categoryUnavailable = Boolean(initialEvent && !hasValidCategory);
   const canSave =
     !isManagedEvent &&
     title.trim().length > 0 &&
     startDate.length > 0 &&
     endDate.length > 0 &&
-    categoryId.length > 0;
+    categoryId.length > 0 &&
+    hasValidCategory;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -274,7 +295,10 @@ export function EventDialog({
               value={title}
               disabled={isManagedEvent}
               autoFocus={isGuidedCreation}
-              onChange={(event) => setTitle(event.target.value)}
+              onChange={(event) => {
+                changedFieldsRef.current.add("title");
+                setTitle(event.target.value);
+              }}
             />
           </div>
 
@@ -291,10 +315,18 @@ export function EventDialog({
                 disabled={isManagedEvent}
                 onChange={(event) => {
                   const nextStartDate = event.target.value;
+                  changedFieldsRef.current.add("startDate");
                   setStartDate(nextStartDate);
                   setEndDate((currentEndDate) => {
-                    if (!currentEndDate) return nextStartDate;
-                    return currentEndDate < nextStartDate ? nextStartDate : currentEndDate;
+                    if (!currentEndDate) {
+                      changedFieldsRef.current.add("endDate");
+                      return nextStartDate;
+                    }
+                    if (currentEndDate < nextStartDate) {
+                      changedFieldsRef.current.add("endDate");
+                      return nextStartDate;
+                    }
+                    return currentEndDate;
                   });
                 }}
               />
@@ -310,7 +342,10 @@ export function EventDialog({
                 min={startDate || undefined}
                 value={endDate}
                 disabled={isManagedEvent}
-                onChange={(event) => setEndDate(event.target.value)}
+                onChange={(event) => {
+                  changedFieldsRef.current.add("endDate");
+                  setEndDate(event.target.value);
+                }}
               />
             </div>
           </div>
@@ -365,7 +400,10 @@ export function EventDialog({
               <label className={FIELD_LABEL_CLASS}>Categoria</label>
               <Select
                 value={categoryId}
-                onValueChange={setCategoryId}
+                onValueChange={(nextCategoryId) => {
+                  changedFieldsRef.current.add("categoryId");
+                  setCategoryId(nextCategoryId);
+                }}
                 disabled={isManagedEvent}
               >
                 <SelectTrigger
@@ -421,7 +459,10 @@ export function EventDialog({
               placeholder="Adicione detalhes úteis para você se lembrar depois"
               value={notes}
               disabled={isManagedEvent}
-              onChange={(event) => setNotes(event.target.value)}
+              onChange={(event) => {
+                changedFieldsRef.current.add("notes");
+                setNotes(event.target.value);
+              }}
             />
           </div>
 
@@ -436,7 +477,11 @@ export function EventDialog({
               <div className="space-y-1">
                 <Select
                   value={recurrenceType}
-                  onValueChange={(value) => setRecurrenceType(value as RecurrenceDraft)}
+                  onValueChange={(value) => {
+                    changedFieldsRef.current.add("recurrenceType");
+                    changedFieldsRef.current.add("recurrenceUntil");
+                    setRecurrenceType(value as RecurrenceDraft);
+                  }}
                   disabled={isManagedEvent}
                 >
                   <SelectTrigger className="h-10 rounded-xl border-border/80 bg-background shadow-sm">
@@ -474,7 +519,10 @@ export function EventDialog({
                     min={startDate || undefined}
                     value={recurrenceUntil}
                     disabled={isManagedEvent}
-                    onChange={(event) => setRecurrenceUntil(event.target.value)}
+                    onChange={(event) => {
+                      changedFieldsRef.current.add("recurrenceUntil");
+                      setRecurrenceUntil(event.target.value);
+                    }}
                   />
                 </div>
               ) : null}
@@ -553,7 +601,7 @@ export function EventDialog({
                   },
                   categoryIds
                 );
-                await onSubmit({
+                const input: EventInput = {
                   title,
                   categoryId,
                   startDate,
@@ -564,7 +612,16 @@ export function EventDialog({
                     recurrenceType === "none" || recurrenceUntil.length === 0
                       ? undefined
                       : recurrenceUntil,
-                });
+                };
+                if (initialEvent) {
+                  const patch: EventUpdatePatch = {};
+                  for (const field of changedFieldsRef.current) {
+                    Object.assign(patch, { [field]: input[field] });
+                  }
+                  await onSubmit({ mode: "update", patch });
+                } else {
+                  await onSubmit({ mode: "create", input });
+                }
                 onOpenChange(false);
               } catch (error) {
                 const message =
@@ -592,6 +649,13 @@ export function EventDialog({
         {!isManagedEvent && profileOptions.length === 0 ? (
           <p className="rounded-xl border border-border/70 bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
             Crie uma categoria pessoal para adicionar novos eventos.
+          </p>
+        ) : null}
+
+        {categoryUnavailable ? (
+          <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+            A categoria original deste evento não está mais disponível. Escolha
+            outra categoria explicitamente ou feche sem salvar.
           </p>
         ) : null}
 

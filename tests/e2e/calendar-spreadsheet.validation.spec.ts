@@ -18,7 +18,7 @@ import {
   type SpreadsheetSource,
 } from "@/lib/calendar-spreadsheet";
 import type { CalendarSnapshot } from "@/lib/sync";
-import { createXlsx } from "@/lib/xlsx-lite";
+import { createXlsx, readXlsxSheet } from "@/lib/xlsx-lite";
 
 const snapshot: CalendarSnapshot = {
   profiles: [
@@ -114,6 +114,70 @@ test("faz round-trip do formato canonico com datas nativas do Excel", () => {
     { title: "Marco Jira", startDate: "2026-12-04", endDate: "2026-12-04", notes: "JIRA-252" },
     { title: "Iniciativa anual", startDate: "2026-10-01", endDate: "2026-12-18", notes: undefined },
   ]);
+});
+
+test("exporta todos os eventos quando nenhum recorte e informado", () => {
+  const source = readSpreadsheetSource(
+    createCalendarSpreadsheetBuffer(snapshot).slice().buffer,
+    "Eventos"
+  );
+
+  expect(source.rows.map((row) => row.values.slice(0, 3))).toEqual([
+    ["Profissional", "Entregas", "Release existente"],
+  ]);
+});
+
+test("filtra a exportacao por contexto e categoria, incluindo calendarios gerenciados", () => {
+  const personalProfile = {
+    ...snapshot.profiles[0],
+    id: "44444444-4444-4444-8444-444444444443",
+    name: "Pessoal",
+  };
+  const managedEvent = {
+    ...snapshot.events[0],
+    id: "77777777-7777-4777-8777-777777777779",
+    title: "Feriado exportado",
+    categoryId: snapshot.categories[1].id,
+  };
+  const personalCategory = {
+    ...snapshot.categories[0],
+    id: "55555555-5555-4555-8555-555555555554",
+    profileId: personalProfile.id,
+    name: "Viagens",
+  };
+  const personalEvent = {
+    ...snapshot.events[0],
+    id: "77777777-7777-4777-8777-777777777780",
+    title: "Ferias",
+    categoryId: personalCategory.id,
+  };
+  const sourceSnapshot: CalendarSnapshot = {
+    profiles: [...snapshot.profiles, personalProfile],
+    categories: [...snapshot.categories, personalCategory],
+    events: [...snapshot.events, managedEvent, personalEvent],
+  };
+  const source = readSpreadsheetSource(
+    createCalendarSpreadsheetBuffer(sourceSnapshot, {
+      profileIds: [snapshot.profiles[0].id],
+      categoryIds: [snapshot.categories[1].id],
+    }).slice().buffer,
+    "Eventos"
+  );
+
+  expect(source.rows.map((row) => row.values.slice(0, 3))).toEqual([
+    ["Profissional", "Feriados", "Feriado exportado"],
+  ]);
+});
+
+test("gera apenas o cabecalho quando o recorte de exportacao esta vazio", () => {
+  const workbook = createCalendarSpreadsheetBuffer(snapshot, {
+    profileIds: [],
+    categoryIds: [],
+  });
+  const rows = readXlsxSheet(workbook.slice().buffer, "Eventos");
+
+  expect(rows).toHaveLength(1);
+  expect([...rows[0].cells.values()]).toEqual([...CANONICAL_SPREADSHEET_HEADERS]);
 });
 
 test("template cria estruturas ausentes e assume data final igual a inicial", () => {
