@@ -328,3 +328,10 @@ export const reconcileGeFootballFeed = ({
   }));
   return { reconciledEvents, unmatchedFeedEvents, issues, providerMappings };
 };
+
+export const missingOfficialMatchIssues = (events: readonly FeedCalendarEvent[]): CandidateValidationIssue[] =>
+  events.map((event) => ({
+    code: "missing_official_match",
+    eventId: event.providerExternalId,
+    message: `O jogo GE ${event.providerExternalId} (${event.homeTeam} x ${event.awayTeam}) não possui correspondência na fonte oficial.`,
+  }));
