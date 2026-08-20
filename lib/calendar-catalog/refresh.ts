@@ -6,7 +6,7 @@ import { canonicalEventId } from "./catalog-builder";
 import { fetchCbfOfficialSource } from "./cbf-transport";
 import { diffCatalogs, materialHash } from "./material";
 import { fetchGeFootballFeed, missingOfficialMatchIssues, reconcileGeFootballFeed } from "./ge-feed";
-import { parseOfficialSource } from "./parsers";
+import { parseOfficialFixtureParticipantKeys, parseOfficialSource } from "./parsers";
 import { fallbackCatalog, getPublishedCatalog, listRunnableSources } from "./repository";
 import type { FootballCandidatePayload, OfficialCalendarEvent } from "./types";
 import { validateOfficialCandidate } from "./validation";
@@ -62,13 +62,19 @@ const fetchOfficialEvents = async (source: Parameters<typeof parseOfficialSource
     try {
       const events = parseOfficialSource(body, contentType, source, { sourceUrl: url });
       if (events.length === 0) throw new Error("nenhum evento oficial reconhecido");
-      return events;
+      return {
+        events,
+        fixtureParticipantKeys: parseOfficialFixtureParticipantKeys(body, contentType, source, { sourceUrl: url }),
+      };
     } catch (error) {
       throw stageError("official_parser", error, url);
     }
   }));
-  return Array.from(new Map(batches.flat().map((event) => [event.externalId, event])).values())
+  const events = Array.from(new Map(batches.flatMap((batch) => batch.events)
+    .map((event) => [event.externalId, event])).values())
     .sort((left, right) => `${left.date}T${left.time}`.localeCompare(`${right.date}T${right.time}`));
+  const fixtureParticipantKeys = new Set(batches.flatMap((batch) => [...batch.fixtureParticipantKeys]));
+  return { events, fixtureParticipantKeys };
 };
 
 const candidateOfficialEvents = (payload: unknown) => {
@@ -102,7 +108,7 @@ export const refreshCalendarCatalog = async ({
     for (const source of sources) {
       summary.checked += 1;
       try {
-        const [officialEvents, feedEvents, mappingResult] = await Promise.all([
+        const [officialSource, feedEvents, mappingResult] = await Promise.all([
           fetchOfficialEvents(source),
           fetchGeFootballFeed(source).catch((error) => { throw stageError("ge_feed", error); }),
           admin.from("calendar_pack_external_ids")
@@ -111,6 +117,7 @@ export const refreshCalendarCatalog = async ({
             .eq("season", source.season)
             .in("authority", [source.authority, "GE"]),
         ]);
+        const { events: officialEvents, fixtureParticipantKeys } = officialSource;
         if (mappingResult.error) throw stageError("mapping_lookup", mappingResult.error);
         const officialMappings = new Map<string, string>();
         const geMappings = new Map<string, string>();
@@ -121,7 +128,10 @@ export const refreshCalendarCatalog = async ({
         let reconciliation;
         try {
           reconciliation = source.feed_provider === "GE"
-            ? reconcileGeFootballFeed({ source, officialEvents, feedEvents, officialMappings, geMappings })
+            ? reconcileGeFootballFeed({
+                source, officialEvents, feedEvents, officialFixtureParticipantKeys: fixtureParticipantKeys,
+                officialMappings, geMappings,
+              })
             : {
                 reconciledEvents: officialEvents,
                 unmatchedFeedEvents: [],

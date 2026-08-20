@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { deterministicCalendarUuid } from "../../lib/calendar-catalog/ids";
 import { diffCatalogs, incrementChangedPackVersions, materialHash } from "../../lib/calendar-catalog/material";
-import { parseOfficialSource } from "../../lib/calendar-catalog/parsers";
+import { parseOfficialFixtureParticipantKeys, parseOfficialSource } from "../../lib/calendar-catalog/parsers";
 import { validateOfficialCandidate } from "../../lib/calendar-catalog/validation";
 import { applyOfficialSourceToCatalog } from "../../lib/calendar-catalog/catalog-builder";
 import {
@@ -37,6 +37,8 @@ test("parser CBF aceita a tabela oficial e descarta placeholders", () => {
   const parsed = parseOfficialSource(body, "application/json", source("cbf"));
   expect(parsed).toHaveLength(1);
   expect(parsed[0]).toMatchObject({ externalId: "831894", date: "2026-01-28", time: "19:00", homeTeamId: "62194", awayTeamId: "20002", result: "2 x 2" });
+  expect(parseOfficialFixtureParticipantKeys(body, "application/json", source("cbf")))
+    .toEqual(new Set(["Atlético Mineiro|Palmeiras", "A|B"]));
 });
 
 test("transporte CBF limita host e valida a CA intermediária versionada", () => {
@@ -117,6 +119,18 @@ test("reconciliação preserva dados oficiais, acrescenta resultado final e isol
     geMappings: new Map([[feed.providerExternalId, "canonical-1"]]),
   });
   expect(mappedConflict.issues.map((issue) => issue.code)).toContain("participants_changed");
+
+  const officialPlaceholder = new Set(["Flamengo|Corinthians"]);
+  const [futureFeed] = parseGeMatches({ jogos: [{
+    id: 502, data_realizacao: "2026-09-13T19:00", hora_realizacao: "19:00", jogo_ja_comecou: false,
+    equipes: { mandante: { nome_popular: "Flamengo" }, visitante: { nome_popular: "Corinthians" } },
+  }] }, geSource, "Rodada 27");
+  const placeholderReconciliation = reconcileGeFootballFeed({
+    source: geSource, officialEvents: [], feedEvents: [futureFeed],
+    officialFixtureParticipantKeys: officialPlaceholder,
+  });
+  expect(placeholderReconciliation.unmatchedFeedEvents).toEqual([]);
+  expect(placeholderReconciliation.reconciledEvents).toEqual([]);
 });
 
 test("fixtures oficiais CONMEBOL cobrem Bahia e Botafogo sem unmatched", () => {

@@ -405,6 +405,37 @@ const parseCbfPayload = (body: string, source: CalendarCatalogSource) => {
   }).sort((left, right) => `${left.date}T${left.time}`.localeCompare(`${right.date}T${right.time}`));
 };
 
+export const parseOfficialFixtureParticipantKeys = (
+  body: string,
+  contentType: string,
+  source: CalendarCatalogSource,
+  context: { sourceUrl?: string } = {}
+) => {
+  if (source.parser_key === "cbf" && contentType.includes("json")) {
+    let payload: unknown;
+    try { payload = JSON.parse(body); } catch { return new Set<string>(); }
+    const root = asRecord(payload);
+    if (!root) return new Set<string>();
+    const keys = Object.values(root).flatMap((phase) => {
+      const games = asRecord(phase)?.jogos;
+      if (!Array.isArray(games)) return [];
+      return games.flatMap((value): string[] => {
+        const record = asRecord(value);
+        if (!record) return [];
+        const home = cbfTeam(record.mandante);
+        const away = cbfTeam(record.visitante);
+        if (!home.name || !away.name) return [];
+        const canonicalHome = canonicalBrazilianClubById(home.id ?? "")?.name ?? canonicalTeamName(home.name);
+        const canonicalAway = canonicalBrazilianClubById(away.id ?? "")?.name ?? canonicalTeamName(away.name);
+        return [`${canonicalHome}|${canonicalAway}`];
+      });
+    });
+    return new Set(keys);
+  }
+  return new Set(parseOfficialSource(body, contentType, source, context)
+    .map((event) => `${canonicalTeamName(event.homeTeam)}|${canonicalTeamName(event.awayTeam)}`));
+};
+
 export const parseOfficialSource = (
   body: string,
   contentType: string,

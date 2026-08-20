@@ -234,12 +234,14 @@ export const reconcileGeFootballFeed = ({
   source,
   officialEvents,
   feedEvents,
+  officialFixtureParticipantKeys = new Set(officialEvents.map(participantKey)),
   officialMappings = new Map<string, string>(),
   geMappings = new Map<string, string>(),
 }: {
   source: CalendarCatalogSource;
   officialEvents: readonly OfficialCalendarEvent[];
   feedEvents: readonly FeedCalendarEvent[];
+  officialFixtureParticipantKeys?: ReadonlySet<string>;
   officialMappings?: ReadonlyMap<string, string>;
   geMappings?: ReadonlyMap<string, string>;
 }) => {
@@ -276,7 +278,9 @@ export const reconcileGeFootballFeed = ({
       if (sameClubAndDate.length === 1) official = sameClubAndDate[0];
     }
     if (!official) {
-      if (isCoveredClubMatch(feedEvent)) unmatchedFeedEvents.push(feedEvent);
+      if (isCoveredClubMatch(feedEvent) && !officialFixtureParticipantKeys.has(participantKey(feedEvent))) {
+        unmatchedFeedEvents.push(feedEvent);
+      }
       continue;
     }
     if (mappedCanonical && !officialByCanonical.has(mappedCanonical)) {
