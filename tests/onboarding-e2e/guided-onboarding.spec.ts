@@ -455,6 +455,90 @@ test("monta contexto Pessoal de forma incremental", async ({ page }, testInfo) =
   ).toBe(true);
 });
 
+test("motion premium preserva progresso, escala e editor contextual", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name === "mobile-chromium",
+    "O controle de escala e o popover contextual são exclusivos do desktop"
+  );
+
+  await page.goto("/?mobileUi=0");
+  const panel = page.getByRole("region", { name: "Guia inicial do Doze 52" });
+  const onboardingProgress = panel.getByRole("progressbar", {
+    name: "Progresso do guia inicial",
+  });
+  await expect(onboardingProgress).toHaveAttribute("aria-valuenow", "14");
+
+  await completePersonalOnboarding(page, false);
+
+  const scale = page.getByRole("radiogroup", { name: "Escala do calendário" });
+  await expect(scale).toBeVisible();
+  await scale.getByRole("radio", { name: "Trimestre" }).click();
+  const zoomControl = page.getByLabel("Zoom do calendário");
+  await expect(zoomControl).toBeVisible();
+  await zoomControl.press("Home");
+  const focusedMonthRow = page.locator(
+    `[data-month-row="${new Date().getMonth()}"]`
+  );
+  const rowHeightAtMinimumZoom = await focusedMonthRow.evaluate(
+    (element) => element.getBoundingClientRect().height
+  );
+  await zoomControl.press("End");
+  await expect(zoomControl).toHaveAttribute(
+    "aria-valuetext",
+    "180% na horizontal e 140% na vertical"
+  );
+  await expect
+    .poll(() =>
+      focusedMonthRow.evaluate((element) => element.getBoundingClientRect().height)
+    )
+    .toBeGreaterThan(rowHeightAtMinimumZoom * 1.3);
+  await scale.getByRole("radio", { name: "Mês" }).click();
+  await expect(scale.getByRole("radio", { name: "Mês" })).toHaveAttribute(
+    "aria-checked",
+    "true"
+  );
+  const currentMonthLabel = [
+    "jan", "fev", "mar", "abr", "mai", "jun",
+    "jul", "ago", "set", "out", "nov", "dez",
+  ][new Date().getMonth()];
+  await expect(
+    page.getByRole("button", { name: /Voltar para .* trimestre/ })
+  ).toHaveText(currentMonthLabel);
+  await scale.getByRole("radio", { name: "Ano" }).click();
+  await expect(page.getByLabel("Zoom do calendário")).toHaveCount(0);
+
+  const targetDay = page.locator('[data-day-cell][data-day-iso="2026-02-03"]');
+  await targetDay.click({ force: true });
+  const editor = page.getByRole("dialog", { name: "Novo evento" });
+  await expect(editor).toHaveAttribute("data-slot", "popover-content");
+  const editorBox = await editor.boundingBox();
+  const viewport = page.viewportSize();
+  expect(editorBox).not.toBeNull();
+  expect(viewport).not.toBeNull();
+  expect(editorBox!.x).toBeGreaterThanOrEqual(0);
+  expect(editorBox!.y).toBeGreaterThanOrEqual(0);
+  expect(editorBox!.x + editorBox!.width).toBeLessThanOrEqual(viewport!.width);
+  expect(editorBox!.y + editorBox!.height).toBeLessThanOrEqual(viewport!.height);
+  await page.keyboard.press("Escape");
+  await expect(editor).toBeHidden();
+  await expect(targetDay).toBeFocused();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/?mobileUi=1");
+  await expect(
+    page.getByRole("radiogroup", { name: "Escala do calendário" })
+  ).toHaveCount(0);
+  await page.getByRole("button", { name: "Novo evento" }).click();
+  const mobileEditor = page.getByRole("dialog", { name: "Novo evento" });
+  await expect(mobileEditor).toHaveAttribute("data-slot", "dialog-content");
+  const mobileEditorBox = await mobileEditor.boundingBox();
+  expect(mobileEditorBox).not.toBeNull();
+  expect(mobileEditorBox!.x).toBeGreaterThanOrEqual(0);
+  expect(mobileEditorBox!.x + mobileEditorBox!.width).toBeLessThanOrEqual(390);
+});
+
 test("ano de exemplo gerencia Feriados do RS e Corridas F1 sem duplicar", async ({
   page,
 }, testInfo) => {
@@ -1048,7 +1132,9 @@ test("edição preserva categoria não inicial no desktop e no mobile", async ({
   await page.goto(mobile ? "/?mobileUi=1" : "/?mobileUi=0");
   await page.locator('[data-onboarding-profile-id][title="Pessoal"]').click();
 
-  const editedEvent = page.getByRole("button", { name: /Noite de fondue$/ });
+  const editedEvent = page.getByRole("button", {
+    name: /Noite de fondue$/,
+  });
   await expect(editedEvent).toBeVisible();
   const editedEventId = await editedEvent.getAttribute("data-calendar-event-id");
   if (!editedEventId) throw new Error("Evento de categoria Amigos sem ID");
@@ -1089,7 +1175,9 @@ test("edição preserva categoria não inicial no desktop e no mobile", async ({
     notes: "Descrição alterada isoladamente",
   });
 
-  await page.getByRole("button", { name: /Festival de verão$/ }).click();
+  await page
+    .getByRole("button", { name: /Festival de verão$/ })
+    .click();
   dialog = page.getByRole("dialog", { name: "Editar evento" });
   await expect(dialog.getByRole("combobox").nth(1)).toContainText("Eventos");
   await dialog.getByRole("button", { name: "Close" }).click();

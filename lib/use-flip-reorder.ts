@@ -5,6 +5,7 @@ import * as React from "react";
 type FlipOptions = {
   durationMs?: number;
   easing?: string;
+  disabled?: boolean;
 };
 
 const DEFAULT_DURATION_MS = 160;
@@ -12,7 +13,7 @@ const DEFAULT_EASING = "cubic-bezier(0.22, 1, 0.36, 1)";
 
 export function useFlipReorder(
   orderedIds: readonly string[],
-  { durationMs = DEFAULT_DURATION_MS, easing = DEFAULT_EASING }: FlipOptions = {}
+  { durationMs = DEFAULT_DURATION_MS, easing = DEFAULT_EASING, disabled = false }: FlipOptions = {}
 ) {
   const nodesRef = React.useRef(new Map<string, HTMLElement>());
   const previousRectsRef = React.useRef(new Map<string, DOMRect>());
@@ -40,6 +41,7 @@ export function useFlipReorder(
 
       const previousRect = previousRectsRef.current.get(id);
       if (!previousRect) continue;
+      if (disabled || window.matchMedia("(prefers-reduced-motion: reduce)").matches) continue;
 
       const dx = previousRect.left - currentRect.left;
       const dy = previousRect.top - currentRect.top;
@@ -65,7 +67,7 @@ export function useFlipReorder(
         animation.cancel();
       }
     };
-  }, [orderSignature, durationMs, easing]);
+  }, [orderSignature, durationMs, easing, disabled]);
 
   return registerNode;
 }

@@ -13,6 +13,7 @@ import { FeedbackProvider } from "@/components/ui/feedback-provider";
 import { ThemeInitScript } from "@/components/theme-init-script";
 import { SiteFooter } from "@/components/site-footer";
 import { CalendarCatalogProvider } from "@/lib/calendar-catalog/runtime";
+import { MotionProvider } from "@/components/ui/motion-provider";
 
 export const metadata: Metadata = {
   applicationName: "Doze 52",
@@ -64,20 +65,22 @@ export default function RootLayout({
       <body className="h-dvh overflow-hidden bg-background text-foreground">
         <ThemeInitScript />
         <ThemeProvider>
-          <FeedbackProvider>
-            <AuthProvider>
-              <BillingProvider>
-                <CalendarCatalogProvider>
-                  <div className="flex h-dvh flex-col overflow-hidden">
-                    <div className="min-h-0 flex-1 overflow-auto">
-                      {children}
+          <MotionProvider>
+            <FeedbackProvider>
+              <AuthProvider>
+                <BillingProvider>
+                  <CalendarCatalogProvider>
+                    <div className="flex h-dvh flex-col overflow-hidden">
+                      <div className="min-h-0 flex-1 overflow-auto">
+                        {children}
+                      </div>
+                      <SiteFooter />
                     </div>
-                    <SiteFooter />
-                  </div>
-                </CalendarCatalogProvider>
-              </BillingProvider>
-            </AuthProvider>
-          </FeedbackProvider>
+                  </CalendarCatalogProvider>
+                </BillingProvider>
+              </AuthProvider>
+            </FeedbackProvider>
+          </MotionProvider>
         </ThemeProvider>
         <Analytics />
       </body>

@@ -12,6 +12,11 @@ import {
   Upload,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { AnimatedProgress } from "@/components/ui/animated-progress";
+import {
+  AsyncStateButton,
+  type AsyncButtonState,
+} from "@/components/ui/async-state-button";
 import {
   Dialog,
   DialogContent,
@@ -45,8 +50,8 @@ import {
   isCanonicalSpreadsheetSource,
   readSpreadsheetSource,
   suggestImportMapping,
-  type CalendarSpreadsheetExportSelection,
   type ColumnOrFixedMapping,
+  type CalendarSpreadsheetExportSelection,
   type ImportColumnMapping,
   type SpreadsheetSource,
 } from "@/lib/calendar-spreadsheet";
@@ -75,20 +80,41 @@ type ActionCardProps = {
   description: string;
   disabled?: boolean;
   onClick: () => void;
+  state: AsyncButtonState;
+  pendingLabel: string;
+  successLabel: string;
+  errorLabel: string;
 };
 
-function ActionCard({ icon, title, description, disabled, onClick }: ActionCardProps) {
+function ActionCard({
+  icon,
+  title,
+  description,
+  disabled,
+  onClick,
+  state,
+  pendingLabel,
+  successLabel,
+  errorLabel,
+}: ActionCardProps) {
   return (
-    <button
+    <AsyncStateButton
       type="button"
+      variant="outline"
       disabled={disabled}
       onClick={onClick}
-      className="rounded-[14px] border border-border/75 bg-card p-3 text-left transition-colors hover:bg-muted/45 disabled:pointer-events-none disabled:opacity-50"
+      state={state}
+      pendingLabel={pendingLabel}
+      successLabel={successLabel}
+      errorLabel={errorLabel}
+      className="h-auto min-h-28 justify-start whitespace-normal rounded-[14px] border-border/75 bg-card p-3 text-left hover:bg-muted/45"
     >
-      <span className="mb-2 block size-4 text-muted-foreground">{icon}</span>
-      <span className="block text-sm font-semibold text-foreground">{title}</span>
-      <span className="mt-1 block text-xs leading-5 text-muted-foreground">{description}</span>
-    </button>
+      <span className="block">
+        <span className="mb-2 block size-4 text-muted-foreground">{icon}</span>
+        <span className="block text-sm font-semibold text-foreground">{title}</span>
+        <span className="mt-1 block text-xs leading-5 text-muted-foreground">{description}</span>
+      </span>
+    </AsyncStateButton>
   );
 }
 
@@ -274,6 +300,10 @@ export function CalendarSpreadsheetDialog({
   const [selectedExportCategoryIds, setSelectedExportCategoryIds] = React.useState<string[]>([]);
   const [result, setResult] = React.useState<ImportSummary | null>(null);
   const [isWorking, setIsWorking] = React.useState(false);
+  const [workingAction, setWorkingAction] = React.useState<
+    "template" | "export" | "import-template" | "import-custom" | null
+  >(null);
+  const [workingState, setWorkingState] = React.useState<AsyncButtonState>("idle");
   const [actionError, setActionError] = React.useState("");
 
   const snapshot = React.useMemo(
@@ -335,6 +365,8 @@ export function CalendarSpreadsheetDialog({
     setResult(null);
     setActionError("");
     setIsWorking(false);
+    setWorkingAction(null);
+    setWorkingState("idle");
     if (fileInputRef.current) fileInputRef.current.value = "";
   }, []);
 
@@ -345,18 +377,23 @@ export function CalendarSpreadsheetDialog({
   const runDownload = async (
     action: () => Promise<void>,
     successTitle: string,
-    logKey: string
+    logKey: string,
+    actionId: "template" | "export"
   ) => {
     try {
+      setWorkingAction(actionId);
+      setWorkingState("pending");
       setIsWorking(true);
       setActionError("");
       await action();
+      setWorkingState("success");
       notify({ tone: "success", title: successTitle });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Falha ao gerar planilha.";
       logDevError(logKey, { message });
       logProdError("Falha ao gerar planilha de calendario.");
       setActionError("Nao foi possivel gerar o arquivo. Tente novamente.");
+      setWorkingState("error");
     } finally {
       setIsWorking(false);
     }
@@ -374,6 +411,8 @@ export function CalendarSpreadsheetDialog({
         .filter((category) => (eventCountByCategoryId.get(category.id) ?? 0) > 0)
         .map((category) => category.id)
     );
+    setWorkingAction(null);
+    setWorkingState("idle");
     setActionError("");
     setStep("export-scope");
   };
@@ -417,6 +456,10 @@ export function CalendarSpreadsheetDialog({
     }
 
     try {
+      setWorkingAction(
+        pendingModeRef.current === "template" ? "import-template" : "import-custom"
+      );
+      setWorkingState("pending");
       setIsWorking(true);
       const nextMode = pendingModeRef.current;
       const buffer = await file.arrayBuffer();
@@ -445,11 +488,13 @@ export function CalendarSpreadsheetDialog({
       );
       setAcceptedInvalidRows(false);
       setStep(nextMode === "template" ? "structures" : "mapping");
+      setWorkingState("success");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Nao foi possivel ler a planilha.";
       logDevError("calendar-spreadsheet.parse", { message, filename: file.name });
       logProdError("Falha ao ler planilha de calendario.");
       setActionError(message);
+      setWorkingState("error");
     } finally {
       setIsWorking(false);
     }
@@ -574,11 +619,16 @@ export function CalendarSpreadsheetDialog({
             title="Baixar template"
             description="Planilha vazia no formato padrao do Doze52."
             disabled={isWorking}
+            state={workingAction === "template" ? workingState : "idle"}
+            pendingLabel="Gerando template…"
+            successLabel="Template baixado"
+            errorLabel="Tentar baixar"
             onClick={() =>
               void runDownload(
                 downloadCalendarSpreadsheetTemplate,
                 "Template baixado",
-                "calendar-spreadsheet.template"
+                "calendar-spreadsheet.template",
+                "template"
               )
             }
           />
@@ -587,6 +637,10 @@ export function CalendarSpreadsheetDialog({
             title="Exportar calendario"
             description="Escolha os contextos e categorias antes de baixar."
             disabled={isWorking}
+            state="idle"
+            pendingLabel="Abrindo seleção…"
+            successLabel="Seleção aberta"
+            errorLabel="Tentar novamente"
             onClick={startExport}
           />
         </div>
@@ -601,6 +655,10 @@ export function CalendarSpreadsheetDialog({
             title="Usar template Doze52"
             description="Reconhece as colunas padrao e pula o mapeamento."
             disabled={isWorking}
+            state={workingAction === "import-template" ? workingState : "idle"}
+            pendingLabel="Lendo template…"
+            successLabel="Template lido"
+            errorLabel="Tentar novamente"
             onClick={() => chooseFile("template")}
           />
           <ActionCard
@@ -608,6 +666,10 @@ export function CalendarSpreadsheetDialog({
             title="Usar planilha customizada"
             description="Escolha as colunas de uma exportacao do Jira ou outra fonte."
             disabled={isWorking}
+            state={workingAction === "import-custom" ? workingState : "idle"}
+            pendingLabel="Lendo planilha…"
+            successLabel="Planilha lida"
+            errorLabel="Tentar novamente"
             onClick={() => chooseFile("custom")}
           />
         </div>
@@ -975,6 +1037,14 @@ export function CalendarSpreadsheetDialog({
   const canConfirm = Boolean(
     canAdvanceStructures && plan && (plan.summary.invalidRows === 0 || acceptedInvalidRows)
   );
+  const isExportFlow = step === "export-scope";
+  const routeSteps: AssistantStep[] = isExportFlow
+    ? ["home", "export-scope"]
+    : mode === "custom"
+      ? ["home", "mapping", "structures", "preview", "result"]
+      : ["home", "structures", "preview", "result"];
+  const routeStepIndex = Math.max(0, routeSteps.indexOf(step));
+  const routeStepNumber = routeStepIndex + 1;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -986,6 +1056,12 @@ export function CalendarSpreadsheetDialog({
           <DialogTitle>{titles[step][0]}</DialogTitle>
           <DialogDescription>{titles[step][1]}</DialogDescription>
         </DialogHeader>
+
+        <AnimatedProgress
+          value={(routeStepNumber / routeSteps.length) * 100}
+          label={isExportFlow ? "Progresso da exportação" : "Progresso da importação"}
+          statusText={`Etapa ${routeStepNumber} de ${routeSteps.length}`}
+        />
 
         {step === "home" ? renderHome() : null}
         {step === "export-scope" ? renderExportScope() : null}
@@ -1004,19 +1080,24 @@ export function CalendarSpreadsheetDialog({
           {step === "home" ? <Button variant="ghost" onClick={() => onOpenChange(false)}>Fechar</Button> : null}
           {step !== "home" && step !== "result" ? <Button variant="ghost" onClick={back}><ArrowLeft className="size-4" />Voltar</Button> : null}
           {step === "export-scope" ? (
-            <Button
+            <AsyncStateButton
               variant="premium"
               disabled={selectedExportEventCount === 0 || isWorking}
+              state={workingAction === "export" ? workingState : "idle"}
+              pendingLabel="Gerando exportação…"
+              successLabel="Calendário exportado"
+              errorLabel="Tentar exportar"
               onClick={() =>
                 void runDownload(
                   () => exportCalendarSpreadsheet(snapshot, exportSelection),
                   "Calendario exportado",
-                  "calendar-spreadsheet.export"
+                  "calendar-spreadsheet.export",
+                  "export"
                 )
               }
             >
               Exportar {selectedExportEventCount} evento{selectedExportEventCount === 1 ? "" : "s"}
-            </Button>
+            </AsyncStateButton>
           ) : null}
           {step === "mapping" ? <Button variant="premium" disabled={mappingErrors.length > 0} onClick={continueFromMapping}>Revisar estruturas</Button> : null}
           {step === "structures" ? <Button variant="premium" disabled={!canAdvanceStructures} onClick={() => setStep("preview")}>Ver pre-visualizacao</Button> : null}

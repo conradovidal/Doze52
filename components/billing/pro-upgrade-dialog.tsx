@@ -4,6 +4,7 @@ import * as React from "react";
 import { CheckCircle2, Sparkles } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { AsyncStateButton } from "@/components/ui/async-state-button";
 import {
   Dialog,
   DialogContent,
@@ -99,13 +100,15 @@ export function ProUpgradeDialog({
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             Agora não
           </Button>
-          <Button
+          <AsyncStateButton
             variant="premium"
             onClick={handleUpgrade}
             disabled={isOpeningCheckout}
+            state={isOpeningCheckout ? "pending" : "idle"}
+            pendingLabel="Abrindo checkout…"
           >
-            {isOpeningCheckout ? "Abrindo..." : isContextual ? copy.cta : "Assinar Pro"}
-          </Button>
+            {isContextual ? copy.cta : "Assinar Pro"}
+          </AsyncStateButton>
         </DialogFooter>
       </DialogContent>
     </Dialog>

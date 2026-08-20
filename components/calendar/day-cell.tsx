@@ -78,6 +78,9 @@ export function DayCell({
     <div
       data-day-cell
       data-day-iso={dateIso}
+      role="button"
+      tabIndex={0}
+      aria-label={`Adicionar evento em ${dateIso}`}
       data-range-selected={isRangeSelected ? "true" : undefined}
       className={`group relative flex w-full cursor-pointer flex-col px-1 py-1 ring-1 ring-inset transition-[background-color,box-shadow] duration-150 ${dayToneClass} ${
         today
@@ -109,7 +112,13 @@ export function DayCell({
         e.stopPropagation();
         onDayDrop(dateIso, e.dataTransfer);
       }}
-      onClick={() => {
+      onClick={(event) => {
+        event.currentTarget.focus();
+        onActivate?.(dateIso);
+      }}
+      onKeyDown={(event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
         onActivate?.(dateIso);
       }}
     >
