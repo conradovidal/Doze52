@@ -27,12 +27,11 @@ test("baixa o template e exporta o recorte selecionado", async ({ page }) => {
 
   await dialog.getByRole("button", { name: "Exportar calendario" }).click();
   const exportDialog = page.getByRole("dialog", { name: "Selecionar dados para exportar" });
-  const enabledCategories = exportDialog
+  const firstCategory = exportDialog
     .getByRole("checkbox", { name: /^Selecionar categoria / })
-    .locator(":enabled");
-  await expect(enabledCategories.first()).toBeChecked();
-
-  const firstCategory = enabledCategories.first();
+    .first();
+  await expect(firstCategory).toBeEnabled();
+  await expect(firstCategory).toBeChecked();
   await firstCategory.uncheck();
   await expect(firstCategory).not.toBeChecked();
   await exportDialog.getByRole("button", { name: "Limpar seleção" }).click();
@@ -50,5 +49,19 @@ test("baixa o template e exporta o recorte selecionado", async ({ page }) => {
   const exportDownload = await exportDownloadPromise;
   expect(exportDownload.suggestedFilename()).toMatch(
     /^doze52-calendario-\d{4}-\d{2}-\d{2}\.xlsx$/
+  );
+});
+
+test("rejeita um arquivo XLSX invalido sem sair do dialogo", async ({ page }) => {
+  const dialog = await openSpreadsheetDialog(page);
+
+  await dialog.locator('input[type="file"]').setInputFiles({
+    name: "invalido.xlsx",
+    mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    buffer: Buffer.from("nao e um arquivo zip"),
+  });
+
+  await expect(dialog).toContainText(
+    "O arquivo .xlsx esta corrompido ou fora do formato esperado."
   );
 });

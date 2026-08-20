@@ -115,10 +115,16 @@ test("contexto, sincronizacao e calendario pronto funcionam de ponta a ponta", a
     .filter({ hasText: "Jogos do Grêmio" });
   const eventsRemoved = waitForSupabaseWrite(page, "events", ["DELETE"]);
   await removeCard.getByRole("button", { name: "Remover" }).click();
-  await expect(removeCard.getByRole("button", { name: "Adicionar calendário" })).toBeVisible();
+  await eventsRemoved;
+  const availableTeamCard = calendarsDialog
+    .getByRole("article")
+    .filter({ hasText: "Jogos do seu time" });
+  await expect(availableTeamCard.getByRole("combobox", { name: /Time para/ })).toBeVisible();
+  await expect(
+    availableTeamCard.getByRole("button", { name: "Adicionar calendário" })
+  ).toBeDisabled();
   await page.keyboard.press("Escape");
   await expect(page.getByText("Jogos do Grêmio", { exact: true })).toHaveCount(0);
-  await eventsRemoved;
   await waitForSyncReady(page);
 
   runtime.assertClean();
