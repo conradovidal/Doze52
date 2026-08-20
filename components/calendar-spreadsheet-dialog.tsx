@@ -45,6 +45,7 @@ import {
   isCanonicalSpreadsheetSource,
   readSpreadsheetSource,
   suggestImportMapping,
+  type CalendarSpreadsheetExportSelection,
   type ColumnOrFixedMapping,
   type ImportColumnMapping,
   type SpreadsheetSource,
@@ -59,7 +60,13 @@ type CalendarSpreadsheetDialogProps = {
   onOpenChange: (open: boolean) => void;
 };
 
-type AssistantStep = "home" | "mapping" | "structures" | "preview" | "result";
+type AssistantStep =
+  | "home"
+  | "export-scope"
+  | "mapping"
+  | "structures"
+  | "preview"
+  | "result";
 type ImportMode = "template" | "custom";
 
 type ActionCardProps = {
@@ -82,6 +89,41 @@ function ActionCard({ icon, title, description, disabled, onClick }: ActionCardP
       <span className="block text-sm font-semibold text-foreground">{title}</span>
       <span className="mt-1 block text-xs leading-5 text-muted-foreground">{description}</span>
     </button>
+  );
+}
+
+type ExportScopeCheckboxProps = {
+  checked: boolean;
+  indeterminate?: boolean;
+  disabled?: boolean;
+  label: string;
+  onChange: () => void;
+};
+
+function ExportScopeCheckbox({
+  checked,
+  indeterminate = false,
+  disabled,
+  label,
+  onChange,
+}: ExportScopeCheckboxProps) {
+  const ref = React.useRef<HTMLInputElement>(null);
+
+  React.useEffect(() => {
+    if (ref.current) ref.current.indeterminate = indeterminate;
+  }, [indeterminate]);
+
+  return (
+    <input
+      ref={ref}
+      type="checkbox"
+      checked={checked}
+      aria-checked={indeterminate ? "mixed" : checked}
+      aria-label={label}
+      disabled={disabled}
+      onChange={onChange}
+      className="size-4 shrink-0 rounded border-input accent-current disabled:cursor-not-allowed disabled:opacity-45"
+    />
   );
 }
 
@@ -229,6 +271,7 @@ export function CalendarSpreadsheetDialog({
   const [mapping, setMapping] = React.useState<ImportColumnMapping | null>(null);
   const [resolution, setResolution] = React.useState<StructureResolution | null>(null);
   const [acceptedInvalidRows, setAcceptedInvalidRows] = React.useState(false);
+  const [selectedExportCategoryIds, setSelectedExportCategoryIds] = React.useState<string[]>([]);
   const [result, setResult] = React.useState<ImportSummary | null>(null);
   const [isWorking, setIsWorking] = React.useState(false);
   const [actionError, setActionError] = React.useState("");
@@ -236,6 +279,36 @@ export function CalendarSpreadsheetDialog({
   const snapshot = React.useMemo(
     () => ({ profiles, categories, events }),
     [profiles, categories, events]
+  );
+  const eventCountByCategoryId = React.useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const event of events) {
+      counts.set(event.categoryId, (counts.get(event.categoryId) ?? 0) + 1);
+    }
+    return counts;
+  }, [events]);
+  const selectedExportCategoryIdSet = React.useMemo(
+    () => new Set(selectedExportCategoryIds),
+    [selectedExportCategoryIds]
+  );
+  const exportSelection = React.useMemo<CalendarSpreadsheetExportSelection>(() => {
+    const selectedCategories = categories.filter(
+      (category) =>
+        selectedExportCategoryIdSet.has(category.id) &&
+        (eventCountByCategoryId.get(category.id) ?? 0) > 0
+    );
+    return {
+      profileIds: [...new Set(selectedCategories.map((category) => category.profileId))],
+      categoryIds: selectedCategories.map((category) => category.id),
+    };
+  }, [categories, eventCountByCategoryId, selectedExportCategoryIdSet]);
+  const selectedExportEventCount = React.useMemo(
+    () =>
+      exportSelection.categoryIds.reduce(
+        (total, categoryId) => total + (eventCountByCategoryId.get(categoryId) ?? 0),
+        0
+      ),
+    [eventCountByCategoryId, exportSelection.categoryIds]
   );
   const plan = React.useMemo(
     () =>
@@ -258,6 +331,7 @@ export function CalendarSpreadsheetDialog({
     setMapping(null);
     setResolution(null);
     setAcceptedInvalidRows(false);
+    setSelectedExportCategoryIds([]);
     setResult(null);
     setActionError("");
     setIsWorking(false);
@@ -292,6 +366,42 @@ export function CalendarSpreadsheetDialog({
     pendingModeRef.current = nextMode;
     if (fileInputRef.current) fileInputRef.current.value = "";
     fileInputRef.current?.click();
+  };
+
+  const startExport = () => {
+    setSelectedExportCategoryIds(
+      categories
+        .filter((category) => (eventCountByCategoryId.get(category.id) ?? 0) > 0)
+        .map((category) => category.id)
+    );
+    setActionError("");
+    setStep("export-scope");
+  };
+
+  const toggleExportCategory = (categoryId: string) => {
+    if ((eventCountByCategoryId.get(categoryId) ?? 0) === 0) return;
+    setSelectedExportCategoryIds((current) =>
+      current.includes(categoryId)
+        ? current.filter((id) => id !== categoryId)
+        : [...current, categoryId]
+    );
+  };
+
+  const toggleExportProfile = (profileId: string) => {
+    const profileCategoryIds = categories
+      .filter(
+        (category) =>
+          category.profileId === profileId &&
+          (eventCountByCategoryId.get(category.id) ?? 0) > 0
+      )
+      .map((category) => category.id);
+    if (profileCategoryIds.length === 0) return;
+    setSelectedExportCategoryIds((current) => {
+      const currentSet = new Set(current);
+      const allSelected = profileCategoryIds.every((id) => currentSet.has(id));
+      if (allSelected) return current.filter((id) => !profileCategoryIds.includes(id));
+      return [...new Set([...current, ...profileCategoryIds])];
+    });
   };
 
   const handleFile = async (file: File | undefined) => {
@@ -475,15 +585,9 @@ export function CalendarSpreadsheetDialog({
           <ActionCard
             icon={<Download className="size-4" />}
             title="Exportar calendario"
-            description="Exporta todos os eventos atuais no mesmo formato."
+            description="Escolha os contextos e categorias antes de baixar."
             disabled={isWorking}
-            onClick={() =>
-              void runDownload(
-                () => exportCalendarSpreadsheet(snapshot),
-                "Calendario exportado",
-                "calendar-spreadsheet.export"
-              )
-            }
+            onClick={startExport}
           />
         </div>
       </div>
@@ -514,6 +618,141 @@ export function CalendarSpreadsheetDialog({
       </p>
     </div>
   );
+
+  const renderExportScope = () => {
+    const exportableCategoryIds = categories
+      .filter((category) => (eventCountByCategoryId.get(category.id) ?? 0) > 0)
+      .map((category) => category.id);
+    const allSelected =
+      exportableCategoryIds.length > 0 &&
+      exportableCategoryIds.every((id) => selectedExportCategoryIdSet.has(id));
+
+    return (
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-[12px] border border-border/70 bg-muted/20 p-3">
+          <div>
+            <p className="text-sm font-semibold text-foreground">
+              {selectedExportEventCount} evento{selectedExportEventCount === 1 ? "" : "s"}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {exportSelection.profileIds.length} contexto{exportSelection.profileIds.length === 1 ? "" : "s"} e {exportSelection.categoryIds.length} categoria{exportSelection.categoryIds.length === 1 ? "" : "s"}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={allSelected || exportableCategoryIds.length === 0}
+              onClick={() => setSelectedExportCategoryIds(exportableCategoryIds)}
+            >
+              Selecionar tudo
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={selectedExportCategoryIds.length === 0}
+              onClick={() => setSelectedExportCategoryIds([])}
+            >
+              Limpar seleção
+            </Button>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          {profiles.map((profile) => {
+            const profileCategories = categories.filter(
+              (category) => category.profileId === profile.id
+            );
+            const exportableProfileCategoryIds = profileCategories
+              .filter((category) => (eventCountByCategoryId.get(category.id) ?? 0) > 0)
+              .map((category) => category.id);
+            const selectedCount = exportableProfileCategoryIds.filter((id) =>
+              selectedExportCategoryIdSet.has(id)
+            ).length;
+            const profileEventCount = exportableProfileCategoryIds.reduce(
+              (total, id) => total + (eventCountByCategoryId.get(id) ?? 0),
+              0
+            );
+            const isChecked =
+              exportableProfileCategoryIds.length > 0 &&
+              selectedCount === exportableProfileCategoryIds.length;
+            const isIndeterminate = selectedCount > 0 && !isChecked;
+
+            return (
+              <div key={profile.id} className="overflow-hidden rounded-[14px] border border-border/75">
+                <label className="flex items-center gap-3 bg-muted/35 px-3 py-2.5">
+                  <ExportScopeCheckbox
+                    checked={isChecked}
+                    indeterminate={isIndeterminate}
+                    disabled={exportableProfileCategoryIds.length === 0}
+                    label={`Selecionar contexto ${profile.name}`}
+                    onChange={() => toggleExportProfile(profile.id)}
+                  />
+                  <span
+                    className="size-2.5 shrink-0 rounded-full"
+                    style={{ backgroundColor: profile.color }}
+                    aria-hidden="true"
+                  />
+                  <span className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">
+                    {profile.name}
+                  </span>
+                  <span className="text-xs tabular-nums text-muted-foreground">
+                    {profileEventCount} evento{profileEventCount === 1 ? "" : "s"}
+                  </span>
+                </label>
+                <div className="divide-y divide-border/60">
+                  {profileCategories.length > 0 ? (
+                    profileCategories.map((category) => {
+                      const eventCount = eventCountByCategoryId.get(category.id) ?? 0;
+                      const disabled = eventCount === 0;
+                      return (
+                        <label
+                          key={category.id}
+                          className={`flex items-center gap-3 px-3 py-2.5 pl-10 ${
+                            disabled ? "cursor-not-allowed opacity-55" : ""
+                          }`}
+                        >
+                          <ExportScopeCheckbox
+                            checked={selectedExportCategoryIdSet.has(category.id)}
+                            disabled={disabled}
+                            label={`Selecionar categoria ${category.name}`}
+                            onChange={() => toggleExportCategory(category.id)}
+                          />
+                          <span
+                            className="size-2.5 shrink-0 rounded-full"
+                            style={{ backgroundColor: category.color }}
+                            aria-hidden="true"
+                          />
+                          <span className="min-w-0 flex-1 truncate text-sm text-foreground">
+                            {category.name}
+                          </span>
+                          <span className="text-xs tabular-nums text-muted-foreground">
+                            {eventCount} evento{eventCount === 1 ? "" : "s"}
+                          </span>
+                        </label>
+                      );
+                    })
+                  ) : (
+                    <p className="px-3 py-2.5 pl-10 text-xs text-muted-foreground">
+                      Nenhuma categoria neste contexto.
+                    </p>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {exportableCategoryIds.length === 0 ? (
+          <div className="rounded-[12px] border border-amber-200/80 bg-amber-50/60 p-3 text-xs text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/8 dark:text-amber-100">
+            Crie ao menos um evento para exportar o calendario.
+          </div>
+        ) : null}
+      </div>
+    );
+  };
 
   const renderMapping = () => {
     if (!source || !mapping) return null;
@@ -723,6 +962,7 @@ export function CalendarSpreadsheetDialog({
 
   const titles: Record<AssistantStep, [string, string]> = {
     home: ["Importar e exportar com Excel", "Escolha uma jornada para trocar eventos com o Doze52."],
+    "export-scope": ["Selecionar dados para exportar", "Escolha os contextos e categorias que devem entrar na planilha."],
     mapping: ["Mapear colunas", "Defina como a sua planilha representa cada campo do calendario."],
     structures: ["Revisar estruturas", "Crie, associe ou ignore contextos e categorias encontrados."],
     preview: ["Revisar importacao", "Confira o resultado antes de alterar o calendario."],
@@ -748,6 +988,7 @@ export function CalendarSpreadsheetDialog({
         </DialogHeader>
 
         {step === "home" ? renderHome() : null}
+        {step === "export-scope" ? renderExportScope() : null}
         {step === "mapping" ? renderMapping() : null}
         {step === "structures" ? renderStructures() : null}
         {step === "preview" ? renderPreview() : null}
@@ -762,6 +1003,21 @@ export function CalendarSpreadsheetDialog({
         <DialogFooter>
           {step === "home" ? <Button variant="ghost" onClick={() => onOpenChange(false)}>Fechar</Button> : null}
           {step !== "home" && step !== "result" ? <Button variant="ghost" onClick={back}><ArrowLeft className="size-4" />Voltar</Button> : null}
+          {step === "export-scope" ? (
+            <Button
+              variant="premium"
+              disabled={selectedExportEventCount === 0 || isWorking}
+              onClick={() =>
+                void runDownload(
+                  () => exportCalendarSpreadsheet(snapshot, exportSelection),
+                  "Calendario exportado",
+                  "calendar-spreadsheet.export"
+                )
+              }
+            >
+              Exportar {selectedExportEventCount} evento{selectedExportEventCount === 1 ? "" : "s"}
+            </Button>
+          ) : null}
           {step === "mapping" ? <Button variant="premium" disabled={mappingErrors.length > 0} onClick={continueFromMapping}>Revisar estruturas</Button> : null}
           {step === "structures" ? <Button variant="premium" disabled={!canAdvanceStructures} onClick={() => setStep("preview")}>Ver pre-visualizacao</Button> : null}
           {step === "preview" ? <Button variant="premium" disabled={!canConfirm} onClick={confirmImport}>Importar {plan?.summary.importedEvents ?? 0} evento(s)</Button> : null}
