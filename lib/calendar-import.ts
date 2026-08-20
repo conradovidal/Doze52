@@ -279,16 +279,16 @@ const eventSignature = (
     event.endDate,
   ].join("::");
 
-const nextDayOrder = (events: CalendarEvent[], startDate: string, endDate: string) => {
-  const singleDay = startDate === endDate;
-  let maximum = -1;
+const dayOrderKey = (startDate: string, endDate: string) =>
+  startDate === endDate ? `single:${startDate}` : "multi";
+
+const createDayOrderIndex = (events: CalendarEvent[]) => {
+  const maximumByKey = new Map<string, number>();
   for (const event of events) {
-    const sameKind = singleDay
-      ? event.startDate === startDate && event.endDate === endDate
-      : event.startDate !== event.endDate;
-    if (sameKind) maximum = Math.max(maximum, event.dayOrder);
+    const key = dayOrderKey(event.startDate, event.endDate);
+    maximumByKey.set(key, Math.max(maximumByKey.get(key) ?? -1, event.dayOrder));
   }
-  return maximum + 1;
+  return maximumByKey;
 };
 
 export const buildImportPlan = (
@@ -320,7 +320,7 @@ export const buildImportPlan = (
   }
 
   const existingCategoryById = new Map(snapshot.categories.map((item) => [item.id, item]));
-  const pendingEvents = [...snapshot.events];
+  const dayOrderIndex = createDayOrderIndex(snapshot.events);
   const knownSignatures = new Set(snapshot.events.map(eventSignature));
 
   for (const row of source.rows) {
@@ -390,7 +390,7 @@ export const buildImportPlan = (
       endDate,
       notes: notes || undefined,
       createdAt: new Date().toISOString(),
-      dayOrder: nextDayOrder(pendingEvents, startDate, endDate),
+      dayOrder: (dayOrderIndex.get(dayOrderKey(startDate, endDate)) ?? -1) + 1,
     };
     const signature = eventSignature(event);
     if (knownSignatures.has(signature)) {
@@ -398,7 +398,7 @@ export const buildImportPlan = (
       continue;
     }
     knownSignatures.add(signature);
-    pendingEvents.push(event);
+    dayOrderIndex.set(dayOrderKey(startDate, endDate), event.dayOrder);
     importedEvents.push(event);
     usedContextKeys.add(context!.key);
     usedCategoryKeys.add(category!.key);
@@ -410,6 +410,7 @@ export const buildImportPlan = (
       startDate,
       endDate,
     });
+    if (importedEvents.length > IMPORT_LIMITS.maxEvents) break;
   }
 
   const newProfiles: CalendarProfile[] = resolution.contexts

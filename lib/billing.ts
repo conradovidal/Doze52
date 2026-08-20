@@ -1,3 +1,4 @@
+import { randomInt } from "node:crypto";
 import type { User } from "@supabase/supabase-js";
 
 import {
@@ -18,6 +19,20 @@ export class BillingNotFoundError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "BillingNotFoundError";
+  }
+}
+
+export class WebhookEventInProgressError extends Error {
+  constructor() {
+    super("Stripe webhook event is already being processed.");
+    this.name = "WebhookEventInProgressError";
+  }
+}
+
+export class WebhookLeaseLostError extends Error {
+  constructor() {
+    super("Stripe webhook event lease is no longer owned by this worker.");
+    this.name = "WebhookLeaseLostError";
   }
 }
 
@@ -154,6 +169,7 @@ export const createCheckoutSession = async (params: {
   const customerId = await getOrCreateBillingCustomer(params.user);
   const appUrl = getAppBaseUrl(params.requestUrl);
   const session = await stripe.checkout.sessions.create({
+    integration_identifier: createIntegrationIdentifier(),
     mode: "subscription",
     customer: customerId,
     client_reference_id: params.user.id,
@@ -180,6 +196,14 @@ export const createCheckoutSession = async (params: {
   }
 
   return session.url;
+};
+
+const createIntegrationIdentifier = () => {
+  const alphabet = "abcdefghijklmnopqrstuvwxyz";
+  const suffix = Array.from({ length: 8 }, () =>
+    alphabet[randomInt(alphabet.length)]
+  ).join("");
+  return `doze52_${suffix}`;
 };
 
 export const createCustomerPortalSession = async (params: {
@@ -226,7 +250,12 @@ const resolveSubscriptionUserId = async (
 
 export const syncStripeSubscription = async (
   subscription: Stripe.Subscription,
-  options: { fallbackUserId?: string | null; fallbackCustomerId?: string | null } = {}
+  options: {
+    eventId: string;
+    eventCreated: number;
+    fallbackUserId?: string | null;
+    fallbackCustomerId?: string | null;
+  }
 ) => {
   const userId = await resolveSubscriptionUserId(
     subscription,
@@ -244,72 +273,103 @@ export const syncStripeSubscription = async (
   await upsertBillingCustomer({ userId, stripeCustomerId });
 
   const firstItem = subscription.items.data[0];
-  const { error } = await getSupabaseAdminClient()
-    .from("billing_subscriptions")
-    .upsert(
-      {
-        user_id: userId,
-        stripe_customer_id: stripeCustomerId,
-        stripe_subscription_id: subscription.id,
-        stripe_price_id: firstItem?.price.id ?? null,
-        status: subscription.status,
-        current_period_end: toIsoFromUnixSeconds(firstItem?.current_period_end),
-        cancel_at_period_end: Boolean(subscription.cancel_at_period_end || subscription.cancel_at),
-      },
-      { onConflict: "user_id" }
-    );
+  const { data, error } = await getSupabaseAdminClient().rpc(
+    "apply_stripe_subscription_state",
+    {
+      p_user_id: userId,
+      p_stripe_customer_id: stripeCustomerId,
+      p_stripe_subscription_id: subscription.id,
+      p_stripe_price_id: firstItem?.price.id ?? null,
+      p_status: subscription.status,
+      p_current_period_end: toIsoFromUnixSeconds(firstItem?.current_period_end),
+      p_cancel_at_period_end: Boolean(
+        subscription.cancel_at_period_end || subscription.cancel_at
+      ),
+      p_event_created_at: toIsoFromUnixSeconds(options.eventCreated),
+      p_event_id: options.eventId,
+    }
+  );
 
   if (error) throw error;
+  return Boolean(data);
 };
 
-const isUniqueViolation = (error: unknown) => {
-  if (!error || typeof error !== "object" || !("code" in error)) return false;
-  return String((error as { code?: string }).code) === "23505";
+type WebhookClaim = {
+  outcome: "claimed" | "duplicate" | "processing";
+  leaseToken: string | null;
+  attemptCount: number;
 };
 
 const claimWebhookEvent = async (event: Stripe.Event) => {
-  const supabase = getSupabaseAdminClient();
-  const { error } = await supabase.from("stripe_webhook_events").insert({
-    stripe_event_id: event.id,
-    type: event.type,
-  });
+  const { data, error } = await getSupabaseAdminClient().rpc(
+    "claim_stripe_webhook_event",
+    {
+      p_event_id: event.id,
+      p_event_type: event.type,
+      p_lease_seconds: 60,
+    }
+  );
+  if (error) throw error;
 
-  if (!error) return true;
-  if (isUniqueViolation(error)) {
-    const { data, error: selectError } = await supabase
-      .from("stripe_webhook_events")
-      .select("processed_at")
-      .eq("stripe_event_id", event.id)
-      .maybeSingle();
-
-    if (selectError) throw selectError;
-    return !data?.processed_at;
+  const claim = data as Partial<WebhookClaim> | null;
+  if (
+    !claim ||
+    !["claimed", "duplicate", "processing"].includes(claim.outcome ?? "") ||
+    !Number.isInteger(claim.attemptCount)
+  ) {
+    throw new Error("Invalid Stripe webhook claim response.");
   }
-  throw error;
+  return claim as WebhookClaim;
 };
 
-const markWebhookEventProcessed = async (eventId: string) => {
-  const { error } = await getSupabaseAdminClient()
-    .from("stripe_webhook_events")
-    .update({ processed_at: new Date().toISOString() })
-    .eq("stripe_event_id", eventId);
+const markWebhookEventProcessed = async (
+  eventId: string,
+  leaseToken: string
+) => {
+  const { data, error } = await getSupabaseAdminClient().rpc(
+    "complete_stripe_webhook_event",
+    {
+      p_event_id: eventId,
+      p_lease_token: leaseToken,
+    }
+  );
 
   if (error) throw error;
+  if (!data) throw new WebhookLeaseLostError();
 };
 
-const releaseWebhookEvent = async (eventId: string) => {
-  const { error } = await getSupabaseAdminClient()
-    .from("stripe_webhook_events")
-    .delete()
-    .eq("stripe_event_id", eventId)
-    .is("processed_at", null);
+const getWebhookErrorCode = (error: unknown) => {
+  if (error instanceof WebhookLeaseLostError) return "lease_lost";
+  if (error instanceof Error && error.name) {
+    const normalized = error.name
+      .replace(/([a-z])([A-Z])/g, "$1_$2")
+      .toLowerCase();
+    if (/^[a-z0-9_.-]{1,64}$/.test(normalized)) return normalized;
+  }
+  return "processing_error";
+};
 
-  if (error) throw error;
+const releaseWebhookEvent = async (
+  eventId: string,
+  leaseToken: string,
+  error: unknown
+) => {
+  const { error: releaseError } = await getSupabaseAdminClient().rpc(
+    "fail_stripe_webhook_event",
+    {
+      p_event_id: eventId,
+      p_lease_token: leaseToken,
+      p_error_code: getWebhookErrorCode(error),
+    }
+  );
+
+  if (releaseError) throw releaseError;
 };
 
 const handleCheckoutSessionCompleted = async (
-  session: Stripe.Checkout.Session
+  event: Stripe.Event
 ) => {
+  const session = event.data.object as Stripe.Checkout.Session;
   const subscriptionId = getStripeObjectId(session.subscription);
   if (!subscriptionId) return;
 
@@ -325,41 +385,58 @@ const handleCheckoutSessionCompleted = async (
 
   const subscription = await getStripe().subscriptions.retrieve(subscriptionId);
   await syncStripeSubscription(subscription, {
+    eventId: event.id,
+    eventCreated: event.created,
     fallbackUserId,
     fallbackCustomerId,
   });
 };
 
-const handleSubscriptionEvent = async (subscription: Stripe.Subscription) => {
-  await syncStripeSubscription(subscription);
+const handleSubscriptionEvent = async (event: Stripe.Event) => {
+  const eventSubscription = event.data.object as Stripe.Subscription;
+  const subscription = await getStripe().subscriptions.retrieve(
+    eventSubscription.id
+  );
+  await syncStripeSubscription(subscription, {
+    eventId: event.id,
+    eventCreated: event.created,
+  });
 };
 
 export const processStripeWebhookEvent = async (event: Stripe.Event) => {
-  const claimed = await claimWebhookEvent(event);
-  if (!claimed) {
-    return { duplicate: true, handled: false };
+  const claim = await claimWebhookEvent(event);
+  if (claim.outcome === "duplicate") {
+    return {
+      duplicate: true,
+      handled: false,
+      attemptCount: claim.attemptCount,
+    };
   }
+  if (claim.outcome === "processing") throw new WebhookEventInProgressError();
+  if (!claim.leaseToken) throw new WebhookLeaseLostError();
 
   try {
     switch (event.type) {
       case "checkout.session.completed":
-        await handleCheckoutSessionCompleted(
-          event.data.object as Stripe.Checkout.Session
-        );
+        await handleCheckoutSessionCompleted(event);
         break;
       case "customer.subscription.created":
       case "customer.subscription.updated":
       case "customer.subscription.deleted":
-        await handleSubscriptionEvent(event.data.object as Stripe.Subscription);
+        await handleSubscriptionEvent(event);
         break;
       default:
         break;
     }
 
-    await markWebhookEventProcessed(event.id);
-    return { duplicate: false, handled: true };
+    await markWebhookEventProcessed(event.id, claim.leaseToken);
+    return {
+      duplicate: false,
+      handled: true,
+      attemptCount: claim.attemptCount,
+    };
   } catch (error) {
-    await releaseWebhookEvent(event.id);
+    await releaseWebhookEvent(event.id, claim.leaseToken, error);
     throw error;
   }
 };

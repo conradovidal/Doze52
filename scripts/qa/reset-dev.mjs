@@ -21,9 +21,13 @@ if (
   throw new Error("Reset recusado: a sessao nao pertence a conta E2E do ambiente DEV.");
 }
 
-for (const table of ["events", "categories", "calendar_profiles"]) {
-  const { error } = await supabase.from(table).delete().eq("user_id", user.id);
-  if (error) throw new Error(`Falha ao limpar ${table}: ${error.message}`);
+const { error: resetError } = await supabase.rpc("replace_calendar_snapshot", {
+  p_profiles: [],
+  p_categories: [],
+  p_events: [],
+});
+if (resetError) {
+  throw new Error(`Falha ao limpar o snapshot da conta E2E: ${resetError.message}`);
 }
 
 for (const table of ["events", "categories", "calendar_profiles"]) {

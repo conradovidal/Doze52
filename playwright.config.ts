@@ -19,19 +19,29 @@ export default defineConfig({
   use: {
     baseURL,
     screenshot: "only-on-failure",
-    trace: "retain-on-failure",
-    video: "retain-on-failure",
+    trace: "off",
+    video: "off",
   },
   projects: [
     {
       name: "setup-desktop",
       testMatch: /auth\.setup\.ts/,
       testIgnore: /auth\.mobile\.setup\.ts/,
+      use: {
+        screenshot: "off",
+        trace: "off",
+        video: "off",
+      },
     },
     {
       name: "setup-mobile",
       testMatch: /auth\.mobile\.setup\.ts/,
       dependencies: ["desktop-chromium"],
+      use: {
+        screenshot: "off",
+        trace: "off",
+        video: "off",
+      },
     },
     {
       name: "desktop-chromium",

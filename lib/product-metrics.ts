@@ -98,6 +98,12 @@ export const toFunnelUpsertPayload = (
 };
 
 const reportMetricsFailure = (context: string, error: unknown) => {
+  if (
+    typeof document !== "undefined" &&
+    document.visibilityState === "hidden"
+  ) {
+    return;
+  }
   logDevError(context, error instanceof Error ? error.message : String(error));
   logProdError("Falha ao registrar métrica agregada do produto.");
 };

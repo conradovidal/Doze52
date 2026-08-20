@@ -47,6 +47,19 @@
   --radius-4xl: calc(var(--radius) + 16px);
 }
 
+@media (prefers-reduced-motion: reduce) {
+  [data-slot="dialog-overlay"],
+  [data-slot="dialog-content"],
+  [data-slot="popover-content"] {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  [data-premium-sortable] {
+    transition: none !important;
+  }
+}
+
 :root {
   --radius: 0.625rem;
   --background: #ffffff;

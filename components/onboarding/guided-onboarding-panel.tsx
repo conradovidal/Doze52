@@ -15,6 +15,7 @@ import {
 import { CategoryColorPicker } from "@/components/category-color-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { AnimatedProgress } from "@/components/ui/animated-progress";
 import type { GuidedSelectionNotice } from "@/components/onboarding/guided-selection-notice";
 import {
   ONBOARDING_CATEGORY_IDS,
@@ -312,14 +313,19 @@ export function GuidedOnboardingPanel({
     state.periodCategoryId,
     periodItemsCreated
   );
-  const progressStep =
-    state.step === "context_selection"
-      ? 1
-      : state.step.startsWith("date")
-        ? 2
-        : state.step.startsWith("period")
-          ? 3
-          : 4;
+  const progressStep = state.step === "context_selection"
+    ? 1
+    : state.step.startsWith("date")
+      ? 2
+      : state.step.startsWith("period")
+        ? 3
+        : state.step.startsWith("edit")
+          ? 4
+          : state.step.startsWith("calendar")
+            ? 5
+            : state.step === "year_instruction"
+              ? 6
+              : 7;
 
   React.useEffect(() => {
     setTitle("");
@@ -333,28 +339,35 @@ export function GuidedOnboardingPanel({
   }, [context, state.step]);
 
   const header = (
-    <div className="flex items-start gap-3">
-      <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-        <CalendarDays className="size-4" aria-hidden="true" />
+    <div className="space-y-3">
+      <div className="flex items-start gap-3">
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <CalendarDays className="size-4" aria-hidden="true" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">
+            Monte o seu ano
+          </p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Passo {progressStep} de 7
+          </p>
+        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-xs"
+          className="rounded-full"
+          aria-label="Encerrar guia inicial"
+          onClick={onClose}
+        >
+          <X />
+        </Button>
       </div>
-      <div className="min-w-0 flex-1">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">
-          Monte o seu ano
-        </p>
-        <p className="mt-0.5 text-xs text-muted-foreground">
-          Passo {progressStep} de 7
-        </p>
-      </div>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-xs"
-        className="rounded-full"
-        aria-label="Encerrar guia inicial"
-        onClick={onClose}
-      >
-        <X />
-      </Button>
+      <AnimatedProgress
+        value={(progressStep / 7) * 100}
+        label="Progresso do guia inicial"
+        statusText={`${progressStep} de 7`}
+      />
     </div>
   );
 

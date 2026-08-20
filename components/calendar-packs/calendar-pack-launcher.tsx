@@ -4,7 +4,6 @@ import * as React from "react";
 import {
   CalendarDays,
   Check,
-  Loader2,
   Plus,
   Trash2,
   TreePine,
@@ -13,6 +12,10 @@ import {
 import { ProUpgradeDialog } from "@/components/billing/pro-upgrade-dialog";
 import { ProfileIcon } from "@/components/profile-icon";
 import { Button } from "@/components/ui/button";
+import {
+  AsyncStateButton,
+  type AsyncButtonState,
+} from "@/components/ui/async-state-button";
 import {
   Dialog,
   DialogContent,
@@ -55,6 +58,20 @@ type PackFlowState =
   | "removing"
   | "removed"
   | "error";
+
+function getAddButtonState(flow: PackFlowState): AsyncButtonState {
+  if (flow === "adding") return "pending";
+  if (flow === "added" || flow === "exists") return "success";
+  if (flow === "error") return "error";
+  return "idle";
+}
+
+function getRemoveButtonState(flow: PackFlowState): AsyncButtonState {
+  if (flow === "removing") return "pending";
+  if (flow === "removed") return "success";
+  if (flow === "error") return "error";
+  return "idle";
+}
 
 function RacingHelmetIcon({ className }: { className?: string }) {
   return (
@@ -447,7 +464,7 @@ export function CalendarPackLauncher({
       </Button>
 
       <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogContent className="max-h-[calc(100dvh-1.5rem)] overflow-y-auto p-4 sm:max-w-[600px] sm:p-6">
+        <DialogContent className="max-h-[calc(100dvh-1.5rem)] overflow-x-hidden overflow-y-auto p-4 sm:max-w-[600px] sm:p-6">
           <DialogHeader className="pr-8 text-left">
             <DialogTitle>
               {guidedVariantGroupId
@@ -592,7 +609,7 @@ export function CalendarPackLauncher({
                       {isPresent ? (
                         <>
                           {isSwitchingVariant ? (
-                            <Button
+                            <AsyncStateButton
                               type="button"
                               variant="premium"
                               size="xs"
@@ -605,36 +622,37 @@ export function CalendarPackLauncher({
                                   availability?.profileId ?? targetProfileId
                                 )
                               }
+                              state={getAddButtonState(currentFlow)}
+                              pendingLabel="Atualizando…"
+                              successLabel="Atualizado"
+                              errorLabel="Tentar novamente"
                             >
-                              {currentFlow === "adding" ? (
-                                <Loader2 className="size-3.5 animate-spin" />
-                              ) : null}
                               {variantGroup?.label === "Estado"
                                 ? "Trocar estado"
                                 : variantGroup?.label === "Cobertura"
                                   ? "Trocar cobertura"
                                   : "Trocar time"}
-                            </Button>
+                            </AsyncStateButton>
                           ) : null}
-                          <Button
+                          <AsyncStateButton
                             type="button"
                             variant="dangerSoft"
                             size="xs"
                             className="rounded-full"
                             disabled={isBusy || isGuidedCardDisabled}
                             onClick={() => handleRemove(pack, variants)}
+                            state={getRemoveButtonState(currentFlow)}
+                            pendingLabel="Removendo…"
+                            successLabel="Removido"
+                            errorLabel="Tentar remover"
                           >
-                            {currentFlow === "removing" ? (
-                              <Loader2 className="size-3.5 animate-spin" />
-                            ) : (
-                              <Trash2 className="size-3.5" />
-                            )}
+                            <Trash2 className="size-3.5" />
                             Remover
-                          </Button>
+                          </AsyncStateButton>
                         </>
                       ) : showAddDetails ? (
                         isGuidedCard ? (
-                          <Button
+                          <AsyncStateButton
                             type="button"
                             variant="premium"
                             size="xs"
@@ -643,14 +661,14 @@ export function CalendarPackLauncher({
                             onClick={() =>
                               handleImport(pack, variants, activeProfileId)
                             }
+                            state={getAddButtonState(currentFlow)}
+                            pendingLabel="Adicionando…"
+                            successLabel="Adicionado"
+                            errorLabel="Tentar adicionar"
                           >
-                            {currentFlow === "adding" ? (
-                              <Loader2 className="size-3.5 animate-spin" />
-                            ) : (
-                              <Check className="size-3.5" />
-                            )}
+                            <Check className="size-3.5" />
                             Adicionar feriados
-                          </Button>
+                          </AsyncStateButton>
                         ) : (
                         <div className="flex min-w-0 items-center justify-end gap-1.5">
                           <Select
@@ -682,7 +700,7 @@ export function CalendarPackLauncher({
                               ))}
                             </SelectContent>
                           </Select>
-                          <Button
+                          <AsyncStateButton
                             type="button"
                             variant="premium"
                             size="icon-xs"
@@ -701,14 +719,14 @@ export function CalendarPackLauncher({
                                 ? `Adicionar em ${targetProfileName}`
                                 : "Escolha um contexto"
                             }
+                            state={getAddButtonState(currentFlow)}
+                            pendingLabel="Adicionando…"
+                            successLabel="Adicionado"
+                            errorLabel="Tentar adicionar"
                           >
-                            {currentFlow === "adding" ? (
-                              <Loader2 className="size-3.5 animate-spin" />
-                            ) : (
-                              <Check className="size-3.5" />
-                            )}
+                            <Check className="size-3.5" />
                             <span className="sr-only">Confirmar</span>
-                          </Button>
+                          </AsyncStateButton>
                         </div>
                         )
                       ) : (

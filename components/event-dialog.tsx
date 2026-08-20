@@ -1,17 +1,23 @@
 "use client";
 
 import * as React from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, X } from "lucide-react";
+import * as m from "motion/react-m";
 import { ProfileIcon } from "@/components/profile-icon";
 import { Button } from "@/components/ui/button";
+import { AsyncStateButton } from "@/components/ui/async-state-button";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogFooter,
-  DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Popover,
+  PopoverAnchor,
+  PopoverContent,
+} from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -20,12 +26,18 @@ import {
   SelectTrigger,
 } from "@/components/ui/select";
 import { getCategoryColorToken } from "@/lib/category-palette";
-import { ONBOARDING_DEFAULT_CATEGORY_ID, useStore } from "@/lib/store";
+import {
+  ONBOARDING_DEFAULT_CATEGORY_ID,
+  useStore,
+  type EventInput,
+  type EventUpdatePatch,
+} from "@/lib/store";
 import { useTheme } from "@/lib/theme";
 import type { AnchorPoint, CalendarEvent, RecurrenceType } from "@/lib/types";
 import type { GuidedCreationIntent } from "@/lib/onboarding";
 import { logDevError, logProdError } from "@/lib/safe-log";
 import { ValidationError, validateEventInput } from "@/lib/validation";
+import { MOTION_SPRING } from "@/lib/motion";
 
 const CHIP_TRIGGER_CLASS =
   "h-10 w-full rounded-xl border px-3 text-sm shadow-sm transition-colors";
@@ -33,6 +45,21 @@ const FIELD_LABEL_CLASS =
   "text-[12px] font-semibold tracking-[-0.01em] text-foreground/78";
 
 type RecurrenceDraft = "none" | RecurrenceType;
+type EventInputField = keyof EventInput;
+
+export type EventDialogSubmission =
+  | { mode: "create"; input: EventInput }
+  | { mode: "update"; patch: EventUpdatePatch };
+
+function subscribeToDesktopViewport(callback: () => void) {
+  const mediaQuery = window.matchMedia("(min-width: 768px)");
+  mediaQuery.addEventListener("change", callback);
+  return () => mediaQuery.removeEventListener("change", callback);
+}
+
+function getDesktopViewportSnapshot() {
+  return window.matchMedia("(min-width: 768px)").matches;
+}
 
 const GUIDED_COPY: Record<
   GuidedCreationIntent,
@@ -77,15 +104,7 @@ export function EventDialog({
   seedRange?: { startDate: string; endDate: string } | null;
   anchorPoint?: AnchorPoint;
   guidedIntent?: GuidedCreationIntent | null;
-  onSubmit: (payload: {
-    title: string;
-    categoryId: string;
-    startDate: string;
-    endDate: string;
-    notes?: string;
-    recurrenceType?: RecurrenceType;
-    recurrenceUntil?: string;
-  }) => Promise<void> | void;
+  onSubmit: (submission: EventDialogSubmission) => Promise<void> | void;
   onDelete?: () => Promise<void> | void;
   allowManagedMutation?: boolean;
 }) {
@@ -103,7 +122,18 @@ export function EventDialog({
   const [recurrenceType, setRecurrenceType] = React.useState<RecurrenceDraft>("none");
   const [recurrenceUntil, setRecurrenceUntil] = React.useState("");
   const [isSaving, setIsSaving] = React.useState(false);
+  const [activeAction, setActiveAction] = React.useState<"save" | "delete" | null>(null);
   const [submitError, setSubmitError] = React.useState<string | null>(null);
+  const isDesktopViewport = React.useSyncExternalStore(
+    subscribeToDesktopViewport,
+    getDesktopViewportSnapshot,
+    () => false
+  );
+  const titleId = React.useId();
+  const descriptionId = React.useId();
+  const returnFocusRef = React.useRef<HTMLElement | null>(null);
+  const initializedSessionRef = React.useRef<string | null>(null);
+  const changedFieldsRef = React.useRef<Set<EventInputField>>(new Set());
   const isManagedEvent = Boolean(
     initialEvent?.calendarPackGroupId && !allowManagedMutation
   );
@@ -160,30 +190,48 @@ export function EventDialog({
     (nextProfileId: string) => {
       setProfileId(nextProfileId);
       const nextCategories = categories.filter(
-        (category) => category.profileId === nextProfileId
+        (category) =>
+          category.profileId === nextProfileId &&
+          (!category.calendarPackGroupId ||
+            category.id === initialEvent?.categoryId)
       );
       setCategoryId((currentCategoryId) => {
-        if (nextCategories.some((category) => category.id === currentCategoryId)) {
-          return currentCategoryId;
+        const nextCategoryId = nextCategories.some(
+          (category) => category.id === currentCategoryId
+        )
+          ? currentCategoryId
+          : nextCategories[0]?.id ?? "";
+        if (nextCategoryId !== currentCategoryId) {
+          changedFieldsRef.current.add("categoryId");
         }
-        return nextCategories[0]?.id ?? "";
+        return nextCategoryId;
       });
     },
-    [categories]
+    [categories, initialEvent?.categoryId]
   );
 
+  const initializationSession = initialEvent
+    ? `edit:${initialEvent.id}`
+    : `create:${seedRange?.startDate ?? seedDate ?? ""}:${seedRange?.endDate ?? ""}:${guidedIntent ?? ""}`;
+
   React.useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      initializedSessionRef.current = null;
+      return;
+    }
+    if (initializedSessionRef.current === initializationSession) return;
+    initializedSessionRef.current = initializationSession;
+    changedFieldsRef.current.clear();
 
     setTitle(initialEvent?.title ?? "");
 
-    const nextProfileId =
-      initialProfileFromEvent ||
-      (profileOptions.some((profile) => profile.id === selectedProfileId)
-        ? selectedProfileId
-        : "") ||
-      profileOptions[0]?.id ||
-      "";
+    const nextProfileId = initialEvent
+      ? initialProfileFromEvent
+      : (profileOptions.some((profile) => profile.id === selectedProfileId)
+          ? selectedProfileId
+          : "") ||
+        profileOptions[0]?.id ||
+        "";
     setProfileId(nextProfileId);
 
     const availableCategories = categories.filter(
@@ -193,11 +241,9 @@ export function EventDialog({
     const guidedDefaultCategoryId = availableCategories.find(
       (category) => category.id === ONBOARDING_DEFAULT_CATEGORY_ID
     )?.id;
-    const nextCategoryId =
-      initialEvent?.categoryId &&
-      availableCategories.some((category) => category.id === initialEvent.categoryId)
-        ? initialEvent.categoryId
-        : guidedDefaultCategoryId ?? availableCategories[0]?.id ?? "";
+    const nextCategoryId = initialEvent
+      ? initialEvent.categoryId
+      : guidedDefaultCategoryId ?? availableCategories[0]?.id ?? "";
 
     setCategoryId(nextCategoryId);
 
@@ -213,6 +259,7 @@ export function EventDialog({
   }, [
     open,
     categories,
+    initializationSession,
     initialEvent,
     initialProfileFromEvent,
     guidedIntent,
@@ -224,45 +271,75 @@ export function EventDialog({
   ]);
 
   React.useEffect(() => {
-    if (!open) return;
-    if (!categoriesForProfile.some((category) => category.id === categoryId)) {
-      setCategoryId(categoriesForProfile[0]?.id ?? "");
-    }
-  }, [open, categoryId, categoriesForProfile]);
+    const rememberFocusedElement = (event: FocusEvent) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+      if (target.closest("[data-slot='dialog-content'], [data-slot='popover-content']")) {
+        return;
+      }
+      returnFocusRef.current = target;
+    };
+    document.addEventListener("focusin", rememberFocusedElement);
+    return () => document.removeEventListener("focusin", rememberFocusedElement);
+  }, []);
 
   const isRecurring = recurrenceType !== "none";
+  const hasValidCategory = Boolean(
+    currentCategory &&
+      currentCategory.profileId === profileId &&
+      categoriesForProfile.some((category) => category.id === currentCategory.id)
+  );
+  const categoryUnavailable = Boolean(initialEvent && !hasValidCategory);
   const canSave =
     !isManagedEvent &&
     title.trim().length > 0 &&
     startDate.length > 0 &&
     endDate.length > 0 &&
-    categoryId.length > 0;
+    categoryId.length > 0 &&
+    hasValidCategory;
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        anchorPoint={anchorPoint}
-        desktopPlacement="right-start"
-        mobileMode="sheet"
-        className="sm:max-w-[520px] p-5 sm:p-6"
-      >
-        <DialogHeader>
-          <DialogTitle>
-            {isManagedEvent
-              ? "Detalhes do evento"
-              : initialEvent
-                ? "Editar evento"
-                : guidedCopy?.title ?? "Novo evento"}
-          </DialogTitle>
-          <DialogDescription>
-            {isManagedEvent
-              ? "Este evento faz parte de um calendário pronto e é atualizado automaticamente."
-              : guidedCopy?.description ??
-                "Defina o essencial primeiro: título, datas e categoria. Os detalhes entram depois."}
-          </DialogDescription>
-        </DialogHeader>
+  const editorTitle = isManagedEvent
+    ? "Detalhes do evento"
+    : initialEvent
+      ? "Editar evento"
+      : guidedCopy?.title ?? "Novo evento";
+  const editorDescription = isManagedEvent
+    ? "Este evento faz parte de um calendário pronto e é atualizado automaticamente."
+    : guidedCopy?.description ??
+      "Defina o essencial primeiro: título, datas e categoria. Os detalhes entram depois.";
 
-        <div className="space-y-5">
+  const renderEditorContent = (dialogSemantics: boolean) => (
+    <>
+      <div className="flex items-start gap-4">
+        <div className="min-w-0 flex-1 space-y-1.5">
+          {dialogSemantics ? (
+            <DialogTitle>{editorTitle}</DialogTitle>
+          ) : (
+            <h2 id={titleId} className="text-lg font-semibold tracking-tight text-foreground">
+              {editorTitle}
+            </h2>
+          )}
+          {dialogSemantics ? (
+            <DialogDescription>{editorDescription}</DialogDescription>
+          ) : (
+            <p id={descriptionId} className="text-sm leading-6 text-muted-foreground">
+              {editorDescription}
+            </p>
+          )}
+        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          className="-mr-2 -mt-2 rounded-full"
+          aria-label="Close"
+          onClick={() => onOpenChange(false)}
+        >
+          <X />
+        </Button>
+      </div>
+
+      <div className="space-y-5">
           <div className="space-y-1.5">
             <label htmlFor="event-title" className={FIELD_LABEL_CLASS}>
               Título do evento
@@ -274,7 +351,10 @@ export function EventDialog({
               value={title}
               disabled={isManagedEvent}
               autoFocus={isGuidedCreation}
-              onChange={(event) => setTitle(event.target.value)}
+              onChange={(event) => {
+                changedFieldsRef.current.add("title");
+                setTitle(event.target.value);
+              }}
             />
           </div>
 
@@ -291,10 +371,18 @@ export function EventDialog({
                 disabled={isManagedEvent}
                 onChange={(event) => {
                   const nextStartDate = event.target.value;
+                  changedFieldsRef.current.add("startDate");
                   setStartDate(nextStartDate);
                   setEndDate((currentEndDate) => {
-                    if (!currentEndDate) return nextStartDate;
-                    return currentEndDate < nextStartDate ? nextStartDate : currentEndDate;
+                    if (!currentEndDate) {
+                      changedFieldsRef.current.add("endDate");
+                      return nextStartDate;
+                    }
+                    if (currentEndDate < nextStartDate) {
+                      changedFieldsRef.current.add("endDate");
+                      return nextStartDate;
+                    }
+                    return currentEndDate;
                   });
                 }}
               />
@@ -310,7 +398,10 @@ export function EventDialog({
                 min={startDate || undefined}
                 value={endDate}
                 disabled={isManagedEvent}
-                onChange={(event) => setEndDate(event.target.value)}
+                onChange={(event) => {
+                  changedFieldsRef.current.add("endDate");
+                  setEndDate(event.target.value);
+                }}
               />
             </div>
           </div>
@@ -365,7 +456,10 @@ export function EventDialog({
               <label className={FIELD_LABEL_CLASS}>Categoria</label>
               <Select
                 value={categoryId}
-                onValueChange={setCategoryId}
+                onValueChange={(nextCategoryId) => {
+                  changedFieldsRef.current.add("categoryId");
+                  setCategoryId(nextCategoryId);
+                }}
                 disabled={isManagedEvent}
               >
                 <SelectTrigger
@@ -421,7 +515,10 @@ export function EventDialog({
               placeholder="Adicione detalhes úteis para você se lembrar depois"
               value={notes}
               disabled={isManagedEvent}
-              onChange={(event) => setNotes(event.target.value)}
+              onChange={(event) => {
+                changedFieldsRef.current.add("notes");
+                setNotes(event.target.value);
+              }}
             />
           </div>
 
@@ -436,7 +533,11 @@ export function EventDialog({
               <div className="space-y-1">
                 <Select
                   value={recurrenceType}
-                  onValueChange={(value) => setRecurrenceType(value as RecurrenceDraft)}
+                  onValueChange={(value) => {
+                    changedFieldsRef.current.add("recurrenceType");
+                    changedFieldsRef.current.add("recurrenceUntil");
+                    setRecurrenceType(value as RecurrenceDraft);
+                  }}
                   disabled={isManagedEvent}
                 >
                   <SelectTrigger className="h-10 rounded-xl border-border/80 bg-background shadow-sm">
@@ -474,7 +575,10 @@ export function EventDialog({
                     min={startDate || undefined}
                     value={recurrenceUntil}
                     disabled={isManagedEvent}
-                    onChange={(event) => setRecurrenceUntil(event.target.value)}
+                    onChange={(event) => {
+                      changedFieldsRef.current.add("recurrenceUntil");
+                      setRecurrenceUntil(event.target.value);
+                    }}
                   />
                 </div>
               ) : null}
@@ -482,18 +586,22 @@ export function EventDialog({
           </div>
             </div>
           </details>
-        </div>
+      </div>
 
         <DialogFooter className="gap-2 sm:justify-between">
           {isManagedEvent ? (
             <div />
           ) : onDelete ? (
-            <Button
+            <AsyncStateButton
               variant="dangerSoft"
+              state={isSaving && activeAction === "delete" ? "pending" : submitError && activeAction === "delete" ? "error" : "idle"}
+              pendingLabel="Excluindo…"
+              errorLabel="Tentar excluir"
               disabled={isSaving}
               onClick={async () => {
                 if (!onDelete) return;
                 try {
+                  setActiveAction("delete");
                   setIsSaving(true);
                   setSubmitError(null);
                   await onDelete();
@@ -514,7 +622,7 @@ export function EventDialog({
               }}
             >
               Excluir
-            </Button>
+            </AsyncStateButton>
           ) : (
             <div />
           )}
@@ -524,11 +632,15 @@ export function EventDialog({
               Fechar
             </Button>
           ) : (
-            <Button
+            <AsyncStateButton
               variant="premium"
+              state={isSaving && activeAction === "save" ? "pending" : submitError && activeAction === "save" ? "error" : "idle"}
+              pendingLabel="Salvando…"
+              errorLabel="Tentar salvar"
               disabled={!canSave || isSaving}
               onClick={async () => {
               try {
+                setActiveAction("save");
                 setIsSaving(true);
                 setSubmitError(null);
                 const categoryIds = new Set(categories.map((category) => category.id));
@@ -553,7 +665,7 @@ export function EventDialog({
                   },
                   categoryIds
                 );
-                await onSubmit({
+                const input: EventInput = {
                   title,
                   categoryId,
                   startDate,
@@ -564,7 +676,16 @@ export function EventDialog({
                     recurrenceType === "none" || recurrenceUntil.length === 0
                       ? undefined
                       : recurrenceUntil,
-                });
+                };
+                if (initialEvent) {
+                  const patch: EventUpdatePatch = {};
+                  for (const field of changedFieldsRef.current) {
+                    Object.assign(patch, { [field]: input[field] });
+                  }
+                  await onSubmit({ mode: "update", patch });
+                } else {
+                  await onSubmit({ mode: "create", input });
+                }
                 onOpenChange(false);
               } catch (error) {
                 const message =
@@ -584,8 +705,8 @@ export function EventDialog({
               }
               }}
             >
-              {isSaving ? "Salvando..." : "Salvar"}
-            </Button>
+              Salvar
+            </AsyncStateButton>
           )}
         </DialogFooter>
 
@@ -595,11 +716,100 @@ export function EventDialog({
           </p>
         ) : null}
 
+        {categoryUnavailable ? (
+          <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+            A categoria original deste evento não está mais disponível. Escolha
+            outra categoria explicitamente ou feche sem salvar.
+          </p>
+        ) : null}
+
         {submitError ? (
           <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
             {submitError}
           </p>
         ) : null}
+    </>
+  );
+
+  const restoreFocus = () => {
+    requestAnimationFrame(() => {
+      const sourceDate = seedRange?.endDate ?? seedDate;
+      const dateTarget = sourceDate
+        ? document.querySelector<HTMLElement>(
+            `[data-day-cell][data-day-iso="${CSS.escape(sourceDate)}"]`
+          )
+        : null;
+      const eventTarget = initialEvent
+        ? document.querySelector<HTMLElement>(
+            `[data-calendar-event-id^="${CSS.escape(initialEvent.id)}"]`
+          )
+        : null;
+      (dateTarget ?? eventTarget ?? returnFocusRef.current)?.focus();
+    });
+  };
+
+  const rememberAnchorFocus = () => {
+    if (returnFocusRef.current?.isConnected) return;
+    const anchorElement = anchorPoint
+      ? document
+          .elementFromPoint(anchorPoint.x, anchorPoint.y)
+          ?.closest<HTMLElement>("[data-day-cell], [data-calendar-event-id]")
+      : null;
+    returnFocusRef.current =
+      anchorElement ?? (document.activeElement as HTMLElement | null);
+  };
+
+  if (isDesktopViewport && anchorPoint) {
+    return (
+      <Popover open={open} onOpenChange={onOpenChange} modal>
+        <PopoverAnchor asChild>
+          <span
+            aria-hidden="true"
+            className="pointer-events-none fixed size-px"
+            style={{ left: anchorPoint.x, top: anchorPoint.y }}
+          />
+        </PopoverAnchor>
+        <PopoverContent
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={titleId}
+          aria-describedby={descriptionId}
+          side="right"
+          align="start"
+          sideOffset={12}
+          collisionPadding={12}
+          className="max-h-[calc(100dvh-1.5rem)] w-[min(520px,calc(100vw-1.5rem))] overflow-y-auto p-0"
+          onOpenAutoFocus={rememberAnchorFocus}
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            restoreFocus();
+          }}
+        >
+          <m.div
+            className="grid gap-4 p-5 sm:p-6"
+            initial={{ opacity: 0, scale: 0.98, y: 6 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={MOTION_SPRING}
+          >
+            {renderEditorContent(false)}
+          </m.div>
+        </PopoverContent>
+      </Popover>
+    );
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        showCloseButton={false}
+        className="max-h-[calc(100dvh-1.5rem)] overflow-y-auto p-5 sm:max-w-[520px] sm:p-6"
+        onOpenAutoFocus={rememberAnchorFocus}
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          restoreFocus();
+        }}
+      >
+        {renderEditorContent(true)}
       </DialogContent>
     </Dialog>
   );

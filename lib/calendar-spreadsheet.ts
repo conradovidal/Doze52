@@ -1,5 +1,5 @@
 import type { CalendarSnapshot } from "@/lib/sync";
-import { createXlsx, listXlsxSheets, readXlsxSheet, type XlsxCell } from "@/lib/xlsx-lite";
+import { createXlsx, openXlsx, type XlsxCell } from "@/lib/xlsx-lite";
 
 const EVENTS_SHEET_NAME = "Eventos";
 const INSTRUCTIONS_SHEET_NAME = "Instrucoes";
@@ -23,6 +23,11 @@ export type SpreadsheetSource = {
   selectedSheetName: string;
   headers: string[];
   rows: SpreadsheetSourceRow[];
+};
+
+export type CalendarSpreadsheetExportSelection = {
+  profileIds: string[];
+  categoryIds: string[];
 };
 
 export type ColumnOrFixedMapping =
@@ -57,7 +62,8 @@ export const readSpreadsheetSource = (
   file: ArrayBuffer,
   requestedSheetName?: string
 ): SpreadsheetSource => {
-  const sheetNames = listXlsxSheets(file);
+  const workbook = openXlsx(file);
+  const sheetNames = workbook.sheetNames;
   if (sheetNames.length === 0) {
     throw new Error("A planilha nao possui abas legiveis.");
   }
@@ -65,7 +71,7 @@ export const readSpreadsheetSource = (
   if (!sheetNames.includes(selectedSheetName)) {
     throw new Error("A aba selecionada nao existe mais no arquivo.");
   }
-  const worksheetRows = readXlsxSheet(file, selectedSheetName);
+  const worksheetRows = workbook.readSheet(selectedSheetName);
   const headerRow = worksheetRows.find((row) => row.rowNumber === 1);
   if (!headerRow) {
     throw new Error("A primeira linha da aba precisa conter os cabecalhos.");
@@ -143,15 +149,27 @@ const isoDateToDate = (value: string) => {
   return match ? new Date(value + "T00:00:00.000Z") : value;
 };
 
-const getExportRows = (snapshot?: CalendarSnapshot): XlsxCell[][] => {
+const getExportRows = (
+  snapshot?: CalendarSnapshot,
+  selection?: CalendarSpreadsheetExportSelection
+): XlsxCell[][] => {
   const rows: XlsxCell[][] = [[...CANONICAL_SPREADSHEET_HEADERS]];
   if (!snapshot) return rows;
+  const selectedProfileIds = selection ? new Set(selection.profileIds) : null;
+  const selectedCategoryIds = selection ? new Set(selection.categoryIds) : null;
   const profilesById = new Map(snapshot.profiles.map((profile) => [profile.id, profile]));
   const categoriesById = new Map(snapshot.categories.map((category) => [category.id, category]));
   for (const event of snapshot.events) {
     const category = categoriesById.get(event.categoryId);
     const profile = category ? profilesById.get(category.profileId) : undefined;
     if (!profile || !category) continue;
+    if (
+      selectedProfileIds &&
+      selectedCategoryIds &&
+      (!selectedProfileIds.has(profile.id) || !selectedCategoryIds.has(category.id))
+    ) {
+      continue;
+    }
     rows.push([
       profile.name,
       category.name,
@@ -175,11 +193,14 @@ const INSTRUCTION_ROWS: XlsxCell[][] = [
   ["Importacao", "Cada linha representa um evento. Estruturas inexistentes podem ser criadas apos revisao."],
 ];
 
-export const createCalendarSpreadsheetBuffer = (snapshot?: CalendarSnapshot) =>
+export const createCalendarSpreadsheetBuffer = (
+  snapshot?: CalendarSnapshot,
+  selection?: CalendarSpreadsheetExportSelection
+) =>
   createXlsx([
     {
       name: EVENTS_SHEET_NAME,
-      rows: getExportRows(snapshot),
+      rows: getExportRows(snapshot, selection),
       widths: [24, 24, 40, 16, 16, 48],
     },
     {
@@ -197,20 +218,26 @@ const downloadWorkbook = (buffer: Uint8Array, filename: string) => {
   const link = document.createElement("a");
   link.href = url;
   link.download = filename;
+  link.style.display = "none";
   document.body.appendChild(link);
   link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
+  window.setTimeout(() => {
+    link.remove();
+    URL.revokeObjectURL(url);
+  }, 1_000);
 };
 
 export const downloadCalendarSpreadsheetTemplate = async () => {
   downloadWorkbook(createCalendarSpreadsheetBuffer(), "doze52-template-eventos.xlsx");
 };
 
-export const exportCalendarSpreadsheet = async (snapshot: CalendarSnapshot) => {
+export const exportCalendarSpreadsheet = async (
+  snapshot: CalendarSnapshot,
+  selection?: CalendarSpreadsheetExportSelection
+) => {
   const stamp = new Date().toISOString().slice(0, 10);
   downloadWorkbook(
-    createCalendarSpreadsheetBuffer(snapshot),
+    createCalendarSpreadsheetBuffer(snapshot, selection),
     "doze52-calendario-" + stamp + ".xlsx"
   );
 };

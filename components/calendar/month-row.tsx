@@ -109,6 +109,7 @@ export function MonthRow({
   todayIso,
   monthIndex,
   density = "year",
+  verticalScale = 1,
   events,
   visibleCategoryIds,
   profileIconByCategoryId,
@@ -137,6 +138,7 @@ export function MonthRow({
   todayIso: string;
   monthIndex: number;
   density?: MonthRowDensity;
+  verticalScale?: number;
   events: CalendarRenderEvent[];
   visibleCategoryIds: string[];
   profileIconByCategoryId: Map<string, ProfileIconId>;
@@ -181,6 +183,9 @@ export function MonthRow({
   const gridStart = startOfWeek(monthStart, { weekStartsOn: 0 });
   const gridEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
   const layoutDensity = MONTH_LAYOUT_BY_DENSITY[density];
+  const resolvedVerticalScale = Math.min(1.4, Math.max(1, verticalScale));
+  const scaleVerticalSpacing = (value: number) =>
+    Math.round(value * resolvedVerticalScale);
 
   const days: Date[] = [];
   let cur = gridStart;
@@ -311,18 +316,23 @@ export function MonthRow({
     maxLaneUsedInMonth + 1
   );
   const hasAnyMultiDayInMonth = maxMultiRows > 0;
-  const eventsTopOffset = Math.max(
+  const baseEventsTopOffset = Math.max(
     hasAnyMultiDayInMonth
       ? layoutDensity.monthMultiDayTopOffsetPx
       : layoutDensity.monthSingleDayTopOffsetNoMultiPx,
     layoutDensity.monthEventsMinTopOffsetPx
   );
+  const eventsTopOffset = scaleVerticalSpacing(baseEventsTopOffset);
   const eventBandHeightPx =
     rowsForHeightTotal * EVENT_ITEM_HEIGHT_PX +
     Math.max(0, rowsForHeightTotal - 1) * EVENT_ITEM_GAP_PX;
-  const contentHeight =
-    eventsTopOffset + eventBandHeightPx + layoutDensity.monthRowBottomPaddingPx;
-  const minHeightPx = Math.max(layoutDensity.monthRowBaseMinHeightPx, contentHeight);
+  const baseContentHeight =
+    baseEventsTopOffset +
+    eventBandHeightPx +
+    layoutDensity.monthRowBottomPaddingPx;
+  const minHeightPx = scaleVerticalSpacing(
+    Math.max(layoutDensity.monthRowBaseMinHeightPx, baseContentHeight)
+  );
 
   const rangeBounds = React.useMemo(() => {
     const a = creatingRange?.startIso ?? guidedSelectionRange?.startDate;
@@ -537,7 +547,10 @@ export function MonthRow({
   }
 
   return (
-    <div className="flex items-stretch border-b border-border/70 last:border-b-0">
+    <div
+      data-month-row={monthIndex}
+      className="flex items-stretch border-b border-border/70 last:border-b-0"
+    >
       <div
         className={cn(
           "flex flex-none overflow-hidden border-r border-border/70",
@@ -603,7 +616,12 @@ export function MonthRow({
           if (isMobileInteractionMode) return;
           if (!e.isPrimary || e.button !== 0 || isDraggingAny) return;
           const target = e.target as HTMLElement | null;
-          if (target?.closest("button, a, input, textarea, select, [role='button']")) return;
+          if (
+            target?.closest("button, a, input, textarea, select, [role='button']") &&
+            !target.closest("[data-day-cell][data-day-iso]")
+          ) {
+            return;
+          }
           const targetIso = resolveRangeTargetIsoFromPointer(e.clientX, e.clientY);
           if (!targetIso) return;
           e.preventDefault();

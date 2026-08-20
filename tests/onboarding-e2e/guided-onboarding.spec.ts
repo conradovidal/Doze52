@@ -455,6 +455,90 @@ test("monta contexto Pessoal de forma incremental", async ({ page }, testInfo) =
   ).toBe(true);
 });
 
+test("motion premium preserva progresso, escala e editor contextual", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name === "mobile-chromium",
+    "O controle de escala e o popover contextual são exclusivos do desktop"
+  );
+
+  await page.goto("/?mobileUi=0");
+  const panel = page.getByRole("region", { name: "Guia inicial do Doze 52" });
+  const onboardingProgress = panel.getByRole("progressbar", {
+    name: "Progresso do guia inicial",
+  });
+  await expect(onboardingProgress).toHaveAttribute("aria-valuenow", "14");
+
+  await completePersonalOnboarding(page, false);
+
+  const scale = page.getByRole("radiogroup", { name: "Escala do calendário" });
+  await expect(scale).toBeVisible();
+  await scale.getByRole("radio", { name: "Trimestre" }).click();
+  const zoomControl = page.getByLabel("Zoom do calendário");
+  await expect(zoomControl).toBeVisible();
+  await zoomControl.press("Home");
+  const focusedMonthRow = page.locator(
+    `[data-month-row="${new Date().getMonth()}"]`
+  );
+  const rowHeightAtMinimumZoom = await focusedMonthRow.evaluate(
+    (element) => element.getBoundingClientRect().height
+  );
+  await zoomControl.press("End");
+  await expect(zoomControl).toHaveAttribute(
+    "aria-valuetext",
+    "180% na horizontal e 140% na vertical"
+  );
+  await expect
+    .poll(() =>
+      focusedMonthRow.evaluate((element) => element.getBoundingClientRect().height)
+    )
+    .toBeGreaterThan(rowHeightAtMinimumZoom * 1.3);
+  await scale.getByRole("radio", { name: "Mês" }).click();
+  await expect(scale.getByRole("radio", { name: "Mês" })).toHaveAttribute(
+    "aria-checked",
+    "true"
+  );
+  const currentMonthLabel = [
+    "jan", "fev", "mar", "abr", "mai", "jun",
+    "jul", "ago", "set", "out", "nov", "dez",
+  ][new Date().getMonth()];
+  await expect(
+    page.getByRole("button", { name: /Voltar para .* trimestre/ })
+  ).toHaveText(currentMonthLabel);
+  await scale.getByRole("radio", { name: "Ano" }).click();
+  await expect(page.getByLabel("Zoom do calendário")).toHaveCount(0);
+
+  const targetDay = page.locator('[data-day-cell][data-day-iso="2026-02-03"]');
+  await targetDay.click({ force: true });
+  const editor = page.getByRole("dialog", { name: "Novo evento" });
+  await expect(editor).toHaveAttribute("data-slot", "popover-content");
+  const editorBox = await editor.boundingBox();
+  const viewport = page.viewportSize();
+  expect(editorBox).not.toBeNull();
+  expect(viewport).not.toBeNull();
+  expect(editorBox!.x).toBeGreaterThanOrEqual(0);
+  expect(editorBox!.y).toBeGreaterThanOrEqual(0);
+  expect(editorBox!.x + editorBox!.width).toBeLessThanOrEqual(viewport!.width);
+  expect(editorBox!.y + editorBox!.height).toBeLessThanOrEqual(viewport!.height);
+  await page.keyboard.press("Escape");
+  await expect(editor).toBeHidden();
+  await expect(targetDay).toBeFocused();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/?mobileUi=1");
+  await expect(
+    page.getByRole("radiogroup", { name: "Escala do calendário" })
+  ).toHaveCount(0);
+  await page.getByRole("button", { name: "Novo evento" }).click();
+  const mobileEditor = page.getByRole("dialog", { name: "Novo evento" });
+  await expect(mobileEditor).toHaveAttribute("data-slot", "dialog-content");
+  const mobileEditorBox = await mobileEditor.boundingBox();
+  expect(mobileEditorBox).not.toBeNull();
+  expect(mobileEditorBox!.x).toBeGreaterThanOrEqual(0);
+  expect(mobileEditorBox!.x + mobileEditorBox!.width).toBeLessThanOrEqual(390);
+});
+
 test("ano de exemplo gerencia Feriados do RS e Corridas F1 sem duplicar", async ({
   page,
 }, testInfo) => {
@@ -974,6 +1058,158 @@ test("aplicação permanece interativa atrás do primeiro card", async ({ page }
 
   await panel.getByRole("button", { name: "Entrar na sua conta" }).click();
   await expect(page.getByRole("dialog", { name: "Entrar" })).toBeVisible();
+});
+
+test("edição preserva categoria não inicial no desktop e no mobile", async ({
+  page,
+}, testInfo) => {
+  const mobile = testInfo.project.name === "mobile-chromium";
+  await page.goto("/?mobileUi=0");
+  await page.getByRole("button", { name: "Encerrar guia inicial" }).click();
+  await page
+    .getByRole("dialog", { name: "Quer encerrar a montagem guiada?" })
+    .getByRole("button", { name: "Encerrar e explorar" })
+    .click();
+
+  const editedEventTitle = "Noite de fondue";
+  const comparisonEventTitle = "Festival de verão";
+  await page.evaluate(
+    ({ editedEventTitle, comparisonEventTitle }) => {
+      const today = new Date();
+      const todayIso = [
+        today.getFullYear(),
+        String(today.getMonth() + 1).padStart(2, "0"),
+        String(today.getDate()).padStart(2, "0"),
+      ].join("-");
+      const payload = JSON.parse(localStorage.getItem("yiv-store") ?? "{}");
+      payload.state.categories = (payload.state.categories ?? []).map(
+        (category: Record<string, unknown>) =>
+          String(category.calendarPackGroupId ?? "").startsWith(
+            "onboarding-personal-demo-"
+          )
+            ? {
+                ...category,
+                calendarPackGroupId: undefined,
+                calendarPackVariantId: undefined,
+                calendarPackCategoryKey: undefined,
+                calendarPackVersion: undefined,
+              }
+            : category
+      );
+      payload.state.events = (payload.state.events ?? []).map(
+        (event: Record<string, unknown>) => {
+          const authorEvent = String(event.calendarPackGroupId ?? "").startsWith(
+            "onboarding-personal-demo-"
+          )
+            ? {
+                ...event,
+                calendarPackGroupId: undefined,
+                calendarPackEventKey: undefined,
+              }
+            : event;
+          return event.title === editedEventTitle ||
+            event.title === comparisonEventTitle
+            ? { ...authorEvent, startDate: todayIso, endDate: todayIso }
+            : authorEvent;
+        }
+      );
+      localStorage.setItem("yiv-store", JSON.stringify(payload));
+      localStorage.setItem(
+        "doze52:onboarding:v2",
+        JSON.stringify({
+          version: 11,
+          step: "completed",
+          context: "personal",
+          completedAt: new Date().toISOString(),
+          postOnboardingEventsCreated: 0,
+          postOnboardingCategoriesCreated: 0,
+        })
+      );
+    },
+    { editedEventTitle, comparisonEventTitle }
+  );
+
+  await page.goto(mobile ? "/?mobileUi=1" : "/?mobileUi=0");
+  await page.locator('[data-onboarding-profile-id][title="Pessoal"]').click();
+
+  const editedEvent = page.getByRole("button", {
+    name: /Noite de fondue$/,
+  });
+  await expect(editedEvent).toBeVisible();
+  const editedEventId = await editedEvent.getAttribute("data-calendar-event-id");
+  if (!editedEventId) throw new Error("Evento de categoria Amigos sem ID");
+
+  const before = await page.evaluate((eventId) => {
+    const payload = JSON.parse(localStorage.getItem("yiv-store") ?? "{}");
+    return payload.state.events.find(
+      (event: { id: string }) => event.id === eventId
+    ) as Record<string, unknown>;
+  }, editedEventId);
+
+  await editedEvent.click();
+  let dialog = page.getByRole("dialog", { name: "Editar evento" });
+  await expect(dialog.getByRole("combobox").nth(1)).toContainText("Amigos");
+  await dialog.getByLabel("Descrição").fill("Descrição alterada isoladamente");
+  await dialog.getByRole("button", { name: "Salvar" }).click();
+  await expect(dialog).toBeHidden();
+
+  await expect
+    .poll(() =>
+      page.evaluate((eventId) => {
+        const payload = JSON.parse(localStorage.getItem("yiv-store") ?? "{}");
+        return payload.state.events.find(
+          (event: { id: string }) => event.id === eventId
+        ) as Record<string, unknown>;
+      }, editedEventId)
+    )
+    .toMatchObject({ notes: "Descrição alterada isoladamente" });
+
+  const persistedAfterDescription = await page.evaluate((eventId) => {
+    const payload = JSON.parse(localStorage.getItem("yiv-store") ?? "{}");
+    return payload.state.events.find(
+      (event: { id: string }) => event.id === eventId
+    ) as Record<string, unknown>;
+  }, editedEventId);
+  expect(persistedAfterDescription).toEqual({
+    ...before,
+    notes: "Descrição alterada isoladamente",
+  });
+
+  await page
+    .getByRole("button", { name: /Festival de verão$/ })
+    .click();
+  dialog = page.getByRole("dialog", { name: "Editar evento" });
+  await expect(dialog.getByRole("combobox").nth(1)).toContainText("Eventos");
+  await dialog.getByRole("button", { name: "Close" }).click();
+
+  await page.getByRole("button", { name: /Noite de fondue$/ }).click();
+  dialog = page.getByRole("dialog", { name: "Editar evento" });
+  await dialog.getByRole("combobox").nth(1).click();
+  await page.getByRole("option", { name: "Eventos", exact: true }).click();
+  await dialog.getByRole("button", { name: "Salvar" }).click();
+
+  const expectedCategory = await page.evaluate(() => {
+    const payload = JSON.parse(localStorage.getItem("yiv-store") ?? "{}");
+    return payload.state.categories.find(
+      (category: { name: string; profileId: string }, _index: number, categories: Array<{ name: string; profileId: string }>) =>
+        category.name === "Eventos" &&
+        category.profileId === categories.find((item) => item.name === "Amigos")?.profileId
+    ) as { id: string; color: string };
+  });
+  await expect
+    .poll(() =>
+      page.evaluate((eventId) => {
+        const payload = JSON.parse(localStorage.getItem("yiv-store") ?? "{}");
+        const event = payload.state.events.find(
+          (item: { id: string }) => item.id === eventId
+        );
+        return { categoryId: event?.categoryId, color: event?.color };
+      }, editedEventId)
+    )
+    .toEqual({
+      categoryId: expectedCategory.id,
+      color: expectedCategory.color,
+    });
 });
 
 test("o X libera o ano de exemplo e a decisão persiste após recarregar", async ({
