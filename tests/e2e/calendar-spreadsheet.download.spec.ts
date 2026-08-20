@@ -5,7 +5,28 @@ import {
   expectAuthenticated,
   installVercelBypass,
   openQaApp,
+  waitForSupabaseWrite,
+  waitForSyncReady,
 } from "./support/browser";
+
+const createExportableCategory = async (page: import("@playwright/test").Page) => {
+  await installVercelBypass(page);
+  await openQaApp(page);
+  await expectAuthenticated(page);
+  await dismissOnboardingIfVisible(page);
+  await page.getByRole("button", { name: "Editar contextos e categorias" }).click();
+  await page.getByRole("button", { name: "Criar nova categoria" }).click();
+  const categoryDialog = page.getByRole("dialog", { name: "Nova categoria" });
+  await categoryDialog.getByLabel("Nome da categoria").fill("QA Export");
+  const categorySaved = waitForSupabaseWrite(page, "categories", ["POST"]);
+  await categoryDialog.getByRole("button", { name: "Criar", exact: true }).click();
+  await expect(categoryDialog).toBeHidden();
+  await page
+    .getByRole("button", { name: "Finalizar edição de contextos e categorias" })
+    .click();
+  await categorySaved;
+  await waitForSyncReady(page);
+};
 
 const openSpreadsheetDialog = async (page: import("@playwright/test").Page) => {
   await installVercelBypass(page);
@@ -18,6 +39,7 @@ const openSpreadsheetDialog = async (page: import("@playwright/test").Page) => {
 };
 
 test("baixa o template e exporta o recorte selecionado", async ({ page }) => {
+  await createExportableCategory(page);
   const dialog = await openSpreadsheetDialog(page);
 
   const templateDownloadPromise = page.waitForEvent("download");
