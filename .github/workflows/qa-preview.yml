@@ -38,7 +38,7 @@ jobs:
       SUPABASE_DEV_URL: ${{ vars.SUPABASE_DEV_URL }}
       SUPABASE_DEV_ANON_KEY: ${{ vars.SUPABASE_DEV_ANON_KEY }}
       VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
-      QA_SUITE: ${{ inputs.suite }}
+      QA_SUITE: ${{ github.event.inputs.suite }}
 
     steps:
       - name: Baixar o codigo

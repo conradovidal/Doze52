@@ -34,11 +34,15 @@ test("baixa o template e exporta o recorte selecionado", async ({ page }) => {
   await expect(firstCategory).toBeChecked();
   await firstCategory.uncheck();
   await expect(firstCategory).not.toBeChecked();
-  await exportDialog.getByRole("button", { name: "Limpar seleção" }).click();
   await expect(
     exportDialog.getByRole("button", { name: /^Exportar \d+ eventos?$/ })
   ).toBeDisabled();
 
+  await exportDialog.getByRole("button", { name: "Selecionar tudo" }).click();
+  await exportDialog.getByRole("button", { name: "Limpar seleção" }).click();
+  await expect(
+    exportDialog.getByRole("button", { name: /^Exportar \d+ eventos?$/ })
+  ).toBeDisabled();
   await exportDialog.getByRole("button", { name: "Selecionar tudo" }).click();
   const exportButton = exportDialog.getByRole("button", {
     name: /^Exportar \d+ eventos?$/,
