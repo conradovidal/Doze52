@@ -66,3 +66,30 @@ test("métrica regional exige mesma origem e payload exato", async () => {
     restoreVercelEnv(previous);
   }
 });
+
+test("métrica regional limita o stream mesmo sem Content-Length", async () => {
+  const previous = process.env.VERCEL_ENV;
+  process.env.VERCEL_ENV = "production";
+  try {
+    const oversized = new Request(
+      "https://doze52.example/api/onboarding/region",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          origin: "https://doze52.example",
+          "sec-fetch-site": "same-origin",
+        },
+        body: JSON.stringify({
+          uf: "RS",
+          onboardingVersion: ONBOARDING_VERSION,
+          padding: "x".repeat(256),
+        }),
+      }
+    );
+    expect(oversized.headers.get("content-length")).toBeNull();
+    expect((await POST(oversized)).status).toBe(413);
+  } finally {
+    restoreVercelEnv(previous);
+  }
+});

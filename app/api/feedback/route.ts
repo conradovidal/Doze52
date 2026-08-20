@@ -7,6 +7,11 @@ import {
 } from "@/lib/product-feedback";
 import { isSameOriginMutation } from "@/lib/feedback-server";
 import {
+  InvalidJsonPayloadError,
+  PayloadTooLargeError,
+  readLimitedJsonObject,
+} from "@/lib/http-json";
+import {
   getAuthenticatedServerUser,
   getSupabaseAdminClient,
   hasSupabaseAdminEnv,
@@ -25,15 +30,14 @@ export async function POST(request: Request) {
   if (!hasSupabaseAdminEnv) {
     return NextResponse.json({ error: "Feedback indisponível." }, { status: 503 });
   }
-  const contentLength = Number(request.headers.get("content-length") ?? 0);
-  if (contentLength > 8192) {
-    return NextResponse.json({ error: "Payload muito grande." }, { status: 413 });
-  }
-
   let body: Record<string, unknown>;
   try {
-    body = (await request.json()) as Record<string, unknown>;
-  } catch {
+    body = await readLimitedJsonObject(request, 8192);
+  } catch (error) {
+    if (error instanceof PayloadTooLargeError) {
+      return NextResponse.json({ error: "Payload muito grande." }, { status: 413 });
+    }
+    if (!(error instanceof InvalidJsonPayloadError)) throw error;
     return NextResponse.json({ error: "Payload inválido." }, { status: 400 });
   }
   const message = normalizeFeedbackMessage(body.message);

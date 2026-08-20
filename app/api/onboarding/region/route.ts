@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { isBrazilUf, ONBOARDING_VERSION } from "@/lib/onboarding-region";
 import {
+  InvalidJsonPayloadError,
+  PayloadTooLargeError,
+  readLimitedJsonObject,
+} from "@/lib/http-json";
+import {
   getSupabaseAdminClient,
   hasSupabaseAdminEnv,
 } from "@/lib/supabase-server";
@@ -19,15 +24,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Origem inválida." }, { status: 403 });
   }
 
-  const contentLength = Number(request.headers.get("content-length") ?? 0);
-  if (contentLength > 256) {
-    return NextResponse.json({ error: "Payload muito grande." }, { status: 413 });
-  }
-
-  let body: { uf?: unknown; onboardingVersion?: unknown };
+  let body: Record<string, unknown>;
   try {
-    body = (await request.json()) as typeof body;
-  } catch {
+    body = await readLimitedJsonObject(request, 256);
+  } catch (error) {
+    if (error instanceof PayloadTooLargeError) {
+      return NextResponse.json({ error: "Payload muito grande." }, { status: 413 });
+    }
+    if (!(error instanceof InvalidJsonPayloadError)) throw error;
     return NextResponse.json({ error: "Payload inválido." }, { status: 400 });
   }
 
