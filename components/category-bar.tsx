@@ -34,6 +34,11 @@ import { useStore } from "@/lib/store";
 import { useTheme } from "@/lib/theme";
 import type { CategoryItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import {
+  PREMIUM_DROP_ANIMATION,
+  PREMIUM_SORTABLE_TRANSITION,
+  SORTABLE_ACCESSIBILITY,
+} from "@/lib/sortable-motion";
 
 const MOTION_CLASS = "duration-[160ms] ease-[cubic-bezier(0.22,1,0.36,1)]";
 const CHIP_SHELL_CLASS =
@@ -139,6 +144,7 @@ function EditCategoryChip({
 
   return (
     <div
+      data-premium-sortable
       ref={chipRef}
       style={categoryTintStyle}
       className={cn(
@@ -295,6 +301,8 @@ function SortableEditCategoryChip({
   } = useSortable({
     id: category.id,
     disabled: !dragEnabled,
+    data: { sortableLabel: category.name },
+    transition: PREMIUM_SORTABLE_TRANSITION,
   });
 
   const style =
@@ -587,6 +595,7 @@ export function CategoryBar({
 
   return (
     <DndContext
+      accessibility={SORTABLE_ACCESSIBILITY}
       sensors={sensors}
       collisionDetection={pointerAwareCollisionDetection}
       measuring={INLINE_SORTABLE_MEASURING}
@@ -630,7 +639,11 @@ export function CategoryBar({
 
       {overlayPortalTarget
         ? createPortal(
-            <DragOverlay modifiers={[preserveActivatorOffsetModifier]} zIndex={80}>
+            <DragOverlay
+              dropAnimation={PREMIUM_DROP_ANIMATION}
+              modifiers={[preserveActivatorOffsetModifier]}
+              zIndex={80}
+            >
               {activeCategory ? (
                 <EditCategoryChip
                   category={activeCategory}

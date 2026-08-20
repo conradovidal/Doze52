@@ -49,6 +49,12 @@ import { useStore } from "@/lib/store";
 import { useTheme } from "@/lib/theme";
 import type { CalendarProfile, CategoryItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { useFlipReorder } from "@/lib/use-flip-reorder";
+import {
+  PREMIUM_DROP_ANIMATION,
+  PREMIUM_SORTABLE_TRANSITION,
+  SORTABLE_ACCESSIBILITY,
+} from "@/lib/sortable-motion";
 
 const TAB_BASE_CLASS =
   "inline-flex min-h-8 items-center justify-center rounded-full px-3 py-1.5 text-sm font-medium transition-[background-color,color,box-shadow]";
@@ -70,11 +76,6 @@ const PLACEHOLDER_PANEL_CLASS =
   "pointer-events-none absolute inset-x-3 inset-y-2 rounded-[0.95rem] border border-dashed border-border/70 bg-muted/32";
 const OVERLAY_ROW_CLASS =
   "overflow-hidden rounded-[1.05rem] border border-border/75 bg-background shadow-[0_22px_42px_-24px_rgba(15,23,42,0.34)]";
-const DROP_ANIMATION = {
-  duration: 180,
-  easing: "cubic-bezier(0.22, 1, 0.36, 1)",
-  sideEffects: null,
-};
 const DIALOG_DRAG_MEASURING = {
   droppable: {
     strategy: MeasuringStrategy.Always,
@@ -305,6 +306,7 @@ function ProfileRowVisual({
 
   return (
     <div
+      data-premium-sortable
       ref={rowRef}
       style={style}
       className={cn(
@@ -428,6 +430,7 @@ function CategoryRowVisual({
 
   return (
     <div
+      data-premium-sortable
       ref={rowRef}
       style={style}
       className={cn(
@@ -509,6 +512,7 @@ function SortableProfileRow({
   onEdit,
   onMoveUp,
   onMoveDown,
+  registerFlipNode,
 }: {
   profile: CalendarProfile;
   categoryCount: number;
@@ -519,6 +523,7 @@ function SortableProfileRow({
   onEdit: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
+  registerFlipNode?: (id: string, node: HTMLElement | null) => void;
 }) {
   const {
     attributes,
@@ -531,6 +536,8 @@ function SortableProfileRow({
   } = useSortable({
     id: profile.id,
     disabled: !dragEnabled,
+    data: { sortableLabel: profile.name },
+    transition: PREMIUM_SORTABLE_TRANSITION,
   });
 
   const style = dragEnabled
@@ -559,7 +566,10 @@ function SortableProfileRow({
       setHandleRef={setActivatorNodeRef}
       isPlaceholder={dragEnabled && isDragging}
       style={style}
-      rowRef={setNodeRef}
+      rowRef={(node) => {
+        setNodeRef(node);
+        registerFlipNode?.(profile.id, node);
+      }}
     />
   );
 }
@@ -572,6 +582,7 @@ function SortableCategoryRow({
   onEdit,
   onMoveUp,
   onMoveDown,
+  registerFlipNode,
 }: {
   category: CategoryItem;
   index: number;
@@ -580,6 +591,7 @@ function SortableCategoryRow({
   onEdit: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
+  registerFlipNode?: (id: string, node: HTMLElement | null) => void;
 }) {
   const {
     attributes,
@@ -592,6 +604,8 @@ function SortableCategoryRow({
   } = useSortable({
     id: category.id,
     disabled: !dragEnabled,
+    data: { sortableLabel: category.name },
+    transition: PREMIUM_SORTABLE_TRANSITION,
   });
 
   const style = dragEnabled
@@ -618,7 +632,10 @@ function SortableCategoryRow({
       setHandleRef={setActivatorNodeRef}
       isPlaceholder={dragEnabled && isDragging}
       style={style}
-      rowRef={setNodeRef}
+      rowRef={(node) => {
+        setNodeRef(node);
+        registerFlipNode?.(category.id, node);
+      }}
     />
   );
 }
@@ -648,6 +665,7 @@ export function OrganizeWorkspaceDialog({
   const [categoryCreateOpen, setCategoryCreateOpen] = React.useState(false);
   const [categoryEditOpen, setCategoryEditOpen] = React.useState(false);
   const [editingCategoryId, setEditingCategoryId] = React.useState<string | null>(null);
+  const [reorderAnnouncement, setReorderAnnouncement] = React.useState("");
 
   const isDesktopDragEnabled = useDesktopDragEnabled();
   const sensors = useSensors(
@@ -716,6 +734,14 @@ export function OrganizeWorkspaceDialog({
     () => orderItemsByIds(categoriesForProfile, draftCategoryOrderIds),
     [categoriesForProfile, draftCategoryOrderIds]
   );
+  const registerProfileFlipNode = useFlipReorder(
+    orderedProfiles.map((profile) => profile.id),
+    { durationMs: 180, disabled: isDesktopDragEnabled }
+  );
+  const registerCategoryFlipNode = useFlipReorder(
+    orderedCategoriesForProfile.map((category) => category.id),
+    { durationMs: 180, disabled: isDesktopDragEnabled }
+  );
 
   const activeProfile = React.useMemo(
     () => orderedProfiles.find((profile) => profile.id === activeProfileDrag?.id) ?? null,
@@ -755,6 +781,13 @@ export function OrganizeWorkspaceDialog({
       const next = moveByStep(profiles, profileId, step);
       if (next === profiles) return;
       setProfilesOrder(next.map((profile) => profile.id));
+      const nextIndex = next.findIndex((profile) => profile.id === profileId);
+      const profile = next[nextIndex];
+      if (profile) {
+        setReorderAnnouncement(
+          `${profile.name} movido para a posição ${nextIndex + 1} de ${next.length}.`
+        );
+      }
     },
     [profiles, setProfilesOrder]
   );
@@ -766,6 +799,15 @@ export function OrganizeWorkspaceDialog({
       if (nextProfileCategories === categoriesForProfile) return;
       const fullOrder = applyProfileOrderToAll(categories, categoryProfileId, nextProfileCategories);
       setCategoriesOrder(fullOrder.map((category) => category.id));
+      const nextIndex = nextProfileCategories.findIndex(
+        (category) => category.id === categoryId
+      );
+      const category = nextProfileCategories[nextIndex];
+      if (category) {
+        setReorderAnnouncement(
+          `${category.name} movida para a posição ${nextIndex + 1} de ${nextProfileCategories.length}.`
+        );
+      }
     },
     [categories, categoriesForProfile, categoryProfileId, setCategoriesOrder]
   );
@@ -899,6 +941,9 @@ export function OrganizeWorkspaceDialog({
 
   return (
     <>
+      <p className="sr-only" aria-live="polite" aria-atomic="true">
+        {reorderAnnouncement}
+      </p>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="top-auto bottom-2 max-h-[calc(100dvh-0.5rem)] w-[calc(100%-1rem)] max-w-[calc(100%-1rem)] translate-y-0 overflow-hidden rounded-[1.85rem] border border-border/80 bg-background px-0 pb-0 pt-0 shadow-[0_28px_70px_-34px_rgba(15,23,42,0.28)] sm:top-1/2 sm:bottom-auto sm:w-full sm:max-w-[780px] sm:-translate-y-1/2 sm:px-0 sm:pb-0">
           <div className="sticky top-0 z-10 border-b border-border/60 bg-background px-5 pb-4 pt-5 backdrop-blur sm:px-6">
@@ -953,6 +998,7 @@ export function OrganizeWorkspaceDialog({
                 </div>
 
                 <DndContext
+                  accessibility={SORTABLE_ACCESSIBILITY}
                   sensors={isDesktopDragEnabled ? sensors : []}
                   collisionDetection={pointerAwareCollisionDetection}
                   measuring={DIALOG_DRAG_MEASURING}
@@ -988,6 +1034,7 @@ export function OrganizeWorkspaceDialog({
                               onEdit={() => openEditProfile(profile.id)}
                               onMoveUp={() => moveProfileStep(profile.id, -1)}
                               onMoveDown={() => moveProfileStep(profile.id, 1)}
+                              registerFlipNode={registerProfileFlipNode}
                             />
                           );
                         })
@@ -998,7 +1045,7 @@ export function OrganizeWorkspaceDialog({
                   {overlayPortalTarget
                     ? createPortal(
                         <DragOverlay
-                          dropAnimation={DROP_ANIMATION}
+                          dropAnimation={PREMIUM_DROP_ANIMATION}
                           modifiers={isDesktopDragEnabled ? [followCursorModifier] : undefined}
                           zIndex={80}
                         >
@@ -1053,6 +1100,7 @@ export function OrganizeWorkspaceDialog({
                 </div>
 
                 <DndContext
+                  accessibility={SORTABLE_ACCESSIBILITY}
                   sensors={isDesktopDragEnabled ? sensors : []}
                   collisionDetection={pointerAwareCollisionDetection}
                   measuring={DIALOG_DRAG_MEASURING}
@@ -1085,6 +1133,7 @@ export function OrganizeWorkspaceDialog({
                             onEdit={() => openEditCategory(category.id)}
                             onMoveUp={() => moveCategoryStep(category.id, -1)}
                             onMoveDown={() => moveCategoryStep(category.id, 1)}
+                            registerFlipNode={registerCategoryFlipNode}
                           />
                         ))
                       )}
@@ -1094,7 +1143,7 @@ export function OrganizeWorkspaceDialog({
                   {overlayPortalTarget
                     ? createPortal(
                         <DragOverlay
-                          dropAnimation={DROP_ANIMATION}
+                          dropAnimation={PREMIUM_DROP_ANIMATION}
                           modifiers={isDesktopDragEnabled ? [followCursorModifier] : undefined}
                           zIndex={80}
                         >

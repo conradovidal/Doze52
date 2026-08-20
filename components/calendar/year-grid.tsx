@@ -15,7 +15,7 @@ import type {
   CalendarRenderEvent,
   CategoryItem,
 } from "@/lib/types";
-import { useStore } from "@/lib/store";
+import { useStore, type CalendarViewMode } from "@/lib/store";
 import { DEFAULT_PROFILE_ICON, type ProfileIconId } from "@/lib/profile-icons";
 import { buildMultiDaySlotMap } from "@/lib/calendar-slotting";
 import { readCalendarEventDndPayload } from "@/lib/calendar-dnd";
@@ -25,6 +25,7 @@ import {
   isSingleDayEvent,
 } from "@/lib/event-order";
 import { cn } from "@/lib/utils";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import {
   LATERAL_KEY_ACTIVE_CLASS,
   LATERAL_KEY_BASE_CLASS,
@@ -65,6 +66,16 @@ type QuarterGroup = {
 
 const CALENDAR_ZOOM_MIN_PERCENT = 100;
 const CALENDAR_ZOOM_MAX_PERCENT = 180;
+const CALENDAR_VERTICAL_ZOOM_MAX_PERCENT = 140;
+
+const CALENDAR_VIEW_OPTIONS = [
+  { value: "year", label: "Ano" },
+  { value: "quarter", label: "Trimestre" },
+  { value: "month", label: "Mês" },
+] as const satisfies ReadonlyArray<{
+  value: CalendarViewMode;
+  label: string;
+}>;
 
 const QUARTER_MONTH_GROUPS = [
   [0, 1, 2],
@@ -498,6 +509,15 @@ export function YearGrid({
   const effectiveZoomPercent = hasFocusZoom
     ? calendarZoomPercent
     : CALENDAR_ZOOM_MIN_PERCENT;
+  const verticalZoomPercent = hasFocusZoom
+    ? Math.round(
+        CALENDAR_ZOOM_MIN_PERCENT +
+          ((effectiveZoomPercent - CALENDAR_ZOOM_MIN_PERCENT) /
+            (CALENDAR_ZOOM_MAX_PERCENT - CALENDAR_ZOOM_MIN_PERCENT)) *
+            (CALENDAR_VERTICAL_ZOOM_MAX_PERCENT - CALENDAR_ZOOM_MIN_PERCENT)
+      )
+    : CALENDAR_ZOOM_MIN_PERCENT;
+  const verticalZoomScale = verticalZoomPercent / CALENDAR_ZOOM_MIN_PERCENT;
 
   const handleZoomChange = React.useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -511,6 +531,18 @@ export function YearGrid({
       setCalendarZoomPercent(nextPercent);
     },
     [setCalendarZoomPercent]
+  );
+
+  const handleViewModeChange = React.useCallback(
+    (nextMode: CalendarViewMode) => {
+      if (nextMode === "year") {
+        setCalendarViewMode("year");
+      } else if (nextMode === "quarter") {
+        focusQuarter(resolvedQuarter);
+      } else {
+        focusMonth(currentMonthIndex);
+      }
+    }, [currentMonthIndex, focusMonth, focusQuarter, resolvedQuarter, setCalendarViewMode]
   );
 
   React.useLayoutEffect(() => {
@@ -614,6 +646,7 @@ export function YearGrid({
                     todayIso={todayIso}
                     monthIndex={monthIndex}
                     density={density}
+                    verticalScale={verticalZoomScale}
                     events={events}
                     visibleCategoryIds={visibleCategoryIds}
                     profileIconByCategoryId={profileIconByCategoryId}
@@ -685,8 +718,14 @@ export function YearGrid({
         </div>
       </div>
 
-      {hasFocusZoom ? (
-        <div className="flex justify-end border-t border-border bg-card px-3 py-2.5 md:px-4 md:py-3">
+      <div className="flex items-center justify-between gap-4 border-t border-border bg-card px-3 py-2.5 md:px-4 md:py-3">
+        <SegmentedControl
+          value={viewMode}
+          options={CALENDAR_VIEW_OPTIONS}
+          onValueChange={handleViewModeChange}
+          aria-label="Escala do calendário"
+        />
+        {hasFocusZoom ? (
           <label className="flex w-[10.75rem] items-center justify-end gap-2.5 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground min-[420px]:w-[11.5rem] md:w-[12.25rem]">
             <span className="shrink-0">Zoom</span>
             <input
@@ -696,15 +735,16 @@ export function YearGrid({
               step={1}
               value={effectiveZoomPercent}
               onChange={handleZoomChange}
-              aria-label="Zoom horizontal do calendario"
+              aria-label="Zoom do calendário"
+              aria-valuetext={`${effectiveZoomPercent}% na horizontal e ${verticalZoomPercent}% na vertical`}
               className="h-1.5 w-full cursor-ew-resize accent-foreground"
             />
             <span className="w-[2.75rem] shrink-0 text-right tabular-nums text-foreground/82">
               {effectiveZoomPercent}%
             </span>
           </label>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
     </div>
   );
 }
