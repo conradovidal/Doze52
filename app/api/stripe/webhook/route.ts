@@ -21,8 +21,8 @@ export async function POST(request: Request) {
       signature,
       getStripeWebhookSecret()
     );
-  } catch (error) {
-    console.error("[stripe.webhook.verify]", error);
+  } catch {
+    console.warn("[stripe.webhook.verify]", { result: "invalid_signature" });
     return NextResponse.json(
       { error: "Invalid Stripe signature." },
       { status: 400 }
@@ -31,9 +31,22 @@ export async function POST(request: Request) {
 
   try {
     const result = await processStripeWebhookEvent(event);
+    console.info("[stripe.webhook.result]", {
+      eventId: event.id,
+      eventType: event.type,
+      eventCreatedAt: new Date(event.created * 1000).toISOString(),
+      result: result.duplicate ? "duplicate" : "processed",
+      attemptCount: result.attemptCount,
+    });
     return NextResponse.json({ received: true, ...result });
   } catch (error) {
-    console.error("[stripe.webhook.process]", error);
+    console.error("[stripe.webhook.process]", {
+      eventId: event.id,
+      eventType: event.type,
+      eventCreatedAt: new Date(event.created * 1000).toISOString(),
+      result: "failed",
+      errorType: error instanceof Error ? error.name : "UnknownError",
+    });
     return NextResponse.json(
       { error: "Could not process Stripe webhook." },
       { status: 500 }
