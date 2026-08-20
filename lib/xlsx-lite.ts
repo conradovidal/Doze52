@@ -169,6 +169,12 @@ const normalizeZipPath = (target: string) => {
 
 const ZIP_END_SIGNATURE = 0x06054b50;
 const ZIP_CENTRAL_SIGNATURE = 0x02014b50;
+const ZIP64_END_LOCATOR_SIGNATURE = 0x07064b50;
+const ZIP16_SENTINEL = 0xffff;
+const ZIP32_SENTINEL = 0xffffffff;
+
+const unsupportedZip = () =>
+  new Error("O arquivo .xlsx usa um formato ZIP nao suportado.");
 
 const assertSafeArchiveMetadata = (bytes: Uint8Array) => {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
@@ -180,17 +186,36 @@ const assertSafeArchiveMetadata = (bytes: Uint8Array) => {
       break;
     }
   }
-  if (endOffset < 0 || view.getUint16(endOffset + 4, true) !== 0 || view.getUint16(endOffset + 6, true) !== 0) {
+  if (endOffset < 0) {
     throw new Error("O arquivo .xlsx esta corrompido ou fora do formato esperado.");
   }
 
+  const diskNumber = view.getUint16(endOffset + 4, true);
+  const centralDisk = view.getUint16(endOffset + 6, true);
+  const entriesOnDisk = view.getUint16(endOffset + 8, true);
   const entryCount = view.getUint16(endOffset + 10, true);
   const centralSize = view.getUint32(endOffset + 12, true);
   const centralOffset = view.getUint32(endOffset + 16, true);
+  const commentLength = view.getUint16(endOffset + 20, true);
+  if (
+    diskNumber !== 0 ||
+    centralDisk !== 0 ||
+    entriesOnDisk !== entryCount ||
+    entriesOnDisk === ZIP16_SENTINEL ||
+    centralSize === ZIP32_SENTINEL ||
+    centralOffset === ZIP32_SENTINEL ||
+    (endOffset >= 20 &&
+      view.getUint32(endOffset - 20, true) === ZIP64_END_LOCATOR_SIGNATURE)
+  ) {
+    throw unsupportedZip();
+  }
+  if (endOffset + 22 + commentLength !== bytes.byteLength) {
+    throw new Error("O arquivo .xlsx esta corrompido ou fora do formato esperado.");
+  }
   if (entryCount > XLSX_ARCHIVE_LIMITS.maxEntries) {
     throw new Error(`O arquivo .xlsx excede o limite de ${XLSX_ARCHIVE_LIMITS.maxEntries} entradas.`);
   }
-  if (centralOffset + centralSize > endOffset) {
+  if (centralOffset + centralSize !== endOffset) {
     throw new Error("O arquivo .xlsx esta corrompido ou fora do formato esperado.");
   }
 
@@ -201,13 +226,24 @@ const assertSafeArchiveMetadata = (bytes: Uint8Array) => {
       throw new Error("O arquivo .xlsx esta corrompido ou fora do formato esperado.");
     }
     const flags = view.getUint16(offset + 8, true);
+    const compressedBytes = view.getUint32(offset + 20, true);
     const expandedBytes = view.getUint32(offset + 24, true);
     const filenameLength = view.getUint16(offset + 28, true);
     const extraLength = view.getUint16(offset + 30, true);
     const commentLength = view.getUint16(offset + 32, true);
+    const startDisk = view.getUint16(offset + 34, true);
+    const localHeaderOffset = view.getUint32(offset + 42, true);
     const nextOffset = offset + 46 + filenameLength + extraLength + commentLength;
-    if (nextOffset > endOffset || expandedBytes === 0xffffffff || (flags & 1) !== 0) {
-      throw new Error("O arquivo .xlsx usa um formato ZIP nao suportado.");
+    if (
+      nextOffset > endOffset ||
+      compressedBytes === ZIP32_SENTINEL ||
+      expandedBytes === ZIP32_SENTINEL ||
+      startDisk === ZIP16_SENTINEL ||
+      startDisk !== 0 ||
+      localHeaderOffset === ZIP32_SENTINEL ||
+      (flags & 1) !== 0
+    ) {
+      throw unsupportedZip();
     }
     const filename = strFromU8(bytes.subarray(offset + 46, offset + 46 + filenameLength));
     totalExpandedBytes += expandedBytes;

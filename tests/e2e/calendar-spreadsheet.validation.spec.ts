@@ -18,7 +18,7 @@ import {
   type SpreadsheetSource,
 } from "@/lib/calendar-spreadsheet";
 import type { CalendarSnapshot } from "@/lib/sync";
-import { createXlsx } from "@/lib/xlsx-lite";
+import { createXlsx, readXlsxSheet } from "@/lib/xlsx-lite";
 
 const withDeclaredExpandedSize = (workbook: Uint8Array, expandedBytes: number) => {
   const copy = workbook.slice();
@@ -35,6 +35,55 @@ const withDeclaredExpandedSize = (workbook: Uint8Array, expandedBytes: number) =
     }
   }
   throw new Error("Central directory entry not found in test workbook.");
+};
+
+const findZipEndOffset = (workbook: Uint8Array) => {
+  const view = new DataView(workbook.buffer, workbook.byteOffset, workbook.byteLength);
+  for (let offset = workbook.byteLength - 22; offset >= 0; offset -= 1) {
+    if (view.getUint32(offset, true) === 0x06054b50) return offset;
+  }
+  throw new Error("ZIP end record not found in test workbook.");
+};
+
+const withHiddenOversizedEntry = () => {
+  const workbook = createXlsx([
+    {
+      name: "Eventos",
+      rows: [["cabecalho"], ["A".repeat(11 * 1024 * 1024)]],
+      widths: [20],
+    },
+  ]);
+  const copy = workbook.slice();
+  const view = new DataView(copy.buffer, copy.byteOffset, copy.byteLength);
+  const endOffset = findZipEndOffset(copy);
+  const centralOffset = view.getUint32(endOffset + 16, true);
+  const firstEntrySize =
+    46 +
+    view.getUint16(centralOffset + 28, true) +
+    view.getUint16(centralOffset + 30, true) +
+    view.getUint16(centralOffset + 32, true);
+
+  view.setUint16(endOffset + 10, 1, true);
+  view.setUint32(endOffset + 12, firstEntrySize, true);
+  return copy;
+};
+
+const withZip64Locator = (workbook: Uint8Array) => {
+  const endOffset = findZipEndOffset(workbook);
+  const copy = new Uint8Array(workbook.byteLength + 20);
+  copy.set(workbook.subarray(0, endOffset));
+  new DataView(copy.buffer).setUint32(endOffset, 0x07064b50, true);
+  copy.set(workbook.subarray(endOffset), endOffset + 20);
+  return copy;
+};
+
+const withZip64EntryCount = (workbook: Uint8Array) => {
+  const copy = workbook.slice();
+  const view = new DataView(copy.buffer, copy.byteOffset, copy.byteLength);
+  const endOffset = findZipEndOffset(copy);
+  view.setUint16(endOffset + 8, 0xffff, true);
+  view.setUint16(endOffset + 10, 0xffff, true);
+  return copy;
 };
 
 const snapshot: CalendarSnapshot = {
@@ -163,6 +212,90 @@ test("rejeita workbooks com mais de 256 entradas", () => {
   expect(() => readSpreadsheetSource(workbook.slice().buffer)).toThrow(
     "limite de 256 entradas"
   );
+});
+
+test("rejeita contagens EOCD divergentes antes de expandir entradas ocultas", () => {
+  const workbook = withHiddenOversizedEntry();
+
+  expect(workbook.byteLength).toBeLessThan(5 * 1024 * 1024);
+  expect(() => readSpreadsheetSource(workbook.slice().buffer, "Eventos")).toThrow(
+    "formato ZIP nao suportado"
+  );
+});
+
+test("rejeita ZIP64 por locator ou sentinela antes da descompressao", () => {
+  const workbook = createCalendarSpreadsheetBuffer();
+
+  expect(() =>
+    readSpreadsheetSource(withZip64Locator(workbook).slice().buffer, "Eventos")
+  ).toThrow("formato ZIP nao suportado");
+  expect(() =>
+    readSpreadsheetSource(withZip64EntryCount(workbook).slice().buffer, "Eventos")
+  ).toThrow("formato ZIP nao suportado");
+});
+
+test("exporta todos os eventos quando nenhum recorte e informado", () => {
+  const source = readSpreadsheetSource(
+    createCalendarSpreadsheetBuffer(snapshot).slice().buffer,
+    "Eventos"
+  );
+
+  expect(source.rows.map((row) => row.values.slice(0, 3))).toEqual([
+    ["Profissional", "Entregas", "Release existente"],
+  ]);
+});
+
+test("filtra a exportacao por contexto e categoria, incluindo calendarios gerenciados", () => {
+  const personalProfile = {
+    ...snapshot.profiles[0],
+    id: "44444444-4444-4444-8444-444444444443",
+    name: "Pessoal",
+  };
+  const managedEvent = {
+    ...snapshot.events[0],
+    id: "77777777-7777-4777-8777-777777777779",
+    title: "Feriado exportado",
+    categoryId: snapshot.categories[1].id,
+  };
+  const personalCategory = {
+    ...snapshot.categories[0],
+    id: "55555555-5555-4555-8555-555555555554",
+    profileId: personalProfile.id,
+    name: "Viagens",
+  };
+  const personalEvent = {
+    ...snapshot.events[0],
+    id: "77777777-7777-4777-8777-777777777780",
+    title: "Ferias",
+    categoryId: personalCategory.id,
+  };
+  const sourceSnapshot: CalendarSnapshot = {
+    profiles: [...snapshot.profiles, personalProfile],
+    categories: [...snapshot.categories, personalCategory],
+    events: [...snapshot.events, managedEvent, personalEvent],
+  };
+  const source = readSpreadsheetSource(
+    createCalendarSpreadsheetBuffer(sourceSnapshot, {
+      profileIds: [snapshot.profiles[0].id],
+      categoryIds: [snapshot.categories[1].id],
+    }).slice().buffer,
+    "Eventos"
+  );
+
+  expect(source.rows.map((row) => row.values.slice(0, 3))).toEqual([
+    ["Profissional", "Feriados", "Feriado exportado"],
+  ]);
+});
+
+test("gera apenas o cabecalho quando o recorte de exportacao esta vazio", () => {
+  const workbook = createCalendarSpreadsheetBuffer(snapshot, {
+    profileIds: [],
+    categoryIds: [],
+  });
+  const rows = readXlsxSheet(workbook.slice().buffer, "Eventos");
+
+  expect(rows).toHaveLength(1);
+  expect([...rows[0].cells.values()]).toEqual([...CANONICAL_SPREADSHEET_HEADERS]);
 });
 
 test("template cria estruturas ausentes e assume data final igual a inicial", () => {
@@ -308,7 +441,23 @@ test("bloqueia exatamente quando excede os limites de criacao e eventos", () => 
       "",
     ])
   );
-  expect(planCanonical(events, { profiles: [], categories: [], events: [] }).blockingErrors.join(" ")).toContain("1.001 eventos");
+  const empty: CalendarSnapshot = { profiles: [], categories: [], events: [] };
+  const mapping = getCanonicalImportMapping();
+  const resolution = createStructureResolution(events, mapping, empty);
+  const unreadRow = {
+    rowNumber: IMPORT_LIMITS.maxEvents + 3,
+    get values(): string[] {
+      throw new Error("leu uma linha depois do 1.001o evento valido");
+    },
+  };
+  const sourceWithUnreadTail: SpreadsheetSource = {
+    ...events,
+    rows: [...events.rows, unreadRow],
+  };
+  const eventPlan = buildImportPlan(sourceWithUnreadTail, mapping, resolution, empty);
+
+  expect(eventPlan.blockingErrors.join(" ")).toContain("1.001 eventos");
+  expect(eventPlan.summary.importedEvents).toBe(1_001);
 });
 
 test("calcula a ordem diaria em tempo linear para snapshots grandes", () => {
