@@ -112,7 +112,7 @@ export const refreshCalendarCatalog = async ({
           fetchOfficialEvents(source),
           fetchGeFootballFeed(source).catch((error) => { throw stageError("ge_feed", error); }),
           admin.from("calendar_pack_external_ids")
-            .select("authority, external_id, canonical_id")
+            .select("authority, external_id, canonical_id, participant_fingerprint")
             .eq("competition", source.competition)
             .eq("season", source.season)
             .in("authority", [source.authority, "GE"]),
@@ -121,16 +121,20 @@ export const refreshCalendarCatalog = async ({
         if (mappingResult.error) throw stageError("mapping_lookup", mappingResult.error);
         const officialMappings = new Map<string, string>();
         const geMappings = new Map<string, string>();
+        const geMappingFingerprints = new Map<string, string>();
         for (const mapping of mappingResult.data ?? []) {
           (mapping.authority === "GE" ? geMappings : officialMappings)
             .set(mapping.external_id, mapping.canonical_id);
+          if (mapping.authority === "GE" && mapping.participant_fingerprint) {
+            geMappingFingerprints.set(mapping.external_id, mapping.participant_fingerprint);
+          }
         }
         let reconciliation;
         try {
           reconciliation = source.feed_provider === "GE"
             ? reconcileGeFootballFeed({
                 source, officialEvents, feedEvents, officialFixtureParticipantKeys: fixtureParticipantKeys,
-                officialMappings, geMappings,
+                officialMappings, geMappings, geMappingFingerprints,
               })
             : {
                 reconciledEvents: officialEvents,

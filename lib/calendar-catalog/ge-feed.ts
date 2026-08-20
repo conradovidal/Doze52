@@ -221,6 +221,11 @@ export const fetchGeFootballFeed = async (
 const participantKey = (event: OfficialCalendarEvent) =>
   `${canonicalTeamName(event.homeTeam)}|${canonicalTeamName(event.awayTeam)}`;
 
+const normalizedParticipantFingerprint = (fingerprint: string) => fingerprint
+  .split("|")
+  .map(canonicalTeamName)
+  .join("|");
+
 const sharesParticipant = (left: OfficialCalendarEvent, right: OfficialCalendarEvent) => {
   const leftTeams = new Set([canonicalTeamName(left.homeTeam), canonicalTeamName(left.awayTeam)]);
   return leftTeams.has(canonicalTeamName(right.homeTeam)) || leftTeams.has(canonicalTeamName(right.awayTeam));
@@ -237,6 +242,7 @@ export const reconcileGeFootballFeed = ({
   officialFixtureParticipantKeys = new Set(officialEvents.map(participantKey)),
   officialMappings = new Map<string, string>(),
   geMappings = new Map<string, string>(),
+  geMappingFingerprints = new Map<string, string>(),
 }: {
   source: CalendarCatalogSource;
   officialEvents: readonly OfficialCalendarEvent[];
@@ -244,6 +250,7 @@ export const reconcileGeFootballFeed = ({
   officialFixtureParticipantKeys?: ReadonlySet<string>;
   officialMappings?: ReadonlyMap<string, string>;
   geMappings?: ReadonlyMap<string, string>;
+  geMappingFingerprints?: ReadonlyMap<string, string>;
 }) => {
   const issues: CandidateValidationIssue[] = [];
   const canonicalByOfficial = new Map(officialEvents.map((event) => [
@@ -257,7 +264,11 @@ export const reconcileGeFootballFeed = ({
   for (const feedEvent of feedEvents) {
     const mappedCanonical = geMappings.get(feedEvent.providerExternalId);
     let official = mappedCanonical ? officialByCanonical.get(mappedCanonical) : undefined;
-    if (official && participantKey(official) !== participantKey(feedEvent)) {
+    const storedGeFingerprint = geMappingFingerprints.get(feedEvent.providerExternalId);
+    const mappedParticipantsAreStable = storedGeFingerprint
+      ? normalizedParticipantFingerprint(storedGeFingerprint) === participantKey(feedEvent)
+      : participantKey(official ?? feedEvent) === participantKey(feedEvent);
+    if (official && !mappedParticipantsAreStable) {
       issues.push({
         code: "participants_changed",
         eventId: feedEvent.providerExternalId,

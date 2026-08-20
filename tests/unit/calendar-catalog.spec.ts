@@ -120,6 +120,27 @@ test("reconciliação preserva dados oficiais, acrescenta resultado final e isol
   });
   expect(mappedConflict.issues.map((issue) => issue.code)).toContain("participants_changed");
 
+  const mappedAlias = reconcileGeFootballFeed({
+    source: geSource,
+    officialEvents: [{ ...official, homeTeam: "Sampaio Correa", awayTeam: "Desportiva Ferroviária" }],
+    feedEvents: [{ ...feed, homeTeam: "Sampaio Corrêa-RJ", awayTeam: "Desportiva Ferroviária" }],
+    officialMappings: new Map([[official.externalId, "canonical-1"]]),
+    geMappings: new Map([[feed.providerExternalId, "canonical-1"]]),
+    geMappingFingerprints: new Map([[feed.providerExternalId, "Sampaio Corrêa-RJ|Desportiva Ferroviária"]]),
+  });
+  expect(mappedAlias.issues).toEqual([]);
+  expect(mappedAlias.unmatchedFeedEvents).toEqual([]);
+
+  const reusedMappedId = reconcileGeFootballFeed({
+    source: geSource,
+    officialEvents: [official],
+    feedEvents: [{ ...feed, homeTeam: "Flamengo" }],
+    officialMappings: new Map([[official.externalId, "canonical-1"]]),
+    geMappings: new Map([[feed.providerExternalId, "canonical-1"]]),
+    geMappingFingerprints: new Map([[feed.providerExternalId, "Palmeiras|Tolima"]]),
+  });
+  expect(reusedMappedId.issues.map((issue) => issue.code)).toContain("participants_changed");
+
   const officialPlaceholder = new Set(["Flamengo|Corinthians"]);
   const [futureFeed] = parseGeMatches({ jogos: [{
     id: 502, data_realizacao: "2026-09-13T19:00", hora_realizacao: "19:00", jogo_ja_comecou: false,
