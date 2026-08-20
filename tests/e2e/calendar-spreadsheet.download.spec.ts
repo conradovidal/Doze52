@@ -26,6 +26,15 @@ const createExportableCategory = async (page: import("@playwright/test").Page) =
     .click();
   await categorySaved;
   await waitForSyncReady(page);
+
+  await page.locator('[data-day-cell][data-day-iso="2026-12-31"]').click();
+  const eventDialog = page.getByRole("dialog", { name: "Novo evento" });
+  await eventDialog.getByLabel("Título do evento").fill("QA Export Event");
+  const eventSaved = waitForSupabaseWrite(page, "events", ["POST"]);
+  await eventDialog.getByRole("button", { name: "Salvar" }).click();
+  await expect(eventDialog).toBeHidden();
+  await eventSaved;
+  await waitForSyncReady(page);
 };
 
 const openSpreadsheetDialog = async (page: import("@playwright/test").Page) => {
