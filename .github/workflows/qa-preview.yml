@@ -89,9 +89,17 @@ jobs:
         shell: bash
         run: |
           if [[ "$QA_SUITE" == "spreadsheet" ]]; then
+            npx playwright test tests/e2e/auth.setup.ts --project=setup-desktop
             npx playwright test \
               tests/e2e/calendar-spreadsheet.download.spec.ts \
-              tests/e2e/mobile.smoke.spec.ts
+              --project=desktop-chromium \
+              --no-deps
+            npx playwright test tests/e2e/auth.mobile.setup.ts \
+              --project=setup-mobile \
+              --no-deps
+            npx playwright test tests/e2e/mobile.smoke.spec.ts \
+              --project=mobile-chromium \
+              --no-deps
           else
             npm run qa:smoke
           fi
