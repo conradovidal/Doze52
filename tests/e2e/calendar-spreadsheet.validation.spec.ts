@@ -20,6 +20,23 @@ import {
 import type { CalendarSnapshot } from "@/lib/sync";
 import { createXlsx } from "@/lib/xlsx-lite";
 
+const withDeclaredExpandedSize = (workbook: Uint8Array, expandedBytes: number) => {
+  const copy = workbook.slice();
+  const view = new DataView(copy.buffer, copy.byteOffset, copy.byteLength);
+  for (let offset = 0; offset <= copy.byteLength - 46; offset += 1) {
+    if (view.getUint32(offset, true) !== 0x02014b50) continue;
+    const filenameLength = view.getUint16(offset + 28, true);
+    const filename = new TextDecoder().decode(
+      copy.subarray(offset + 46, offset + 46 + filenameLength)
+    );
+    if (filename.endsWith(".xml")) {
+      view.setUint32(offset + 24, expandedBytes, true);
+      return copy;
+    }
+  }
+  throw new Error("Central directory entry not found in test workbook.");
+};
+
 const snapshot: CalendarSnapshot = {
   profiles: [
     {
@@ -114,6 +131,38 @@ test("faz round-trip do formato canonico com datas nativas do Excel", () => {
     { title: "Marco Jira", startDate: "2026-12-04", endDate: "2026-12-04", notes: "JIRA-252" },
     { title: "Iniciativa anual", startDate: "2026-10-01", endDate: "2026-12-18", notes: undefined },
   ]);
+});
+
+test("rejeita archive bomb antes de expandir o workbook", () => {
+  const workbook = createCalendarSpreadsheetBuffer();
+  const bomb = withDeclaredExpandedSize(workbook, 26 * 1024 * 1024);
+
+  expect(() => readSpreadsheetSource(bomb.slice().buffer, "Eventos")).toThrow(
+    "limite expandido de 25 MiB"
+  );
+});
+
+test("rejeita um XML individual acima de 10 MiB", () => {
+  const workbook = createCalendarSpreadsheetBuffer();
+  const oversizedXml = withDeclaredExpandedSize(workbook, 11 * 1024 * 1024);
+
+  expect(() => readSpreadsheetSource(oversizedXml.slice().buffer, "Eventos")).toThrow(
+    "excede o limite de 10 MiB"
+  );
+});
+
+test("rejeita workbooks com mais de 256 entradas", () => {
+  const workbook = createXlsx(
+    Array.from({ length: 252 }, (_, index) => ({
+      name: `Aba ${index}`,
+      rows: [["cabecalho"], ["valor"]],
+      widths: [20],
+    }))
+  );
+
+  expect(() => readSpreadsheetSource(workbook.slice().buffer)).toThrow(
+    "limite de 256 entradas"
+  );
 });
 
 test("template cria estruturas ausentes e assume data final igual a inicial", () => {
@@ -260,6 +309,30 @@ test("bloqueia exatamente quando excede os limites de criacao e eventos", () => 
     ])
   );
   expect(planCanonical(events, { profiles: [], categories: [], events: [] }).blockingErrors.join(" ")).toContain("1.001 eventos");
+});
+
+test("calcula a ordem diaria em tempo linear para snapshots grandes", () => {
+  const existingEvents = Array.from({ length: 20_000 }, (_, index) => ({
+    ...snapshot.events[0],
+    id: `event-${index}`,
+    title: `Existente ${index}`,
+    dayOrder: index,
+  }));
+  const source = canonicalSource(
+    Array.from({ length: IMPORT_LIMITS.maxEvents }, (_, index) => [
+      "Profissional",
+      "Entregas",
+      `Novo ${index}`,
+      "2026-09-10",
+      "",
+      "",
+    ])
+  );
+  const startedAt = performance.now();
+  const plan = planCanonical(source, { ...snapshot, events: existingEvents });
+
+  expect(plan.snapshot.events.at(-1)?.dayOrder).toBe(20_999);
+  expect(performance.now() - startedAt).toBeLessThan(2_000);
 });
 
 test("planejar nao altera o estado e produz um unico snapshot coerente", () => {

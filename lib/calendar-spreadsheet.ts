@@ -1,5 +1,5 @@
 import type { CalendarSnapshot } from "@/lib/sync";
-import { createXlsx, listXlsxSheets, readXlsxSheet, type XlsxCell } from "@/lib/xlsx-lite";
+import { createXlsx, openXlsx, type XlsxCell } from "@/lib/xlsx-lite";
 
 const EVENTS_SHEET_NAME = "Eventos";
 const INSTRUCTIONS_SHEET_NAME = "Instrucoes";
@@ -57,7 +57,8 @@ export const readSpreadsheetSource = (
   file: ArrayBuffer,
   requestedSheetName?: string
 ): SpreadsheetSource => {
-  const sheetNames = listXlsxSheets(file);
+  const workbook = openXlsx(file);
+  const sheetNames = workbook.sheetNames;
   if (sheetNames.length === 0) {
     throw new Error("A planilha nao possui abas legiveis.");
   }
@@ -65,7 +66,7 @@ export const readSpreadsheetSource = (
   if (!sheetNames.includes(selectedSheetName)) {
     throw new Error("A aba selecionada nao existe mais no arquivo.");
   }
-  const worksheetRows = readXlsxSheet(file, selectedSheetName);
+  const worksheetRows = workbook.readSheet(selectedSheetName);
   const headerRow = worksheetRows.find((row) => row.rowNumber === 1);
   if (!headerRow) {
     throw new Error("A primeira linha da aba precisa conter os cabecalhos.");

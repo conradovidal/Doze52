@@ -1,5 +1,11 @@
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
 
+export const XLSX_ARCHIVE_LIMITS = {
+  maxEntries: 256,
+  maxExpandedBytes: 25 * 1024 * 1024,
+  maxXmlBytes: 10 * 1024 * 1024,
+} as const;
+
 const XML_HEADER = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
 const SPREADSHEET_NAMESPACE =
   "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
@@ -161,6 +167,87 @@ const normalizeZipPath = (target: string) => {
   return parts.join("/");
 };
 
+const ZIP_END_SIGNATURE = 0x06054b50;
+const ZIP_CENTRAL_SIGNATURE = 0x02014b50;
+
+const assertSafeArchiveMetadata = (bytes: Uint8Array) => {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const searchStart = Math.max(0, bytes.byteLength - 65_557);
+  let endOffset = -1;
+  for (let offset = bytes.byteLength - 22; offset >= searchStart; offset -= 1) {
+    if (view.getUint32(offset, true) === ZIP_END_SIGNATURE) {
+      endOffset = offset;
+      break;
+    }
+  }
+  if (endOffset < 0 || view.getUint16(endOffset + 4, true) !== 0 || view.getUint16(endOffset + 6, true) !== 0) {
+    throw new Error("O arquivo .xlsx esta corrompido ou fora do formato esperado.");
+  }
+
+  const entryCount = view.getUint16(endOffset + 10, true);
+  const centralSize = view.getUint32(endOffset + 12, true);
+  const centralOffset = view.getUint32(endOffset + 16, true);
+  if (entryCount > XLSX_ARCHIVE_LIMITS.maxEntries) {
+    throw new Error(`O arquivo .xlsx excede o limite de ${XLSX_ARCHIVE_LIMITS.maxEntries} entradas.`);
+  }
+  if (centralOffset + centralSize > endOffset) {
+    throw new Error("O arquivo .xlsx esta corrompido ou fora do formato esperado.");
+  }
+
+  let offset = centralOffset;
+  let totalExpandedBytes = 0;
+  for (let index = 0; index < entryCount; index += 1) {
+    if (offset + 46 > endOffset || view.getUint32(offset, true) !== ZIP_CENTRAL_SIGNATURE) {
+      throw new Error("O arquivo .xlsx esta corrompido ou fora do formato esperado.");
+    }
+    const flags = view.getUint16(offset + 8, true);
+    const expandedBytes = view.getUint32(offset + 24, true);
+    const filenameLength = view.getUint16(offset + 28, true);
+    const extraLength = view.getUint16(offset + 30, true);
+    const commentLength = view.getUint16(offset + 32, true);
+    const nextOffset = offset + 46 + filenameLength + extraLength + commentLength;
+    if (nextOffset > endOffset || expandedBytes === 0xffffffff || (flags & 1) !== 0) {
+      throw new Error("O arquivo .xlsx usa um formato ZIP nao suportado.");
+    }
+    const filename = strFromU8(bytes.subarray(offset + 46, offset + 46 + filenameLength));
+    totalExpandedBytes += expandedBytes;
+    if (totalExpandedBytes > XLSX_ARCHIVE_LIMITS.maxExpandedBytes) {
+      throw new Error("O arquivo .xlsx excede o limite expandido de 25 MiB.");
+    }
+    if (/\.(?:xml|rels)$/i.test(filename) && expandedBytes > XLSX_ARCHIVE_LIMITS.maxXmlBytes) {
+      throw new Error(`O XML ${filename} excede o limite de 10 MiB.`);
+    }
+    offset = nextOffset;
+  }
+  if (offset !== centralOffset + centralSize) {
+    throw new Error("O arquivo .xlsx esta corrompido ou fora do formato esperado.");
+  }
+};
+
+const openArchive = (file: ArrayBuffer) => {
+  const bytes = new Uint8Array(file);
+  assertSafeArchiveMetadata(bytes);
+  let archive: ReturnType<typeof unzipSync>;
+  try {
+    archive = unzipSync(bytes);
+  } catch {
+    throw new Error("O arquivo .xlsx esta corrompido ou fora do formato esperado.");
+  }
+  const entries = Object.entries(archive);
+  const expandedBytes = entries.reduce((total, [, value]) => total + value.byteLength, 0);
+  if (
+    entries.length > XLSX_ARCHIVE_LIMITS.maxEntries ||
+    expandedBytes > XLSX_ARCHIVE_LIMITS.maxExpandedBytes ||
+    entries.some(
+      ([name, value]) =>
+        /\.(?:xml|rels)$/i.test(name) && value.byteLength > XLSX_ARCHIVE_LIMITS.maxXmlBytes
+    )
+  ) {
+    throw new Error("O arquivo .xlsx excede os limites seguros de expansao.");
+  }
+  return archive;
+};
+
 const readWorksheetRows = (worksheet: string, sharedStrings: string[]) => {
   const rows: XlsxReadRow[] = [];
   for (const rowMatch of worksheet.matchAll(/<row\b([^>]*)>([\s\S]*?)<\/row>/gi)) {
@@ -185,55 +272,49 @@ const readWorksheetRows = (worksheet: string, sharedStrings: string[]) => {
   return rows;
 };
 
-export const listXlsxSheets = (file: ArrayBuffer) => {
-  let archive: ReturnType<typeof unzipSync>;
-  try {
-    archive = unzipSync(new Uint8Array(file));
-  } catch {
-    throw new Error("O arquivo .xlsx esta corrompido ou fora do formato esperado.");
-  }
-  const workbookBytes = archive["xl/workbook.xml"];
-  if (!workbookBytes) {
-    throw new Error("O arquivo nao possui a estrutura de uma planilha Excel valida.");
-  }
-  const workbook = strFromU8(workbookBytes);
-  return [...workbook.matchAll(/<sheet\b([^>]*)\/?\s*>/gi)]
-    .map((match) => getXmlAttribute(match[1], "name"))
-    .filter(Boolean);
-};
-
-export const readXlsxSheet = (file: ArrayBuffer, sheetName: string) => {
-  let archive: ReturnType<typeof unzipSync>;
-  try {
-    archive = unzipSync(new Uint8Array(file));
-  } catch {
-    throw new Error("O arquivo .xlsx esta corrompido ou fora do formato esperado.");
-  }
+export const openXlsx = (file: ArrayBuffer) => {
+  const archive = openArchive(file);
   const workbookBytes = archive["xl/workbook.xml"];
   const relationshipBytes = archive["xl/_rels/workbook.xml.rels"];
   if (!workbookBytes || !relationshipBytes) {
     throw new Error("O arquivo nao possui a estrutura de uma planilha Excel valida.");
   }
   const workbook = strFromU8(workbookBytes);
-  const sheetTag = [...workbook.matchAll(/<sheet\b([^>]*)\/?\s*>/gi)].find(
-    (match) => getXmlAttribute(match[1], "name") === sheetName
-  );
-  if (!sheetTag) throw new Error(`A planilha precisa conter uma aba chamada "${sheetName}".`);
-  const relationshipId = getXmlAttribute(sheetTag[1], "r:id");
+  const sheetTags = [...workbook.matchAll(/<sheet\b([^>]*)\/?\s*>/gi)];
+  const sheetNames = sheetTags
+    .map((match) => getXmlAttribute(match[1], "name"))
+    .filter(Boolean);
   const relationships = strFromU8(relationshipBytes);
-  const relationshipTag = [
-    ...relationships.matchAll(/<Relationship\b([^>]*)\/?\s*>/gi),
-  ].find((match) => getXmlAttribute(match[1], "Id") === relationshipId);
-  const worksheetPath = relationshipTag
-    ? normalizeZipPath(getXmlAttribute(relationshipTag[1], "Target"))
-    : "";
-  const worksheetBytes = archive[worksheetPath];
-  if (!worksheetBytes) throw new Error(`Nao foi possivel localizar a aba ${sheetName}.`);
   const sharedStringsBytes = archive["xl/sharedStrings.xml"];
   const sharedStrings = sharedStringsBytes
     ? [...strFromU8(sharedStringsBytes).matchAll(/<si(?:\s[^>]*)?>([\s\S]*?)<\/si>/gi)].map(
         (match) => getTextNodes(match[1])
       )
     : [];
-  return readWorksheetRows(strFromU8(worksheetBytes), sharedStrings);
+  return {
+    sheetNames,
+    readSheet(sheetName: string) {
+      const sheetTag = sheetTags.find(
+        (match) => getXmlAttribute(match[1], "name") === sheetName
+      );
+      if (!sheetTag) {
+        throw new Error(`A planilha precisa conter uma aba chamada "${sheetName}".`);
+      }
+      const relationshipId = getXmlAttribute(sheetTag[1], "r:id");
+      const relationshipTag = [
+        ...relationships.matchAll(/<Relationship\b([^>]*)\/?\s*>/gi),
+      ].find((match) => getXmlAttribute(match[1], "Id") === relationshipId);
+      const worksheetPath = relationshipTag
+        ? normalizeZipPath(getXmlAttribute(relationshipTag[1], "Target"))
+        : "";
+      const worksheetBytes = archive[worksheetPath];
+      if (!worksheetBytes) throw new Error(`Nao foi possivel localizar a aba ${sheetName}.`);
+      return readWorksheetRows(strFromU8(worksheetBytes), sharedStrings);
+    },
+  };
 };
+
+export const listXlsxSheets = (file: ArrayBuffer) => openXlsx(file).sheetNames;
+
+export const readXlsxSheet = (file: ArrayBuffer, sheetName: string) =>
+  openXlsx(file).readSheet(sheetName);
