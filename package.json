@@ -13,6 +13,7 @@
     "qa:reset:dev": "node scripts/qa/reset-dev.mjs",
     "qa:smoke": "playwright test",
     "test:onboarding": "playwright test --config=playwright.unit.config.ts",
+    "test:spreadsheet": "playwright test --config=playwright.spreadsheet.config.ts",
     "test:onboarding:e2e": "playwright test --config=playwright.onboarding.config.ts",
     "repair:calendar-packs": "tsx scripts/repair-calendar-packs.ts",
     "generate:team-calendar-seed": "tsx scripts/generate-team-calendar-seed.ts"

@@ -7,6 +7,14 @@ on:
         description: URL raiz do Vercel Preview a validar
         required: true
         type: string
+      suite:
+        description: Conjunto de testes a executar
+        required: true
+        default: full
+        type: choice
+        options:
+          - full
+          - spreadsheet
 
 permissions:
   contents: read
@@ -30,6 +38,7 @@ jobs:
       SUPABASE_DEV_URL: ${{ vars.SUPABASE_DEV_URL }}
       SUPABASE_DEV_ANON_KEY: ${{ vars.SUPABASE_DEV_ANON_KEY }}
       VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+      QA_SUITE: ${{ github.event.inputs.suite }}
 
     steps:
       - name: Baixar o codigo
@@ -77,7 +86,23 @@ jobs:
       - name: Executar smoke
         id: smoke
         continue-on-error: true
-        run: npm run qa:smoke
+        shell: bash
+        run: |
+          if [[ "$QA_SUITE" == "spreadsheet" ]]; then
+            npx playwright test tests/e2e/auth.setup.ts --project=setup-desktop
+            npx playwright test \
+              tests/e2e/calendar-spreadsheet.download.spec.ts \
+              --project=desktop-chromium \
+              --no-deps
+            npx playwright test tests/e2e/auth.mobile.setup.ts \
+              --project=setup-mobile \
+              --no-deps
+            npx playwright test tests/e2e/mobile.smoke.spec.ts \
+              --project=mobile-chromium \
+              --no-deps
+          else
+            npm run qa:smoke
+          fi
 
       - name: Limpar conta E2E depois do smoke
         id: cleanup

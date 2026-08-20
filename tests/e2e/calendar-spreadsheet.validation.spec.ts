@@ -20,6 +20,72 @@ import {
 import type { CalendarSnapshot } from "@/lib/sync";
 import { createXlsx, readXlsxSheet } from "@/lib/xlsx-lite";
 
+const withDeclaredExpandedSize = (workbook: Uint8Array, expandedBytes: number) => {
+  const copy = workbook.slice();
+  const view = new DataView(copy.buffer, copy.byteOffset, copy.byteLength);
+  for (let offset = 0; offset <= copy.byteLength - 46; offset += 1) {
+    if (view.getUint32(offset, true) !== 0x02014b50) continue;
+    const filenameLength = view.getUint16(offset + 28, true);
+    const filename = new TextDecoder().decode(
+      copy.subarray(offset + 46, offset + 46 + filenameLength)
+    );
+    if (filename.endsWith(".xml")) {
+      view.setUint32(offset + 24, expandedBytes, true);
+      return copy;
+    }
+  }
+  throw new Error("Central directory entry not found in test workbook.");
+};
+
+const findZipEndOffset = (workbook: Uint8Array) => {
+  const view = new DataView(workbook.buffer, workbook.byteOffset, workbook.byteLength);
+  for (let offset = workbook.byteLength - 22; offset >= 0; offset -= 1) {
+    if (view.getUint32(offset, true) === 0x06054b50) return offset;
+  }
+  throw new Error("ZIP end record not found in test workbook.");
+};
+
+const withHiddenOversizedEntry = () => {
+  const workbook = createXlsx([
+    {
+      name: "Eventos",
+      rows: [["cabecalho"], ["A".repeat(11 * 1024 * 1024)]],
+      widths: [20],
+    },
+  ]);
+  const copy = workbook.slice();
+  const view = new DataView(copy.buffer, copy.byteOffset, copy.byteLength);
+  const endOffset = findZipEndOffset(copy);
+  const centralOffset = view.getUint32(endOffset + 16, true);
+  const firstEntrySize =
+    46 +
+    view.getUint16(centralOffset + 28, true) +
+    view.getUint16(centralOffset + 30, true) +
+    view.getUint16(centralOffset + 32, true);
+
+  view.setUint16(endOffset + 10, 1, true);
+  view.setUint32(endOffset + 12, firstEntrySize, true);
+  return copy;
+};
+
+const withZip64Locator = (workbook: Uint8Array) => {
+  const endOffset = findZipEndOffset(workbook);
+  const copy = new Uint8Array(workbook.byteLength + 20);
+  copy.set(workbook.subarray(0, endOffset));
+  new DataView(copy.buffer).setUint32(endOffset, 0x07064b50, true);
+  copy.set(workbook.subarray(endOffset), endOffset + 20);
+  return copy;
+};
+
+const withZip64EntryCount = (workbook: Uint8Array) => {
+  const copy = workbook.slice();
+  const view = new DataView(copy.buffer, copy.byteOffset, copy.byteLength);
+  const endOffset = findZipEndOffset(copy);
+  view.setUint16(endOffset + 8, 0xffff, true);
+  view.setUint16(endOffset + 10, 0xffff, true);
+  return copy;
+};
+
 const snapshot: CalendarSnapshot = {
   profiles: [
     {
@@ -114,6 +180,58 @@ test("faz round-trip do formato canonico com datas nativas do Excel", () => {
     { title: "Marco Jira", startDate: "2026-12-04", endDate: "2026-12-04", notes: "JIRA-252" },
     { title: "Iniciativa anual", startDate: "2026-10-01", endDate: "2026-12-18", notes: undefined },
   ]);
+});
+
+test("rejeita archive bomb antes de expandir o workbook", () => {
+  const workbook = createCalendarSpreadsheetBuffer();
+  const bomb = withDeclaredExpandedSize(workbook, 26 * 1024 * 1024);
+
+  expect(() => readSpreadsheetSource(bomb.slice().buffer, "Eventos")).toThrow(
+    "limite expandido de 25 MiB"
+  );
+});
+
+test("rejeita um XML individual acima de 10 MiB", () => {
+  const workbook = createCalendarSpreadsheetBuffer();
+  const oversizedXml = withDeclaredExpandedSize(workbook, 11 * 1024 * 1024);
+
+  expect(() => readSpreadsheetSource(oversizedXml.slice().buffer, "Eventos")).toThrow(
+    "excede o limite de 10 MiB"
+  );
+});
+
+test("rejeita workbooks com mais de 256 entradas", () => {
+  const workbook = createXlsx(
+    Array.from({ length: 252 }, (_, index) => ({
+      name: `Aba ${index}`,
+      rows: [["cabecalho"], ["valor"]],
+      widths: [20],
+    }))
+  );
+
+  expect(() => readSpreadsheetSource(workbook.slice().buffer)).toThrow(
+    "limite de 256 entradas"
+  );
+});
+
+test("rejeita contagens EOCD divergentes antes de expandir entradas ocultas", () => {
+  const workbook = withHiddenOversizedEntry();
+
+  expect(workbook.byteLength).toBeLessThan(5 * 1024 * 1024);
+  expect(() => readSpreadsheetSource(workbook.slice().buffer, "Eventos")).toThrow(
+    "formato ZIP nao suportado"
+  );
+});
+
+test("rejeita ZIP64 por locator ou sentinela antes da descompressao", () => {
+  const workbook = createCalendarSpreadsheetBuffer();
+
+  expect(() =>
+    readSpreadsheetSource(withZip64Locator(workbook).slice().buffer, "Eventos")
+  ).toThrow("formato ZIP nao suportado");
+  expect(() =>
+    readSpreadsheetSource(withZip64EntryCount(workbook).slice().buffer, "Eventos")
+  ).toThrow("formato ZIP nao suportado");
 });
 
 test("exporta todos os eventos quando nenhum recorte e informado", () => {
@@ -323,7 +441,47 @@ test("bloqueia exatamente quando excede os limites de criacao e eventos", () => 
       "",
     ])
   );
-  expect(planCanonical(events, { profiles: [], categories: [], events: [] }).blockingErrors.join(" ")).toContain("1.001 eventos");
+  const empty: CalendarSnapshot = { profiles: [], categories: [], events: [] };
+  const mapping = getCanonicalImportMapping();
+  const resolution = createStructureResolution(events, mapping, empty);
+  const unreadRow = {
+    rowNumber: IMPORT_LIMITS.maxEvents + 3,
+    get values(): string[] {
+      throw new Error("leu uma linha depois do 1.001o evento valido");
+    },
+  };
+  const sourceWithUnreadTail: SpreadsheetSource = {
+    ...events,
+    rows: [...events.rows, unreadRow],
+  };
+  const eventPlan = buildImportPlan(sourceWithUnreadTail, mapping, resolution, empty);
+
+  expect(eventPlan.blockingErrors.join(" ")).toContain("1.001 eventos");
+  expect(eventPlan.summary.importedEvents).toBe(1_001);
+});
+
+test("calcula a ordem diaria em tempo linear para snapshots grandes", () => {
+  const existingEvents = Array.from({ length: 20_000 }, (_, index) => ({
+    ...snapshot.events[0],
+    id: `event-${index}`,
+    title: `Existente ${index}`,
+    dayOrder: index,
+  }));
+  const source = canonicalSource(
+    Array.from({ length: IMPORT_LIMITS.maxEvents }, (_, index) => [
+      "Profissional",
+      "Entregas",
+      `Novo ${index}`,
+      "2026-09-10",
+      "",
+      "",
+    ])
+  );
+  const startedAt = performance.now();
+  const plan = planCanonical(source, { ...snapshot, events: existingEvents });
+
+  expect(plan.snapshot.events.at(-1)?.dayOrder).toBe(20_999);
+  expect(performance.now() - startedAt).toBeLessThan(2_000);
 });
 
 test("planejar nao altera o estado e produz um unico snapshot coerente", () => {
