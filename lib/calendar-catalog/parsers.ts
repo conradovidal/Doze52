@@ -275,7 +275,86 @@ const parseConmebolKnockoutArticle = (body: string, source: CalendarCatalogSourc
   return events;
 };
 
-const parseConmebolHtml = (body: string, source: CalendarCatalogSource) => {
+const FIXTURE_MONTHS: Record<string, string> = {
+  jan: "01", fev: "02", mar: "03", abr: "04", mai: "05", jun: "06",
+  jul: "07", ago: "08", set: "09", out: "10", nov: "11", dez: "12",
+};
+
+const fixtureLocation = (venue: string) => {
+  const normalized = normalizedWord(venue);
+  if (/victor agustin ugarte|potosi/.test(normalized)) return { city: "Potosí", timezone: "America/La_Paz" };
+  if (/el teniente/.test(normalized)) return { city: "Rancagua", timezone: "America/Santiago" };
+  if (/monumental banco pichincha/.test(normalized)) return { city: "Guayaquil", timezone: "America/Guayaquil" };
+  if (/fonte nova/.test(normalized)) return { city: "Salvador", timezone: "America/Sao_Paulo" };
+  if (/nilton santos/.test(normalized)) return { city: "Rio de Janeiro", timezone: "America/Sao_Paulo" };
+  return { city: "", timezone: "America/Sao_Paulo" };
+};
+
+const fixtureDetail = (body: string, className: string) => {
+  const escaped = className.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = body.match(new RegExp(
+    `m-match-fixture-details__list-item--${escaped}[\\s\\S]{0,700}?m-match-fixture-details__list-item-value[\"'][^>]*>([\\s\\S]*?)<\\/span>`,
+    "i"
+  ));
+  return match ? decodeHtml(match[1]) : "";
+};
+
+const parseConmebolFixture = (
+  body: string,
+  source: CalendarCatalogSource,
+  sourceUrl: string
+) => {
+  const records: UnknownRecord[] = [];
+  jsonPayloads(body, "text/html").forEach((payload) => collectRecords(payload, records, new Set()));
+  const targeting = records.find((record) =>
+    text(record.fixture_id) && text(record.fixture_home_team_title) && text(record.fixture_away_team_title)
+  );
+  const urlFixtureId = sourceUrl.match(/\/fixture\/view\/(\d+)/)?.[1] ?? "";
+  const fixtureId = text(targeting?.fixture_id) || urlFixtureId;
+  if (!fixtureId || (urlFixtureId && fixtureId !== urlFixtureId)) return [];
+
+  const title = text(targeting?.fixture_title);
+  const dateTime = normalizedWord(title).match(/(\d{1,2})\s+([a-z]{3})\s+(\d{4})\s*-\s*(\d{1,2}:\d{2})/);
+  const month = dateTime ? FIXTURE_MONTHS[dateTime[2]] : undefined;
+  const homeTeam = text(targeting?.fixture_home_team_title);
+  const awayTeam = text(targeting?.fixture_away_team_title);
+  if (!dateTime || !month || !homeTeam || !awayTeam) return [];
+
+  const venueRelations = asRecord(targeting?.relations)?.cc_venue_vocab;
+  const venue = Array.isArray(venueRelations)
+    ? text(asRecord(venueRelations[0])?.label)
+    : fixtureDetail(body, "venue");
+  const location = fixtureLocation(venue);
+  const phaseValue = text(targeting?.fixture_stage_title);
+  const phase = phaseValue === "2nd Round" ? "Segunda fase"
+    : phaseValue === "3rd Round" ? "Terceira fase"
+      : phaseValue;
+  const finalScore = fixtureDetail(body, "full-time-score").match(/(\d+)\s*[-x]\s*(\d+)/i);
+  const canonicalHome = canonicalTeamName(homeTeam);
+  const canonicalAway = canonicalTeamName(awayTeam);
+  return [{
+    externalId: `fixture-${fixtureId}`,
+    competition: source.competition,
+    season: source.season,
+    date: `${dateTime[3]}-${month}-${dateTime[1].padStart(2, "0")}`,
+    time: dateTime[4],
+    timezone: location.timezone,
+    city: location.city,
+    venue,
+    phase,
+    homeTeam: canonicalHome,
+    awayTeam: canonicalAway,
+    homeTeamId: canonicalTeamId(canonicalHome),
+    awayTeamId: canonicalTeamId(canonicalAway),
+    result: finalScore ? `${finalScore[1]} x ${finalScore[2]}` : undefined,
+    placeholder: false,
+  } satisfies OfficialCalendarEvent];
+};
+
+const parseConmebolHtml = (body: string, source: CalendarCatalogSource, sourceUrl = "") => {
+  if (sourceUrl.includes("/fixture/view/")) {
+    return parseConmebolFixture(body, source, sourceUrl);
+  }
   const events = /\b(?:Ida|Volta):/i.test(body)
     ? parseConmebolKnockoutArticle(body, source)
     : parseConmebolGroupArticle(body, source);
@@ -326,10 +405,42 @@ const parseCbfPayload = (body: string, source: CalendarCatalogSource) => {
   }).sort((left, right) => `${left.date}T${left.time}`.localeCompare(`${right.date}T${right.time}`));
 };
 
+export const parseOfficialFixtureParticipantKeys = (
+  body: string,
+  contentType: string,
+  source: CalendarCatalogSource,
+  context: { sourceUrl?: string } = {}
+) => {
+  if (source.parser_key === "cbf" && contentType.includes("json")) {
+    let payload: unknown;
+    try { payload = JSON.parse(body); } catch { return new Set<string>(); }
+    const root = asRecord(payload);
+    if (!root) return new Set<string>();
+    const keys = Object.values(root).flatMap((phase) => {
+      const games = asRecord(phase)?.jogos;
+      if (!Array.isArray(games)) return [];
+      return games.flatMap((value): string[] => {
+        const record = asRecord(value);
+        if (!record) return [];
+        const home = cbfTeam(record.mandante);
+        const away = cbfTeam(record.visitante);
+        if (!home.name || !away.name) return [];
+        const canonicalHome = canonicalBrazilianClubById(home.id ?? "")?.name ?? canonicalTeamName(home.name);
+        const canonicalAway = canonicalBrazilianClubById(away.id ?? "")?.name ?? canonicalTeamName(away.name);
+        return [`${canonicalHome}|${canonicalAway}`];
+      });
+    });
+    return new Set(keys);
+  }
+  return new Set(parseOfficialSource(body, contentType, source, context)
+    .map((event) => `${canonicalTeamName(event.homeTeam)}|${canonicalTeamName(event.awayTeam)}`));
+};
+
 export const parseOfficialSource = (
   body: string,
   contentType: string,
-  source: CalendarCatalogSource
+  source: CalendarCatalogSource,
+  context: { sourceUrl?: string } = {}
 ) => {
   if (source.parser_key === "cbf" && contentType.includes("json")) {
     return parseCbfPayload(body, source);
@@ -338,7 +449,7 @@ export const parseOfficialSource = (
     return parseFormula1Html(body, source);
   }
   if (source.parser_key === "conmebol" && contentType.includes("html")) {
-    return parseConmebolHtml(body, source);
+    return parseConmebolHtml(body, source, context.sourceUrl);
   }
   const records: UnknownRecord[] = [];
   jsonPayloads(body, contentType).forEach((payload) =>

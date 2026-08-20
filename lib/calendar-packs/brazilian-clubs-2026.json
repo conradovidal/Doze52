@@ -1,6 +1,6 @@
 [
-  { "id": "20052", "name": "Athletico Paranaense", "aliases": ["Athletico Paranaense"] },
-  { "id": "62194", "name": "Atlético Mineiro", "aliases": ["Atlético Mineiro", "Atletico Mineiro"] },
+  { "id": "20052", "name": "Athletico Paranaense", "aliases": ["Athletico Paranaense", "Athletico-PR"] },
+  { "id": "62194", "name": "Atlético Mineiro", "aliases": ["Atlético Mineiro", "Atletico Mineiro", "Atlético-MG", "Atletico-MG"] },
   { "id": "61377", "name": "Bahia", "aliases": ["Bahia"] },
   { "id": "60175", "name": "Botafogo", "aliases": ["Botafogo"] },
   { "id": "20086", "name": "Chapecoense", "aliases": ["Chapecoense"] },

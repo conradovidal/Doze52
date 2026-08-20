@@ -3,7 +3,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import clubs from "../lib/calendar-packs/brazilian-clubs-2026.json";
 import { parseOfficialSource } from "../lib/calendar-catalog/parsers";
-import { fetchGeFootballFeed, reconcileGeFootballFeed } from "../lib/calendar-catalog/ge-feed";
+import { fetchGeFootballFeed, missingOfficialMatchIssues, reconcileGeFootballFeed } from "../lib/calendar-catalog/ge-feed";
 import { deterministicCalendarUuid } from "../lib/calendar-catalog/ids";
 import type { CalendarCatalogSource } from "../lib/calendar-catalog/types";
 
@@ -29,6 +29,11 @@ const sources: Record<string, CalendarCatalogSource> = {
 const documents = [
   { source: sources.brasileirao, url: "https://www.cbf.com.br/api/cbf/jogos/tabela-detalhada/campeonato/1260611", contentType: "application/json" },
   { source: sources.copa, url: "https://www.cbf.com.br/api/cbf/jogos/tabela-detalhada/campeonato/1260615", contentType: "application/json" },
+  ...[5, 13, 3, 11, 714, 711].map((fixtureId) => ({
+    source: sources.libertadores,
+    url: `https://gol.conmebol.com/libertadores/pt-br/fixture/view/${fixtureId}`,
+    contentType: "text/html",
+  })),
   { source: sources.libertadores, url: "https://gol.conmebol.com/libertadores/es/news/calendario-conmebol-libertadores-2026-dias-horarios-y-sedes-de-la-fase-de-grupos", contentType: "text/html" },
   { source: sources.libertadores, url: "https://gol.conmebol.com/libertadores/pt-br/news/datas-e-horarios-assim-serao-disputadas-oitavas-de-final-da-conmebol-libertadores", contentType: "text/html" },
   { source: sources.sudamericana, url: "https://gol.conmebol.com/sudamericana/es/news/calendario-conmebol-sudamericana-2026-dias-horarios-y-sedes-de-la-fase-de-grupos", contentType: "text/html" },
@@ -43,7 +48,7 @@ const fetchOfficial = (url: string) => execFileSync("curl", [
 
 const clubIds = new Set(clubs.map((club) => club.id));
 const officialEvents = documents.flatMap(({ source, url, contentType }) =>
-  parseOfficialSource(fetchOfficial(url), contentType, source)
+  parseOfficialSource(fetchOfficial(url), contentType, source, { sourceUrl: url })
     .filter((event) => clubIds.has(event.homeTeamId ?? "") || clubIds.has(event.awayTeamId ?? ""))
     .map((event) => ({ source, event }))
 );
@@ -54,8 +59,12 @@ const eventBatches = await Promise.all(Object.values(sources).map(async (source)
     .map((entry) => entry.event);
   const feedEvents = await fetchGeFootballFeed(source);
   const reconciliation = reconcileGeFootballFeed({ source, officialEvents: sourceOfficialEvents, feedEvents });
-  if (reconciliation.issues.length > 0) {
-    throw new Error(reconciliation.issues.map((issue) => issue.message).join(" "));
+  const issues = [
+    ...reconciliation.issues,
+    ...missingOfficialMatchIssues(reconciliation.unmatchedFeedEvents),
+  ];
+  if (issues.length > 0) {
+    throw new Error(issues.map((issue) => issue.message).join(" "));
   }
   console.log(`${source.id}: ${feedEvents.length} no GE, ${reconciliation.unmatchedFeedEvents.length} sem confirmação oficial.`);
   return reconciliation.reconciledEvents.map((event) => ({

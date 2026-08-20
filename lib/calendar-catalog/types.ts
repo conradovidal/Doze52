@@ -68,7 +68,8 @@ export type CandidateValidationIssue = {
     | "excessive_removal"
     | "external_id_reused"
     | "participants_changed"
-    | "result_conflict";
+    | "result_conflict"
+    | "missing_official_match";
   message: string;
   eventId?: string;
 };

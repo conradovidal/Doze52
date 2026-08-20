@@ -221,6 +221,11 @@ export const fetchGeFootballFeed = async (
 const participantKey = (event: OfficialCalendarEvent) =>
   `${canonicalTeamName(event.homeTeam)}|${canonicalTeamName(event.awayTeam)}`;
 
+const normalizedParticipantFingerprint = (fingerprint: string) => fingerprint
+  .split("|")
+  .map(canonicalTeamName)
+  .join("|");
+
 const sharesParticipant = (left: OfficialCalendarEvent, right: OfficialCalendarEvent) => {
   const leftTeams = new Set([canonicalTeamName(left.homeTeam), canonicalTeamName(left.awayTeam)]);
   return leftTeams.has(canonicalTeamName(right.homeTeam)) || leftTeams.has(canonicalTeamName(right.awayTeam));
@@ -234,14 +239,18 @@ export const reconcileGeFootballFeed = ({
   source,
   officialEvents,
   feedEvents,
+  officialFixtureParticipantKeys = new Set(officialEvents.map(participantKey)),
   officialMappings = new Map<string, string>(),
   geMappings = new Map<string, string>(),
+  geMappingFingerprints = new Map<string, string>(),
 }: {
   source: CalendarCatalogSource;
   officialEvents: readonly OfficialCalendarEvent[];
   feedEvents: readonly FeedCalendarEvent[];
+  officialFixtureParticipantKeys?: ReadonlySet<string>;
   officialMappings?: ReadonlyMap<string, string>;
   geMappings?: ReadonlyMap<string, string>;
+  geMappingFingerprints?: ReadonlyMap<string, string>;
 }) => {
   const issues: CandidateValidationIssue[] = [];
   const canonicalByOfficial = new Map(officialEvents.map((event) => [
@@ -255,7 +264,11 @@ export const reconcileGeFootballFeed = ({
   for (const feedEvent of feedEvents) {
     const mappedCanonical = geMappings.get(feedEvent.providerExternalId);
     let official = mappedCanonical ? officialByCanonical.get(mappedCanonical) : undefined;
-    if (official && participantKey(official) !== participantKey(feedEvent)) {
+    const storedGeFingerprint = geMappingFingerprints.get(feedEvent.providerExternalId);
+    const mappedParticipantsAreStable = storedGeFingerprint
+      ? normalizedParticipantFingerprint(storedGeFingerprint) === participantKey(feedEvent)
+      : participantKey(official ?? feedEvent) === participantKey(feedEvent);
+    if (official && !mappedParticipantsAreStable) {
       issues.push({
         code: "participants_changed",
         eventId: feedEvent.providerExternalId,
@@ -276,7 +289,9 @@ export const reconcileGeFootballFeed = ({
       if (sameClubAndDate.length === 1) official = sameClubAndDate[0];
     }
     if (!official) {
-      if (isCoveredClubMatch(feedEvent)) unmatchedFeedEvents.push(feedEvent);
+      if (isCoveredClubMatch(feedEvent) && !officialFixtureParticipantKeys.has(participantKey(feedEvent))) {
+        unmatchedFeedEvents.push(feedEvent);
+      }
       continue;
     }
     if (mappedCanonical && !officialByCanonical.has(mappedCanonical)) {
@@ -328,3 +343,10 @@ export const reconcileGeFootballFeed = ({
   }));
   return { reconciledEvents, unmatchedFeedEvents, issues, providerMappings };
 };
+
+export const missingOfficialMatchIssues = (events: readonly FeedCalendarEvent[]): CandidateValidationIssue[] =>
+  events.map((event) => ({
+    code: "missing_official_match",
+    eventId: event.providerExternalId,
+    message: `O jogo GE ${event.providerExternalId} (${event.homeTeam} x ${event.awayTeam}) não possui correspondência na fonte oficial.`,
+  }));
