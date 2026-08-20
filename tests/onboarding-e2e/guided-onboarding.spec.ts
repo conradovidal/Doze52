@@ -976,6 +976,154 @@ test("aplicação permanece interativa atrás do primeiro card", async ({ page }
   await expect(page.getByRole("dialog", { name: "Entrar" })).toBeVisible();
 });
 
+test("edição preserva categoria não inicial no desktop e no mobile", async ({
+  page,
+}, testInfo) => {
+  const mobile = testInfo.project.name === "mobile-chromium";
+  await page.goto("/?mobileUi=0");
+  await page.getByRole("button", { name: "Encerrar guia inicial" }).click();
+  await page
+    .getByRole("dialog", { name: "Quer encerrar a montagem guiada?" })
+    .getByRole("button", { name: "Encerrar e explorar" })
+    .click();
+
+  const editedEventTitle = "Noite de fondue";
+  const comparisonEventTitle = "Festival de verão";
+  await page.evaluate(
+    ({ editedEventTitle, comparisonEventTitle }) => {
+      const today = new Date();
+      const todayIso = [
+        today.getFullYear(),
+        String(today.getMonth() + 1).padStart(2, "0"),
+        String(today.getDate()).padStart(2, "0"),
+      ].join("-");
+      const payload = JSON.parse(localStorage.getItem("yiv-store") ?? "{}");
+      payload.state.categories = (payload.state.categories ?? []).map(
+        (category: Record<string, unknown>) =>
+          String(category.calendarPackGroupId ?? "").startsWith(
+            "onboarding-personal-demo-"
+          )
+            ? {
+                ...category,
+                calendarPackGroupId: undefined,
+                calendarPackVariantId: undefined,
+                calendarPackCategoryKey: undefined,
+                calendarPackVersion: undefined,
+              }
+            : category
+      );
+      payload.state.events = (payload.state.events ?? []).map(
+        (event: Record<string, unknown>) => {
+          const authorEvent = String(event.calendarPackGroupId ?? "").startsWith(
+            "onboarding-personal-demo-"
+          )
+            ? {
+                ...event,
+                calendarPackGroupId: undefined,
+                calendarPackEventKey: undefined,
+              }
+            : event;
+          return event.title === editedEventTitle ||
+            event.title === comparisonEventTitle
+            ? { ...authorEvent, startDate: todayIso, endDate: todayIso }
+            : authorEvent;
+        }
+      );
+      localStorage.setItem("yiv-store", JSON.stringify(payload));
+      localStorage.setItem(
+        "doze52:onboarding:v2",
+        JSON.stringify({
+          version: 11,
+          step: "completed",
+          context: "personal",
+          completedAt: new Date().toISOString(),
+          postOnboardingEventsCreated: 0,
+          postOnboardingCategoriesCreated: 0,
+        })
+      );
+    },
+    { editedEventTitle, comparisonEventTitle }
+  );
+
+  await page.goto(mobile ? "/?mobileUi=1" : "/?mobileUi=0");
+  await page.locator('[data-onboarding-profile-id][title="Pessoal"]').click();
+
+  const editedEvent = page.getByRole("button", { name: /Noite de fondue$/ });
+  await expect(editedEvent).toBeVisible();
+  const editedEventId = await editedEvent.getAttribute("data-calendar-event-id");
+  if (!editedEventId) throw new Error("Evento de categoria Amigos sem ID");
+
+  const before = await page.evaluate((eventId) => {
+    const payload = JSON.parse(localStorage.getItem("yiv-store") ?? "{}");
+    return payload.state.events.find(
+      (event: { id: string }) => event.id === eventId
+    ) as Record<string, unknown>;
+  }, editedEventId);
+
+  await editedEvent.click();
+  let dialog = page.getByRole("dialog", { name: "Editar evento" });
+  await expect(dialog.getByRole("combobox").nth(1)).toContainText("Amigos");
+  await dialog.getByLabel("Descrição").fill("Descrição alterada isoladamente");
+  await dialog.getByRole("button", { name: "Salvar" }).click();
+  await expect(dialog).toBeHidden();
+
+  await expect
+    .poll(() =>
+      page.evaluate((eventId) => {
+        const payload = JSON.parse(localStorage.getItem("yiv-store") ?? "{}");
+        return payload.state.events.find(
+          (event: { id: string }) => event.id === eventId
+        ) as Record<string, unknown>;
+      }, editedEventId)
+    )
+    .toMatchObject({ notes: "Descrição alterada isoladamente" });
+
+  const persistedAfterDescription = await page.evaluate((eventId) => {
+    const payload = JSON.parse(localStorage.getItem("yiv-store") ?? "{}");
+    return payload.state.events.find(
+      (event: { id: string }) => event.id === eventId
+    ) as Record<string, unknown>;
+  }, editedEventId);
+  expect(persistedAfterDescription).toEqual({
+    ...before,
+    notes: "Descrição alterada isoladamente",
+  });
+
+  await page.getByRole("button", { name: /Festival de verão$/ }).click();
+  dialog = page.getByRole("dialog", { name: "Editar evento" });
+  await expect(dialog.getByRole("combobox").nth(1)).toContainText("Eventos");
+  await dialog.getByRole("button", { name: "Close" }).click();
+
+  await page.getByRole("button", { name: /Noite de fondue$/ }).click();
+  dialog = page.getByRole("dialog", { name: "Editar evento" });
+  await dialog.getByRole("combobox").nth(1).click();
+  await page.getByRole("option", { name: "Eventos", exact: true }).click();
+  await dialog.getByRole("button", { name: "Salvar" }).click();
+
+  const expectedCategory = await page.evaluate(() => {
+    const payload = JSON.parse(localStorage.getItem("yiv-store") ?? "{}");
+    return payload.state.categories.find(
+      (category: { name: string; profileId: string }, _index: number, categories: Array<{ name: string; profileId: string }>) =>
+        category.name === "Eventos" &&
+        category.profileId === categories.find((item) => item.name === "Amigos")?.profileId
+    ) as { id: string; color: string };
+  });
+  await expect
+    .poll(() =>
+      page.evaluate((eventId) => {
+        const payload = JSON.parse(localStorage.getItem("yiv-store") ?? "{}");
+        const event = payload.state.events.find(
+          (item: { id: string }) => item.id === eventId
+        );
+        return { categoryId: event?.categoryId, color: event?.color };
+      }, editedEventId)
+    )
+    .toEqual({
+      categoryId: expectedCategory.id,
+      color: expectedCategory.color,
+    });
+});
+
 test("o X libera o ano de exemplo e a decisão persiste após recarregar", async ({
   page,
 }, testInfo) => {

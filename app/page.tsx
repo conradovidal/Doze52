@@ -5,7 +5,10 @@ import { format, parseISO } from "date-fns";
 import { Plus } from "lucide-react";
 import { MobileCalendarExperience } from "@/components/calendar/mobile-calendar-experience";
 import { YearGrid } from "@/components/calendar/year-grid";
-import { EventDialog } from "@/components/event-dialog";
+import {
+  EventDialog,
+  type EventDialogSubmission,
+} from "@/components/event-dialog";
 import { AppHeader } from "@/components/app-header";
 import {
   SyncStatusOverlay,
@@ -33,7 +36,6 @@ import {
   isOnboardingPersonalDemoGroup,
   stripOnboardingPersonalDemo,
   useStore,
-  type EventInput,
 } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { useCalendarCatalog } from "@/lib/calendar-catalog/runtime";
@@ -1417,9 +1419,12 @@ export default function HomePage() {
     [session?.user.id, updateGuidedOnboarding]
   );
 
-  const handleSubmit = async (payload: EventInput) => {
-    if (editingId) {
-      updateEvent(editingId, payload);
+  const handleSubmit = async (submission: EventDialogSubmission) => {
+    if (submission.mode === "update") {
+      if (!editingId) {
+        throw new Error("Não foi possível identificar o evento em edição.");
+      }
+      updateEvent(editingId, submission.patch);
       recordDemoInteraction(`mutation:event:update:${editingId}`);
 
       notify({
@@ -1431,7 +1436,7 @@ export default function HomePage() {
       return;
     }
 
-    const eventId = addEvent(payload);
+    const eventId = addEvent(submission.input);
     if (!eventId) {
       throw new Error("Não foi possível adicionar este evento à categoria escolhida.");
     }

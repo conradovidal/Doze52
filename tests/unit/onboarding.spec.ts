@@ -989,25 +989,41 @@ test("sandbox libera criação, edição e exclusão sem preservar a origem demo
     )
   ).toEqual(new Set(["holidays-by-state", formula12026Pack.id]));
 
-  const categoryId = sandbox.categories[0]?.id;
-  expect(categoryId).toBeTruthy();
+  const category = sandbox.categories.find((item) => item.name === "Amigos");
+  const targetCategory = sandbox.categories.find(
+    (item) => item.name === "Eventos" && item.profileId === category?.profileId
+  );
+  expect(category).toBeTruthy();
+  expect(targetCategory).toBeTruthy();
   const eventId = sandbox.addEvent({
     title: "Novo evento no exemplo",
-    categoryId: categoryId!,
+    categoryId: category!.id,
     startDate: "2026-08-12",
-    endDate: "2026-08-12",
+    endDate: "2026-08-14",
+    notes: "Descrição original",
+    recurrenceType: "weekly",
+    recurrenceUntil: "2026-09-30",
   });
   expect(eventId).toBeTruthy();
 
+  const beforeTitleUpdate = useStore.getState().getEventById(eventId!);
   useStore.getState().updateEvent(eventId!, {
     title: "Evento ajustado no exemplo",
-    categoryId: categoryId!,
-    startDate: "2026-08-13",
-    endDate: "2026-08-13",
   });
-  expect(useStore.getState().getEventById(eventId!)?.title).toBe(
-    "Evento ajustado no exemplo"
-  );
+  const afterTitleUpdate = useStore.getState().getEventById(eventId!);
+  expect(afterTitleUpdate).toEqual({
+    ...beforeTitleUpdate,
+    title: "Evento ajustado no exemplo",
+  });
+
+  useStore.getState().updateEvent(eventId!, {
+    categoryId: targetCategory!.id,
+  });
+  expect(useStore.getState().getEventById(eventId!)).toEqual({
+    ...afterTitleUpdate,
+    categoryId: targetCategory!.id,
+    color: targetCategory!.color,
+  });
 
   useStore.getState().deleteEvent(eventId!);
   expect(useStore.getState().getEventById(eventId!)).toBeUndefined();

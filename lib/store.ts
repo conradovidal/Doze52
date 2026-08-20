@@ -43,6 +43,8 @@ export type EventInput = {
   recurrenceUntil?: string;
 };
 
+export type EventUpdatePatch = Partial<EventInput>;
+
 export type CalendarViewMode = "year" | "quarter" | "month";
 const CALENDAR_ZOOM_MIN_PERCENT = 100;
 const CALENDAR_ZOOM_MAX_PERCENT = 180;
@@ -93,7 +95,7 @@ type StoreState = {
   deleteProfile: (input: { profileId: string; reassignToProfileId: string }) => void;
   setProfilesOrder: (orderedIds: string[]) => void;
   addEvent: (input: EventInput) => string | null;
-  updateEvent: (id: string, input: EventInput) => void;
+  updateEvent: (id: string, patch: EventUpdatePatch) => void;
   moveEventByDelta: (id: string, deltaDays: number) => void;
   reorderEventInDay: (params: { eventId: string; dayIso: string; toIndex: number }) => void;
   normalizeDayOrder: (dayIso: string, eventIdsInDay: string[]) => void;
@@ -1702,14 +1704,30 @@ export const useStore = create<StoreState>()(
         });
         return didAdd ? id : null;
       },
-      updateEvent: (id, input) =>
+      updateEvent: (id, patch) =>
         set((state) => {
+          if (Object.keys(patch).length === 0) return state;
           const currentEvent = state.events.find((event) => event.id === id);
+          if (!currentEvent) return state;
+          const input: EventInput = {
+            title: patch.title ?? currentEvent.title,
+            categoryId: patch.categoryId ?? currentEvent.categoryId,
+            startDate: patch.startDate ?? currentEvent.startDate,
+            endDate: patch.endDate ?? currentEvent.endDate,
+            notes: "notes" in patch ? patch.notes : currentEvent.notes,
+            recurrenceType:
+              "recurrenceType" in patch
+                ? patch.recurrenceType
+                : currentEvent.recurrenceType,
+            recurrenceUntil:
+              "recurrenceUntil" in patch
+                ? patch.recurrenceUntil
+                : currentEvent.recurrenceUntil,
+          };
           const targetCategory = state.categories.find(
             (category) => category.id === input.categoryId
           );
           if (
-            !currentEvent ||
             (currentEvent.calendarPackGroupId &&
               !isOnboardingPersonalDemoGroup(currentEvent.calendarPackGroupId)) ||
             !targetCategory ||
@@ -1721,39 +1739,45 @@ export const useStore = create<StoreState>()(
           }
           return {
             events: state.events.map((evt) => {
-            if (evt.id !== id) return evt;
-            const prevIsSingleDay = isSingleDayEvent(evt);
-            const nextIsSingleDay = input.startDate === input.endDate;
-            const mustRecalculateOrder = prevIsSingleDay !== nextIsSingleDay;
-            const nextOrder = mustRecalculateOrder
-              ? nextIsSingleDay
-                ? nextSingleDayOrder(
-                    state.events.filter((entry) => entry.id !== id),
-                    input.startDate
-                  )
-                : nextMultiDayOrder(state.events.filter((entry) => entry.id !== id))
-              : normalizeEventDayOrder(evt.dayOrder);
-            const recurrenceType = normalizeRecurrenceType(input.recurrenceType);
-            const recurrenceUntil = normalizeRecurrenceUntil({
-              value: input.recurrenceUntil,
-              recurrenceType,
-              startDate: input.startDate,
-            });
-            return {
-              ...evt,
-              title: input.title.trim(),
-              categoryId: input.categoryId,
-              color:
-                state.categories.find((c) => c.id === input.categoryId)?.color ??
-                evt.color,
-              startDate: input.startDate,
-              endDate: input.endDate,
-              notes: input.notes?.trim() || undefined,
-              recurrenceType,
-              recurrenceUntil,
-              createdAt: evt.createdAt,
-              dayOrder: nextOrder,
-            };
+              if (evt.id !== id) return evt;
+              const prevIsSingleDay = isSingleDayEvent(evt);
+              const nextIsSingleDay = input.startDate === input.endDate;
+              const mustRecalculateOrder = prevIsSingleDay !== nextIsSingleDay;
+              const nextOrder = mustRecalculateOrder
+                ? nextIsSingleDay
+                  ? nextSingleDayOrder(
+                      state.events.filter((entry) => entry.id !== id),
+                      input.startDate
+                    )
+                  : nextMultiDayOrder(
+                      state.events.filter((entry) => entry.id !== id)
+                    )
+                : evt.dayOrder;
+              const recurrenceType = normalizeRecurrenceType(input.recurrenceType);
+              const recurrenceUntil = normalizeRecurrenceUntil({
+                value: input.recurrenceUntil,
+                recurrenceType,
+                startDate: input.startDate,
+              });
+              const nextEvent = { ...evt };
+              if ("title" in patch) nextEvent.title = input.title.trim();
+              if ("categoryId" in patch) {
+                nextEvent.categoryId = input.categoryId;
+                nextEvent.color = targetCategory.color;
+              }
+              if ("startDate" in patch) nextEvent.startDate = input.startDate;
+              if ("endDate" in patch) nextEvent.endDate = input.endDate;
+              if ("notes" in patch) {
+                nextEvent.notes = input.notes?.trim() || undefined;
+              }
+              if ("recurrenceType" in patch) {
+                nextEvent.recurrenceType = recurrenceType;
+              }
+              if ("recurrenceType" in patch || "recurrenceUntil" in patch) {
+                nextEvent.recurrenceUntil = recurrenceUntil;
+              }
+              if (mustRecalculateOrder) nextEvent.dayOrder = nextOrder;
+              return nextEvent;
             }),
           };
         }),
