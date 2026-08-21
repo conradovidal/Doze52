@@ -1,4 +1,8 @@
-import { getAuthenticatedServerUser, getSupabaseAdminClient } from "@/lib/supabase-server";
+import {
+  getAuthenticatedServerUser,
+  getSupabaseAdminClient,
+  hasSupabaseAdminEnv,
+} from "@/lib/supabase-server";
 import type { FeedbackKind, FeedbackStatus } from "@/lib/product-feedback";
 
 export type FeedbackRow = {
@@ -18,6 +22,7 @@ export type FeedbackRow = {
 };
 
 export const getFeedbackAdminUser = async () => {
+  if (!hasSupabaseAdminEnv) return null;
   const user = await getAuthenticatedServerUser();
   if (!user) return null;
   const { data, error } = await getSupabaseAdminClient()
