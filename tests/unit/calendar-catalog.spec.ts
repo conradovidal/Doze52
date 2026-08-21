@@ -1,15 +1,22 @@
 import { expect, test } from "@playwright/test";
 import { deterministicCalendarUuid } from "../../lib/calendar-catalog/ids";
 import { diffCatalogs, incrementChangedPackVersions, materialHash } from "../../lib/calendar-catalog/material";
-import { parseOfficialSource } from "../../lib/calendar-catalog/parsers";
+import { parseOfficialFixtureParticipantKeys, parseOfficialSource } from "../../lib/calendar-catalog/parsers";
 import { validateOfficialCandidate } from "../../lib/calendar-catalog/validation";
 import { applyOfficialSourceToCatalog } from "../../lib/calendar-catalog/catalog-builder";
 import {
   fetchGeFootballFeed,
+  missingOfficialMatchIssues,
   parseGeBootstrap,
   parseGeMatches,
   reconcileGeFootballFeed,
 } from "../../lib/calendar-catalog/ge-feed";
+import {
+  CBF_CA_SHA256,
+  CBF_SECTIGO_OV_R36_CA,
+  cbfRequestOptions,
+  validateCbfIntermediateCertificate,
+} from "../../lib/calendar-catalog/cbf-transport";
 import type { CalendarCatalogSource, OfficialCalendarEvent } from "../../lib/calendar-catalog/types";
 import type { CalendarPack } from "../../lib/calendar-packs/types";
 import clubs from "../../lib/calendar-packs/brazilian-clubs-2026.json";
@@ -30,6 +37,19 @@ test("parser CBF aceita a tabela oficial e descarta placeholders", () => {
   const parsed = parseOfficialSource(body, "application/json", source("cbf"));
   expect(parsed).toHaveLength(1);
   expect(parsed[0]).toMatchObject({ externalId: "831894", date: "2026-01-28", time: "19:00", homeTeamId: "62194", awayTeamId: "20002", result: "2 x 2" });
+  expect(parseOfficialFixtureParticipantKeys(body, "application/json", source("cbf")))
+    .toEqual(new Set(["Atlético Mineiro|Palmeiras", "A|B"]));
+});
+
+test("transporte CBF limita host e valida a CA intermediária versionada", () => {
+  expect(validateCbfIntermediateCertificate().fingerprint256).toBe(CBF_CA_SHA256);
+  const options = cbfRequestOptions(new URL("https://www.cbf.com.br/api/cbf/calendario"));
+  expect(options.servername).toBe("www.cbf.com.br");
+  expect(options.ca).toEqual(expect.arrayContaining([CBF_SECTIGO_OV_R36_CA]));
+  expect(() => cbfRequestOptions(new URL("https://cbf.example/api"))).toThrow(/cbf_tls_chain_error/);
+  expect(() => validateCbfIntermediateCertificate("certificado inválido")).toThrow(/cbf_tls_chain_error/);
+  expect(() => validateCbfIntermediateCertificate(CBF_SECTIGO_OV_R36_CA, "00:00"))
+    .toThrow(/fingerprint.*divergente/);
 });
 
 test("parser GE descobre tabela e fases no bootstrap público", () => {
@@ -99,6 +119,90 @@ test("reconciliação preserva dados oficiais, acrescenta resultado final e isol
     geMappings: new Map([[feed.providerExternalId, "canonical-1"]]),
   });
   expect(mappedConflict.issues.map((issue) => issue.code)).toContain("participants_changed");
+
+  const mappedAlias = reconcileGeFootballFeed({
+    source: geSource,
+    officialEvents: [{ ...official, homeTeam: "Sampaio Correa", awayTeam: "Desportiva Ferroviária" }],
+    feedEvents: [{ ...feed, homeTeam: "Sampaio Corrêa-RJ", awayTeam: "Desportiva Ferroviária" }],
+    officialMappings: new Map([[official.externalId, "canonical-1"]]),
+    geMappings: new Map([[feed.providerExternalId, "canonical-1"]]),
+    geMappingFingerprints: new Map([[feed.providerExternalId, "Sampaio Corrêa-RJ|Desportiva Ferroviária"]]),
+  });
+  expect(mappedAlias.issues).toEqual([]);
+  expect(mappedAlias.unmatchedFeedEvents).toEqual([]);
+
+  const reusedMappedId = reconcileGeFootballFeed({
+    source: geSource,
+    officialEvents: [official],
+    feedEvents: [{ ...feed, homeTeam: "Flamengo" }],
+    officialMappings: new Map([[official.externalId, "canonical-1"]]),
+    geMappings: new Map([[feed.providerExternalId, "canonical-1"]]),
+    geMappingFingerprints: new Map([[feed.providerExternalId, "Palmeiras|Tolima"]]),
+  });
+  expect(reusedMappedId.issues.map((issue) => issue.code)).toContain("participants_changed");
+
+  const officialPlaceholder = new Set(["Flamengo|Corinthians"]);
+  const [futureFeed] = parseGeMatches({ jogos: [{
+    id: 502, data_realizacao: "2026-09-13T19:00", hora_realizacao: "19:00", jogo_ja_comecou: false,
+    equipes: { mandante: { nome_popular: "Flamengo" }, visitante: { nome_popular: "Corinthians" } },
+  }] }, geSource, "Rodada 27");
+  const placeholderReconciliation = reconcileGeFootballFeed({
+    source: geSource, officialEvents: [], feedEvents: [futureFeed],
+    officialFixtureParticipantKeys: officialPlaceholder,
+  });
+  expect(placeholderReconciliation.unmatchedFeedEvents).toEqual([]);
+  expect(placeholderReconciliation.reconciledEvents).toEqual([]);
+});
+
+test("fixtures oficiais CONMEBOL cobrem Bahia e Botafogo sem unmatched", () => {
+  const geSource = { ...source("conmebol"), id: "conmebol-libertadores-2026", feed_provider: "GE", feed_url: "https://ge.example/tabela" };
+  const fixtures = [
+    ["5", "Bahia", "O'Higgins", "25", "Fev", "19:00", "2nd Round", "Casa de Apostas Arena Fonte Nova", "2 - 1"],
+    ["13", "O'Higgins", "Bahia", "18", "Fev", "19:00", "2nd Round", "Estadio Codelco El Teniente", "1 - 0"],
+    ["3", "Botafogo", "Nacional Potosí", "25", "Fev", "21:30", "2nd Round", "Estádio Olímpico Nilton Santos", "2 - 0"],
+    ["11", "Nacional Potosí", "Botafogo", "18", "Fev", "21:30", "2nd Round", "Estadio Víctor Agustín Ugarte de Potosí", "1 - 0"],
+    ["714", "Barcelona", "Botafogo", "3", "Mar", "21:30", "3rd Round", "Estadio Monumental Banco Pichincha", "1 - 1"],
+    ["711", "Botafogo", "Barcelona", "10", "Mar", "21:30", "3rd Round", "Estádio Olímpico Nilton Santos", "0 - 1"],
+  ] as const;
+  const officialEvents = fixtures.flatMap(([id, home, away, day, month, time, stage, venue, result]) => {
+    const settings = { metadata: { targeting: {
+      fixture_id: id,
+      fixture_title: `${home} vs ${away} (Qua, ${day} ${month} 2026 - ${time})`,
+      fixture_home_team_title: home,
+      fixture_away_team_title: away,
+      fixture_stage_title: stage,
+      relations: { cc_venue_vocab: [{ label: venue }] },
+    } } };
+    const html = `<script type="application/json" data-drupal-selector="drupal-settings-json">${JSON.stringify(settings)}</script>
+      <li class="m-match-fixture-details__list-item--full-time-score"><span class="m-match-fixture-details__list-item-value">${result}</span></li>`;
+    return parseOfficialSource(html, "text/html", geSource, {
+      sourceUrl: `https://gol.conmebol.com/libertadores/pt-br/fixture/view/${id}`,
+    });
+  });
+  expect(officialEvents.map((item) => item.externalId)).toEqual([
+    "fixture-5", "fixture-13", "fixture-3", "fixture-11", "fixture-714", "fixture-711",
+  ]);
+  expect(officialEvents[0]).toMatchObject({
+    date: "2026-02-25", time: "19:00", homeTeam: "Bahia", awayTeam: "O'Higgins",
+    phase: "Segunda fase", city: "Salvador", result: "2 x 1",
+  });
+  expect(officialEvents[3]).toMatchObject({ city: "Potosí", timezone: "America/La_Paz" });
+
+  const feedEvents = officialEvents.map((item, index) => ({
+    ...item,
+    provider: "GE",
+    providerExternalId: String(700 + index),
+    externalId: `ge:${700 + index}`,
+    status: "finished" as const,
+  }));
+  const reconciliation = reconcileGeFootballFeed({ source: geSource, officialEvents, feedEvents });
+  expect(reconciliation.unmatchedFeedEvents).toEqual([]);
+  expect(reconciliation.providerMappings).toHaveLength(6);
+
+  const withoutOfficial = reconcileGeFootballFeed({ source: geSource, officialEvents: [], feedEvents: [feedEvents[0]] });
+  expect(missingOfficialMatchIssues(withoutOfficial.unmatchedFeedEvents)).toEqual([
+    expect.objectContaining({ code: "missing_official_match", eventId: "700" }),
+  ]);
 });
 
 const event = (overrides: Partial<OfficialCalendarEvent> = {}): OfficialCalendarEvent => ({
