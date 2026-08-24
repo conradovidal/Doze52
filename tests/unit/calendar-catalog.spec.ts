@@ -65,7 +65,7 @@ test("parser GE descobre tabela e fases no bootstrap público", () => {
 });
 
 test("parser GE aceita encerrado e pênaltis, mas ignora placar em andamento", () => {
-  const geSource = { ...source("cbf"), feed_provider: "GE", feed_url: "https://ge.example/tabela" };
+  const geSource = { ...source("cbf"), feed_provider: "GE", feed_url: "https://ge.globo.com/tabela" };
   const matches = parseGeMatches({ jogos: [
     { id: 101, data_realizacao: "2026-08-11T21:30", hora_realizacao: "21:30", jogo_ja_comecou: true, placar_oficial_mandante: 2, placar_oficial_visitante: 2, placar_penaltis_mandante: 5, placar_penaltis_visitante: 4, equipes: { mandante: { id: 1, nome_popular: "Palmeiras" }, visitante: { id: 2, nome_popular: "Tolima" } }, sede: { nome_popular: "Allianz Parque" }, transmissao: { broadcast: { id: "ENCERRADA" } } },
     { id: 102, data_realizacao: "2026-08-12T19:00", hora_realizacao: "19:00", jogo_ja_comecou: true, placar_oficial_mandante: 1, placar_oficial_visitante: 0, equipes: { mandante: { id: 3, nome_popular: "Flamengo" }, visitante: { id: 4, nome_popular: "Estudiantes" } }, sede: { nome_popular: "Maracanã" }, transmissao: { broadcast: { id: "AO_VIVO" } } },
@@ -75,10 +75,10 @@ test("parser GE aceita encerrado e pênaltis, mas ignora placar em andamento", (
 });
 
 test("feed GE navega grupos, rodadas e mata-mata com concorrência limitada", async () => {
-  const geSource = { ...source("cbf"), feed_provider: "GE", feed_url: "https://ge.example/tabela" };
+  const geSource = { ...source("cbf"), feed_provider: "GE", feed_url: "https://ge.globo.com/tabela" };
   const game = (id: number) => ({ id, data_realizacao: "2026-08-11T21:30", hora_realizacao: "21:30", jogo_ja_comecou: false, equipes: { mandante: { nome_popular: "Palmeiras" }, visitante: { nome_popular: `Time ${id}` } }, sede: { nome_popular: "Estádio" } });
   const responses = new Map<string, unknown>([
-    ["https://ge.example/tabela", `<script>const classificacao = {"fase":{"slug":"grupos"},"fases_navegacao":[{"nome":"Grupos","slug":"grupos"},{"nome":"Oitavas","slug":"oitavas"}]}; const resource = { tUUID: "table-1" };</script>`],
+    ["https://ge.globo.com/tabela", `<script>const classificacao = {"fase":{"slug":"grupos"},"fases_navegacao":[{"nome":"Grupos","slug":"grupos"},{"nome":"Oitavas","slug":"oitavas"}]}; const resource = { tUUID: "table-1" };</script>`],
     ["https://api.globoesporte.globo.com/tabela/table-1/fase/grupos/classificacao/", { lista_tipo_unica: false, grupos: [{ grupo_id: 10, rodada: { ultima: 2 } }] }],
     ["https://api.globoesporte.globo.com/tabela/table-1/fase/grupos/rodada/1/grupo/10/jogos/", [game(1)]],
     ["https://api.globoesporte.globo.com/tabela/table-1/fase/grupos/rodada/2/grupo/10/jogos/", [game(2)]],
@@ -98,7 +98,7 @@ test("feed GE navega grupos, rodadas e mata-mata com concorrência limitada", as
 });
 
 test("reconciliação preserva dados oficiais, acrescenta resultado final e isola divergência", () => {
-  const geSource = { ...source("conmebol"), id: "conmebol-libertadores-2026", feed_provider: "GE", feed_url: "https://ge.example/tabela" };
+  const geSource = { ...source("conmebol"), id: "conmebol-libertadores-2026", feed_provider: "GE", feed_url: "https://ge.globo.com/tabela" };
   const official = event({ externalId: "official-1", homeTeam: "Palmeiras", awayTeam: "Tolima", venue: "Local oficial" });
   const officialWithoutGe = event({ externalId: "official-2", date: "2026-08-18", homeTeam: "Flamengo", awayTeam: "Estudiantes" });
   const [feed] = parseGeMatches({ jogos: [{ id: 501, data_realizacao: "2026-08-11T21:30", hora_realizacao: "21:30", jogo_ja_comecou: true, placar_oficial_mandante: 2, placar_oficial_visitante: 0, equipes: { mandante: { nome_popular: "Palmeiras" }, visitante: { nome_popular: "Tolima" } }, sede: { nome_popular: "Outro local" }, transmissao: { broadcast: { id: "ENCERRADA" } } }] }, geSource, "Oitavas");
@@ -155,7 +155,7 @@ test("reconciliação preserva dados oficiais, acrescenta resultado final e isol
 });
 
 test("fixtures oficiais CONMEBOL cobrem Bahia e Botafogo sem unmatched", () => {
-  const geSource = { ...source("conmebol"), id: "conmebol-libertadores-2026", feed_provider: "GE", feed_url: "https://ge.example/tabela" };
+  const geSource = { ...source("conmebol"), id: "conmebol-libertadores-2026", feed_provider: "GE", feed_url: "https://ge.globo.com/tabela" };
   const fixtures = [
     ["5", "Bahia", "O'Higgins", "25", "Fev", "19:00", "2nd Round", "Casa de Apostas Arena Fonte Nova", "2 - 1"],
     ["13", "O'Higgins", "Bahia", "18", "Fev", "19:00", "2nd Round", "Estadio Codelco El Teniente", "1 - 0"],
