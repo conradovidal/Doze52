@@ -1,5 +1,30 @@
 "use client";
 
+import { Check } from "lucide-react";
+import {
+  getDesktopHabitSlot,
+  getHabitDayAction,
+  getHabitCheckInKey,
+} from "@/lib/habits-prototype";
+import type { Habit, HabitCheckIn } from "@/lib/types";
+import { cn } from "@/lib/utils";
+
+export type DayCellHabitPresentation = {
+  habits: Habit[];
+  checkIns: Record<string, HabitCheckIn>;
+  selectedHabit: Habit | null;
+  onToggle: (dateIso: string) => void;
+  onCreateRequest: () => void;
+};
+
+const ACCESSIBLE_DATE_FORMATTER = new Intl.DateTimeFormat("pt-BR", {
+  dateStyle: "full",
+  timeZone: "UTC",
+});
+
+const formatAccessibleDate = (dateIso: string) =>
+  ACCESSIBLE_DATE_FORMATTER.format(new Date(`${dateIso}T12:00:00Z`));
+
 export function DayCell({
   date,
   dateIso,
@@ -14,6 +39,7 @@ export function DayCell({
   onDayHover,
   onDayDrop,
   onActivate,
+  habitPresentation,
 }: {
   date: Date;
   dateIso: string;
@@ -28,8 +54,10 @@ export function DayCell({
   onDayHover?: (dateIso: string) => void;
   onDayDrop?: (dateIso: string, transfer?: DataTransfer | null) => void;
   onActivate?: (dateIso: string) => void;
+  habitPresentation?: DayCellHabitPresentation;
 }) {
   const isPast = dateIso < todayIso;
+  const isHabitMode = Boolean(habitPresentation);
 
   if (!isInMonth) {
     return (
@@ -60,6 +88,30 @@ export function DayCell({
   const dayOfWeek = date.getDay(); // 0..6
   const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
   const today = dateIso === todayIso;
+  const isFuture = dateIso > todayIso;
+  const completedHabits = isFuture
+    ? []
+    : habitPresentation?.habits.filter((habit) =>
+        Boolean(
+          habitPresentation.checkIns[getHabitCheckInKey(habit.id, dateIso)]
+            ?.completed
+        )
+      ) ?? [];
+  const selectedHabitCompleted = habitPresentation?.selectedHabit
+    ? Boolean(
+        habitPresentation.checkIns[
+          getHabitCheckInKey(habitPresentation.selectedHabit.id, dateIso)
+        ]?.completed
+      )
+    : false;
+  const completedNames = completedHabits.map((habit) => habit.name).join(", ");
+  const habitAriaLabel = habitPresentation
+    ? isFuture
+      ? `${formatAccessibleDate(dateIso)}: data futura, indisponível para hábitos`
+      : habitPresentation.selectedHabit
+        ? `${selectedHabitCompleted ? "Desmarcar" : "Marcar"} ${habitPresentation.selectedHabit.name} em ${formatAccessibleDate(dateIso)}.${completedNames ? ` Concluídos: ${completedNames}.` : " Nenhum hábito concluído."}`
+        : `${formatAccessibleDate(dateIso)}: crie um hábito para fazer check-in`
+    : undefined;
   const dayToneClass = isPast
     ? isWeekend
       ? "bg-neutral-300/62 dark:bg-[hsl(var(--cal-cell-weekend-past))]"
@@ -72,7 +124,17 @@ export function DayCell({
     : isWeekend
       ? "text-neutral-500 dark:text-neutral-200/86"
       : "text-muted-foreground dark:text-neutral-100/88";
-  const showCenterCreateCue = showCreateCue && !today && !isRangeSelected;
+  const showCenterCreateCue =
+    !isHabitMode && showCreateCue && !today && !isRangeSelected;
+  const habitDayAction = habitPresentation
+    ? getHabitDayAction({
+        inYear: true,
+        isFuture,
+        hasSelectedHabit: Boolean(habitPresentation.selectedHabit),
+      })
+    : null;
+  const habitCanToggle = habitDayAction === "toggle";
+  const habitCanActivate = habitDayAction === "toggle" || habitDayAction === "create";
 
   return (
     <div
@@ -80,9 +142,16 @@ export function DayCell({
       data-day-iso={dateIso}
       role="button"
       tabIndex={0}
-      aria-label={`Adicionar evento em ${dateIso}`}
+      aria-label={habitAriaLabel ?? `Adicionar evento em ${dateIso}`}
+      aria-disabled={isHabitMode && !habitCanActivate ? true : undefined}
       data-range-selected={isRangeSelected ? "true" : undefined}
-      className={`group relative flex w-full cursor-pointer flex-col px-1 py-1 ring-1 ring-inset transition-[background-color,box-shadow] duration-150 ${dayToneClass} ${
+      className={`group relative flex w-full flex-col px-1 py-1 ring-1 ring-inset transition-[background-color,box-shadow] duration-150 ${dayToneClass} ${
+        isHabitMode
+          ? habitCanActivate
+            ? "cursor-pointer"
+            : "cursor-not-allowed"
+          : "cursor-pointer"
+      } ${
         today
           ? "ring-neutral-900 shadow-[inset_0_0_0_1px_rgba(23,23,23,0.06)] dark:ring-neutral-100 dark:shadow-none"
           : showCreateCue
@@ -114,11 +183,27 @@ export function DayCell({
       }}
       onClick={(event) => {
         event.currentTarget.focus();
+         if (isHabitMode) {
+           if (habitCanToggle) {
+             habitPresentation?.onToggle(dateIso);
+          } else if (habitCanActivate) {
+            habitPresentation?.onCreateRequest();
+           }
+           return;
+         }
         onActivate?.(dateIso);
       }}
       onKeyDown={(event) => {
         if (event.key !== "Enter" && event.key !== " ") return;
         event.preventDefault();
+         if (isHabitMode) {
+           if (habitCanToggle) {
+             habitPresentation?.onToggle(dateIso);
+          } else if (habitCanActivate) {
+            habitPresentation?.onCreateRequest();
+           }
+           return;
+         }
         onActivate?.(dateIso);
       }}
     >
@@ -145,6 +230,50 @@ export function DayCell({
         </span>
       </div>
       <div className="mt-1 flex-1" />
+      {habitPresentation && completedHabits.length > 0 ? (
+        <div
+          data-day-habit-markers
+          className={cn(
+            "pointer-events-none absolute inset-x-0 top-7 bottom-1 grid place-items-center",
+            habitPresentation.habits.length > 1 && "mx-auto w-fit grid-cols-2 grid-rows-2 gap-px"
+          )}
+          aria-hidden="true"
+        >
+          {habitPresentation.habits.map((habit, habitIndex) => {
+            const completed = completedHabits.some((entry) => entry.id === habit.id);
+            const slot = getDesktopHabitSlot(
+              habitPresentation.habits.length,
+              habitIndex
+            );
+            return (
+              <span
+                key={habit.id}
+                data-habit-marker={completed ? habit.id : undefined}
+                data-habit-slot={slot ?? undefined}
+                className={cn(
+                  "grid place-items-center rounded-full border border-black/10 text-slate-950",
+                  habitPresentation.habits.length === 1
+                    ? "size-[clamp(9px,0.9vw,13px)]"
+                    : "size-[clamp(6px,0.72vw,10px)]",
+                  !completed && "invisible"
+                )}
+                style={completed ? { backgroundColor: habit.color } : undefined}
+              >
+                {completed ? (
+                  <Check
+                    className={cn(
+                      habitPresentation.habits.length === 1
+                        ? "size-[clamp(6px,0.58vw,9px)]"
+                        : "size-[clamp(4px,0.46vw,7px)]"
+                    )}
+                    strokeWidth={3}
+                  />
+                ) : null}
+              </span>
+            );
+          })}
+        </div>
+      ) : null}
       {showCreateCue ? (
         <div className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-transparent transition-all duration-150 group-hover:ring-neutral-300/45 dark:group-hover:ring-neutral-500/30" />
       ) : null}

@@ -41,6 +41,8 @@ type AppHeaderProps = {
   authLoading: boolean;
   isAuthenticated: boolean;
   isMobileCalendarUi?: boolean;
+  showCalendarControls?: boolean;
+  useAdaptiveNavigation?: boolean;
   onOpenAuthDialog: (anchorPoint?: AnchorPoint) => void;
   onCalendarPackFocusYear: (year: number) => void;
   onboardingFocusTarget?: OnboardingFocusTarget;
@@ -76,6 +78,8 @@ export function AppHeader({
   authLoading,
   isAuthenticated,
   isMobileCalendarUi = false,
+  showCalendarControls = true,
+  useAdaptiveNavigation = false,
   onOpenAuthDialog,
   onCalendarPackFocusYear,
   onboardingFocusTarget = null,
@@ -341,8 +345,24 @@ export function AppHeader({
           isMobileMode ? "mb-1" : "mb-4 md:mb-5"
         )}
       >
-        <div className="grid min-h-9 grid-cols-[auto_minmax(0,1fr)] items-start gap-2.5 md:min-h-10 md:grid-cols-[minmax(0,1fr)_auto] md:items-center md:gap-4">
-          <div className="justify-self-start">
+        <div
+          className={cn(
+            "relative min-h-9 md:min-h-10",
+            useAdaptiveNavigation
+              ? "flex items-start justify-end md:items-center"
+              : "grid grid-cols-[auto_minmax(0,1fr)] items-start gap-2.5 md:grid-cols-[minmax(0,1fr)_auto] md:items-center md:gap-4"
+          )}
+        >
+          <div
+            data-brand-logo-position={
+              useAdaptiveNavigation ? "header-center" : undefined
+            }
+            className={cn(
+              useAdaptiveNavigation
+                ? "absolute top-0 left-[calc(50vw-0.75rem)] -translate-x-1/2 md:left-[calc(50vw-3.5rem)]"
+                : "justify-self-start"
+            )}
+          >
             <BrandLogo />
           </div>
 
@@ -353,12 +373,13 @@ export function AppHeader({
               }
               className="flex min-w-0 flex-wrap items-center justify-end gap-1 sm:gap-2"
             >
-              <div
-                data-onboarding-spotlight-target={
-                  guidedToolbarNotice?.target === "edit" ? "true" : undefined
-                }
-                className="relative shrink-0"
-              >
+              {showCalendarControls ? (
+                <div
+                  data-onboarding-spotlight-target={
+                    guidedToolbarNotice?.target === "edit" ? "true" : undefined
+                  }
+                  className="relative shrink-0"
+                >
                 {effectiveInlineEditMode ? (
                   <Button
                     type="button"
@@ -415,14 +436,16 @@ export function AppHeader({
                     onAction={() => onGuidedToolbarAction?.("edit")}
                   />
                 ) : null}
-              </div>
+                </div>
+              ) : null}
 
-              <div
-                data-onboarding-spotlight-target={
-                  guidedToolbarNotice?.target === "calendars" ? "true" : undefined
-                }
-                className="relative shrink-0"
-              >
+              {showCalendarControls ? (
+                <div
+                  data-onboarding-spotlight-target={
+                    guidedToolbarNotice?.target === "calendars" ? "true" : undefined
+                  }
+                  className="relative shrink-0"
+                >
                 <CalendarPackLauncher
                   onFocusYear={onCalendarPackFocusYear}
                   className="shrink-0"
@@ -449,7 +472,8 @@ export function AppHeader({
                     onClose={onDismissGuidedSelection}
                   />
                 ) : null}
-              </div>
+                </div>
+              ) : null}
 
               <div
                 data-onboarding-spotlight-target={
@@ -495,65 +519,70 @@ export function AppHeader({
                 ) : null}
               </div>
 
-              <div
-                data-onboarding-spotlight-target={
-                  guidedToolbarNotice?.target === "theme" ? "true" : undefined
-                }
-                className="relative shrink-0"
-              >
-                <ThemeToggle
-                  highlighted={guidedToolbarNotice?.target === "theme"}
-                  disabled={themeToggleDisabled}
-                />
-                {guidedToolbarNotice?.target === "theme" &&
-                onDismissGuidedSelection ? (
-                  <GuidedToolbarNoticeCard
-                    notice={guidedToolbarNotice}
-                    onClose={onDismissGuidedSelection}
-                    onAction={
-                      guidedToolbarNotice.actionLabel
-                        ? () => onGuidedToolbarAction?.("theme")
-                        : undefined
+              {!useAdaptiveNavigation ? (
+                <>
+                  <div
+                    data-onboarding-spotlight-target={
+                      guidedToolbarNotice?.target === "theme" ? "true" : undefined
                     }
-                    align="end"
-                  />
-                ) : null}
-              </div>
-
-              <div className="flex h-8 items-center justify-end md:h-9">
-                {authLoading ? null : isAuthenticated ? (
-                  <UserMenu />
-                ) : (
-                  <Button
-                    data-onboarding-auth-entry
-                    size="sm"
-                    variant="outline"
-                    disabled={onboardingLayoutLocked}
-                    className={utilityButtonClass}
-                    onClick={(event) => {
-                      const rect = event.currentTarget.getBoundingClientRect();
-                      onOpenAuthDialog({ x: rect.right, y: rect.bottom });
-                    }}
+                    className="relative shrink-0"
                   >
-                    Entrar
-                  </Button>
-                )}
-              </div>
+                    <ThemeToggle
+                      highlighted={guidedToolbarNotice?.target === "theme"}
+                      disabled={themeToggleDisabled}
+                    />
+                    {guidedToolbarNotice?.target === "theme" &&
+                    onDismissGuidedSelection ? (
+                      <GuidedToolbarNoticeCard
+                        notice={guidedToolbarNotice}
+                        onClose={onDismissGuidedSelection}
+                        onAction={
+                          guidedToolbarNotice.actionLabel
+                            ? () => onGuidedToolbarAction?.("theme")
+                            : undefined
+                        }
+                        align="end"
+                      />
+                    ) : null}
+                  </div>
+
+                  <div className="flex h-8 items-center justify-end md:h-9">
+                    {authLoading ? null : isAuthenticated ? (
+                      <UserMenu />
+                    ) : (
+                      <Button
+                        data-onboarding-auth-entry
+                        size="sm"
+                        variant="outline"
+                        disabled={onboardingLayoutLocked}
+                        className={utilityButtonClass}
+                        onClick={(event) => {
+                          const rect = event.currentTarget.getBoundingClientRect();
+                          onOpenAuthDialog({ x: rect.right, y: rect.bottom });
+                        }}
+                      >
+                        Entrar
+                      </Button>
+                    )}
+                  </div>
+                </>
+              ) : null}
             </div>
           </div>
         </div>
 
-        <div
-          data-onboarding-filter-region
-          className={cn(
-            "relative isolate mx-auto flex w-full flex-col items-center gap-1.5 md:gap-2",
-            isMobileMode
-              ? "max-w-[31rem]"
-              : "max-w-[62rem] border-t border-border/45 pt-2.5 md:pt-3",
-            onboardingLayoutReserved &&
-              (isMobileMode ? "min-h-[10.25rem]" : "min-h-[5.6rem]")
-          )}
-        >
+        {showCalendarControls ? (
+          <div
+            data-onboarding-filter-region
+            className={cn(
+              "relative isolate mx-auto flex w-full flex-col items-center gap-1.5 md:gap-2",
+              isMobileMode
+                ? "max-w-[31rem]"
+                : "max-w-[62rem] border-t border-border/45 pt-2.5 md:pt-3",
+              onboardingLayoutReserved &&
+                (isMobileMode ? "min-h-[10.25rem]" : "min-h-[5.6rem]")
+            )}
+          >
           <div
             className={cn(
               "flex w-full flex-col items-center gap-1.5 transition-opacity duration-150 md:gap-2"
@@ -749,9 +778,10 @@ export function AppHeader({
               </div>
             </div>
           ) : null}
-        </div>
+          </div>
+        ) : null}
 
-        {isMobileMode ? null : (
+        {!showCalendarControls || isMobileMode ? null : (
           <div
             data-onboarding-filter-separator
             className="mx-auto h-px w-full max-w-[62rem] bg-border/45"

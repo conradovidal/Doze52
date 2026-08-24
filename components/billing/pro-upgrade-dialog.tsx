@@ -28,6 +28,7 @@ type ProUpgradeDialogProps = {
 };
 
 const PRO_BULLETS = [
+  "Até 4 hábitos para acompanhar diferentes rotinas no mesmo ano.",
   "Mais contextos para separar trabalho, vida pessoal, viagens e família.",
   "Mais categorias para entender melhor como seu tempo está distribuído.",
   "Calendários ilimitados para acompanhar datas importantes.",

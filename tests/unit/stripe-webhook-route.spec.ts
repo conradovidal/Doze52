@@ -1,9 +1,7 @@
 import { expect, test } from "@playwright/test";
 
-import {
-  POST,
-  STRIPE_WEBHOOK_MAX_BODY_BYTES,
-} from "../../app/api/stripe/webhook/route";
+import { POST } from "../../app/api/stripe/webhook/route";
+import { STRIPE_WEBHOOK_MAX_BODY_BYTES } from "../../lib/stripe-webhook";
 
 const webhookRequest = (body: BodyInit, signature?: string) => {
   const init: RequestInit & { duplex?: "half" } = {

@@ -32,6 +32,7 @@ import {
   LATERAL_KEY_REST_CLASS,
 } from "./lateral-key-styles";
 import { MonthRow } from "./month-row";
+import type { DayCellHabitPresentation } from "./day-cell";
 
 type ReorderTarget = {
   dayIso: string;
@@ -124,6 +125,7 @@ export function YearGrid({
   onMoveEventByDelta,
   onApplyDayReorder,
   isMobileInteractionMode = false,
+  habitPresentation,
 }: {
   year: number;
   todayIso: string;
@@ -146,6 +148,7 @@ export function YearGrid({
     orderedIds: string[];
   }) => void;
   isMobileInteractionMode?: boolean;
+  habitPresentation?: DayCellHabitPresentation;
 }) {
   const profiles = useStore((s) => s.profiles as CalendarProfile[]);
   const categories = useStore((s) => s.categories as CategoryItem[]);
@@ -219,12 +222,14 @@ export function YearGrid({
 
   const visibleEvents = React.useMemo(
     () =>
-      events.filter(
-        (event) =>
-          visibleCategoryIds.includes(event.categoryId) &&
-          isRenderableEventDateRange(event)
-      ),
-    [events, visibleCategoryIds]
+      habitPresentation
+        ? []
+        : events.filter(
+            (event) =>
+              visibleCategoryIds.includes(event.categoryId) &&
+              isRenderableEventDateRange(event)
+          ),
+    [events, habitPresentation, visibleCategoryIds]
   );
 
   const multiDaySlotById = React.useMemo(() => {
@@ -647,7 +652,7 @@ export function YearGrid({
                     monthIndex={monthIndex}
                     density={density}
                     verticalScale={verticalZoomScale}
-                    events={events}
+                    events={habitPresentation ? [] : events}
                     visibleCategoryIds={visibleCategoryIds}
                     profileIconByCategoryId={profileIconByCategoryId}
                     multiDaySlotById={multiDaySlotById}
@@ -678,6 +683,7 @@ export function YearGrid({
                         ? handleMobileDayCellActivate
                         : undefined
                     }
+                    habitPresentation={habitPresentation}
                   />
                 );
               })}
@@ -691,6 +697,7 @@ export function YearGrid({
   return (
     <div
       data-year-grid
+      data-year-grid-surface={habitPresentation ? "habits" : "calendar"}
       className={cn(
         "w-full overflow-hidden rounded-[1.35rem] border border-border bg-card shadow-[0_18px_42px_-34px_rgba(15,23,42,0.24)]",
         canvasWidthClass
@@ -723,7 +730,9 @@ export function YearGrid({
           value={viewMode}
           options={CALENDAR_VIEW_OPTIONS}
           onValueChange={handleViewModeChange}
-          aria-label="Escala do calendário"
+          aria-label={
+            habitPresentation ? "Escala dos hábitos" : "Escala do calendário"
+          }
         />
         {hasFocusZoom ? (
           <label className="flex w-[10.75rem] items-center justify-end gap-2.5 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground min-[420px]:w-[11.5rem] md:w-[12.25rem]">

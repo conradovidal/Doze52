@@ -53,9 +53,21 @@ export type AnchorPoint = {
 
 export type Habit = {
   id: string;
-  title: string;
+  userId?: string;
+  name: string;
   color: string;
-  active: boolean;
+  icon: "circle-check";
+  position: number;
+  archivedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type HabitCheckIn = {
+  habitId: string;
+  date: string; // ISO yyyy-MM-dd
+  completed: boolean;
+  updatedAt: string;
 };
 
 export type MonthlyReview = {
