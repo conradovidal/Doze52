@@ -3,6 +3,7 @@
 import * as React from "react";
 import {
   AlertCircle,
+  Archive,
   ArrowLeft,
   CheckCircle2,
   Download,
@@ -12,7 +13,6 @@ import {
   Upload,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { AnimatedProgress } from "@/components/ui/animated-progress";
 import {
   AsyncStateButton,
   type AsyncButtonState,
@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/dialog";
 import { useFeedback } from "@/components/ui/feedback-provider";
 import { Input } from "@/components/ui/input";
+import { ProfileIcon } from "@/components/profile-icon";
 import {
   Select,
   SelectContent,
@@ -56,6 +57,8 @@ import {
   type SpreadsheetSource,
 } from "@/lib/calendar-spreadsheet";
 import { logDevError, logProdError } from "@/lib/safe-log";
+import { isAuthorCategory, isAuthorEvent } from "@/lib/calendar-export";
+import { exportUserData } from "@/lib/sync";
 import { useStore } from "@/lib/store";
 
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;
@@ -301,7 +304,7 @@ export function CalendarSpreadsheetDialog({
   const [result, setResult] = React.useState<ImportSummary | null>(null);
   const [isWorking, setIsWorking] = React.useState(false);
   const [workingAction, setWorkingAction] = React.useState<
-    "template" | "export" | "import-template" | "import-custom" | null
+    "template" | "export" | "backup" | "import-template" | "import-custom" | null
   >(null);
   const [workingState, setWorkingState] = React.useState<AsyncButtonState>("idle");
   const [actionError, setActionError] = React.useState("");
@@ -310,19 +313,30 @@ export function CalendarSpreadsheetDialog({
     () => ({ profiles, categories, events }),
     [profiles, categories, events]
   );
+  const authorCategoryIds = React.useMemo(
+    () => new Set(categories.filter(isAuthorCategory).map((category) => category.id)),
+    [categories]
+  );
   const eventCountByCategoryId = React.useMemo(() => {
     const counts = new Map<string, number>();
     for (const event of events) {
+      if (!isAuthorEvent(event) || !authorCategoryIds.has(event.categoryId)) continue;
       counts.set(event.categoryId, (counts.get(event.categoryId) ?? 0) + 1);
     }
     return counts;
-  }, [events]);
+  }, [authorCategoryIds, events]);
+  const exportableCategories = React.useMemo(
+    () => categories.filter((category) =>
+      authorCategoryIds.has(category.id) && (eventCountByCategoryId.get(category.id) ?? 0) > 0
+    ),
+    [authorCategoryIds, categories, eventCountByCategoryId]
+  );
   const selectedExportCategoryIdSet = React.useMemo(
     () => new Set(selectedExportCategoryIds),
     [selectedExportCategoryIds]
   );
   const exportSelection = React.useMemo<CalendarSpreadsheetExportSelection>(() => {
-    const selectedCategories = categories.filter(
+    const selectedCategories = exportableCategories.filter(
       (category) =>
         selectedExportCategoryIdSet.has(category.id) &&
         (eventCountByCategoryId.get(category.id) ?? 0) > 0
@@ -331,7 +345,7 @@ export function CalendarSpreadsheetDialog({
       profileIds: [...new Set(selectedCategories.map((category) => category.profileId))],
       categoryIds: selectedCategories.map((category) => category.id),
     };
-  }, [categories, eventCountByCategoryId, selectedExportCategoryIdSet]);
+  }, [eventCountByCategoryId, exportableCategories, selectedExportCategoryIdSet]);
   const selectedExportEventCount = React.useMemo(
     () =>
       exportSelection.categoryIds.reduce(
@@ -375,10 +389,10 @@ export function CalendarSpreadsheetDialog({
   }, [open, reset]);
 
   const runDownload = async (
-    action: () => Promise<void>,
+    action: () => void | Promise<void>,
     successTitle: string,
     logKey: string,
-    actionId: "template" | "export"
+    actionId: "template" | "export" | "backup"
   ) => {
     try {
       setWorkingAction(actionId);
@@ -407,9 +421,7 @@ export function CalendarSpreadsheetDialog({
 
   const startExport = () => {
     setSelectedExportCategoryIds(
-      categories
-        .filter((category) => (eventCountByCategoryId.get(category.id) ?? 0) > 0)
-        .map((category) => category.id)
+      exportableCategories.map((category) => category.id)
     );
     setWorkingAction(null);
     setWorkingState("idle");
@@ -427,12 +439,8 @@ export function CalendarSpreadsheetDialog({
   };
 
   const toggleExportProfile = (profileId: string) => {
-    const profileCategoryIds = categories
-      .filter(
-        (category) =>
-          category.profileId === profileId &&
-          (eventCountByCategoryId.get(category.id) ?? 0) > 0
-      )
+    const profileCategoryIds = exportableCategories
+      .filter((category) => category.profileId === profileId)
       .map((category) => category.id);
     if (profileCategoryIds.length === 0) return;
     setSelectedExportCategoryIds((current) => {
@@ -613,7 +621,7 @@ export function CalendarSpreadsheetDialog({
         <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Exportar
         </p>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-3">
           <ActionCard
             icon={<FileDown className="size-4" />}
             title="Baixar template"
@@ -642,6 +650,22 @@ export function CalendarSpreadsheetDialog({
             successLabel="Seleção aberta"
             errorLabel="Tentar novamente"
             onClick={startExport}
+          />
+          <ActionCard
+            icon={<Archive className="size-4" />}
+            title="Baixar backup técnico"
+            description="ZIP com seus dados autorais em JSON e CSV."
+            disabled={isWorking}
+            state={workingAction === "backup" ? workingState : "idle"}
+            pendingLabel="Gerando backup…"
+            successLabel="Backup baixado"
+            errorLabel="Tentar baixar"
+            onClick={() => void runDownload(
+              () => exportUserData(snapshot),
+              "Backup baixado",
+              "calendar-backup.export",
+              "backup"
+            )}
           />
         </div>
       </div>
@@ -682,9 +706,7 @@ export function CalendarSpreadsheetDialog({
   );
 
   const renderExportScope = () => {
-    const exportableCategoryIds = categories
-      .filter((category) => (eventCountByCategoryId.get(category.id) ?? 0) > 0)
-      .map((category) => category.id);
+    const exportableCategoryIds = exportableCategories.map((category) => category.id);
     const allSelected =
       exportableCategoryIds.length > 0 &&
       exportableCategoryIds.every((id) => selectedExportCategoryIdSet.has(id));
@@ -722,9 +744,9 @@ export function CalendarSpreadsheetDialog({
           </div>
         </div>
 
-        <div className="space-y-3">
+        <div className="grid gap-3 md:grid-cols-2">
           {profiles.map((profile) => {
-            const profileCategories = categories.filter(
+            const profileCategories = exportableCategories.filter(
               (category) => category.profileId === profile.id
             );
             const exportableProfileCategoryIds = profileCategories
@@ -742,6 +764,8 @@ export function CalendarSpreadsheetDialog({
               selectedCount === exportableProfileCategoryIds.length;
             const isIndeterminate = selectedCount > 0 && !isChecked;
 
+            if (profileCategories.length === 0) return null;
+
             return (
               <div key={profile.id} className="overflow-hidden rounded-[14px] border border-border/75">
                 <label className="flex items-center gap-3 bg-muted/35 px-3 py-2.5">
@@ -752,11 +776,9 @@ export function CalendarSpreadsheetDialog({
                     label={`Selecionar contexto ${profile.name}`}
                     onChange={() => toggleExportProfile(profile.id)}
                   />
-                  <span
-                    className="size-2.5 shrink-0 rounded-full"
-                    style={{ backgroundColor: profile.color }}
-                    aria-hidden="true"
-                  />
+                  <span style={{ color: profile.color }}>
+                    <ProfileIcon icon={profile.icon} size={16} />
+                  </span>
                   <span className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">
                     {profile.name}
                   </span>
@@ -765,8 +787,7 @@ export function CalendarSpreadsheetDialog({
                   </span>
                 </label>
                 <div className="divide-y divide-border/60">
-                  {profileCategories.length > 0 ? (
-                    profileCategories.map((category) => {
+                  {profileCategories.map((category) => {
                       const eventCount = eventCountByCategoryId.get(category.id) ?? 0;
                       const disabled = eventCount === 0;
                       return (
@@ -795,12 +816,7 @@ export function CalendarSpreadsheetDialog({
                           </span>
                         </label>
                       );
-                    })
-                  ) : (
-                    <p className="px-3 py-2.5 pl-10 text-xs text-muted-foreground">
-                      Nenhuma categoria neste contexto.
-                    </p>
-                  )}
+                    })}
                 </div>
               </div>
             );
@@ -1023,7 +1039,7 @@ export function CalendarSpreadsheetDialog({
   ) : null;
 
   const titles: Record<AssistantStep, [string, string]> = {
-    home: ["Importar e exportar com Excel", "Escolha uma jornada para trocar eventos com o Doze52."],
+    home: ["Importar ou exportar", "Escolha uma opção para trazer ou baixar seus dados."],
     "export-scope": ["Selecionar dados para exportar", "Escolha os contextos e categorias que devem entrar na planilha."],
     mapping: ["Mapear colunas", "Defina como a sua planilha representa cada campo do calendario."],
     structures: ["Revisar estruturas", "Crie, associe ou ignore contextos e categorias encontrados."],
@@ -1037,14 +1053,6 @@ export function CalendarSpreadsheetDialog({
   const canConfirm = Boolean(
     canAdvanceStructures && plan && (plan.summary.invalidRows === 0 || acceptedInvalidRows)
   );
-  const isExportFlow = step === "export-scope";
-  const routeSteps: AssistantStep[] = isExportFlow
-    ? ["home", "export-scope"]
-    : mode === "custom"
-      ? ["home", "mapping", "structures", "preview", "result"]
-      : ["home", "structures", "preview", "result"];
-  const routeStepIndex = Math.max(0, routeSteps.indexOf(step));
-  const routeStepNumber = routeStepIndex + 1;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -1056,12 +1064,6 @@ export function CalendarSpreadsheetDialog({
           <DialogTitle>{titles[step][0]}</DialogTitle>
           <DialogDescription>{titles[step][1]}</DialogDescription>
         </DialogHeader>
-
-        <AnimatedProgress
-          value={(routeStepNumber / routeSteps.length) * 100}
-          label={isExportFlow ? "Progresso da exportação" : "Progresso da importação"}
-          statusText={`Etapa ${routeStepNumber} de ${routeSteps.length}`}
-        />
 
         {step === "home" ? renderHome() : null}
         {step === "export-scope" ? renderExportScope() : null}

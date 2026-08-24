@@ -46,14 +46,14 @@ test("modal de calendarios permanece alinhado no mobile", async ({ page }) => {
   ).toBe(true);
 });
 
-test("exportacao por Excel permanece utilizavel no mobile", async ({ page }) => {
+test("exportacao permanece utilizavel no mobile", async ({ page }) => {
   await installVercelBypass(page);
   await openQaApp(page);
   await expectAuthenticated(page);
   await page.getByRole("button", { name: "Abrir menu da conta" }).click();
-  await page.getByRole("button", { name: "Importar/exportar Excel" }).click();
+  await page.getByRole("button", { name: "Importar ou exportar" }).click();
 
-  const dialog = page.getByRole("dialog", { name: "Importar e exportar com Excel" });
+  const dialog = page.getByRole("dialog", { name: "Importar ou exportar" });
   const templateDownloadPromise = page.waitForEvent("download");
   await dialog.getByRole("button", { name: "Baixar template" }).click();
   expect((await templateDownloadPromise).suggestedFilename()).toBe(

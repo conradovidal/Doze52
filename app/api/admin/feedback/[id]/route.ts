@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 
 export async function PATCH(
   request: Request,
-  context: { params: Promise<{ id: string }> }
+  context: RouteContext<"/api/admin/feedback/[id]">
 ) {
   if (!isSameOriginMutation(request)) {
     return NextResponse.json({ error: "Origem inválida." }, { status: 403 });

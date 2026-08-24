@@ -46,8 +46,8 @@ const openSpreadsheetDialog = async (page: import("@playwright/test").Page) => {
   await expectAuthenticated(page);
   await dismissOnboardingIfVisible(page);
   await page.getByRole("button", { name: "Abrir menu da conta" }).click();
-  await page.getByRole("button", { name: "Importar/exportar Excel" }).click();
-  return page.getByRole("dialog", { name: "Importar e exportar com Excel" });
+  await page.getByRole("button", { name: "Importar ou exportar" }).click();
+  return page.getByRole("dialog", { name: "Importar ou exportar" });
 };
 
 test("baixa o template e exporta o recorte selecionado", async ({ page }) => {
@@ -87,6 +87,13 @@ test("baixa o template e exporta o recorte selecionado", async ({ page }) => {
   const exportDownload = await exportDownloadPromise;
   expect(exportDownload.suggestedFilename()).toMatch(
     /^doze52-calendario-\d{4}-\d{2}-\d{2}\.xlsx$/
+  );
+
+  await exportDialog.getByRole("button", { name: "Voltar" }).click();
+  const backupDownloadPromise = page.waitForEvent("download");
+  await dialog.getByRole("button", { name: "Baixar backup técnico" }).click();
+  expect((await backupDownloadPromise).suggestedFilename()).toMatch(
+    /^doze52-backup-\d{4}-\d{2}-\d{2}\.zip$/
   );
 });
 
