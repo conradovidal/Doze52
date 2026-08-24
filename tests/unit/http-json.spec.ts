@@ -3,6 +3,7 @@ import {
   InvalidJsonPayloadError,
   PayloadTooLargeError,
   readLimitedJsonObject,
+  readLimitedText,
 } from "../../lib/http-json";
 
 const jsonRequest = (body: BodyInit) => {
@@ -44,4 +45,50 @@ test("rejeita JSON truncado e valores que não são objeto", async () => {
   await expect(readLimitedJsonObject(jsonRequest("[]"), 32)).rejects.toBeInstanceOf(
     InvalidJsonPayloadError
   );
+});
+
+test("lê texto por bytes até exatamente o limite", async () => {
+  const payload = "x".repeat(1024 * 1024);
+  await expect(readLimitedText(jsonRequest(payload), payload.length)).resolves.toBe(
+    payload
+  );
+});
+
+test("conta bytes UTF-8 em vez de caracteres", async () => {
+  await expect(readLimitedText(jsonRequest("é".repeat(8)), 15)).rejects.toBeInstanceOf(
+    PayloadTooLargeError
+  );
+});
+
+test("rejeita Content-Length declarado acima do limite", async () => {
+  const request = jsonRequest("{}");
+  request.headers.set("content-length", "1048577");
+  await expect(readLimitedText(request, 1024 * 1024)).rejects.toBeInstanceOf(
+    PayloadTooLargeError
+  );
+});
+
+test("não confia em Content-Length menor que o corpo real", async () => {
+  const request = jsonRequest("x".repeat(17));
+  request.headers.set("content-length", "1");
+  await expect(readLimitedText(request, 16)).rejects.toBeInstanceOf(
+    PayloadTooLargeError
+  );
+});
+
+test("cancela corpo chunked assim que o primeiro chunk excede o limite", async () => {
+  let canceled = false;
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(new Uint8Array(17));
+    },
+    cancel() {
+      canceled = true;
+    },
+  });
+
+  await expect(readLimitedText(jsonRequest(body), 16)).rejects.toBeInstanceOf(
+    PayloadTooLargeError
+  );
+  expect(canceled).toBe(true);
 });
