@@ -31,7 +31,7 @@ const PRO_BULLETS = [
   "Mais contextos para separar trabalho, vida pessoal, viagens e família.",
   "Mais categorias para entender melhor como seu tempo está distribuído.",
   "Calendários ilimitados para acompanhar datas importantes.",
-  "Importacao e exportacao de eventos por planilha Excel.",
+  "Importacao e exportacao de eventos por planilha.",
   "Acesso às próximas funcionalidades Pro.",
 ];
 
