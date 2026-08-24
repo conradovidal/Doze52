@@ -43,7 +43,10 @@ import {
   LATERAL_KEY_BASE_CLASS,
   LATERAL_KEY_REST_CLASS,
 } from "./lateral-key-styles";
-import { DayCell } from "./day-cell";
+import {
+  DayCell,
+  type DayCellHabitPresentation,
+} from "./day-cell";
 import { EventBar } from "./event-bar";
 
 const COLUMNS = 37;
@@ -133,6 +136,7 @@ export function MonthRow({
   monthLabelActive = false,
   isMobileInteractionMode = false,
   onDayCellActivate,
+  habitPresentation,
 }: {
   year: number;
   todayIso: string;
@@ -174,6 +178,7 @@ export function MonthRow({
   monthLabelActive?: boolean;
   isMobileInteractionMode?: boolean;
   onDayCellActivate?: (payload: { monthIndex: number; dateIso: string }) => void;
+  habitPresentation?: DayCellHabitPresentation;
 }) {
   const daysGridRef = React.useRef<HTMLDivElement | null>(null);
   const interactionSurfaceRef = React.useRef<HTMLDivElement | null>(null);
@@ -186,6 +191,7 @@ export function MonthRow({
   const resolvedVerticalScale = Math.min(1.4, Math.max(1, verticalScale));
   const scaleVerticalSpacing = (value: number) =>
     Math.round(value * resolvedVerticalScale);
+  const isHabitMode = Boolean(habitPresentation);
 
   const days: Date[] = [];
   let cur = gridStart;
@@ -588,6 +594,7 @@ export function MonthRow({
         data-month-interaction-surface
         className="relative w-full flex-1 bg-card/55"
         onDragOver={(e) => {
+          if (isHabitMode) return;
           const dragPayload = readCalendarEventDndPayload(e.dataTransfer);
           const hasTransferType = hasCalendarEventDndPayloadType(e.dataTransfer);
           const hasAppDrag = Boolean(dragPayload || hasTransferType || hasDragContext);
@@ -601,6 +608,7 @@ export function MonthRow({
           clearReorderTarget();
         }}
         onDrop={(e) => {
+          if (isHabitMode) return;
           const dragPayload = readCalendarEventDndPayload(e.dataTransfer);
           const hasTransferType = hasCalendarEventDndPayloadType(e.dataTransfer);
           const hasAppDrag = Boolean(dragPayload || hasTransferType || hasDragContext);
@@ -613,7 +621,7 @@ export function MonthRow({
           onDayDrop(format(targetDate, "yyyy-MM-dd"), e.dataTransfer);
         }}
         onPointerDown={(e) => {
-          if (isMobileInteractionMode) return;
+          if (isMobileInteractionMode || isHabitMode) return;
           if (!e.isPrimary || e.button !== 0 || isDraggingAny) return;
           const target = e.target as HTMLElement | null;
           if (
@@ -682,9 +690,10 @@ export function MonthRow({
                 isRangeEnd={!!rangeBounds && day.iso === rangeBounds.endIso}
                 isInMonth={day.inMonth}
                 isDropActive={isDraggingAny && dragState.hoverDateIso === day.iso}
-                showCreateCue={!isMobileInteractionMode && day.inMonth}
+                showCreateCue={!isMobileInteractionMode && !isHabitMode && day.inMonth}
                 onDayHover={onDayHover}
                 onDayDrop={onDayDrop}
+                habitPresentation={day.inMonth ? habitPresentation : undefined}
                 onActivate={
                   day.inMonth && onDayCellActivate
                     ? (dateIso) => onDayCellActivate({ monthIndex, dateIso })

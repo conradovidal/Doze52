@@ -3,9 +3,9 @@ import { NextResponse } from "next/server";
 import { processStripeWebhookEvent } from "@/lib/billing";
 import { PayloadTooLargeError, readLimitedText } from "@/lib/http-json";
 import { getStripe, getStripeWebhookSecret } from "@/lib/stripe";
+import { STRIPE_WEBHOOK_MAX_BODY_BYTES } from "@/lib/stripe-webhook";
 
 export const runtime = "nodejs";
-export const STRIPE_WEBHOOK_MAX_BODY_BYTES = 1024 * 1024;
 
 export async function POST(request: Request) {
   const signature = request.headers.get("stripe-signature");

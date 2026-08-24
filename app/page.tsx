@@ -3,6 +3,7 @@
 import * as React from "react";
 import { format, parseISO } from "date-fns";
 import { Plus } from "lucide-react";
+import dynamic from "next/dynamic";
 import { MobileCalendarExperience } from "@/components/calendar/mobile-calendar-experience";
 import { YearGrid } from "@/components/calendar/year-grid";
 import {
@@ -10,6 +11,11 @@ import {
   type EventDialogSubmission,
 } from "@/components/event-dialog";
 import { AppHeader } from "@/components/app-header";
+import {
+  AdaptiveNavigation,
+  type UtilityPanelSection,
+} from "@/components/navigation/adaptive-navigation";
+import { AppUtilityPanel } from "@/components/navigation/app-utility-panel";
 import {
   SyncStatusOverlay,
   type SyncOverlayStatus,
@@ -79,6 +85,12 @@ import { cn } from "@/lib/utils";
 import type { AnchorPoint } from "@/lib/types";
 import { useTheme } from "@/lib/theme";
 import { trackOnboardingRegion } from "@/lib/onboarding-region";
+import { isHabitsPrototypeEnabled } from "@/lib/feature-flags";
+import {
+  buildProductDestinationUrl,
+  resolveInitialProductDestination,
+  type ProductDestinationId,
+} from "@/lib/product-navigation";
 
 const toSnapshotHash = (snapshot: CalendarSnapshot) => JSON.stringify(snapshot);
 
@@ -126,6 +138,12 @@ const isDetailedSyncDiagnosticsEnabled =
   process.env.NEXT_PUBLIC_APP_ENV === "dev";
 
 const MOBILE_CALENDAR_UI_MAX_WIDTH_PX = 767;
+const HabitsPrototype = dynamic(() =>
+  import("@/components/habits/habits-prototype").then(
+    (module) => module.HabitsPrototype
+  ),
+  { ssr: false }
+);
 const MOBILE_EXAMPLE_PREVIEW_SESSION_KEY =
   "doze52:mobile-example-preview:session";
 
@@ -384,6 +402,11 @@ export default function HomePage() {
   const [isMobileCalendarUi, setIsMobileCalendarUi] = React.useState<
     boolean | null
   >(null);
+  const [activeDestination, setActiveDestination] =
+    React.useState<ProductDestinationId>("annual");
+  const [utilityPanelOpen, setUtilityPanelOpen] = React.useState(false);
+  const [utilityPanelSection, setUtilityPanelSection] =
+    React.useState<UtilityPanelSection>("account");
   const [mobileExamplePreviewDismissed, setMobileExamplePreviewDismissed] =
     React.useState(readMobileExamplePreviewSession);
   const [mobileActiveDateIso, setMobileActiveDateIso] = React.useState(() =>
@@ -412,6 +435,9 @@ export default function HomePage() {
   const categoriesRef = React.useRef(categories);
   const eventsRef = React.useRef(events);
   const desktopCalendarScrollRef = React.useRef<HTMLDivElement | null>(null);
+  const desktopCalendarScrollTopRef = React.useRef(0);
+  const surfaceInitializedRef = React.useRef(false);
+  const utilityPanelTriggerRef = React.useRef<HTMLElement | null>(null);
 
   React.useEffect(() => {
     profilesRef.current = profiles;
@@ -544,6 +570,23 @@ export default function HomePage() {
       }
     };
   }, [windowContext]);
+
+  React.useEffect(() => {
+    if (!isHabitsPrototypeEnabled || isMobileCalendarUi === null) return;
+    if (surfaceInitializedRef.current) return;
+
+    surfaceInitializedRef.current = true;
+    const initialDestination = resolveInitialProductDestination({
+      search: window.location.search,
+      isMobile: isMobileCalendarUi,
+    });
+    setActiveDestination(initialDestination);
+    window.history.replaceState(
+      window.history.state,
+      "",
+      buildProductDestinationUrl(window.location.href, initialDestination)
+    );
+  }, [isMobileCalendarUi]);
 
   React.useEffect(() => {
     if (windowContext !== "main") return;
@@ -2027,6 +2070,64 @@ export default function HomePage() {
     });
   }, [todayIso, year]);
 
+  const handleDestinationSelect = React.useCallback(
+    (destination: ProductDestinationId) => {
+      if (destination === activeDestination) return;
+      if (activeDestination === "annual" && isMobileCalendarUi === false) {
+        desktopCalendarScrollTopRef.current =
+          desktopCalendarScrollRef.current?.scrollTop ?? 0;
+      }
+      setActiveDestination(destination);
+      window.history.replaceState(
+        window.history.state,
+        "",
+        buildProductDestinationUrl(window.location.href, destination)
+      );
+    },
+    [activeDestination, isMobileCalendarUi]
+  );
+
+  const handleOpenUtilityPanel = React.useCallback(
+    (section: UtilityPanelSection, trigger: HTMLElement) => {
+      utilityPanelTriggerRef.current = trigger;
+      setUtilityPanelSection(section);
+      setUtilityPanelOpen(true);
+    },
+    []
+  );
+
+  React.useLayoutEffect(() => {
+    if (
+      !isHabitsPrototypeEnabled ||
+      activeDestination !== "annual" ||
+      isMobileCalendarUi !== false
+    ) {
+      return;
+    }
+    const scrollRegion = desktopCalendarScrollRef.current;
+    if (!scrollRegion || desktopCalendarScrollTopRef.current <= 0) return;
+    scrollRegion.scrollTop = desktopCalendarScrollTopRef.current;
+  }, [activeDestination, isMobileCalendarUi]);
+
+  React.useEffect(() => {
+    if (
+      !isHabitsPrototypeEnabled ||
+      guidedToolbarNotice?.target !== "theme"
+    ) {
+      return;
+    }
+    setUtilityPanelSection("appearance");
+    setUtilityPanelOpen(true);
+  }, [guidedToolbarNotice?.target]);
+
+  const isHabitsSurfaceActive =
+    isHabitsPrototypeEnabled && activeDestination === "habits";
+  const isCalendarSurfaceActive = !isHabitsSurfaceActive;
+  const headerGuidedToolbarNotice =
+    isHabitsPrototypeEnabled && guidedToolbarNotice?.target === "theme"
+      ? null
+      : guidedToolbarNotice;
+
   if (windowContext === "popup") {
     return (
       <main className="flex min-h-screen items-center justify-center px-4">
@@ -2041,10 +2142,50 @@ export default function HomePage() {
       className={cn(
         "mx-auto w-full max-w-none",
         isMobileCalendarUi
-          ? "flex h-[100dvh] min-h-0 flex-col overflow-hidden px-3 pt-2 pb-1"
-          : "flex h-full min-h-0 flex-col overflow-hidden px-4 pt-3 pb-2 md:pb-4"
+          ? cn(
+              "flex h-[100dvh] min-h-0 flex-col overflow-hidden px-3 pt-2",
+              isHabitsPrototypeEnabled
+                ? "pb-[calc(4.25rem+env(safe-area-inset-bottom,0px))]"
+                : "pb-1"
+            )
+          : cn(
+              "flex h-full min-h-0 flex-col overflow-hidden pt-3 pb-2 md:pb-4",
+              isHabitsPrototypeEnabled
+                ? "pr-1 pl-14"
+                : "px-4"
+            )
       )}
     >
+      {isHabitsPrototypeEnabled && isMobileCalendarUi !== null ? (
+        <>
+          <AdaptiveNavigation
+            activeDestination={activeDestination}
+            authLoading={authLoading}
+            onDestinationSelect={handleDestinationSelect}
+            onOpenUtilityPanel={handleOpenUtilityPanel}
+          />
+          <AppUtilityPanel
+            open={utilityPanelOpen}
+            section={utilityPanelSection}
+            isMobile={isMobileCalendarUi}
+            returnFocusRef={utilityPanelTriggerRef}
+            guidedThemeNotice={
+              guidedToolbarNotice?.target === "theme"
+                ? guidedToolbarNotice
+                : null
+            }
+            onOpenChange={setUtilityPanelOpen}
+            onOpenAuthDialog={() => {
+              setAuthDialogInitialMode("login");
+              setAuthDialogAnchorPoint(undefined);
+              setAuthDialogOpen(true);
+            }}
+            onDismissGuidedNotice={dismissGuidedOnboarding}
+            onGuidedThemeAction={() => handleGuidedToolbarAction("theme")}
+          />
+        </>
+      ) : null}
+
       <SyncStatusOverlay
         status={syncOverlayStatus}
         visible={isSyncOverlayVisible}
@@ -2066,10 +2207,18 @@ export default function HomePage() {
           authLoading={authLoading}
           isAuthenticated={Boolean(session)}
           isMobileCalendarUi={isMobileCalendarUi === true}
+          showCalendarControls={isCalendarSurfaceActive}
+          useAdaptiveNavigation={isHabitsPrototypeEnabled}
           onCalendarPackFocusYear={handleYearChange}
-          onboardingFocusTarget={onboardingFocusTarget}
-          guidedSelectionNotice={guidedSelectionNotice}
-          guidedToolbarNotice={guidedToolbarNotice}
+          onboardingFocusTarget={
+            isCalendarSurfaceActive ? onboardingFocusTarget : null
+          }
+          guidedSelectionNotice={
+            isCalendarSurfaceActive ? guidedSelectionNotice : null
+          }
+          guidedToolbarNotice={
+            isCalendarSurfaceActive ? headerGuidedToolbarNotice : null
+          }
           onDismissGuidedSelection={dismissGuidedOnboarding}
           onGuidedToolbarAction={handleGuidedToolbarAction}
           onGuidedCalendarOpen={handleGuidedCalendarOpen}
@@ -2079,9 +2228,13 @@ export default function HomePage() {
             guidedOnboarding?.step === "calendar_instruction" ||
             guidedOnboarding?.step === "calendar_selection"
           }
-          guidedEditPreviewActive={guidedOnboarding?.step === "edit_preview"}
+          guidedEditPreviewActive={
+            isCalendarSurfaceActive && guidedOnboarding?.step === "edit_preview"
+          }
           onboardingLayoutLocked={false}
-          onboardingLayoutReserved={Boolean(guidedSelectionNotice)}
+          onboardingLayoutReserved={
+            isCalendarSurfaceActive && Boolean(guidedSelectionNotice)
+          }
           onInlineEditModeChange={setInlineEditModeActive}
           onFilterLayoutChange={requestDesktopTodayCenter}
           exitInlineEditRequestKey={exitInlineEditRequestKey}
@@ -2103,7 +2256,18 @@ export default function HomePage() {
         />
       </div>
 
-      {isMobileCalendarUi === true ? (
+      {isHabitsSurfaceActive && isMobileCalendarUi !== null ? (
+        <HabitsPrototype
+          year={year}
+          todayIso={todayIso}
+          isMobile={isMobileCalendarUi}
+          onRequireAuth={() => {
+            setAuthDialogInitialMode("login");
+            setAuthDialogAnchorPoint(undefined);
+            setAuthDialogOpen(true);
+          }}
+        />
+      ) : isMobileCalendarUi === true ? (
         <MobileCalendarExperience
           year={year}
           todayIso={todayIso}
@@ -2169,7 +2333,7 @@ export default function HomePage() {
         </div>
       )}
 
-      {showGuidedOnboarding && guidedOnboarding ? (
+      {isCalendarSurfaceActive && showGuidedOnboarding && guidedOnboarding ? (
         <GuidedOnboardingPanel
           state={guidedOnboarding}
           draft={guidedDraft}
@@ -2192,7 +2356,7 @@ export default function HomePage() {
         onConfirm={confirmDismissGuidedOnboarding}
       />
 
-      {showMobileDesktopFirstGate ? (
+      {isCalendarSurfaceActive && showMobileDesktopFirstGate ? (
         <MobileDesktopFirstGate
           allowExample={isInitialMobileOnboarding}
           onExploreExample={() => {
@@ -2207,8 +2371,10 @@ export default function HomePage() {
         />
       ) : null}
 
-      {isDemoExploration ||
-      (showGuidedOnboarding && guidedOnboarding?.step === "context_selection") ? (
+      {isCalendarSurfaceActive &&
+      (isDemoExploration ||
+        (showGuidedOnboarding &&
+          guidedOnboarding?.step === "context_selection")) ? (
         <div
           data-demo-mode-badge
           className="pointer-events-none fixed bottom-3 left-1/2 z-30 -translate-x-1/2 rounded-full border border-border/75 bg-card/92 px-3 py-1 text-[11px] font-semibold tracking-wide text-muted-foreground shadow-sm backdrop-blur"
@@ -2217,7 +2383,7 @@ export default function HomePage() {
         </div>
       ) : null}
 
-      {showDemoInvite ? (
+      {isCalendarSurfaceActive && showDemoInvite ? (
         <DemoExplorationInvite
           onCreateYear={restartGuidedOnboardingFromDemo}
           onContinue={() => setDemoInviteSuppressed(true)}
@@ -2236,13 +2402,18 @@ export default function HomePage() {
         />
       ) : null}
 
-      {isMobileCalendarUi &&
+      {isCalendarSurfaceActive &&
+      isMobileCalendarUi &&
       !showGuidedOnboarding &&
       !isMobileExamplePreview &&
       !showMobileDesktopFirstGate ? (
         <div
           className="fixed right-4 z-40"
-          style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 2.75rem)" }}
+          style={{
+            bottom: isHabitsPrototypeEnabled
+              ? "calc(env(safe-area-inset-bottom, 0px) + 4.75rem)"
+              : "calc(env(safe-area-inset-bottom, 0px) + 2.75rem)",
+          }}
         >
           <Button
             type="button"

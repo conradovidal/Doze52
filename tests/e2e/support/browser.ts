@@ -72,8 +72,31 @@ export const dismissOnboardingIfVisible = async (page: Page) => {
 };
 
 export const expectAuthenticated = async (page: Page) => {
-  await expect(page.getByRole("button", { name: "Abrir menu da conta" })).toBeVisible();
+  await expect(
+    page
+      .getByRole("button", { name: "Abrir menu da conta" })
+      .or(page.getByRole("button", { name: /Abrir (perfil|conta)/ }))
+  ).toBeVisible();
   await expect(page.getByRole("button", { name: "Entrar", exact: true })).toHaveCount(0);
+};
+
+export const openAuthenticatedSettings = async (
+  page: Page,
+  topic: "data" | "help" = "data"
+) => {
+  const adaptiveEntry = page.getByRole("button", { name: /Abrir (perfil|conta)/ });
+  const legacyEntry = page.getByRole("button", { name: "Abrir menu da conta" });
+  await expect(legacyEntry.or(adaptiveEntry)).toBeVisible();
+  if (await adaptiveEntry.isVisible().catch(() => false)) {
+    await adaptiveEntry.click();
+    const label = topic === "data" ? /^Dados/ : /^Ajuda/;
+    await page
+      .locator("[data-app-utility-panel]")
+      .getByRole("button", { name: label })
+      .click();
+    return;
+  }
+  await legacyEntry.click();
 };
 
 export const waitForSupabaseWrite = (

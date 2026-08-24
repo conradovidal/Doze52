@@ -20,6 +20,7 @@ export type PlanLimits = {
   maxProfiles: number | null;
   maxCategories: number | null;
   maxCalendarSubscriptions: number | null;
+  maxHabits: number;
 };
 
 export type ProUpgradeReason =
@@ -27,6 +28,7 @@ export type ProUpgradeReason =
   | "categories"
   | "calendar-subscriptions"
   | "calendar-import-export"
+  | "habits"
   | "generic";
 
 export const PRO_SUBSCRIPTION_STATUSES = ["active", "trialing"] as const;
@@ -36,11 +38,13 @@ export const PLAN_LIMITS: Record<BillingPlan, PlanLimits> = {
     maxProfiles: 1,
     maxCategories: 3,
     maxCalendarSubscriptions: 1,
+    maxHabits: 1,
   },
   pro: {
     maxProfiles: null,
     maxCategories: null,
     maxCalendarSubscriptions: null,
+    maxHabits: 4,
   },
 };
 
@@ -72,6 +76,12 @@ export const PRO_UPGRADE_COPY: Record<
     title: "Planilhas de calendario fazem parte do Doze52 Pro.",
     description:
       "O Pro permite baixar o template, exportar o calendario e importar eventos com validacao e pre-visualizacao.",
+    cta: `Assinar Pro por ${FOUNDER_PRICE_LABEL}`,
+  },
+  habits: {
+    title: "Mais hábitos fazem parte do Doze 52 Pro.",
+    description:
+      "No plano gratuito, você pode acompanhar 1 hábito. O Pro libera até 4 hábitos no mesmo ano.",
     cta: `Assinar Pro por ${FOUNDER_PRICE_LABEL}`,
   },
   generic: {
