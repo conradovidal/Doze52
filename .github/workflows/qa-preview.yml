@@ -34,15 +34,15 @@ jobs:
       QA_ALLOWED_ORIGIN_PATTERN: ${{ vars.QA_ALLOWED_ORIGIN_PATTERN }}
       QA_SUPABASE_PROJECT_REF: ${{ vars.QA_SUPABASE_PROJECT_REF }}
       QA_E2E_EMAIL: ${{ vars.QA_E2E_EMAIL }}
-      QA_E2E_PASSWORD: ${{ secrets.QA_E2E_PASSWORD }}
       SUPABASE_DEV_URL: ${{ vars.SUPABASE_DEV_URL }}
       SUPABASE_DEV_ANON_KEY: ${{ vars.SUPABASE_DEV_ANON_KEY }}
-      VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
       QA_SUITE: ${{ github.event.inputs.suite }}
 
     steps:
       - name: Baixar o codigo
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
       - name: Validar configuracao obrigatoria
         shell: bash
@@ -53,10 +53,8 @@ jobs:
             QA_ALLOWED_ORIGIN_PATTERN
             QA_SUPABASE_PROJECT_REF
             QA_E2E_EMAIL
-            QA_E2E_PASSWORD
             SUPABASE_DEV_URL
             SUPABASE_DEV_ANON_KEY
-            VERCEL_AUTOMATION_BYPASS_SECRET
           )
           for name in "${required[@]}"; do
             if [[ -z "${!name:-}" ]]; then
@@ -66,7 +64,7 @@ jobs:
           done
 
       - name: Preparar Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 24
           cache: npm
@@ -81,13 +79,22 @@ jobs:
         run: npm run qa:validate:dev
 
       - name: Limpar conta E2E antes do smoke
+        env:
+          QA_E2E_PASSWORD: ${{ secrets.QA_E2E_PASSWORD }}
         run: npm run qa:reset:dev
 
       - name: Executar smoke
         id: smoke
         continue-on-error: true
         shell: bash
+        env:
+          QA_E2E_PASSWORD: ${{ secrets.QA_E2E_PASSWORD }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: |
+          if [[ -z "$QA_E2E_PASSWORD" || -z "$VERCEL_AUTOMATION_BYPASS_SECRET" ]]; then
+            echo "Secrets obrigatorios de QA ausentes." >&2
+            exit 1
+          fi
           if [[ "$QA_SUITE" == "spreadsheet" ]]; then
             npx playwright test tests/e2e/auth.setup.ts --project=setup-desktop
             npx playwright test \
@@ -108,11 +115,13 @@ jobs:
         id: cleanup
         if: always()
         continue-on-error: true
+        env:
+          QA_E2E_PASSWORD: ${{ secrets.QA_E2E_PASSWORD }}
         run: npm run qa:reset:dev
 
       - name: Publicar evidencias da falha
         if: steps.smoke.outcome == 'failure'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: qa-preview-failure-${{ github.run_id }}
           path: |
