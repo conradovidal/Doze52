@@ -1,6 +1,10 @@
 import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
-import { refreshCalendarCatalog, type RefreshTrigger } from "@/lib/calendar-catalog/refresh";
+import {
+  CalendarRefreshInProgressError,
+  refreshCalendarCatalog,
+  type RefreshTrigger,
+} from "@/lib/calendar-catalog/refresh";
 import { isProductAdmin } from "@/lib/calendar-catalog/repository";
 import { getAuthenticatedServerUser, hasSupabaseAdminEnv } from "@/lib/supabase-server";
 
@@ -42,7 +46,21 @@ export async function POST(request: Request) {
     const result = await refreshCalendarCatalog({ trigger, requestedBy });
     return NextResponse.json(result, { status: 202 });
   } catch (error) {
-    console.error("[calendar-packs.refresh]", error);
+    if (error instanceof CalendarRefreshInProgressError) {
+      return NextResponse.json(
+        {
+          error: "Uma atualização do catálogo já está em andamento.",
+          activeRunId: error.activeRunId,
+        },
+        {
+          status: 409,
+          headers: { "Retry-After": String(error.retryAfterSeconds) },
+        }
+      );
+    }
+    console.error("[calendar-packs.refresh]", {
+      errorType: error instanceof Error ? error.name : "UnknownError",
+    });
     return NextResponse.json({ error: "A atualização falhou e o último release foi preservado." }, { status: 500 });
   }
 }

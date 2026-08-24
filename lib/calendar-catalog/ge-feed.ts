@@ -1,4 +1,10 @@
 import { canonicalEventId } from "./catalog-builder";
+import {
+  CALENDAR_SOURCE_LIMITS,
+  CalendarSourceBudget,
+  CalendarSourceLimitError,
+  fetchBoundedCalendarSource,
+} from "./source-transport";
 import { brazilianClubs2026, canonicalTeamId, canonicalTeamName } from "./team-identities";
 import type {
   CalendarCatalogSource,
@@ -9,6 +15,26 @@ import type {
 
 type UnknownRecord = Record<string, unknown>;
 type FetchLike = typeof fetch;
+
+const GE_ALLOWED_HOSTS = new Set([
+  "ge.globo.com",
+  "globoesporte.globo.com",
+  "api.globoesporte.globo.com",
+]);
+const MAX_GE_PHASES = 16;
+const MAX_GE_GROUPS_PER_PHASE = 16;
+const MAX_GE_ROUNDS = 60;
+const MAX_GE_ROUND_REQUESTS = 80;
+const MAX_GE_EVENTS = 2_000;
+
+const rejectGeSource = (
+  budget: CalendarSourceBudget,
+  sourceId: string,
+  code: string
+): never => {
+  budget.fail(sourceId, code);
+  throw new CalendarSourceLimitError(code);
+};
 
 const asRecord = (value: unknown): UnknownRecord | null =>
   value && typeof value === "object" && !Array.isArray(value)
@@ -147,16 +173,30 @@ export const parseGeMatches = (
   );
 };
 
-const request = async (fetchImpl: FetchLike, url: string, responseType: "text" | "json") => {
-  const requestInit = {
-    headers: { "user-agent": "Doze52-Calendar-Updater/1.0 (+https://doze52.com)" },
-    signal: AbortSignal.timeout(20_000),
-    cache: "force-cache",
-    next: { revalidate: 60 },
-  } as RequestInit;
-  const response = await fetchImpl(url, requestInit);
-  if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`);
-  return responseType === "text" ? response.text() : response.json();
+const request = async (
+  sourceId: string,
+  budget: CalendarSourceBudget,
+  fetchImpl: FetchLike,
+  url: string,
+  responseType: "text" | "json"
+) => {
+  const { body } = await fetchBoundedCalendarSource({
+    sourceId,
+    input: url,
+    allowedHosts: GE_ALLOWED_HOSTS,
+    acceptedContentTypes: responseType === "text"
+      ? ["text/html"]
+      : ["application/json"],
+    maxBytes: CALENDAR_SOURCE_LIMITS.geResponseBytes,
+    budget,
+    fetchImpl,
+  });
+  if (responseType === "text") return body;
+  try {
+    return JSON.parse(body) as unknown;
+  } catch {
+    return rejectGeSource(budget, sourceId, "source_json_invalid");
+  }
 };
 
 const inBatches = async <T, R>(values: readonly T[], size: number, task: (value: T) => Promise<R>) => {
@@ -169,26 +209,48 @@ const inBatches = async <T, R>(values: readonly T[], size: number, task: (value:
 
 export const fetchGeFootballFeed = async (
   source: CalendarCatalogSource,
-  fetchImpl: FetchLike = fetch
+  fetchImpl: FetchLike = fetch,
+  budget = new CalendarSourceBudget()
 ) => {
   if (source.feed_provider !== "GE" || !source.feed_url) return [];
-  const html = await request(fetchImpl, source.feed_url, "text") as string;
-  const bootstrap = parseGeBootstrap(html);
+  const html = await request(source.id, budget, fetchImpl, source.feed_url, "text") as string;
+  const bootstrap = (() => {
+    try {
+      return parseGeBootstrap(html);
+    } catch {
+      return rejectGeSource(budget, source.id, "source_bootstrap_invalid");
+    }
+  })();
+  if (bootstrap.phases.length > MAX_GE_PHASES) {
+    rejectGeSource(budget, source.id, "source_phase_limit_exceeded");
+  }
   const apiBase = `https://api.globoesporte.globo.com/tabela/${bootstrap.tableId}`;
   const phasePayloads = await inBatches(bootstrap.phases, 3, async (phase) => ({
     phase,
-    payload: await request(fetchImpl, `${apiBase}/fase/${phase.slug}/classificacao/`, "json"),
+    payload: await request(
+      source.id,
+      budget,
+      fetchImpl,
+      `${apiBase}/fase/${phase.slug}/classificacao/`,
+      "json"
+    ),
   }));
   const batches: FeedCalendarEvent[][] = [];
 
   for (const { phase, payload } of phasePayloads) {
     const root = asRecord(payload);
     const groups = Array.isArray(root?.grupos) ? root.grupos.map(asRecord).filter(Boolean) as UnknownRecord[] : [];
+    if (groups.length > MAX_GE_GROUPS_PER_PHASE) {
+      rejectGeSource(budget, source.id, "source_group_limit_exceeded");
+    }
     const roundRequests: Array<{ url: string; label: string }> = [];
     if (groups.length > 0 && root?.lista_tipo_unica === false) {
       for (const group of groups) {
         const groupId = stringValue(group.grupo_id);
         const lastRound = numberValue(asRecord(group.rodada)?.ultima) ?? 0;
+        if (lastRound > MAX_GE_ROUNDS) {
+          rejectGeSource(budget, source.id, "source_round_limit_exceeded");
+        }
         for (let round = 1; groupId && round <= lastRound; round += 1) {
           roundRequests.push({
             url: `${apiBase}/fase/${phase.slug}/rodada/${round}/grupo/${groupId}/jogos/`,
@@ -198,6 +260,9 @@ export const fetchGeFootballFeed = async (
       }
     } else {
       const lastRound = numberValue(asRecord(root?.rodada)?.ultima) ?? 0;
+      if (lastRound > MAX_GE_ROUNDS) {
+        rejectGeSource(budget, source.id, "source_round_limit_exceeded");
+      }
       for (let round = 1; round <= lastRound; round += 1) {
         roundRequests.push({
           url: `${apiBase}/fase/${phase.slug}/rodada/${round}/jogos/`,
@@ -208,14 +273,29 @@ export const fetchGeFootballFeed = async (
     if (roundRequests.length === 0) {
       batches.push(parseGeMatches(payload, source, phase.name));
     } else {
+      if (roundRequests.length > MAX_GE_ROUND_REQUESTS) {
+        rejectGeSource(
+          budget,
+          source.id,
+          "source_round_request_limit_exceeded"
+        );
+      }
       batches.push(...await inBatches(roundRequests, 4, async ({ url, label }) =>
-        parseGeMatches(await request(fetchImpl, url, "json"), source, label)
+        parseGeMatches(
+          await request(source.id, budget, fetchImpl, url, "json"),
+          source,
+          label
+        )
       ));
     }
   }
-  return Array.from(new Map(batches.flat().map((event) => [event.providerExternalId, event])).values())
+  const events = Array.from(new Map(batches.flat().map((event) => [event.providerExternalId, event])).values())
     .sort((left, right) => `${left.date}T${left.time}:${left.providerExternalId}`
       .localeCompare(`${right.date}T${right.time}:${right.providerExternalId}`));
+  if (events.length > MAX_GE_EVENTS) {
+    rejectGeSource(budget, source.id, "source_event_limit_exceeded");
+  }
+  return events;
 };
 
 const participantKey = (event: OfficialCalendarEvent) =>

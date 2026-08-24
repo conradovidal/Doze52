@@ -27,6 +27,29 @@ visíveis como falha/quarentena; nunca desative a validação TLS para contorná
 Os jobs verificam o horário local a cada hora. Eles disparam exatamente às 00:00 e
 04:00 em `America/Sao_Paulo`, mesmo se a relação com UTC mudar no futuro.
 
+## Limites e concorrência
+
+Cada execução precisa adquirir um lease transacional antes de criar o run. O lease
+dura 330 segundos, é renovado antes de cada fonte e imediatamente antes da publicação.
+Uma segunda chamada recebe `409` e `Retry-After`; se uma execução for abandonada, o
+lease expira e o run anterior é encerrado como falha antes da retomada.
+
+O transporte aceita somente HTTPS e hosts explicitamente autorizados, não segue
+redirects e interrompe respostas que excedam o limite durante o streaming. Os limites
+iniciais são:
+
+- 300 requisições e 96 MiB por execução;
+- 100 requisições e 32 MiB por fonte;
+- 12 MiB por resposta da CBF;
+- 4 MiB por resposta oficial ou do GE;
+- 16 fases, 16 grupos por fase, 60 rodadas e 80 requisições de rodadas por fase;
+- 2.000 eventos oficiais ou do feed por fonte.
+
+O `summary` do run registra por fonte somente requisições, requisições recusadas,
+bytes, duração acumulada, classes HTTP e códigos padronizados de falha. Corpo, URL,
+headers e conteúdo recebido não entram nessas métricas. Ajuste limites apenas por
+migration/revisão de código e depois de comparar essa telemetria com execuções reais.
+
 ## Rollout
 
 Brasileirão, Copa do Brasil, Libertadores e Sul-Americana começam em `shadow`.
