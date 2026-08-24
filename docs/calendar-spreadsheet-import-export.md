@@ -1,16 +1,18 @@
-# Importacao e exportacao de calendarios por Excel
+# Importacao e exportacao de calendarios
 
 ## Escopo
 
-A funcionalidade Pro oferece tres jornadas no menu da conta, em **Dados > Importar/exportar Excel**:
+A funcionalidade Pro oferece as jornadas no menu da conta, em **Dados > Importar ou exportar**:
 
-1. exportar os eventos atuais no formato canonico do Doze52;
-2. importar uma planilha preenchida a partir do template;
-3. importar uma planilha customizada, incluindo exportacoes do Jira, mapeando suas colunas.
+1. baixar o template canonico do Doze52;
+2. exportar um recorte selecionado dos eventos autorais;
+3. baixar um backup tecnico unico em ZIP, com JSON e tres CSVs;
+4. importar uma planilha preenchida a partir do template;
+5. importar uma planilha customizada, incluindo exportacoes do Jira, mapeando suas colunas.
 
 Cada linha da fonte representa exatamente um evento. A importacao e aditiva: nao atualiza nem remove eventos. Nao ha integracao com a API do Jira, persistencia de IDs externos, presets ou alteracao no banco de dados nesta fase.
 
-O backup tecnico existente em JSON/CSV continua separado. O Excel e um formato de intercambio de eventos e nao preserva estruturas vazias ou metadados internos.
+Calendarios prontos nunca entram na planilha nem no backup. O backup preserva perfis autorais vazios, mas exclui categorias e eventos gerenciados. O formato `.xlsx` continua sendo usado somente para o intercambio de eventos por planilha.
 
 O bloqueio de plano e aplicado somente no deployment de producao. Em desenvolvimento local e deployments de preview, o assistente fica liberado para validacao. A deteccao usa `NEXT_PUBLIC_VERCEL_ENV` quando disponivel e, fora da Vercel, recorre a `NODE_ENV` de forma conservadora.
 

@@ -1,4 +1,5 @@
 import type { CalendarSnapshot } from "@/lib/sync";
+import { filterAuthorCalendarSnapshot } from "@/lib/calendar-export";
 import { createXlsx, openXlsx, type XlsxCell } from "@/lib/xlsx-lite";
 
 const EVENTS_SHEET_NAME = "Eventos";
@@ -155,11 +156,12 @@ const getExportRows = (
 ): XlsxCell[][] => {
   const rows: XlsxCell[][] = [[...CANONICAL_SPREADSHEET_HEADERS]];
   if (!snapshot) return rows;
+  const authorSnapshot = filterAuthorCalendarSnapshot(snapshot);
   const selectedProfileIds = selection ? new Set(selection.profileIds) : null;
   const selectedCategoryIds = selection ? new Set(selection.categoryIds) : null;
-  const profilesById = new Map(snapshot.profiles.map((profile) => [profile.id, profile]));
-  const categoriesById = new Map(snapshot.categories.map((category) => [category.id, category]));
-  for (const event of snapshot.events) {
+  const profilesById = new Map(authorSnapshot.profiles.map((profile) => [profile.id, profile]));
+  const categoriesById = new Map(authorSnapshot.categories.map((category) => [category.id, category]));
+  for (const event of authorSnapshot.events) {
     const category = categoriesById.get(event.categoryId);
     const profile = category ? profilesById.get(category.profileId) : undefined;
     if (!profile || !category) continue;
@@ -227,11 +229,11 @@ const downloadWorkbook = (buffer: Uint8Array, filename: string) => {
   }, 1_000);
 };
 
-export const downloadCalendarSpreadsheetTemplate = async () => {
+export const downloadCalendarSpreadsheetTemplate = () => {
   downloadWorkbook(createCalendarSpreadsheetBuffer(), "doze52-template-eventos.xlsx");
 };
 
-export const exportCalendarSpreadsheet = async (
+export const exportCalendarSpreadsheet = (
   snapshot: CalendarSnapshot,
   selection?: CalendarSpreadsheetExportSelection
 ) => {

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { strFromU8, unzipSync } from "fflate";
 
 import {
   buildImportPlan,
@@ -18,6 +19,7 @@ import {
   type SpreadsheetSource,
 } from "@/lib/calendar-spreadsheet";
 import type { CalendarSnapshot } from "@/lib/sync";
+import { createUserDataBackupArchive } from "@/lib/user-data-backup";
 import { createXlsx, readXlsxSheet } from "@/lib/xlsx-lite";
 
 const withDeclaredExpandedSize = (workbook: Uint8Array, expandedBytes: number) => {
@@ -245,7 +247,7 @@ test("exporta todos os eventos quando nenhum recorte e informado", () => {
   ]);
 });
 
-test("filtra a exportacao por contexto e categoria, incluindo calendarios gerenciados", () => {
+test("exclui calendarios prontos mesmo quando o recorte os solicita", () => {
   const personalProfile = {
     ...snapshot.profiles[0],
     id: "44444444-4444-4444-8444-444444444443",
@@ -274,7 +276,7 @@ test("filtra a exportacao por contexto e categoria, incluindo calendarios gerenc
     categories: [...snapshot.categories, personalCategory],
     events: [...snapshot.events, managedEvent, personalEvent],
   };
-  const source = readSpreadsheetSource(
+  const rows = readXlsxSheet(
     createCalendarSpreadsheetBuffer(sourceSnapshot, {
       profileIds: [snapshot.profiles[0].id],
       categoryIds: [snapshot.categories[1].id],
@@ -282,9 +284,73 @@ test("filtra a exportacao por contexto e categoria, incluindo calendarios gerenc
     "Eventos"
   );
 
-  expect(source.rows.map((row) => row.values.slice(0, 3))).toEqual([
-    ["Profissional", "Feriados", "Feriado exportado"],
+  expect(rows).toHaveLength(1);
+  expect([...rows[0].cells.values()]).toEqual([...CANONICAL_SPREADSHEET_HEADERS]);
+});
+
+test("exclui evento marcado como calendario pronto em categoria autoral", () => {
+  const inconsistentEvent = {
+    ...snapshot.events[0],
+    id: "77777777-7777-4777-8777-777777777781",
+    title: "Evento gerenciado inconsistente",
+    calendarPackGroupId: "pack-inconsistente",
+  };
+  const source = readSpreadsheetSource(
+    createCalendarSpreadsheetBuffer({
+      ...snapshot,
+      categories: snapshot.categories.slice(0, 1),
+      events: [...snapshot.events, inconsistentEvent],
+    }).slice().buffer,
+    "Eventos"
+  );
+
+  expect(source.rows.map((row) => row.values[2])).toEqual(["Release existente"]);
+});
+
+test("exporta 370 eventos autorais sem perder linhas", () => {
+  const bulkSnapshot: CalendarSnapshot = {
+    ...snapshot,
+    categories: snapshot.categories.slice(0, 1),
+    events: Array.from({ length: 370 }, (_, index) => ({
+      ...snapshot.events[0],
+      id: `evento-${index}`,
+      title: `Evento ${index + 1}`,
+    })),
+  };
+  const source = readSpreadsheetSource(
+    createCalendarSpreadsheetBuffer(bulkSnapshot).slice().buffer,
+    "Eventos"
+  );
+
+  expect(source.rows).toHaveLength(370);
+  expect(source.rows.at(-1)?.values[2]).toBe("Evento 370");
+});
+
+test("backup gera um ZIP unico sem categorias ou eventos gerenciados", () => {
+  const managedEvent = {
+    ...snapshot.events[0],
+    id: "77777777-7777-4777-8777-777777777782",
+    title: "Feriado gerenciado",
+    categoryId: snapshot.categories[1].id,
+    calendarPackGroupId: "pack-brasil",
+  };
+  const files = unzipSync(createUserDataBackupArchive({
+    ...snapshot,
+    events: [...snapshot.events, managedEvent],
+  }, "2026-08-24"));
+  const json = JSON.parse(strFromU8(files["doze52-data-2026-08-24.json"]));
+
+  expect(Object.keys(files).sort()).toEqual([
+    "doze52-categories-2026-08-24.csv",
+    "doze52-data-2026-08-24.json",
+    "doze52-events-2026-08-24.csv",
+    "doze52-profiles-2026-08-24.csv",
   ]);
+  expect(json.profiles).toHaveLength(1);
+  expect(json.categories.map((item: { name: string }) => item.name)).toEqual(["Entregas"]);
+  expect(json.events.map((item: { title: string }) => item.title)).toEqual(["Release existente"]);
+  expect(strFromU8(files["doze52-categories-2026-08-24.csv"])).not.toContain("Feriados");
+  expect(strFromU8(files["doze52-events-2026-08-24.csv"])).not.toContain("Feriado gerenciado");
 });
 
 test("gera apenas o cabecalho quando o recorte de exportacao esta vazio", () => {

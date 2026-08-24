@@ -5,11 +5,9 @@ import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import {
   CreditCard,
-  Download,
   FileSpreadsheet,
   LogOut,
   MessageSquareText,
-  RotateCcw,
   Sparkles,
   type LucideIcon,
 } from "lucide-react";
@@ -20,8 +18,7 @@ import { useFeedback } from "@/components/ui/feedback-provider";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useAuth } from "@/lib/auth";
 import { isCalendarSpreadsheetProGateEnabled } from "@/lib/entitlements";
-import { resetAllProductOnboarding } from "@/lib/onboarding";
-import { exportUserData, saveSnapshot } from "@/lib/sync";
+import { saveSnapshot } from "@/lib/sync";
 import { logDevError, logProdError } from "@/lib/safe-log";
 import { useStore } from "@/lib/store";
 import { useBilling } from "@/lib/use-billing";
@@ -110,7 +107,6 @@ export function UserMenu() {
   } = useBilling();
   const [open, setOpen] = useState(false);
   const [brokenAvatar, setBrokenAvatar] = useState(false);
-  const [isExporting, setIsExporting] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [spreadsheetOpen, setSpreadsheetOpen] = useState(false);
   const [spreadsheetUpgradeOpen, setSpreadsheetUpgradeOpen] = useState(false);
@@ -312,44 +308,12 @@ export function UserMenu() {
                 }
               }}
             >
-              Importar/exportar Excel
+              Importar ou exportar
               {spreadsheetRequiresPro && !isPro && !isBillingLoading ? (
                 <span className="ml-auto rounded-full border border-amber-500/20 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:border-amber-300/20 dark:bg-amber-300/10 dark:text-amber-100">
                   Pro
                 </span>
               ) : null}
-            </MenuAction>
-            <MenuAction
-              icon={Download}
-              disabled={isExporting}
-              onClick={async () => {
-                try {
-                  setIsExporting(true);
-                  await exportUserData();
-                  setOpen(false);
-                  notify({
-                    tone: "success",
-                    title: "Exportação iniciada",
-                    description: "Seu arquivo será preparado e baixado em seguida.",
-                  });
-                } catch (error) {
-                  const message =
-                    error instanceof Error
-                      ? error.message
-                      : "Falhou ao exportar. Tente novamente.";
-                  logDevError("user-menu.export", { message });
-                  logProdError("Falha ao exportar dados do usuario.");
-                  notify({
-                    tone: "error",
-                    title: "Falha ao exportar",
-                    description: "Tente novamente em instantes.",
-                  });
-                } finally {
-                  setIsExporting(false);
-                }
-              }}
-            >
-              {isExporting ? "Exportando..." : "Baixar backup tecnico"}
             </MenuAction>
           </MenuSection>
 
@@ -371,20 +335,6 @@ export function UserMenu() {
                 Painel de feedback
               </MenuAction>
             ) : null}
-            <MenuAction
-              icon={RotateCcw}
-              onClick={() => {
-                resetAllProductOnboarding();
-                setOpen(false);
-                notify({
-                  tone: "success",
-                  title: "Tour reiniciado",
-                  description: "As dicas iniciais voltaram a ficar disponíveis.",
-                });
-              }}
-            >
-              Refazer tour
-            </MenuAction>
           </MenuSection>
 
           <MenuSection title="Sessão">

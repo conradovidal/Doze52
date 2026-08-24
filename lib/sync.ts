@@ -10,6 +10,7 @@ import {
   supabaseEnv,
 } from "@/lib/supabase";
 import { logDevError, logProdError } from "@/lib/safe-log";
+import { createUserDataBackupArchive } from "@/lib/user-data-backup";
 import {
   ValidationError,
   validateCategoryInput,
@@ -739,91 +740,27 @@ const saveSnapshotInternal = async (snapshot: CalendarSnapshot): Promise<void> =
   }
 };
 
-const escapeCsv = (value: unknown) => {
-  const raw = typeof value === "string" ? value : JSON.stringify(value ?? "");
-  const escaped = raw.replace(/"/g, '""');
-  return `"${escaped}"`;
-};
-
-const toCsv = (rows: Record<string, unknown>[]) => {
-  if (rows.length === 0) return "";
-  const headers = Object.keys(rows[0]);
-  const head = headers.join(",");
-  const body = rows
-    .map((row) => headers.map((header) => escapeCsv(row[header])).join(","))
-    .join("\n");
-  return `${head}\n${body}`;
-};
-
-const downloadFile = (filename: string, content: string, type: string) => {
-  const blob = new Blob([content], { type });
+const downloadFile = (filename: string, content: Uint8Array, type: string) => {
+  const blob = new Blob([content.slice().buffer], { type });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
   link.download = filename;
+  link.style.display = "none";
+  document.body.appendChild(link);
   link.click();
-  URL.revokeObjectURL(url);
+  window.setTimeout(() => {
+    link.remove();
+    URL.revokeObjectURL(url);
+  }, 1_000);
 };
 
-export const exportUserData = async () => {
-  const snapshot = await loadRemoteData();
+export const exportUserData = async (snapshotOverride?: CalendarSnapshot) => {
+  const snapshot = snapshotOverride ?? (await loadRemoteData());
   const stamp = new Date().toISOString().slice(0, 10);
   downloadFile(
-    `doze52-data-${stamp}.json`,
-    JSON.stringify(snapshot, null, 2),
-    "application/json"
+    `doze52-backup-${stamp}.zip`,
+    createUserDataBackupArchive(snapshot, stamp),
+    "application/zip"
   );
-
-  const profilesCsv = toCsv(
-    snapshot.profiles.map((profile) => ({
-      id: profile.id,
-      name: profile.name,
-      color: profile.color,
-      icon: profile.icon,
-      position: profile.position,
-    }))
-  );
-  downloadFile(
-    `doze52-profiles-${stamp}.csv`,
-    profilesCsv,
-    "text/csv;charset=utf-8"
-  );
-
-  const categoriesCsv = toCsv(
-    snapshot.categories.map((category, index) => ({
-      id: category.id,
-      profile_id: category.profileId,
-      name: category.name,
-      color: category.color,
-      visible: category.visible,
-      calendar_pack_group_id: category.calendarPackGroupId ?? "",
-      calendar_pack_variant_id: category.calendarPackVariantId ?? "",
-      calendar_pack_category_key: category.calendarPackCategoryKey ?? "",
-      calendar_pack_version: category.calendarPackVersion ?? "",
-      position: index,
-    }))
-  );
-  downloadFile(
-    `doze52-categories-${stamp}.csv`,
-    categoriesCsv,
-    "text/csv;charset=utf-8"
-  );
-
-  const eventsCsv = toCsv(
-    snapshot.events.map((event) => ({
-      id: event.id,
-      title: event.title,
-      category_id: event.categoryId,
-      start_date: event.startDate,
-      end_date: event.endDate,
-      notes: event.notes ?? "",
-      recurrence_type: event.recurrenceType ?? "",
-      recurrence_until: event.recurrenceUntil ?? "",
-      created_at: event.createdAt,
-      day_order: event.dayOrder,
-      calendar_pack_group_id: event.calendarPackGroupId ?? "",
-      calendar_pack_event_key: event.calendarPackEventKey ?? "",
-    }))
-  );
-  downloadFile(`doze52-events-${stamp}.csv`, eventsCsv, "text/csv;charset=utf-8");
 };
