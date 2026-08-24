@@ -1,6 +1,6 @@
 export class PayloadTooLargeError extends Error {
   constructor(readonly maxBytes: number) {
-    super(`JSON payload exceeds ${maxBytes} bytes.`);
+    super(`Request payload exceeds ${maxBytes} bytes.`);
     this.name = "PayloadTooLargeError";
   }
 }
@@ -12,18 +12,27 @@ export class InvalidJsonPayloadError extends Error {
   }
 }
 
-export async function readLimitedJsonObject(
-  request: Request,
-  maxBytes: number
-): Promise<Record<string, unknown>> {
+const assertPositiveByteLimit = (maxBytes: number) => {
   if (!Number.isSafeInteger(maxBytes) || maxBytes < 1) {
     throw new RangeError("maxBytes must be a positive safe integer.");
   }
+};
+
+const declaredBodyExceedsLimit = (request: Request, maxBytes: number) => {
+  const contentLength = request.headers.get("content-length")?.trim();
+  if (!contentLength || !/^\d+$/.test(contentLength)) return false;
+  return BigInt(contentLength) > BigInt(maxBytes);
+};
+
+const readLimitedBytes = async (request: Request, maxBytes: number) => {
+  assertPositiveByteLimit(maxBytes);
+  if (declaredBodyExceedsLimit(request, maxBytes)) {
+    await request.body?.cancel().catch(() => undefined);
+    throw new PayloadTooLargeError(maxBytes);
+  }
 
   const reader = request.body?.getReader();
-  if (!reader) {
-    throw new InvalidJsonPayloadError();
-  }
+  if (!reader) return new Uint8Array();
 
   const chunks: Uint8Array[] = [];
   let totalBytes = 0;
@@ -35,7 +44,7 @@ export async function readLimitedJsonObject(
 
     totalBytes += value.byteLength;
     if (totalBytes > maxBytes) {
-      await reader.cancel();
+      await reader.cancel().catch(() => undefined);
       throw new PayloadTooLargeError(maxBytes);
     }
     chunks.push(value);
@@ -47,7 +56,18 @@ export async function readLimitedJsonObject(
     bytes.set(chunk, offset);
     offset += chunk.byteLength;
   }
+  return bytes;
+};
 
+export async function readLimitedText(request: Request, maxBytes: number) {
+  return new TextDecoder().decode(await readLimitedBytes(request, maxBytes));
+}
+
+export async function readLimitedJsonObject(
+  request: Request,
+  maxBytes: number
+): Promise<Record<string, unknown>> {
+  const bytes = await readLimitedBytes(request, maxBytes);
   try {
     const parsed: unknown = JSON.parse(
       new TextDecoder("utf-8", { fatal: true }).decode(bytes)

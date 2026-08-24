@@ -1,4 +1,4 @@
-import { randomInt } from "node:crypto";
+import { createHash } from "node:crypto";
 import type { User } from "@supabase/supabase-js";
 
 import {
@@ -35,6 +35,113 @@ export class WebhookLeaseLostError extends Error {
     this.name = "WebhookLeaseLostError";
   }
 }
+
+export class BillingCheckoutThrottledError extends Error {
+  constructor(readonly retryAfterSeconds: number) {
+    super("Billing checkout is temporarily throttled.");
+    this.name = "BillingCheckoutThrottledError";
+  }
+}
+
+type BillingCheckoutClaim =
+  | { outcome: "acquired"; attemptKey: string; leaseToken: string }
+  | { outcome: "reused"; url: string }
+  | { outcome: "processing" | "rate_limited"; retryAfterSeconds: number };
+
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const positiveRetryAfter = (value: unknown) => {
+  const seconds = Number(value);
+  return Number.isSafeInteger(seconds) && seconds > 0 ? seconds : 1;
+};
+
+const parseBillingCheckoutClaim = (value: unknown): BillingCheckoutClaim => {
+  if (!value || typeof value !== "object") {
+    throw new Error("Invalid billing checkout claim response.");
+  }
+  const claim = value as Record<string, unknown>;
+  if (
+    claim.outcome === "acquired" &&
+    typeof claim.attemptKey === "string" &&
+    UUID_PATTERN.test(claim.attemptKey) &&
+    typeof claim.leaseToken === "string" &&
+    UUID_PATTERN.test(claim.leaseToken)
+  ) {
+    return {
+      outcome: "acquired",
+      attemptKey: claim.attemptKey,
+      leaseToken: claim.leaseToken,
+    };
+  }
+  if (
+    claim.outcome === "reused" &&
+    typeof claim.url === "string" &&
+    claim.url.startsWith("https://checkout.stripe.com/")
+  ) {
+    return { outcome: "reused", url: claim.url };
+  }
+  if (claim.outcome === "processing" || claim.outcome === "rate_limited") {
+    return {
+      outcome: claim.outcome,
+      retryAfterSeconds: positiveRetryAfter(claim.retryAfterSeconds),
+    };
+  }
+  throw new Error("Invalid billing checkout claim response.");
+};
+
+const claimBillingCheckout = async (userId: string) => {
+  const { data, error } = await getSupabaseAdminClient().rpc(
+    "claim_billing_checkout",
+    { p_user_id: userId }
+  );
+  if (error) throw error;
+  return parseBillingCheckoutClaim(data);
+};
+
+const completeBillingCheckout = async (params: {
+  userId: string;
+  leaseToken: string;
+  sessionId: string;
+  sessionUrl: string;
+  sessionExpiresAt: string;
+}) => {
+  const { error } = await getSupabaseAdminClient().rpc(
+    "complete_billing_checkout",
+    {
+      p_user_id: params.userId,
+      p_lease_token: params.leaseToken,
+      p_session_id: params.sessionId,
+      p_session_url: params.sessionUrl,
+      p_session_expires_at: params.sessionExpiresAt,
+    }
+  );
+  if (error) throw error;
+};
+
+const releaseBillingCheckout = async (params: {
+  userId: string;
+  leaseToken: string;
+  errorCode: string;
+}) => {
+  const { error } = await getSupabaseAdminClient().rpc(
+    "release_billing_checkout",
+    {
+      p_user_id: params.userId,
+      p_lease_token: params.leaseToken,
+      p_error_code: params.errorCode,
+    }
+  );
+  if (error) throw error;
+};
+
+const checkoutErrorCode = (error: unknown) =>
+  error instanceof Error && error.name ? error.name.slice(0, 64) : "UnknownError";
+
+export const billingCheckoutIdempotencyKey = (
+  resource: "customer" | "session",
+  attemptKey: string
+) => `doze52_${resource}_${attemptKey}`;
 
 const toIsoFromUnixSeconds = (timestamp: number | null | undefined) => {
   if (!timestamp) return null;
@@ -140,18 +247,26 @@ const upsertBillingCustomer = async (params: {
   if (error) throw error;
 };
 
-export const getOrCreateBillingCustomer = async (user: User) => {
+export const getOrCreateBillingCustomer = async (
+  user: User,
+  attemptKey: string
+) => {
   const existingCustomerId = await getBillingCustomerId(user.id);
   if (existingCustomerId) return existingCustomerId;
 
   const stripe = getStripe();
-  const customer = await stripe.customers.create({
-    email: user.email ?? undefined,
-    name: getUserDisplayName(user),
-    metadata: {
-      user_id: user.id,
+  const customer = await stripe.customers.create(
+    {
+      email: user.email ?? undefined,
+      name: getUserDisplayName(user),
+      metadata: {
+        user_id: user.id,
+      },
     },
-  });
+    {
+      idempotencyKey: billingCheckoutIdempotencyKey("customer", attemptKey),
+    }
+  );
 
   await upsertBillingCustomer({
     userId: user.id,
@@ -165,43 +280,87 @@ export const createCheckoutSession = async (params: {
   user: User;
   requestUrl: string;
 }) => {
-  const stripe = getStripe();
-  const customerId = await getOrCreateBillingCustomer(params.user);
-  const appUrl = getAppBaseUrl(params.requestUrl);
-  const session = await stripe.checkout.sessions.create({
-    integration_identifier: createIntegrationIdentifier(),
-    mode: "subscription",
-    customer: customerId,
-    client_reference_id: params.user.id,
-    line_items: [
-      {
-        price: getStripeProPriceId(),
-        quantity: 1,
-      },
-    ],
-    metadata: {
-      user_id: params.user.id,
-    },
-    subscription_data: {
-      metadata: {
-        user_id: params.user.id,
-      },
-    },
-    success_url: `${appUrl}/?billing=success`,
-    cancel_url: `${appUrl}/?billing=cancelled`,
-  });
-
-  if (!session.url) {
-    throw new Error("Stripe Checkout did not return a redirect URL.");
+  const claim = await claimBillingCheckout(params.user.id);
+  if (claim.outcome === "reused") return claim.url;
+  if (claim.outcome !== "acquired") {
+    throw new BillingCheckoutThrottledError(claim.retryAfterSeconds);
   }
+
+  const stripe = getStripe();
+  let session: Stripe.Checkout.Session;
+  try {
+    const customerId = await getOrCreateBillingCustomer(
+      params.user,
+      claim.attemptKey
+    );
+    const appUrl = getAppBaseUrl(params.requestUrl);
+    session = await stripe.checkout.sessions.create(
+      {
+        integration_identifier: createIntegrationIdentifier(claim.attemptKey),
+        mode: "subscription",
+        customer: customerId,
+        client_reference_id: params.user.id,
+        line_items: [
+          {
+            price: getStripeProPriceId(),
+            quantity: 1,
+          },
+        ],
+        metadata: {
+          user_id: params.user.id,
+        },
+        subscription_data: {
+          metadata: {
+            user_id: params.user.id,
+          },
+        },
+        success_url: `${appUrl}/?billing=success`,
+        cancel_url: `${appUrl}/?billing=cancelled`,
+      },
+      {
+        idempotencyKey: billingCheckoutIdempotencyKey(
+          "session",
+          claim.attemptKey
+        ),
+      }
+    );
+
+    if (!session.url) {
+      throw new Error("Stripe Checkout did not return a redirect URL.");
+    }
+  } catch (error) {
+    try {
+      await releaseBillingCheckout({
+        userId: params.user.id,
+        leaseToken: claim.leaseToken,
+        errorCode: checkoutErrorCode(error),
+      });
+    } catch (releaseError) {
+      console.error("[billing.checkout.release]", {
+        result: "failed",
+        errorType: checkoutErrorCode(releaseError),
+      });
+    }
+    throw error;
+  }
+
+  await completeBillingCheckout({
+    userId: params.user.id,
+    leaseToken: claim.leaseToken,
+    sessionId: session.id,
+    sessionUrl: session.url,
+    sessionExpiresAt: new Date(session.expires_at * 1000).toISOString(),
+  });
 
   return session.url;
 };
 
-const createIntegrationIdentifier = () => {
+export const createIntegrationIdentifier = (attemptKey: string) => {
   const alphabet = "abcdefghijklmnopqrstuvwxyz";
-  const suffix = Array.from({ length: 8 }, () =>
-    alphabet[randomInt(alphabet.length)]
+  const digest = createHash("sha256").update(attemptKey).digest();
+  const suffix = Array.from(
+    digest.subarray(0, 8),
+    (value) => alphabet[value % alphabet.length]
   ).join("");
   return `doze52_${suffix}`;
 };
