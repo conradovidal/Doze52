@@ -5,22 +5,24 @@ import type { CalendarCatalog, OfficialCalendarEvent } from "../../lib/calendar-
 import clubs from "../../lib/calendar-packs/brazilian-clubs-2026.json";
 import { dismissOnboardingIfVisible } from "./support/browser";
 
-test("fallback compilado exige a escolha explícita entre os 20 clubes", async ({ page }) => {
+test("fallback compilado pré-seleciona São Paulo e Grêmio entre as opções disponíveis", async ({ page }) => {
   await page.goto("/");
   await page.waitForLoadState("networkidle");
   await dismissOnboardingIfVisible(page);
   await page.getByRole("button", { name: "Adicionar ou gerenciar calendários." }).click();
   const dialog = page.getByRole("dialog", { name: "Calendários" });
+  await expect(
+    dialog.getByRole("combobox", { name: /Estado para/ })
+  ).toContainText("São Paulo (SP)");
   const selector = dialog.getByRole("combobox", { name: /Time para/ });
-  await expect(selector).toContainText("Escolha seu time");
+  await expect(selector).toContainText("Grêmio");
   await selector.click();
   const options = page.getByRole("option");
   await expect(options).toHaveCount(20);
   const labels = await options.allTextContents();
   expect(labels).toEqual([...labels].sort((left, right) => left.localeCompare(right, "pt-BR")));
   expect(labels[0]).not.toBe("Grêmio");
-  await page.getByRole("option", { name: "Grêmio", exact: true }).click();
-  await expect(selector).toContainText("Grêmio");
+  await page.keyboard.press("Escape");
 
   const catalog = await page.evaluate(async () => (await fetch("/api/calendar-packs")).json());
   const palmeiras = catalog.packs.find((pack: { variantGroup?: { optionLabel?: string } }) => pack.variantGroup?.optionLabel === "Palmeiras");

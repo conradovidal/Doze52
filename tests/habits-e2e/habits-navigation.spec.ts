@@ -22,16 +22,19 @@ const installCompletedOnboarding = async (
 const expectCenteredLogo = async (
   page: import("@playwright/test").Page
 ) => {
-  const logo = page.locator('[data-brand-logo-position="header-center"]');
+  const logo = page.locator('[data-brand-logo-position="header-adaptive"]');
   const logoBox = await logo.boundingBox();
   const viewport = page.viewportSize();
   if (!logoBox || !viewport) throw new Error("Logo não pôde ser medido.");
-  const desktopRail = page.locator('[data-product-navigation="desktop"]');
-  const desktop = await desktopRail.isVisible().catch(() => false);
-  const expectedCenter = desktop
-    ? 52 + (viewport.width - 52) / 2
-    : viewport.width / 2;
-  expect(Math.abs(logoBox.x + logoBox.width / 2 - expectedCenter)).toBeLessThanOrEqual(1);
+  const desktop = await page
+    .locator('[data-product-navigation="desktop"]')
+    .isVisible()
+    .catch(() => false);
+  if (desktop) {
+    expect(Math.round(logoBox.x)).toBe(16);
+    return;
+  }
+  expect(Math.abs(logoBox.x + logoBox.width / 2 - viewport.width / 2)).toBeLessThanOrEqual(1);
 };
 
 test("mobile abre em Hábitos e preserva a sessão entre superfícies", async ({
@@ -155,29 +158,25 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
     );
   });
   await page.goto("/");
-  const rail = page.locator('[data-product-navigation="desktop"]');
-  await expect(rail).toBeVisible();
-  expect((await rail.boundingBox())?.width).toBe(52);
-  await expect(rail.getByRole("link", { name: "Anual" })).toHaveClass(/text-foreground/);
-  await expect(rail.getByRole("link", { name: "Anual" })).not.toHaveClass(/bg-foreground/);
+  const desktopNavigation = page.locator('[data-product-navigation="desktop"]');
+  await expect(desktopNavigation).toBeVisible();
+  await expect(desktopNavigation.getByRole("link", { name: "Anual" })).toHaveClass(/text-foreground/);
+  await expect(desktopNavigation.getByRole("link", { name: "Anual" })).not.toHaveClass(/bg-foreground/);
   await expectCenteredLogo(page);
-  const profileBox = await rail.getByRole("button", { name: "Abrir perfil" }).boundingBox();
-  const annualBox = await rail.getByRole("link", { name: "Anual" }).boundingBox();
-  const habitsBox = await rail.getByRole("link", { name: "Hábitos" }).boundingBox();
-  if (!profileBox || !annualBox || !habitsBox) {
-    throw new Error("Itens da rail não puderam ser medidos.");
+  const profile = page.locator('[data-product-account="desktop"]');
+  const navigationBox = await desktopNavigation.boundingBox();
+  const profileBox = await profile.boundingBox();
+  const annualBox = await desktopNavigation.getByRole("link", { name: "Anual" }).boundingBox();
+  const habitsBox = await desktopNavigation.getByRole("link", { name: "Hábitos" }).boundingBox();
+  const desktopViewport = page.viewportSize();
+  if (!navigationBox || !profileBox || !annualBox || !habitsBox || !desktopViewport) {
+    throw new Error("Itens do cabeçalho não puderam ser medidos.");
   }
-  expect(profileBox.y).toBeLessThan(annualBox.y);
-  expect(annualBox.y).toBeLessThan(habitsBox.y);
-  expect(Math.round(profileBox.y)).toBe(16);
-  await expect(rail.locator("[data-rail-divider]")).toHaveCount(1);
-  expect(Math.round((await rail.locator("[data-rail-divider]").boundingBox())?.width ?? 0)).toBe(24);
-  const railDividerBox = await rail.locator("[data-rail-divider]").boundingBox();
-  const filterRegionBox = await page.locator("[data-onboarding-filter-region]").boundingBox();
-  if (!railDividerBox || !filterRegionBox) throw new Error("Separadores não puderam ser medidos.");
-  expect(Math.abs(railDividerBox.y - filterRegionBox.y)).toBeLessThanOrEqual(1);
-  await expect(rail.getByRole("button", { name: "Editar", exact: true })).toHaveCount(0);
-  await expect(rail.locator("[data-rail-year-stepper]")).toHaveCount(0);
+  expect(Math.abs(navigationBox.x + navigationBox.width / 2 - desktopViewport.width / 2)).toBeLessThanOrEqual(1);
+  expect(Math.abs(annualBox.y - habitsBox.y)).toBeLessThanOrEqual(1);
+  expect(Math.round(profileBox.x + profileBox.width)).toBe(desktopViewport.width - 16);
+  await expect(page.locator("[data-rail-divider]")).toHaveCount(0);
+  await expect(desktopNavigation.getByRole("button", { name: "Editar", exact: true })).toHaveCount(0);
   await expect(page.locator('[data-calendar-ui-mode="desktop"]')).toBeVisible();
   const contextualEdit = page.getByRole("button", { name: "Editar", exact: true });
   const collapseCategories = page.getByRole("button", { name: "Recolher categorias" });
@@ -187,21 +186,32 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
   expect(contextualEditBox.x).toBeLessThan(collapseBox.x);
   await expect(page.locator("[data-calendar-scale-control]")).toHaveCount(0);
   const scaleBox = await page.locator("[data-calendar-footer-center]").boundingBox();
-  const desktopViewport = page.viewportSize();
   if (!scaleBox || !desktopViewport) throw new Error("Escala não pôde ser medida.");
-  const usableCenter = 52 + (desktopViewport.width - 52) / 2;
-  expect(Math.abs(scaleBox.x + scaleBox.width / 2 - usableCenter)).toBeLessThanOrEqual(2);
+  expect(Math.abs(scaleBox.x + scaleBox.width / 2 - desktopViewport.width / 2)).toBeLessThanOrEqual(2);
   await expect(page.getByRole("button", { name: "Adicionar ou gerenciar calendários." })).toHaveCount(0);
 
   await contextualEdit.click();
   await page.getByRole("button", { name: "Criar nova categoria" }).click();
   const categoryChoice = page.getByRole("dialog", { name: "Adicionar categoria" });
   await expect(categoryChoice).toBeVisible();
+  await expect(categoryChoice.getByText("Escolha o que deseja adicionar.")).toBeVisible();
+  await expect(categoryChoice.getByText(/contexto/i)).toHaveCount(0);
   await expect(categoryChoice.getByRole("button", { name: /Criar minha categoria/ })).toBeVisible();
   await categoryChoice.getByRole("button", { name: /Adicionar calendário pronto/ }).click();
   const calendarGallery = page.getByRole("dialog", { name: "Calendários" });
   await expect(calendarGallery).toBeVisible();
   await expect(calendarGallery.getByRole("combobox", { name: /Contexto para/ })).toHaveCount(0);
+  await expect(
+    calendarGallery.getByRole("combobox", { name: /Estado para/ })
+  ).toContainText("São Paulo (SP)");
+  await expect(
+    calendarGallery.getByRole("combobox", { name: /Time para/ })
+  ).toContainText("Grêmio");
+  const defaultTeamCard = calendarGallery
+    .getByRole("article")
+    .filter({ hasText: "Jogos do Grêmio" });
+  await defaultTeamCard.getByRole("button", { name: "Adicionar calendário" }).click();
+  await expect(defaultTeamCard.getByText("Meu ano", { exact: true })).toBeVisible();
   await calendarGallery.getByRole("button", { name: "Voltar para as opções de categoria" }).click();
   await expect(categoryChoice).toBeVisible();
   await page.keyboard.press("Escape");
@@ -216,7 +226,6 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
   const calendarRegion = page.locator("[data-desktop-calendar-scroll-region]");
   const widthBefore = (await calendarRegion.boundingBox())?.width;
   await expect(page.getByRole("button", { name: "Abrir configurações" })).toHaveCount(0);
-  const profile = page.getByRole("button", { name: "Abrir perfil" });
   await profile.click();
   const panel = page.locator("[data-app-utility-panel]");
   await expect(panel).toBeVisible();
@@ -240,8 +249,13 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
   );
   await page.getByRole("link", { name: "Hábitos" }).click();
   const habitControlsBox = await page.locator('[data-habit-controls-layout="desktop"]').boundingBox();
-  if (!habitControlsBox) throw new Error("Separador de hábitos não pôde ser medido.");
-  expect(Math.abs(railDividerBox.y - habitControlsBox.y)).toBeLessThanOrEqual(1);
+  if (!habitControlsBox) throw new Error("Controles de hábitos não puderam ser medidos.");
+  expect(
+    Math.abs(
+      habitControlsBox.x + habitControlsBox.width / 2 - desktopViewport.width / 2
+    )
+  ).toBeLessThanOrEqual(2);
+  await expect(desktopNavigation.getByRole("link", { name: "Hábitos" })).toHaveClass(/text-foreground/);
   const habits = page.locator("[data-habits-prototype]");
   await expect(habits).toHaveAttribute("data-habits-layout", "desktop-year");
   await expect(habits.locator('[data-year-grid-surface="habits"]')).toBeVisible();
@@ -429,7 +443,7 @@ test("mobile reordena hábitos pelo mesmo DnD e persiste a posição", async ({
   ).toBeVisible();
 });
 
-test("onboarding desktop ensina navegação lateral depois do ano", async ({
+test("onboarding desktop ensina navegação de período depois do ano", async ({
   page,
 }, testInfo) => {
   test.skip(!testInfo.project.name.startsWith("desktop-"), "Cenário desktop");

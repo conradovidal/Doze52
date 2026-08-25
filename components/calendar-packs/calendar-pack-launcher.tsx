@@ -151,6 +151,21 @@ const buildCalendarPackCards = (calendarPacks: readonly CalendarPack[]) => {
   return cards;
 };
 
+const getDefaultVariant = (
+  groupId: string,
+  variants: readonly CalendarPack[]
+) => {
+  if (groupId === "holidays-by-state") {
+    return variants.find((variant) => variant.regionCode === "SP");
+  }
+  if (groupId === "brasileirao-2026-by-team") {
+    return variants.find(
+      (variant) => variant.variantGroup?.optionLabel === "Grêmio"
+    );
+  }
+  return undefined;
+};
+
 export function CalendarPackLauncher({
   onFocusYear,
   className,
@@ -213,28 +228,6 @@ export function CalendarPackLauncher({
   >({});
   const [expandedPackId, setExpandedPackId] = React.useState<string | null>(null);
   const [upgradeDialogOpen, setUpgradeDialogOpen] = React.useState(false);
-
-  React.useEffect(() => {
-    if (
-      guidedVariantGroupId !== "holidays-by-state" ||
-      !requireExplicitVariant
-    ) {
-      return;
-    }
-
-    const saoPauloPack = calendarPacks.find(
-      (pack) =>
-        getCalendarPackGroupId(pack) === guidedVariantGroupId &&
-        pack.regionCode === "SP"
-    );
-    if (!saoPauloPack) return;
-
-    setSelectedVariantByGroup((current) =>
-      current[guidedVariantGroupId]
-        ? current
-        : { ...current, [guidedVariantGroupId]: saoPauloPack.id }
-    );
-  }, [calendarPacks, guidedVariantGroupId, requireExplicitVariant]);
 
   const snapshot = React.useMemo(
     () => ({ profiles, categories, events }),
@@ -524,6 +517,7 @@ export function CalendarPackLauncher({
               const selectedVariant = variants.find(
                 (candidate) => candidate.id === selectedPackId
               );
+              const defaultVariant = getDefaultVariant(key, variants);
               const groupIsPresent = variants.some((candidate) => {
                 const candidateAvailability = availabilityByPack.get(candidate.id);
                 return (
@@ -535,16 +529,19 @@ export function CalendarPackLauncher({
                 variants.find((candidate) =>
                   isCalendarPackVariantInstalled(snapshot, candidate, variants)
                 ) ?? (groupIsPresent ? selectedVariant ?? variants[0] : undefined);
-              const pack =
+              const effectiveVariant =
                 selectedVariant ??
                 installedVariant ??
+                defaultVariant;
+              const pack =
+                effectiveVariant ??
                 variants[0];
               const isTeamGroup = key === "brasileirao-2026-by-team";
               const requiresExplicitSelection =
                 (isGuidedCard && requireExplicitVariant) || isTeamGroup;
               const hasRequiredVariant =
                 !requiresExplicitSelection ||
-                Boolean(selectedVariant || installedVariant);
+                Boolean(effectiveVariant);
               const availability = availabilityByPack.get(pack.id);
               const isPresent = groupIsPresent;
               const currentFlow = flowByPack[pack.id] ?? "idle";
@@ -592,7 +589,7 @@ export function CalendarPackLauncher({
                       />
                       <div className="min-w-0">
                         <h4 className="text-sm font-medium text-foreground">
-                          {isTeamGroup && !selectedVariant && !installedVariant
+                          {isTeamGroup && !effectiveVariant
                             ? "Jogos do seu time"
                             : pack.name}
                         </h4>
@@ -604,7 +601,7 @@ export function CalendarPackLauncher({
                             <Select
                               value={
                                 requiresExplicitSelection
-                                  ? selectedVariant?.id ?? installedVariant?.id ?? ""
+                                  ? effectiveVariant?.id ?? ""
                                   : pack.id
                               }
                               disabled={isGuidedCardDisabled}

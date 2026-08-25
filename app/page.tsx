@@ -2194,9 +2194,7 @@ export default function HomePage() {
             )
           : cn(
               "flex h-full min-h-0 flex-col overflow-hidden pt-3 pb-2 md:pb-4",
-              isHabitsPrototypeEnabled
-                ? "pr-1 pl-14"
-                : "px-4"
+              "px-4"
             )
       )}
     >
@@ -2255,6 +2253,9 @@ export default function HomePage() {
           isMobileCalendarUi={isMobileCalendarUi === true}
           showCalendarControls={isCalendarSurfaceActive}
           useAdaptiveNavigation={isHabitsPrototypeEnabled}
+          activeDestination={activeDestination}
+          onDestinationSelect={handleDestinationSelect}
+          onOpenUtilityPanel={handleOpenUtilityPanel}
           onCalendarPackFocusYear={handleYearChange}
           onboardingFocusTarget={
             isCalendarSurfaceActive ? onboardingFocusTarget : null
