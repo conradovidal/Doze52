@@ -251,6 +251,19 @@ test("cria contexto, categorias incrementais e quatro eventos", () => {
   });
 });
 
+test("onboarding desktop ensina trimestre e mês depois do ano", () => {
+  const periodNavigation = reduceGuidedOnboardingState(
+    { ...initialState(), step: "year_instruction" },
+    { type: "continue_from_year", showPeriodNavigation: true }
+  );
+  expect(periodNavigation.step).toBe("period_navigation_instruction");
+
+  const theme = reduceGuidedOnboardingState(periodNavigation, {
+    type: "continue_from_period_navigation",
+  });
+  expect(theme.step).toBe("theme_instruction");
+});
+
 test("convite de conta exige dois eventos espontâneos", () => {
   const first = reduceGuidedOnboardingState(completedState(), {
     type: "record_post_onboarding_event",

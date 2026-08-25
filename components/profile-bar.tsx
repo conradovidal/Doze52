@@ -47,9 +47,9 @@ const CHIP_LEADING_SLOT_CLASS =
 const READ_CHIP_LEADING_SLOT_CLASS =
   "inline-flex h-8 w-6 shrink-0 items-center justify-center";
 const CHIP_HANDLE_CLASS =
-  "inline-flex h-8 w-8 shrink-0 touch-none cursor-grab items-center justify-center rounded-[9px] transition-colors active:cursor-grabbing";
+  "inline-flex h-8 w-8 shrink-0 touch-none cursor-grab items-center justify-center rounded-[9px] active:cursor-grabbing focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45";
 const CHIP_EDIT_ACTION_CLASS =
-  "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] transition-colors";
+  "inline-flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-[8px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45";
 const CHIP_PLACEHOLDER_CLASS =
   "pointer-events-none absolute inset-[3px] rounded-[8px] border border-dashed border-border bg-muted/70";
 const CHIP_OVERLAY_CLASS =
@@ -119,8 +119,8 @@ function EditProfileChip({
 }) {
   const contentHiddenClass = isPlaceholder ? "invisible" : "";
   const utilityToneClass = isActive
-    ? "text-primary-foreground/70 hover:bg-primary-foreground/10 hover:text-primary-foreground"
-    : "text-muted-foreground hover:bg-muted hover:text-foreground";
+    ? "text-primary-foreground/70"
+    : "text-muted-foreground";
 
   return (
     <div
@@ -134,7 +134,7 @@ function EditProfileChip({
           ? "border-border bg-card text-muted-foreground"
           : isActive
             ? "border-primary bg-primary text-primary-foreground"
-            : "border-border bg-card text-foreground/78 hover:border-foreground/18 hover:bg-muted hover:text-foreground",
+            : "border-border bg-card text-foreground/78",
         isOverlay && CHIP_OVERLAY_CLASS,
         isPlaceholder && "shadow-none"
       )}

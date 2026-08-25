@@ -137,6 +137,10 @@ export function YearGrid({
   guidedYearNotice,
   onDismissGuidedYearNotice,
   onGuidedYearAction,
+  guidedPeriodNotice,
+  onDismissGuidedPeriodNotice,
+  onGuidedPeriodAction,
+  showScaleControl = true,
 }: {
   year: number;
   todayIso: string;
@@ -164,6 +168,10 @@ export function YearGrid({
   guidedYearNotice?: GuidedToolbarNotice | null;
   onDismissGuidedYearNotice?: () => void;
   onGuidedYearAction?: () => void;
+  guidedPeriodNotice?: GuidedToolbarNotice | null;
+  onDismissGuidedPeriodNotice?: () => void;
+  onGuidedPeriodAction?: () => void;
+  showScaleControl?: boolean;
 }) {
   const profiles = useStore((s) => s.profiles as CalendarProfile[]);
   const categories = useStore((s) => s.categories as CategoryItem[]);
@@ -640,7 +648,7 @@ export function YearGrid({
         return (
           <div
             key={group.key}
-            className="flex items-stretch border-b border-border/70 last:border-b-0"
+            className="relative flex items-stretch border-b border-border/70 last:border-b-0"
           >
             <button
               type="button"
@@ -658,8 +666,13 @@ export function YearGrid({
                 LATERAL_KEY_BASE_CLASS,
                 "h-auto self-stretch w-[1.95rem] shrink-0 border-r border-border px-0 min-[420px]:w-[2.1rem] md:w-[2.25rem]",
                 quarterRailShapeClass,
-                isQuarterSelected ? LATERAL_KEY_ACTIVE_CLASS : LATERAL_KEY_REST_CLASS
+                isQuarterSelected ? LATERAL_KEY_ACTIVE_CLASS : LATERAL_KEY_REST_CLASS,
+                guidedPeriodNotice?.target === "period-navigation" &&
+                  "product-spotlight-target"
               )}
+              data-onboarding-period-control={
+                guidedPeriodNotice?.target === "period-navigation" ? "true" : undefined
+              }
             >
               <span
                 className="block -rotate-90 whitespace-nowrap text-[10px] font-medium uppercase tracking-[0.04em] min-[420px]:text-[10.5px] md:text-[11px]"
@@ -667,6 +680,16 @@ export function YearGrid({
                 {QUARTER_SHORT_LABELS[group.quarterIndex]}
               </span>
             </button>
+            {isFirstVisibleGroup &&
+            guidedPeriodNotice?.target === "period-navigation" &&
+            onDismissGuidedPeriodNotice ? (
+              <GuidedToolbarNoticeCard
+                notice={guidedPeriodNotice}
+                onClose={onDismissGuidedPeriodNotice}
+                onAction={onGuidedPeriodAction}
+                placement="right"
+              />
+            ) : null}
 
             <div className="min-w-0 flex-1">
               {group.monthIndices.map((monthIndex) => {
@@ -704,6 +727,9 @@ export function YearGrid({
                         : `Abrir ${MONTH_TITLE_LABELS[monthIndex]}`
                     }
                     monthLabelActive={isActiveMonth}
+                    monthLabelHighlighted={
+                      guidedPeriodNotice?.target === "period-navigation"
+                    }
                     isMobileInteractionMode={isMobileInteractionMode}
                     onDayCellActivate={
                       isMobileInteractionMode && viewMode !== "month"
@@ -815,16 +841,18 @@ export function YearGrid({
               />
             ) : null}
           </div>
-          <div data-calendar-scale-control>
-          <SegmentedControl
-            value={viewMode}
-            options={CALENDAR_VIEW_OPTIONS}
-            onValueChange={handleViewModeChange}
-            aria-label={
-              habitPresentation ? "Escala dos hábitos" : "Escala do calendário"
-            }
-          />
-          </div>
+          {showScaleControl ? (
+            <div data-calendar-scale-control>
+              <SegmentedControl
+                value={viewMode}
+                options={CALENDAR_VIEW_OPTIONS}
+                onValueChange={handleViewModeChange}
+                aria-label={
+                  habitPresentation ? "Escala dos hábitos" : "Escala do calendário"
+                }
+              />
+            </div>
+          ) : null}
         </div>
         {hasFocusZoom ? (
           <label className="flex w-[10.75rem] items-center justify-end justify-self-end gap-2.5 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground min-[420px]:w-[11.5rem] md:w-[12.25rem] max-[900px]:col-span-3 max-[900px]:row-start-2">

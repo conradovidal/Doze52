@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 export type GuidedToolbarNotice = {
-  target: "edit" | "calendars" | "year" | "theme";
+  target: "edit" | "calendars" | "year" | "period-navigation" | "theme";
   title: string;
   instruction: string;
   actionLabel?: string;

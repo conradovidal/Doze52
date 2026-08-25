@@ -31,6 +31,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 
+import { CollapsibleControlRegion } from "@/components/ui/collapsible-control-region";
 import { getCategoryColorToken } from "@/lib/category-palette";
 import {
   arraysEqual,
@@ -118,7 +119,7 @@ function EditHabitChip({
         aria-label={`Reordenar hábito ${habit.name}`}
         title={`Reordenar hábito ${habit.name}`}
         className={cn(
-          "grid h-full w-8 shrink-0 touch-none place-items-center text-muted-foreground hover:bg-muted hover:text-foreground active:cursor-grabbing",
+          "grid h-full w-8 shrink-0 touch-none place-items-center text-muted-foreground active:cursor-grabbing focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/45",
           interactiveHandle && "cursor-grab",
           isPlaceholder && "invisible"
         )}
@@ -130,7 +131,7 @@ function EditHabitChip({
         type="button"
         aria-label={`Selecionar hábito ${habit.name}`}
         className={cn(
-          "flex h-full min-w-0 flex-1 items-center gap-2 px-1.5 hover:bg-muted",
+          "flex h-full min-w-0 flex-1 items-center gap-2 px-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/45",
           isPlaceholder && "invisible"
         )}
         onClick={onSelect}
@@ -147,7 +148,7 @@ function EditHabitChip({
         aria-label={`Editar hábito ${habit.name}`}
         title={`Editar hábito ${habit.name}`}
         className={cn(
-          "grid h-full w-8 shrink-0 place-items-center text-muted-foreground hover:bg-muted hover:text-foreground",
+          "grid h-full w-8 shrink-0 cursor-pointer place-items-center text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/45",
           isPlaceholder && "invisible"
         )}
         onClick={onEdit}
@@ -441,7 +442,7 @@ export function HabitControls({
         "shrink-0",
         mobile
           ? "w-full overflow-hidden rounded-[10px] border border-border bg-card"
-          : "mb-2 flex w-full flex-col items-center gap-1.5"
+          : "mx-auto mb-2 flex w-full max-w-[50rem] flex-col items-center gap-1.5 border-t border-border/45 pt-3"
       )}
     >
       <h1 className="sr-only">Hábitos</h1>
@@ -524,28 +525,18 @@ export function HabitControls({
         </div>
       )}
 
-      <div
+      <CollapsibleControlRegion
         id={controlsId}
-        aria-hidden={!expanded}
-        inert={!expanded ? true : undefined}
-        className={cn(
-          "grid w-full transition-[grid-template-rows,opacity,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
-          expanded
-            ? "grid-rows-[1fr] translate-y-0 opacity-100"
-            : "pointer-events-none grid-rows-[0fr] -translate-y-1 opacity-0"
+        expanded={expanded}
+        contentClassName={cn(
+          mobile
+            ? cn(
+                "px-2",
+                expanded ? "border-t border-border/55 py-2" : "border-0 py-0"
+              )
+            : "-mx-4 overflow-x-auto px-4 pb-0.5 doze52-scrollbar-none sm:mx-0 sm:px-0 md:overflow-visible"
         )}
       >
-        <div
-          className={cn(
-            "min-h-0 overflow-hidden",
-            mobile
-              ? cn(
-                  "px-2 transition-[padding,border-color]",
-                  expanded ? "border-t border-border/55 py-2" : "border-0 py-0"
-                )
-              : "-mx-4 overflow-x-auto px-4 pb-0.5 doze52-scrollbar-none sm:mx-0 sm:px-0 md:overflow-visible"
-          )}
-        >
           {isEditing ? editableHabitButtons : habitButtons}
           {isEditing && archivedHabits.length > 0 ? (
             <div className="mt-2 flex flex-wrap items-center justify-center gap-1.5" data-archived-habits>
@@ -575,8 +566,7 @@ export function HabitControls({
               {creationDisabledLabel}
             </p>
           ) : null}
-        </div>
-      </div>
+      </CollapsibleControlRegion>
     </section>
   );
 }

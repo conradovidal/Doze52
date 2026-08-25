@@ -30,6 +30,7 @@ export type GuidedOnboardingStep =
   | "calendar_instruction"
   | "calendar_selection"
   | "year_instruction"
+  | "period_navigation_instruction"
   | "theme_instruction"
   | "demo_exploration"
   | "dismissed_preserved"
@@ -79,7 +80,8 @@ export type GuidedOnboardingAction =
   | { type: "open_calendar" }
   | { type: "close_calendar" }
   | { type: "calendar_added"; uf?: string; at?: string }
-  | { type: "continue_from_year"; at?: string }
+  | { type: "continue_from_year"; showPeriodNavigation?: boolean; at?: string }
+  | { type: "continue_from_period_navigation"; at?: string }
   | { type: "confirm_theme"; at?: string }
   | { type: "complete"; at?: string }
   | { type: "record_post_onboarding_event"; at?: string }
@@ -189,6 +191,7 @@ const isGuidedStep = (value: unknown): value is GuidedOnboardingStep =>
   value === "calendar_instruction" ||
   value === "calendar_selection" ||
   value === "year_instruction" ||
+  value === "period_navigation_instruction" ||
   value === "theme_instruction" ||
   value === "demo_exploration" ||
   value === "dismissed_preserved" ||
@@ -563,6 +566,23 @@ export const reduceGuidedOnboardingState = (
         : state;
     case "continue_from_year":
       if (state.step !== "year_instruction") return state;
+      if (action.showPeriodNavigation) {
+        return { ...state, step: "period_navigation_instruction" };
+      }
+      if (!state.themeConfirmedAt) {
+        return { ...state, step: "theme_instruction" };
+      }
+      return {
+        ...state,
+        step: "completed",
+        postOnboardingEventsCreated: 0,
+        postOnboardingCategoriesCreated: 0,
+        accountNudgeShownAt: undefined,
+        completedAt: action.at ?? nowIso(),
+        dismissedAt: undefined,
+      };
+    case "continue_from_period_navigation":
+      if (state.step !== "period_navigation_instruction") return state;
       if (!state.themeConfirmedAt) {
         return { ...state, step: "theme_instruction" };
       }

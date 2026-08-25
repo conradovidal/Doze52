@@ -83,6 +83,7 @@ export function DesktopHabitsPrototype({
           onFinishCreateRange={noop}
           onMoveEventByDelta={noop}
           onApplyDayReorder={noop}
+          showScaleControl={false}
           habitPresentation={{
             habits,
             checkIns,
