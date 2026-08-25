@@ -387,7 +387,10 @@ export default function HomePage() {
     React.useState<GuidedOnboardingState | null>(null);
   const [accountNudgeVisible, setAccountNudgeVisible] = React.useState(false);
   const [onboardingExitOpen, setOnboardingExitOpen] = React.useState(false);
-  const [inlineEditModeActive, setInlineEditModeActive] = React.useState(false);
+  const [workspaceEditMode, setWorkspaceEditMode] = React.useState<
+    "calendar" | "habits" | null
+  >(null);
+  const inlineEditModeActive = workspaceEditMode === "calendar";
   const [exitInlineEditRequestKey, setExitInlineEditRequestKey] =
     React.useState(0);
   const [demoInviteSuppressed, setDemoInviteSuppressed] = React.useState(false);
@@ -2077,6 +2080,7 @@ export default function HomePage() {
         desktopCalendarScrollTopRef.current =
           desktopCalendarScrollRef.current?.scrollTop ?? 0;
       }
+      setWorkspaceEditMode(null);
       setActiveDestination(destination);
       window.history.replaceState(
         window.history.state,
@@ -2163,6 +2167,30 @@ export default function HomePage() {
             authLoading={authLoading}
             onDestinationSelect={handleDestinationSelect}
             onOpenUtilityPanel={handleOpenUtilityPanel}
+            year={year}
+            onYearChange={handleYearChange}
+            editActive={
+              workspaceEditMode ===
+                (activeDestination === "habits" ? "habits" : "calendar") ||
+              (activeDestination === "annual" &&
+                guidedOnboarding?.step === "edit_preview")
+            }
+            editDisabled={isMobileExamplePreview}
+            onToggleEdit={() => {
+              const currentSurfaceMode =
+                activeDestination === "habits" ? "habits" : "calendar";
+              setWorkspaceEditMode((current) =>
+                current === currentSurfaceMode ? null : currentSurfaceMode
+              );
+            }}
+            guidedToolbarNotice={
+              guidedToolbarNotice?.target === "edit" ||
+              guidedToolbarNotice?.target === "year"
+                ? guidedToolbarNotice
+                : null
+            }
+            onDismissGuidedNotice={dismissGuidedOnboarding}
+            onGuidedToolbarAction={handleGuidedToolbarAction}
           />
           <AppUtilityPanel
             open={utilityPanelOpen}
@@ -2235,7 +2263,10 @@ export default function HomePage() {
           onboardingLayoutReserved={
             isCalendarSurfaceActive && Boolean(guidedSelectionNotice)
           }
-          onInlineEditModeChange={setInlineEditModeActive}
+          onInlineEditModeChange={(active) =>
+            setWorkspaceEditMode(active ? "calendar" : null)
+          }
+          controlledInlineEditMode={inlineEditModeActive}
           onFilterLayoutChange={requestDesktopTodayCenter}
           exitInlineEditRequestKey={exitInlineEditRequestKey}
           mobileExamplePreviewActive={isMobileExamplePreview}
@@ -2261,6 +2292,7 @@ export default function HomePage() {
           year={year}
           todayIso={todayIso}
           isMobile={isMobileCalendarUi}
+          isEditing={!isMobileCalendarUi && workspaceEditMode === "habits"}
           onRequireAuth={() => {
             setAuthDialogInitialMode("login");
             setAuthDialogAnchorPoint(undefined);
@@ -2295,7 +2327,7 @@ export default function HomePage() {
         <div
           ref={desktopCalendarScrollRef}
           data-desktop-calendar-scroll-region
-          className="min-h-0 flex-1 overflow-auto pb-1"
+          className="min-h-0 flex-1 overflow-auto pb-1 [scrollbar-gutter:stable_both-edges]"
         >
           <div
             data-calendar-focus-root

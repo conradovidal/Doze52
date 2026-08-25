@@ -26,7 +26,12 @@ const expectCenteredLogo = async (
   const logoBox = await logo.boundingBox();
   const viewport = page.viewportSize();
   if (!logoBox || !viewport) throw new Error("Logo não pôde ser medido.");
-  expect(Math.abs(logoBox.x + logoBox.width / 2 - viewport.width / 2)).toBeLessThanOrEqual(1);
+  const desktopRail = page.locator('[data-product-navigation="desktop"]');
+  const desktop = await desktopRail.isVisible().catch(() => false);
+  const expectedCenter = desktop
+    ? 52 + (viewport.width - 52) / 2
+    : viewport.width / 2;
+  expect(Math.abs(logoBox.x + logoBox.width / 2 - expectedCenter)).toBeLessThanOrEqual(1);
 };
 
 test("mobile abre em Hábitos e preserva a sessão entre superfícies", async ({
@@ -165,6 +170,11 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
   expect(profileBox.y).toBeLessThan(annualBox.y);
   expect(annualBox.y).toBeLessThan(habitsBox.y);
   await expect(page.locator('[data-calendar-ui-mode="desktop"]')).toBeVisible();
+  const scaleBox = await page.locator("[data-calendar-scale-control]").boundingBox();
+  const desktopViewport = page.viewportSize();
+  if (!scaleBox || !desktopViewport) throw new Error("Escala não pôde ser medida.");
+  const usableCenter = 52 + (desktopViewport.width - 52) / 2;
+  expect(Math.abs(scaleBox.x + scaleBox.width / 2 - usableCenter)).toBeLessThanOrEqual(2);
 
   const calendarRegion = page.locator("[data-desktop-calendar-scroll-region]");
   const widthBefore = (await calendarRegion.boundingBox())?.width;
@@ -241,6 +251,59 @@ test("desktop mantém a grade anual disponível antes do primeiro hábito", asyn
   );
   await expect(emptyDay.locator("[data-habit-marker]")).toHaveCount(0);
   await expect(habits.locator('[data-day-cell][aria-disabled="true"]').first()).toBeVisible();
+});
+
+test("desktop edita hábitos pela rail e preserva o histórico local", async ({
+  page,
+}, testInfo) => {
+  test.skip(!testInfo.project.name.startsWith("desktop-"), "Cenário desktop");
+
+  await installCompletedOnboarding(page);
+  await page.addInitScript(() => {
+    if (window.sessionStorage.getItem("doze52:habits-edit-seeded")) return;
+    const habits = [
+      { id: "habit-a", name: "Caminhar", color: "#2563eb", position: 0 },
+      { id: "habit-b", name: "Ler", color: "#14b8a6", position: 1 },
+    ].map((habit, index) => ({
+      ...habit,
+      icon: "circle-check",
+      createdAt: `2026-01-0${index + 1}T00:00:00.000Z`,
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    }));
+    window.sessionStorage.setItem(
+      "doze52:habits-prototype:v1",
+      JSON.stringify({ habits, checkIns: {}, selectedHabitId: "habit-a" })
+    );
+    window.sessionStorage.setItem("doze52:habits-edit-seeded", "1");
+  });
+  await page.goto("/?surface=habits");
+
+  const rail = page.locator('[data-product-navigation="desktop"]');
+  const edit = rail.getByRole("button", { name: "Editar", exact: true });
+  await edit.click();
+  await expect(rail.getByRole("button", { name: "Finalizar edição" })).toBeVisible();
+  await expect(page.locator('[data-day-cell][aria-disabled="true"]').first()).toBeVisible();
+
+  const controls = page.locator('[data-habit-controls-layout="desktop"]');
+  await controls.getByRole("button", { name: "Mover Caminhar para a direita" }).click();
+  await controls.getByRole("button", { name: "Editar hábito Caminhar" }).click();
+  await page.getByLabel("Nome do hábito").fill("Corrida");
+  await page.getByRole("button", { name: "Salvar alterações" }).click();
+  await expect(controls.getByRole("button", { name: "Editar hábito Corrida" })).toBeVisible();
+
+  await controls.getByRole("button", { name: "Editar hábito Corrida" }).click();
+  await page.getByRole("button", { name: "Arquivar" }).click();
+  await controls.getByRole("button", { name: "Editar hábito Ler" }).click();
+  await page.getByRole("button", { name: "Arquivar" }).click();
+  await controls.getByRole("button", { name: "Corrida", exact: true }).click();
+  await expect(controls.getByRole("button", { name: "Editar hábito Corrida" })).toBeVisible();
+
+  const currentYear = new Date().getFullYear();
+  await rail.getByRole("button", { name: `Avançar para ${currentYear + 1}` }).click();
+  await expect(rail.getByLabel(`Ano ${currentYear + 1}`)).toBeVisible();
+
+  await page.reload();
+  await expect(page.locator('[data-habit-controls-layout="desktop"]')).toContainText("Corrida");
 });
 
 test("onboarding de tema usa o painel de Configurações", async ({

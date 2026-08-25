@@ -1,7 +1,15 @@
 "use client";
 
 import * as React from "react";
-import { ChevronDown, CircleCheck, Plus } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  CircleCheck,
+  PencilLine,
+  Plus,
+  RotateCcw,
+} from "lucide-react";
 
 import { getCategoryColorToken } from "@/lib/category-palette";
 import { useTheme } from "@/lib/theme";
@@ -12,22 +20,32 @@ type HabitControlsProps = {
   habits: Habit[];
   totalActiveHabits: number;
   selectedHabit: Habit | null;
+  archivedHabits?: Habit[];
+  isEditing?: boolean;
   mobile?: boolean;
   creationDisabled: boolean;
   creationDisabledLabel: string | null;
   onSelectHabit: (habitId: string) => void;
   onRequestCreate: () => void;
+  onEditHabit?: (habitId: string) => void;
+  onMoveHabit?: (habitId: string, direction: -1 | 1) => void;
+  onReactivateHabit?: (habitId: string) => void;
 };
 
 export function HabitControls({
   habits,
   totalActiveHabits,
   selectedHabit,
+  archivedHabits = [],
+  isEditing = false,
   mobile = false,
   creationDisabled,
   creationDisabledLabel,
   onSelectHabit,
   onRequestCreate,
+  onEditHabit,
+  onMoveHabit,
+  onReactivateHabit,
 }: HabitControlsProps) {
   const { mode: themeMode } = useTheme();
   const [expanded, setExpanded] = React.useState(true);
@@ -44,6 +62,60 @@ export function HabitControls({
       {habits.map((habit) => {
         const selected = selectedHabit?.id === habit.id;
         const colorToken = getCategoryColorToken(habit.color, themeMode);
+
+        if (!mobile && isEditing) {
+          const habitIndex = habits.findIndex((entry) => entry.id === habit.id);
+          return (
+            <div
+              key={habit.id}
+              data-habit-edit-chip={habit.id}
+              className={cn(
+                "inline-flex h-8 shrink-0 items-center overflow-hidden rounded-[10px] border bg-card text-[0.78rem] font-semibold",
+                selected ? "border-foreground/30" : "border-border"
+              )}
+            >
+              <button
+                type="button"
+                aria-label={`Selecionar hábito ${habit.name}`}
+                className="flex h-8 min-w-0 items-center gap-2 px-2.5 hover:bg-muted"
+                onClick={() => onSelectHabit(habit.id)}
+              >
+                <span
+                  className="size-2.5 shrink-0 rounded-full"
+                  style={{ backgroundColor: colorToken.indicator }}
+                  aria-hidden="true"
+                />
+                <span className="max-w-32 truncate">{habit.name}</span>
+              </button>
+              <button
+                type="button"
+                aria-label={`Mover ${habit.name} para a esquerda`}
+                disabled={habitIndex === 0}
+                className="grid size-7 place-items-center text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-25"
+                onClick={() => onMoveHabit?.(habit.id, -1)}
+              >
+                <ChevronLeft className="size-3.5" />
+              </button>
+              <button
+                type="button"
+                aria-label={`Mover ${habit.name} para a direita`}
+                disabled={habitIndex === habits.length - 1}
+                className="grid size-7 place-items-center text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-25"
+                onClick={() => onMoveHabit?.(habit.id, 1)}
+              >
+                <ChevronRight className="size-3.5" />
+              </button>
+              <button
+                type="button"
+                aria-label={`Editar hábito ${habit.name}`}
+                className="grid size-7 place-items-center text-muted-foreground hover:bg-muted hover:text-foreground"
+                onClick={() => onEditHabit?.(habit.id)}
+              >
+                <PencilLine className="size-3.5" />
+              </button>
+            </div>
+          );
+        }
 
         return (
           <button
@@ -198,6 +270,24 @@ export function HabitControls({
           )}
         >
           {habitButtons}
+          {!mobile && isEditing && archivedHabits.length > 0 ? (
+            <div className="mt-2 flex flex-wrap items-center justify-center gap-1.5" data-archived-habits>
+              <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                Arquivados
+              </span>
+              {archivedHabits.map((habit) => (
+                <button
+                  key={habit.id}
+                  type="button"
+                  className="inline-flex h-8 items-center gap-1.5 rounded-[10px] border border-dashed border-border px-2.5 text-[0.75rem] font-semibold text-muted-foreground hover:bg-muted hover:text-foreground"
+                  onClick={() => onReactivateHabit?.(habit.id)}
+                >
+                  <RotateCcw className="size-3.5" aria-hidden="true" />
+                  {habit.name}
+                </button>
+              ))}
+            </div>
+          ) : null}
           {totalActiveHabits > habits.length ? (
             <p className="mt-1.5 text-center text-[10px] text-muted-foreground">
               Mostrando os 4 primeiros hábitos nesta grade.
