@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 
 import {
   buildHabitPrototypeWeeks,
+  applyActiveHabitOrder,
   getDesktopHabitSlot,
   getDesktopHabitMarkerSize,
   getDesktopVisibleHabits,
@@ -11,6 +12,7 @@ import {
   orderActiveHabits,
   setHabitArchived,
 } from "../../lib/habits-prototype";
+import { getYearTransitionDirection } from "../../lib/calendar-year-transition";
 import { PLAN_LIMITS, PRO_UPGRADE_COPY } from "../../lib/entitlements";
 import type { Habit } from "../../lib/types";
 import { isHabitsPrototypeAvailable } from "../../lib/feature-flags";
@@ -179,6 +181,17 @@ test("reordena, arquiva e restaura hábitos sem apagar os demais dados", () => {
     "dois",
     "um",
   ]);
+
+  const persisted = applyActiveHabitOrder(restored, ["um", "dois"], timestamp);
+  expect(orderActiveHabits(persisted).map((item) => item.id)).toEqual([
+    "um",
+    "dois",
+  ]);
+});
+
+test("resolve a direção visual ao navegar entre anos", () => {
+  expect(getYearTransitionDirection(2026, 2027)).toBe(1);
+  expect(getYearTransitionDirection(2026, 2025)).toBe(-1);
 });
 
 test("define um hábito Free e quatro Pro com upgrade contextual", () => {

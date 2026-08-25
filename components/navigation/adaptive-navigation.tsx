@@ -3,19 +3,11 @@
 import * as React from "react";
 import {
   CalendarDays,
-  Check,
-  ChevronDown,
-  ChevronUp,
   CircleCheck,
-  PencilLine,
   UserRound,
   type LucideIcon,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
-import {
-  GuidedToolbarNoticeCard,
-  type GuidedToolbarNotice,
-} from "@/components/onboarding/guided-toolbar-notice";
 import { useBilling } from "@/lib/use-billing";
 import {
   PRODUCT_DESTINATIONS,
@@ -40,14 +32,6 @@ type AdaptiveNavigationProps = {
     section: UtilityPanelSection,
     trigger: HTMLElement
   ) => void;
-  year: number;
-  onYearChange: (year: number) => void;
-  editActive: boolean;
-  editDisabled?: boolean;
-  onToggleEdit: () => void;
-  guidedToolbarNotice?: GuidedToolbarNotice | null;
-  onDismissGuidedNotice?: () => void;
-  onGuidedToolbarAction?: (target: GuidedToolbarNotice["target"]) => void;
 };
 
 const ICON_BY_NAME: Record<
@@ -191,14 +175,6 @@ export function AdaptiveNavigation({
   authLoading,
   onDestinationSelect,
   onOpenUtilityPanel,
-  year,
-  onYearChange,
-  editActive,
-  editDisabled = false,
-  onToggleEdit,
-  guidedToolbarNotice = null,
-  onDismissGuidedNotice,
-  onGuidedToolbarAction,
 }: AdaptiveNavigationProps) {
   const handleAccount = (event: React.MouseEvent<HTMLButtonElement>) => {
     if (authLoading) return;
@@ -210,9 +186,8 @@ export function AdaptiveNavigation({
       <nav
         aria-label="Navegação principal"
         data-product-navigation="desktop"
-        className="fixed inset-y-0 left-0 z-40 hidden w-[52px] flex-col items-center border-r border-border/70 bg-background/96 px-1.5 py-2 backdrop-blur md:flex"
+        className="fixed inset-y-0 left-0 z-40 hidden w-[52px] flex-col items-center border-r border-border/70 bg-background/96 px-1.5 pt-4 pb-2 backdrop-blur md:flex"
       >
-        <div className="relative">
         <button
           type="button"
           data-onboarding-auth-entry
@@ -225,7 +200,7 @@ export function AdaptiveNavigation({
           {authLoading ? null : <AccountGlyph desktopRail />}
         </button>
 
-        <div className="my-2 h-px w-6 bg-border/70" aria-hidden="true" />
+        <div data-rail-divider className="my-2 h-px w-6 bg-border/70" aria-hidden="true" />
 
         <div className="flex flex-col items-center gap-1">
           {PRODUCT_DESTINATIONS.map((destination) => (
@@ -236,93 +211,6 @@ export function AdaptiveNavigation({
               onSelect={onDestinationSelect}
             />
           ))}
-        </div>
-
-        <div className="my-2 h-px w-6 bg-border/70" aria-hidden="true" />
-
-        <button
-          type="button"
-          data-onboarding-edit-control
-          data-onboarding-highlighted={
-            guidedToolbarNotice?.target === "edit" ? "true" : undefined
-          }
-          data-rail-edit-active={editActive ? "true" : "false"}
-          aria-pressed={editActive}
-          aria-label={editActive ? "Finalizar edição" : "Editar"}
-          title={editActive ? "Finalizar edição" : "Editar"}
-          disabled={editDisabled}
-          className={cn(
-            "grid size-10 place-items-center rounded-xl transition-[color,background-color,transform] motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 disabled:cursor-not-allowed disabled:opacity-40",
-            guidedToolbarNotice?.target === "edit" && "product-spotlight-target",
-            editActive
-              ? "bg-foreground text-background shadow-sm"
-              : "text-muted-foreground/55 hover:bg-muted/45 hover:text-foreground/80"
-          )}
-          onClick={() => {
-            onToggleEdit();
-            if (guidedToolbarNotice?.target === "edit") {
-              onGuidedToolbarAction?.("edit");
-            }
-          }}
-        >
-          {editActive ? (
-            <Check className="size-5" aria-hidden="true" />
-          ) : (
-            <PencilLine className="size-5" aria-hidden="true" />
-          )}
-        </button>
-        {guidedToolbarNotice?.target === "edit" && onDismissGuidedNotice ? (
-          <GuidedToolbarNoticeCard
-            notice={guidedToolbarNotice}
-            onClose={onDismissGuidedNotice}
-            onAction={() => onGuidedToolbarAction?.("edit")}
-            placement="right"
-          />
-        ) : null}
-        </div>
-
-        <div className="my-2 h-px w-6 bg-border/70" aria-hidden="true" />
-
-        <div
-          data-rail-year-stepper
-          className={cn(
-            "relative flex flex-col items-center text-muted-foreground",
-            guidedToolbarNotice?.target === "year" && "product-spotlight-target rounded-xl"
-          )}
-        >
-          <button
-            type="button"
-            data-onboarding-year-control
-            aria-label={`Avançar para ${year + 1}`}
-            title={`Avançar para ${year + 1}`}
-            className="grid size-8 place-items-center rounded-lg transition-colors hover:bg-muted/45 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
-            onClick={() => onYearChange(year + 1)}
-          >
-            <ChevronUp className="size-4" aria-hidden="true" />
-          </button>
-          <span
-            aria-label={`Ano ${year}`}
-            className="py-1 text-[11px] font-semibold tracking-[-0.02em] tabular-nums text-foreground/82"
-          >
-            {year}
-          </span>
-          <button
-            type="button"
-            aria-label={`Voltar para ${year - 1}`}
-            title={`Voltar para ${year - 1}`}
-            className="grid size-8 place-items-center rounded-lg transition-colors hover:bg-muted/45 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
-            onClick={() => onYearChange(year - 1)}
-          >
-            <ChevronDown className="size-4" aria-hidden="true" />
-          </button>
-          {guidedToolbarNotice?.target === "year" && onDismissGuidedNotice ? (
-            <GuidedToolbarNoticeCard
-              notice={guidedToolbarNotice}
-              onClose={onDismissGuidedNotice}
-              onAction={() => onGuidedToolbarAction?.("year")}
-              placement="right"
-            />
-          ) : null}
         </div>
       </nav>
 
