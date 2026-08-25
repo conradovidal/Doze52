@@ -725,17 +725,20 @@ export function YearGrid({
         </div>
       </div>
 
-      <div className="flex items-center justify-between gap-4 border-t border-border bg-card px-3 py-2.5 md:px-4 md:py-3">
-        <SegmentedControl
-          value={viewMode}
-          options={CALENDAR_VIEW_OPTIONS}
-          onValueChange={handleViewModeChange}
-          aria-label={
-            habitPresentation ? "Escala dos hábitos" : "Escala do calendário"
-          }
-        />
+      <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 border-t border-border bg-card px-3 py-2.5 md:px-4 md:py-3">
+        <span aria-hidden="true" />
+        <div data-calendar-scale-control className="justify-self-center">
+          <SegmentedControl
+            value={viewMode}
+            options={CALENDAR_VIEW_OPTIONS}
+            onValueChange={handleViewModeChange}
+            aria-label={
+              habitPresentation ? "Escala dos hábitos" : "Escala do calendário"
+            }
+          />
+        </div>
         {hasFocusZoom ? (
-          <label className="flex w-[10.75rem] items-center justify-end gap-2.5 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground min-[420px]:w-[11.5rem] md:w-[12.25rem]">
+          <label className="flex w-[10.75rem] items-center justify-end justify-self-end gap-2.5 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground min-[420px]:w-[11.5rem] md:w-[12.25rem]">
             <span className="shrink-0">Zoom</span>
             <input
               type="range"

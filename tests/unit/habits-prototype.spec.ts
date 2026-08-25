@@ -3,10 +3,13 @@ import { expect, test } from "@playwright/test";
 import {
   buildHabitPrototypeWeeks,
   getDesktopHabitSlot,
+  getDesktopHabitMarkerSize,
   getDesktopVisibleHabits,
   getHabitDayAction,
   getHabitCheckInKey,
+  moveActiveHabit,
   orderActiveHabits,
+  setHabitArchived,
 } from "../../lib/habits-prototype";
 import { PLAN_LIMITS, PRO_UPGRADE_COPY } from "../../lib/entitlements";
 import type { Habit } from "../../lib/types";
@@ -119,8 +122,17 @@ test("ordena hábitos ativos e limita a apresentação desktop aos quatro primei
   ]);
 });
 
-test("centraliza um hábito e fixa até quatro hábitos nos quadrantes", () => {
+test("dimensiona e fixa os marcadores conforme a quantidade de hábitos", () => {
   expect(getDesktopHabitSlot(1, 0)).toBe("center");
+  expect([0, 1].map((index) => getDesktopHabitSlot(2, index))).toEqual([
+    "middle-left",
+    "middle-right",
+  ]);
+  expect([0, 1, 2].map((index) => getDesktopHabitSlot(3, index))).toEqual([
+    "top-left",
+    "top-right",
+    "bottom-left",
+  ]);
   expect([0, 1, 2, 3].map((index) => getDesktopHabitSlot(4, index))).toEqual([
     "top-left",
     "top-right",
@@ -128,6 +140,45 @@ test("centraliza um hábito e fixa até quatro hábitos nos quadrantes", () => {
     "bottom-right",
   ]);
   expect(getDesktopHabitSlot(4, 4)).toBeNull();
+  expect([1, 2, 3, 4].map(getDesktopHabitMarkerSize)).toEqual([
+    "single",
+    "pair",
+    "grid",
+    "grid",
+  ]);
+});
+
+test("reordena, arquiva e restaura hábitos sem apagar os demais dados", () => {
+  const habit = (id: string, position: number): Habit => ({
+    id,
+    name: id,
+    color: "#2563eb",
+    icon: "circle-check",
+    position,
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+  });
+  const timestamp = "2026-08-25T12:00:00.000Z";
+  const reordered = moveActiveHabit(
+    [habit("um", 0), habit("dois", 1)],
+    "um",
+    1,
+    timestamp
+  );
+  expect(orderActiveHabits(reordered).map((item) => item.id)).toEqual([
+    "dois",
+    "um",
+  ]);
+
+  const archived = setHabitArchived(reordered, "um", timestamp, timestamp);
+  expect(orderActiveHabits(archived).map((item) => item.id)).toEqual(["dois"]);
+  expect(archived.find((item) => item.id === "um")?.name).toBe("um");
+
+  const restored = setHabitArchived(archived, "um", undefined, timestamp, 1);
+  expect(orderActiveHabits(restored).map((item) => item.id)).toEqual([
+    "dois",
+    "um",
+  ]);
 });
 
 test("define um hábito Free e quatro Pro com upgrade contextual", () => {

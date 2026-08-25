@@ -30,7 +30,9 @@ import {
   getDesktopVisibleHabits,
   getHabitDayAction,
   getHabitCheckInKey,
+  moveActiveHabit,
   orderActiveHabits,
+  setHabitArchived,
 } from "@/lib/habits-prototype";
 import type { Habit, HabitCheckIn } from "@/lib/types";
 import { useBilling } from "@/lib/use-billing";
@@ -90,7 +92,7 @@ const readHabitsPrototypeSession = (): HabitsPrototypeSession => {
 const getHabitScrollStorageKey = (year: number, habitId: string) =>
   `${HABITS_PROTOTYPE_SCROLL_PREFIX}:${year}:${habitId}`;
 
-function HabitCreateDialog({
+function HabitEditorDialog({
   open,
   name,
   color,
@@ -98,6 +100,8 @@ function HabitCreateDialog({
   onNameChange,
   onColorChange,
   onSubmit,
+  editing,
+  onArchive,
 }: {
   open: boolean;
   name: string;
@@ -106,15 +110,19 @@ function HabitCreateDialog({
   onNameChange: (name: string) => void;
   onColorChange: (color: string) => void;
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
+  editing: boolean;
+  onArchive?: () => void;
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[430px]">
         <form onSubmit={onSubmit}>
           <DialogHeader>
-            <DialogTitle>Novo hábito</DialogTitle>
+            <DialogTitle>{editing ? "Editar hábito" : "Novo hábito"}</DialogTitle>
             <DialogDescription>
-              Só o essencial agora. O registro diário será feito direto na grade.
+              {editing
+                ? "Atualize nome ou cor sem perder o histórico já registrado."
+                : "Só o essencial agora. O registro diário será feito direto na grade."}
             </DialogDescription>
           </DialogHeader>
 
@@ -166,11 +174,16 @@ function HabitCreateDialog({
           </div>
 
           <DialogFooter className="mt-6">
+            {editing && onArchive ? (
+              <Button type="button" variant="ghost" className="sm:mr-auto" onClick={onArchive}>
+                Arquivar
+              </Button>
+            ) : null}
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
             <Button type="submit" variant="premium" disabled={!name.trim()}>
-              Criar hábito
+              {editing ? "Salvar alterações" : "Criar hábito"}
             </Button>
           </DialogFooter>
         </form>
@@ -184,11 +197,13 @@ export function HabitsPrototype({
   todayIso,
   isMobile,
   onRequireAuth,
+  isEditing = false,
 }: {
   year: number;
   todayIso: string;
   isMobile: boolean;
   onRequireAuth?: () => void;
+  isEditing?: boolean;
 }) {
   const { notify } = useFeedback();
   const { limits, isPro, isLoading: isBillingLoading, error: billingError } =
@@ -202,6 +217,7 @@ export function HabitsPrototype({
     initialSession.selectedHabitId
   );
   const [createDialogOpen, setCreateDialogOpen] = React.useState(false);
+  const [editingHabitId, setEditingHabitId] = React.useState<string | null>(null);
   const [upgradeOpen, setUpgradeOpen] = React.useState(false);
   const [draftName, setDraftName] = React.useState("");
   const [draftColor, setDraftColor] = React.useState<string>(HABIT_COLORS[0]);
@@ -210,6 +226,10 @@ export function HabitsPrototype({
 
   const activeHabits = React.useMemo(
     () => orderActiveHabits(habits),
+    [habits]
+  );
+  const archivedHabits = React.useMemo(
+    () => habits.filter((habit) => Boolean(habit.archivedAt)),
     [habits]
   );
   const selectedHabit = React.useMemo(
@@ -301,6 +321,7 @@ export function HabitsPrototype({
       return;
     }
     setDraftName("");
+    setEditingHabitId(null);
     setDraftColor(HABIT_COLORS[activeHabits.length % HABIT_COLORS.length]);
     setCreateDialogOpen(true);
   };
@@ -311,6 +332,18 @@ export function HabitsPrototype({
     if (!name) return;
 
     const timestamp = new Date().toISOString();
+    if (editingHabitId) {
+      setHabits((current) =>
+        current.map((habit) =>
+          habit.id === editingHabitId
+            ? { ...habit, name, color: draftColor, updatedAt: timestamp }
+            : habit
+        )
+      );
+      setCreateDialogOpen(false);
+      setEditingHabitId(null);
+      return;
+    }
     const habit: Habit = {
       id: crypto.randomUUID(),
       name,
@@ -323,6 +356,68 @@ export function HabitsPrototype({
     setHabits((current) => [...current, habit]);
     setSelectedHabitId(habit.id);
     setCreateDialogOpen(false);
+  };
+
+  const requestEditHabit = (habitId: string) => {
+    const habit = habits.find((entry) => entry.id === habitId);
+    if (!habit) return;
+    setEditingHabitId(habit.id);
+    setDraftName(habit.name);
+    setDraftColor(habit.color);
+    setCreateDialogOpen(true);
+  };
+
+  const moveHabit = (habitId: string, direction: -1 | 1) => {
+    const timestamp = new Date().toISOString();
+    setHabits((current) =>
+      moveActiveHabit(current, habitId, direction, timestamp)
+    );
+  };
+
+  const archiveEditingHabit = () => {
+    if (!editingHabitId) return;
+    const timestamp = new Date().toISOString();
+    const nextActive = activeHabits.filter((habit) => habit.id !== editingHabitId);
+    setHabits((current) =>
+      setHabitArchived(current, editingHabitId, timestamp, timestamp)
+    );
+    if (selectedHabitId === editingHabitId) {
+      setSelectedHabitId(nextActive[0]?.id ?? null);
+    }
+    setCreateDialogOpen(false);
+    setEditingHabitId(null);
+  };
+
+  const reactivateHabit = (habitId: string) => {
+    if (creationUnavailable) {
+      notify({
+        tone: "info",
+        title: "Plano ainda não confirmado",
+        description: "Tente restaurar o hábito novamente em instantes.",
+      });
+      return;
+    }
+    if (reachedHabitLimit) {
+      if (!isPro) setUpgradeOpen(true);
+      else
+        notify({
+          tone: "info",
+          title: "Limite de hábitos atingido",
+          description: "Arquive um hábito ativo antes de restaurar este.",
+        });
+      return;
+    }
+    const timestamp = new Date().toISOString();
+    setHabits((current) =>
+      setHabitArchived(
+        current,
+        habitId,
+        undefined,
+        timestamp,
+        activeHabits.length
+      )
+    );
+    setSelectedHabitId(habitId);
   };
 
   const toggleHabitDay = (habit: Habit | null, dateIso: string) => {
@@ -343,7 +438,7 @@ export function HabitsPrototype({
   };
 
   const createDialog = (
-    <HabitCreateDialog
+    <HabitEditorDialog
       open={createDialogOpen}
       name={draftName}
       color={draftColor}
@@ -351,6 +446,8 @@ export function HabitsPrototype({
       onNameChange={setDraftName}
       onColorChange={setDraftColor}
       onSubmit={createHabit}
+      editing={Boolean(editingHabitId)}
+      onArchive={editingHabitId ? archiveEditingHabit : undefined}
     />
   );
 
@@ -371,6 +468,11 @@ export function HabitsPrototype({
             toggleHabitDay(desktopSelectedHabit, dateIso)
           }
           onRequestCreate={requestCreateHabit}
+          isEditing={isEditing}
+          archivedHabits={archivedHabits}
+          onEditHabit={requestEditHabit}
+          onMoveHabit={moveHabit}
+          onReactivateHabit={reactivateHabit}
         />
         {createDialog}
         <ProUpgradeDialog

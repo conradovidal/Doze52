@@ -17,11 +17,13 @@ export function GuidedToolbarNoticeCard({
   onClose,
   onAction,
   align = "start",
+  placement = "below",
 }: {
   notice: GuidedToolbarNotice;
   onClose: () => void;
   onAction?: () => void;
   align?: "start" | "end";
+  placement?: "below" | "right";
 }) {
   return (
     <aside
@@ -30,10 +32,12 @@ export function GuidedToolbarNoticeCard({
       aria-label="Instrução do guia inicial"
       aria-live="polite"
       className={cn(
-        "inverse-product-surface fixed top-[calc(env(safe-area-inset-top,0px)+4.6rem)] left-3 z-60 w-[min(22rem,calc(100vw-1.5rem))] rounded-2xl border border-border bg-card p-3.5 text-left text-card-foreground shadow-[0_24px_60px_-20px_rgba(15,23,42,0.85)] md:absolute md:top-[calc(100%+0.6rem)]",
-        align === "start"
-          ? "md:left-0"
-          : "md:right-0 md:left-auto"
+        "inverse-product-surface fixed top-[calc(env(safe-area-inset-top,0px)+4.6rem)] left-3 z-60 w-[min(22rem,calc(100vw-1.5rem))] rounded-2xl border border-border bg-card p-3.5 text-left text-card-foreground shadow-[0_24px_60px_-20px_rgba(15,23,42,0.85)] md:absolute",
+        placement === "right"
+          ? "md:top-0 md:left-[calc(100%+0.75rem)]"
+          : "md:top-[calc(100%+0.6rem)]",
+        placement === "below" &&
+          (align === "start" ? "md:left-0" : "md:right-0 md:left-auto")
       )}
     >
       <div className="pr-7">

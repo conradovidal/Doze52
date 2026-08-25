@@ -13,6 +13,8 @@ export const HABITS_DESKTOP_MAX = 4;
 
 export type DesktopHabitSlot =
   | "center"
+  | "middle-left"
+  | "middle-right"
   | "top-left"
   | "top-right"
   | "bottom-left"
@@ -38,13 +40,66 @@ export const orderActiveHabits = (habits: Habit[]) =>
 export const getDesktopVisibleHabits = (habits: Habit[]) =>
   orderActiveHabits(habits).slice(0, HABITS_DESKTOP_MAX);
 
+export const moveActiveHabit = (
+  habits: Habit[],
+  habitId: string,
+  direction: -1 | 1,
+  updatedAt: string
+) => {
+  const orderedIds = orderActiveHabits(habits).map((habit) => habit.id);
+  const index = orderedIds.indexOf(habitId);
+  const targetIndex = index + direction;
+  if (index < 0 || targetIndex < 0 || targetIndex >= orderedIds.length) {
+    return habits;
+  }
+  [orderedIds[index], orderedIds[targetIndex]] = [
+    orderedIds[targetIndex],
+    orderedIds[index],
+  ];
+  return habits.map((habit) => {
+    const position = orderedIds.indexOf(habit.id);
+    return position >= 0 ? { ...habit, position, updatedAt } : habit;
+  });
+};
+
+export const setHabitArchived = (
+  habits: Habit[],
+  habitId: string,
+  archivedAt: string | undefined,
+  updatedAt: string,
+  restoredPosition?: number
+) =>
+  habits.map((habit) =>
+    habit.id === habitId
+      ? {
+          ...habit,
+          archivedAt,
+          position: restoredPosition ?? habit.position,
+          updatedAt,
+        }
+      : habit
+  );
+
 export const getDesktopHabitSlot = (
   totalVisibleHabits: number,
   habitIndex: number
 ): DesktopHabitSlot | null => {
   if (habitIndex < 0 || habitIndex >= totalVisibleHabits) return null;
   if (totalVisibleHabits === 1) return "center";
+  if (totalVisibleHabits === 2) {
+    return (["middle-left", "middle-right"] as const)[habitIndex] ?? null;
+  }
   return DESKTOP_HABIT_QUADRANTS[habitIndex] ?? null;
+};
+
+export type DesktopHabitMarkerSize = "single" | "pair" | "grid";
+
+export const getDesktopHabitMarkerSize = (
+  totalVisibleHabits: number
+): DesktopHabitMarkerSize => {
+  if (totalVisibleHabits <= 1) return "single";
+  if (totalVisibleHabits === 2) return "pair";
+  return "grid";
 };
 
 export type HabitPrototypeDay = {

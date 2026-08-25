@@ -3,6 +3,7 @@
 import { Check } from "lucide-react";
 import {
   getDesktopHabitSlot,
+  getDesktopHabitMarkerSize,
   getHabitDayAction,
   getHabitCheckInKey,
 } from "@/lib/habits-prototype";
@@ -15,6 +16,7 @@ export type DayCellHabitPresentation = {
   selectedHabit: Habit | null;
   onToggle: (dateIso: string) => void;
   onCreateRequest: () => void;
+  isEditing?: boolean;
 };
 
 const ACCESSIBLE_DATE_FORMATTER = new Intl.DateTimeFormat("pt-BR", {
@@ -108,6 +110,8 @@ export function DayCell({
   const habitAriaLabel = habitPresentation
     ? isFuture
       ? `${formatAccessibleDate(dateIso)}: data futura, indisponível para hábitos`
+      : habitPresentation.isEditing
+        ? `${formatAccessibleDate(dateIso)}: finalize a edição para registrar hábitos`
       : habitPresentation.selectedHabit
         ? `${selectedHabitCompleted ? "Desmarcar" : "Marcar"} ${habitPresentation.selectedHabit.name} em ${formatAccessibleDate(dateIso)}.${completedNames ? ` Concluídos: ${completedNames}.` : " Nenhum hábito concluído."}`
         : `${formatAccessibleDate(dateIso)}: crie um hábito para fazer check-in`
@@ -134,7 +138,9 @@ export function DayCell({
       })
     : null;
   const habitCanToggle = habitDayAction === "toggle";
-  const habitCanActivate = habitDayAction === "toggle" || habitDayAction === "create";
+  const habitCanActivate =
+    !habitPresentation?.isEditing &&
+    (habitDayAction === "toggle" || habitDayAction === "create");
 
   return (
     <div
@@ -235,7 +241,10 @@ export function DayCell({
           data-day-habit-markers
           className={cn(
             "pointer-events-none absolute inset-x-0 top-7 bottom-1 grid place-items-center",
-            habitPresentation.habits.length > 1 && "mx-auto w-fit grid-cols-2 grid-rows-2 gap-px"
+            habitPresentation.habits.length === 2 &&
+              "mx-auto w-fit grid-cols-2 grid-rows-1 gap-1",
+            habitPresentation.habits.length > 2 &&
+              "mx-auto w-fit grid-cols-2 grid-rows-2 gap-px"
           )}
           aria-hidden="true"
         >
@@ -245,6 +254,9 @@ export function DayCell({
               habitPresentation.habits.length,
               habitIndex
             );
+            const markerSize = getDesktopHabitMarkerSize(
+              habitPresentation.habits.length
+            );
             return (
               <span
                 key={habit.id}
@@ -252,9 +264,11 @@ export function DayCell({
                 data-habit-slot={slot ?? undefined}
                 className={cn(
                   "grid place-items-center rounded-full border border-black/10 text-slate-950",
-                  habitPresentation.habits.length === 1
-                    ? "size-[clamp(9px,0.9vw,13px)]"
-                    : "size-[clamp(6px,0.72vw,10px)]",
+                  markerSize === "single"
+                    ? "size-[clamp(12px,1.1vw,18px)]"
+                    : markerSize === "pair"
+                      ? "size-[clamp(10px,0.95vw,15px)]"
+                      : "size-[clamp(7px,0.78vw,11px)]",
                   !completed && "invisible"
                 )}
                 style={completed ? { backgroundColor: habit.color } : undefined}
@@ -262,9 +276,11 @@ export function DayCell({
                 {completed ? (
                   <Check
                     className={cn(
-                      habitPresentation.habits.length === 1
-                        ? "size-[clamp(6px,0.58vw,9px)]"
-                        : "size-[clamp(4px,0.46vw,7px)]"
+                      markerSize === "single"
+                        ? "size-[clamp(7px,0.66vw,11px)]"
+                        : markerSize === "pair"
+                          ? "size-[clamp(6px,0.58vw,9px)]"
+                          : "size-[clamp(4px,0.46vw,7px)]"
                     )}
                     strokeWidth={3}
                   />

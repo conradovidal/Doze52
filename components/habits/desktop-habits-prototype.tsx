@@ -18,6 +18,11 @@ export function DesktopHabitsPrototype({
   onSelectHabit,
   onToggleDay,
   onRequestCreate,
+  isEditing,
+  archivedHabits,
+  onEditHabit,
+  onMoveHabit,
+  onReactivateHabit,
 }: {
   year: number;
   todayIso: string;
@@ -30,6 +35,11 @@ export function DesktopHabitsPrototype({
   onSelectHabit: (habitId: string) => void;
   onToggleDay: (dateIso: string) => void;
   onRequestCreate: () => void;
+  isEditing: boolean;
+  archivedHabits: Habit[];
+  onEditHabit: (habitId: string) => void;
+  onMoveHabit: (habitId: string, direction: -1 | 1) => void;
+  onReactivateHabit: (habitId: string) => void;
 }) {
   return (
     <section
@@ -45,11 +55,16 @@ export function DesktopHabitsPrototype({
         creationDisabledLabel={creationDisabledLabel}
         onSelectHabit={onSelectHabit}
         onRequestCreate={onRequestCreate}
+        isEditing={isEditing}
+        archivedHabits={archivedHabits}
+        onEditHabit={onEditHabit}
+        onMoveHabit={onMoveHabit}
+        onReactivateHabit={onReactivateHabit}
       />
 
       <div
         data-desktop-habits-scroll-region
-        className="min-h-0 flex-1 overflow-auto pb-1"
+        className="min-h-0 flex-1 overflow-auto pb-1 [scrollbar-gutter:stable_both-edges]"
       >
         <YearGrid
           year={year}
@@ -68,6 +83,7 @@ export function DesktopHabitsPrototype({
             selectedHabit,
             onToggle: onToggleDay,
             onCreateRequest: onRequestCreate,
+            isEditing,
           }}
         />
       </div>

@@ -63,6 +63,7 @@ type AppHeaderProps = {
   onCategoryCreated?: (categoryId: string) => void;
   onProfileCreated?: (profileId: string) => void;
   onInlineEditModeChange?: (active: boolean) => void;
+  controlledInlineEditMode?: boolean;
   onFilterLayoutChange?: () => void;
   exitInlineEditRequestKey?: number;
 };
@@ -100,6 +101,7 @@ export function AppHeader({
   onCategoryCreated,
   onProfileCreated,
   onInlineEditModeChange,
+  controlledInlineEditMode,
   onFilterLayoutChange,
   exitInlineEditRequestKey = 0,
 }: AppHeaderProps) {
@@ -124,7 +126,7 @@ export function AppHeader({
   const previousOnboardingLayoutLockedRef = React.useRef(false);
   const effectiveInlineEditMode = onboardingLayoutLocked
     ? guidedEditPreviewActive
-    : isInlineEditMode;
+    : controlledInlineEditMode ?? isInlineEditMode;
 
   const pendingProfileCreateRestoreRef = React.useRef<{
     knownProfileIds: string[];
@@ -289,7 +291,7 @@ export function AppHeader({
         getPreferredEditingProfileId(selectedProfileIds, profileIds)
       );
     }
-    if (!onboardingLayoutLocked) {
+    if (!onboardingLayoutLocked && controlledInlineEditMode === undefined) {
       setIsInlineEditMode(next);
     }
     onInlineEditModeChange?.(next);
@@ -300,6 +302,7 @@ export function AppHeader({
     guidedToolbarNotice?.target,
     effectiveInlineEditMode,
     onboardingLayoutLocked,
+    controlledInlineEditMode,
     onGuidedToolbarAction,
     onInlineEditModeChange,
     profiles,
@@ -359,7 +362,7 @@ export function AppHeader({
             }
             className={cn(
               useAdaptiveNavigation
-                ? "absolute top-0 left-[calc(50vw-0.75rem)] -translate-x-1/2 md:left-[calc(50vw-3.5rem)]"
+                ? "absolute top-0 left-1/2 -translate-x-1/2"
                 : "justify-self-start"
             )}
           >
@@ -378,7 +381,10 @@ export function AppHeader({
                   data-onboarding-spotlight-target={
                     guidedToolbarNotice?.target === "edit" ? "true" : undefined
                   }
-                  className="relative shrink-0"
+                  className={cn(
+                    "relative shrink-0",
+                    useAdaptiveNavigation && "md:hidden"
+                  )}
                 >
                 {effectiveInlineEditMode ? (
                   <Button
@@ -479,7 +485,10 @@ export function AppHeader({
                 data-onboarding-spotlight-target={
                   guidedToolbarNotice?.target === "year" ? "true" : undefined
                 }
-                className="relative shrink-0"
+                className={cn(
+                  "relative shrink-0",
+                  useAdaptiveNavigation && "md:hidden"
+                )}
               >
                 <Select
                   value={String(year)}
