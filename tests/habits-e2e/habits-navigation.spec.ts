@@ -172,6 +172,10 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
   expect(Math.round(profileBox.y)).toBe(16);
   await expect(rail.locator("[data-rail-divider]")).toHaveCount(1);
   expect(Math.round((await rail.locator("[data-rail-divider]").boundingBox())?.width ?? 0)).toBe(24);
+  const railDividerBox = await rail.locator("[data-rail-divider]").boundingBox();
+  const filterRegionBox = await page.locator("[data-onboarding-filter-region]").boundingBox();
+  if (!railDividerBox || !filterRegionBox) throw new Error("Separadores não puderam ser medidos.");
+  expect(Math.abs(railDividerBox.y - filterRegionBox.y)).toBeLessThanOrEqual(1);
   await expect(rail.getByRole("button", { name: "Editar", exact: true })).toHaveCount(0);
   await expect(rail.locator("[data-rail-year-stepper]")).toHaveCount(0);
   await expect(page.locator('[data-calendar-ui-mode="desktop"]')).toBeVisible();
@@ -181,11 +185,33 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
   const collapseBox = await collapseCategories.boundingBox();
   if (!contextualEditBox || !collapseBox) throw new Error("Controles contextuais não puderam ser medidos.");
   expect(contextualEditBox.x).toBeLessThan(collapseBox.x);
+  await expect(page.locator("[data-calendar-scale-control]")).toHaveCount(0);
   const scaleBox = await page.locator("[data-calendar-footer-center]").boundingBox();
   const desktopViewport = page.viewportSize();
   if (!scaleBox || !desktopViewport) throw new Error("Escala não pôde ser medida.");
   const usableCenter = 52 + (desktopViewport.width - 52) / 2;
   expect(Math.abs(scaleBox.x + scaleBox.width / 2 - usableCenter)).toBeLessThanOrEqual(2);
+  await expect(page.getByRole("button", { name: "Adicionar ou gerenciar calendários." })).toHaveCount(0);
+
+  await contextualEdit.click();
+  await page.getByRole("button", { name: "Criar nova categoria" }).click();
+  const categoryChoice = page.getByRole("dialog", { name: "Adicionar categoria" });
+  await expect(categoryChoice).toBeVisible();
+  await expect(categoryChoice.getByRole("button", { name: /Criar minha categoria/ })).toBeVisible();
+  await categoryChoice.getByRole("button", { name: /Adicionar calendário pronto/ }).click();
+  const calendarGallery = page.getByRole("dialog", { name: "Calendários" });
+  await expect(calendarGallery).toBeVisible();
+  await expect(calendarGallery.getByRole("combobox", { name: /Contexto para/ })).toHaveCount(0);
+  await calendarGallery.getByRole("button", { name: "Voltar para as opções de categoria" }).click();
+  await expect(categoryChoice).toBeVisible();
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Finalizar edição" }).click();
+  const categoryRegion = page.locator("#app-header-categories");
+  await collapseCategories.click();
+  await expect(categoryRegion).toHaveAttribute("aria-hidden", "true");
+  await expect(categoryRegion).toHaveCount(1);
+  await page.getByRole("button", { name: "Mostrar categorias" }).click();
+  await expect(categoryRegion).toHaveAttribute("aria-hidden", "false");
 
   const calendarRegion = page.locator("[data-desktop-calendar-scroll-region]");
   const widthBefore = (await calendarRegion.boundingBox())?.width;
@@ -213,6 +239,9 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
     (element) => element.scrollTop
   );
   await page.getByRole("link", { name: "Hábitos" }).click();
+  const habitControlsBox = await page.locator('[data-habit-controls-layout="desktop"]').boundingBox();
+  if (!habitControlsBox) throw new Error("Separador de hábitos não pôde ser medido.");
+  expect(Math.abs(railDividerBox.y - habitControlsBox.y)).toBeLessThanOrEqual(1);
   const habits = page.locator("[data-habits-prototype]");
   await expect(habits).toHaveAttribute("data-habits-layout", "desktop-year");
   await expect(habits.locator('[data-year-grid-surface="habits"]')).toBeVisible();
@@ -398,6 +427,41 @@ test("mobile reordena hábitos pelo mesmo DnD e persiste a posição", async ({
   await expect(
     controls.getByRole("button", { name: "Editar hábito Caminhar mobile" })
   ).toBeVisible();
+});
+
+test("onboarding desktop ensina navegação lateral depois do ano", async ({
+  page,
+}, testInfo) => {
+  test.skip(!testInfo.project.name.startsWith("desktop-"), "Cenário desktop");
+
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      "doze52:onboarding:v2",
+      JSON.stringify({
+        version: 11,
+        step: "year_instruction",
+        context: "personal",
+        startedAt: new Date().toISOString(),
+        dateItemsCreated: 2,
+        periodItemsCreated: 2,
+      })
+    );
+  });
+  await page.goto("/?surface=annual");
+
+  const yearNotice = page.locator(
+    '[data-guided-toolbar-notice][data-guided-toolbar-target="year"]'
+  );
+  await yearNotice.getByRole("button", { name: "Continuar" }).click();
+  const periodNotice = page.locator(
+    '[data-guided-toolbar-notice][data-guided-toolbar-target="period-navigation"]'
+  );
+  await expect(periodNotice).toBeVisible();
+  await expect(page.locator('[data-onboarding-period-control="true"]')).toHaveCount(16);
+  await page.getByTitle("1o trimestre").click();
+  await expect(page.locator("[data-month-row]")).toHaveCount(3);
+  await periodNotice.getByRole("button", { name: "Continuar" }).click();
+  await expect(page.locator("[data-month-row]")).toHaveCount(12);
 });
 
 test("onboarding de tema usa o painel de Configurações", async ({

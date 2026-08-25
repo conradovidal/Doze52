@@ -12,6 +12,7 @@ import {
   type GuidedToolbarNotice,
 } from "@/components/onboarding/guided-toolbar-notice";
 import { CategoryBar } from "@/components/category-bar";
+import { CategoryCreationFlow } from "@/components/category-creation-flow";
 import { CategoryManager } from "@/components/category-manager";
 import { CalendarPackLauncher } from "@/components/calendar-packs/calendar-pack-launcher";
 import { ProfileBar } from "@/components/profile-bar";
@@ -30,6 +31,7 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { CollapsibleControlRegion } from "@/components/ui/collapsible-control-region";
 import { useStore } from "@/lib/store";
 import type { OnboardingFocusTarget } from "@/lib/onboarding";
 import type { AnchorPoint } from "@/lib/types";
@@ -193,6 +195,14 @@ export function AppHeader({
   }, [effectiveInlineEditMode, profiles, selectedProfileIds]);
 
   React.useEffect(() => {
+    if (!useAdaptiveNavigation || guidedToolbarNotice?.target !== "calendars") return;
+    const profileIds = profiles.map((profile) => profile.id);
+    setEditingProfileId(
+      getPreferredEditingProfileId(selectedProfileIds, profileIds)
+    );
+  }, [guidedToolbarNotice?.target, profiles, selectedProfileIds, useAdaptiveNavigation]);
+
+  React.useEffect(() => {
     const wasOpen = previousProfileManagerOpenRef.current;
     previousProfileManagerOpenRef.current = profileManagerOpen;
 
@@ -344,8 +354,13 @@ export function AppHeader({
     <>
       <header
         className={cn(
-          "space-y-3 bg-background md:space-y-3.5",
-          isMobileMode ? "mb-1" : "mb-4 md:mb-5"
+          "space-y-3 bg-background",
+          useAdaptiveNavigation ? "md:space-y-3" : "md:space-y-3.5",
+          isMobileMode
+            ? "mb-1"
+            : useAdaptiveNavigation && !showCalendarControls
+              ? "mb-0"
+              : "mb-4 md:mb-5"
         )}
       >
         <div
@@ -445,7 +460,7 @@ export function AppHeader({
                 </div>
               ) : null}
 
-              {showCalendarControls ? (
+              {showCalendarControls && !useAdaptiveNavigation ? (
                 <div
                   data-onboarding-spotlight-target={
                     guidedToolbarNotice?.target === "calendars" ? "true" : undefined
@@ -587,7 +602,10 @@ export function AppHeader({
               "relative isolate mx-auto flex w-full flex-col items-center gap-1.5 md:gap-2",
               isMobileMode
                 ? "max-w-[31rem]"
-                : "max-w-[62rem] border-t border-border/45 pt-2.5 md:pt-3",
+                : cn(
+                    useAdaptiveNavigation ? "max-w-[50rem]" : "max-w-[62rem]",
+                    "border-t border-border/45 pt-2.5 md:pt-3"
+                  ),
               onboardingLayoutReserved &&
                 (isMobileMode ? "min-h-[10.25rem]" : "min-h-[5.6rem]")
             )}
@@ -677,23 +695,16 @@ export function AppHeader({
                 </span>
               </div>
 
-              <div
+              <CollapsibleControlRegion
                 id={filterPanelId}
-                className={cn(
-                  "grid w-full transition-[grid-template-rows,opacity,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
+                expanded={showMobileFilterPanel}
+                contentClassName={cn(
+                  "px-2",
                   showMobileFilterPanel
-                    ? "grid-rows-[1fr] translate-y-0 opacity-100"
-                    : "pointer-events-none grid-rows-[0fr] -translate-y-1 opacity-0"
+                    ? "border-t border-border/55 py-2"
+                    : "border-0 py-0"
                 )}
               >
-                <div
-                  className={cn(
-                    "min-h-0 overflow-hidden px-2 transition-[padding,border-color] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
-                    showMobileFilterPanel
-                      ? "border-t border-border/55 py-2"
-                      : "border-0 py-0"
-                  )}
-                >
                   <div className="grid w-full grid-cols-1 gap-1.5">
                     <ProfileBar
                       compact
@@ -708,7 +719,7 @@ export function AppHeader({
                     />
                   </div>
 
-                  <div className="mt-2 border-t border-border/55 pt-2">
+                  <div className="relative mt-2 border-t border-border/55 pt-2">
                     <CategoryBar
                       compact
                       mobileDense
@@ -718,10 +729,17 @@ export function AppHeader({
                       onEditCategory={openEditCategory}
                       highlightedCategoryId={highlightedCategoryId}
                       highlightedCategoryEffect={highlightedCategoryEffect}
+                      highlightCreate={guidedToolbarNotice?.target === "calendars"}
                     />
+                    {guidedToolbarNotice?.target === "calendars" &&
+                    onDismissGuidedSelection ? (
+                      <GuidedToolbarNoticeCard
+                        notice={guidedToolbarNotice}
+                        onClose={onDismissGuidedSelection}
+                      />
+                    ) : null}
                   </div>
-                </div>
-              </div>
+              </CollapsibleControlRegion>
               </div>
             ) : (
               <>
@@ -823,7 +841,33 @@ export function AppHeader({
                 </div>
               </div>
 
-              {effectiveCategoriesExpanded ? (
+              {useAdaptiveNavigation ? (
+              <CollapsibleControlRegion
+                id="app-header-categories"
+                expanded={effectiveCategoriesExpanded}
+              >
+                  <div className="relative -mx-4 overflow-x-auto px-4 pb-0.5 doze52-scrollbar-none sm:mx-0 sm:px-0 md:overflow-visible">
+                    <CategoryBar
+                      compact
+                      className="w-max min-w-full flex-nowrap justify-start sm:w-full sm:flex-wrap sm:justify-center"
+                      isInlineEditMode={effectiveInlineEditMode}
+                      editingProfileId={editingProfileId}
+                      onCreateCategory={openCreateCategory}
+                      onEditCategory={openEditCategory}
+                      highlightedCategoryId={highlightedCategoryId}
+                      highlightedCategoryEffect={highlightedCategoryEffect}
+                      highlightCreate={guidedToolbarNotice?.target === "calendars"}
+                    />
+                    {guidedToolbarNotice?.target === "calendars" &&
+                    onDismissGuidedSelection ? (
+                      <GuidedToolbarNoticeCard
+                        notice={guidedToolbarNotice}
+                        onClose={onDismissGuidedSelection}
+                      />
+                    ) : null}
+                  </div>
+              </CollapsibleControlRegion>
+              ) : effectiveCategoriesExpanded ? (
                 <div
                   id="app-header-categories"
                   className="w-full origin-top transition-[opacity,transform] duration-150 ease-out"
@@ -868,12 +912,13 @@ export function AppHeader({
           </div>
         ) : null}
 
-        {!showCalendarControls || isMobileMode ? null : (
+        {!showCalendarControls || isMobileMode || useAdaptiveNavigation ? null : (
           <div
             data-onboarding-filter-separator
             className="mx-auto h-px w-full max-w-[62rem] bg-border/45"
           />
         )}
+
       </header>
 
       <ProfileManager
@@ -885,15 +930,33 @@ export function AppHeader({
         onCreated={onProfileCreated}
       />
 
-      <CategoryManager
-        mode="create"
-        open={categoryCreateOpen}
-        onOpenChange={setCategoryCreateOpen}
-        profileId={editingProfileId ?? undefined}
-        onCreated={onCategoryCreated}
-        onRequireAuth={() => onOpenAuthDialog()}
-        bypassLimits={demoExplorationActive}
-      />
+      {useAdaptiveNavigation ? (
+        <CategoryCreationFlow
+          open={categoryCreateOpen}
+          onOpenChange={setCategoryCreateOpen}
+          profileId={editingProfileId ?? undefined}
+          onCreated={onCategoryCreated}
+          onFocusYear={onCalendarPackFocusYear}
+          onRequireAuth={() => onOpenAuthDialog()}
+          bypassLimits={demoExplorationActive}
+          guidedCalendarSelection={guidedCalendarSelectionActive}
+          onCalendarOpen={onGuidedCalendarOpen}
+          onCalendarClose={onGuidedCalendarClose}
+          onCalendarImported={(pack) =>
+            onGuidedCalendarImported?.(pack.regionCode)
+          }
+        />
+      ) : (
+        <CategoryManager
+          mode="create"
+          open={categoryCreateOpen}
+          onOpenChange={setCategoryCreateOpen}
+          profileId={editingProfileId ?? undefined}
+          onCreated={onCategoryCreated}
+          onRequireAuth={() => onOpenAuthDialog()}
+          bypassLimits={demoExplorationActive}
+        />
+      )}
 
       <CategoryManager
         mode="edit"

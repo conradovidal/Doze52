@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { ArrowLeft } from "lucide-react";
 import { CategoryColorPicker } from "@/components/category-color-picker";
 import { ProUpgradeDialog } from "@/components/billing/pro-upgrade-dialog";
 import { ProfileIcon } from "@/components/profile-icon";
@@ -54,6 +55,8 @@ type CategoryManagerProps = {
   anchorPoint?: AnchorPoint;
   onRequireAuth?: () => void;
   bypassLimits?: boolean;
+  lockProfile?: boolean;
+  onBack?: () => void;
 };
 
 export function CategoryManager({
@@ -66,6 +69,8 @@ export function CategoryManager({
   anchorPoint,
   onRequireAuth,
   bypassLimits = false,
+  lockProfile = false,
+  onBack,
 }: CategoryManagerProps) {
   const { calendarPacks } = useCalendarCatalog();
   const { notify } = useFeedback();
@@ -360,7 +365,20 @@ export function CategoryManager({
         className="sm:max-w-[500px] p-5 sm:p-6"
       >
         <DialogHeader>
-          <DialogTitle>{isEdit ? "Editar categoria" : "Nova categoria"}</DialogTitle>
+          <div className="flex items-center gap-2 pr-8">
+            {!isEdit && onBack ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Voltar para as opções de categoria"
+                onClick={onBack}
+              >
+                <ArrowLeft className="size-4" />
+              </Button>
+            ) : null}
+            <DialogTitle>{isEdit ? "Editar categoria" : "Nova categoria"}</DialogTitle>
+          </div>
           <DialogDescription className="sr-only">
             {isEdit
               ? "Ajuste o nome, o contexto e a cor desta categoria."
@@ -381,6 +399,15 @@ export function CategoryManager({
           />
 
           <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center">
+            {lockProfile && !isEdit ? (
+              <div
+                className={`${CHIP_TRIGGER_CLASS} inline-flex items-center gap-2 border-border/80 bg-background text-foreground sm:flex-1`}
+                aria-label={`Contexto ${currentProfile?.name ?? "indisponível"}`}
+              >
+                {currentProfile ? <ProfileIcon icon={currentProfile.icon} size={12} /> : null}
+                <span className="truncate">{currentProfile?.name ?? "Contexto"}</span>
+              </div>
+            ) : (
             <Select
               value={profileDraftId}
               onValueChange={(nextProfileId) => {
@@ -410,6 +437,7 @@ export function CategoryManager({
                 ))}
               </SelectContent>
             </Select>
+            )}
 
             <div
               className="inline-flex h-10 max-w-full items-center gap-2 rounded-xl border px-3 text-sm font-medium shadow-sm sm:max-w-[220px]"

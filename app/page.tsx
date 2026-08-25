@@ -1943,6 +1943,8 @@ export default function HomePage() {
 
   const guidedToolbarNotice = React.useMemo<GuidedToolbarNotice | null>(() => {
     if (!showGuidedOnboarding || !guidedOnboarding) return null;
+    const totalSteps =
+      isHabitsPrototypeEnabled && isMobileCalendarUi !== true ? 8 : 7;
     if (guidedOnboarding.step === "edit_instruction") {
       return {
         target: "edit",
@@ -1951,7 +1953,7 @@ export default function HomePage() {
           isMobileCalendarUi === true
             ? "Toque no lápis para abrir o modo de edição."
             : "Clique no lápis para abrir o modo de edição.",
-        stepLabel: "Passo 4 de 7",
+        stepLabel: `Passo 4 de ${totalSteps}`,
       };
     }
     if (guidedOnboarding.step === "edit_preview") {
@@ -1962,7 +1964,7 @@ export default function HomePage() {
           isMobileCalendarUi === true
             ? "Aqui você poderá ajustar nomes, cores e organização. Toque em Finalizar para continuar."
             : "Aqui você poderá ajustar nomes, cores e organização. Clique em Finalizar para continuar.",
-        stepLabel: "Passo 4 de 7",
+        stepLabel: `Passo 4 de ${totalSteps}`,
       };
     }
     if (guidedOnboarding.step === "calendar_instruction") {
@@ -1970,7 +1972,7 @@ export default function HomePage() {
         target: "calendars",
         title: "Complemente seu ano com calendários prontos.",
         instruction: "Adicione os feriados do seu estado.",
-        stepLabel: "Passo 5 de 7",
+        stepLabel: `Passo 5 de ${totalSteps}`,
       };
     }
     if (guidedOnboarding.step === "year_instruction") {
@@ -1979,7 +1981,20 @@ export default function HomePage() {
         title: "Explore outros anos.",
         instruction: "Aqui você consulta o ano anterior, o atual e o próximo.",
         actionLabel: "Continuar",
-        stepLabel: "Passo 6 de 7",
+        stepLabel: `Passo 6 de ${totalSteps}`,
+      };
+    }
+    if (
+      guidedOnboarding.step === "period_navigation_instruction" &&
+      isMobileCalendarUi !== true
+    ) {
+      return {
+        target: "period-navigation",
+        title: "Aproxime-se de um período.",
+        instruction:
+          "Clique em Q1–Q4 ou em um mês para aproximar a visão. Clique novamente no rótulo ativo para voltar.",
+        actionLabel: "Continuar",
+        stepLabel: "Passo 7 de 8",
       };
     }
     if (guidedOnboarding.step === "theme_instruction") {
@@ -1989,7 +2004,7 @@ export default function HomePage() {
         instruction:
           "Teste o tema claro e escuro e fique com o que combina mais com você.",
         actionLabel: "Explorar meu ano",
-        stepLabel: "Passo 7 de 7",
+        stepLabel: `Passo ${totalSteps} de ${totalSteps}`,
       };
     }
     return null;
@@ -2008,7 +2023,22 @@ export default function HomePage() {
       return;
     }
     if (target === "year" && current.step === "year_instruction") {
-      const next = updateGuidedOnboarding({ type: "continue_from_year" });
+      const next = updateGuidedOnboarding({
+        type: "continue_from_year",
+        showPeriodNavigation:
+          isHabitsPrototypeEnabled && isMobileCalendarUi !== true,
+      });
+      if (next.step === "completed") announceGuidedCompletion();
+      return;
+    }
+    if (
+      target === "period-navigation" &&
+      current.step === "period_navigation_instruction"
+    ) {
+      useStore.getState().setCalendarViewMode("year");
+      const next = updateGuidedOnboarding({
+        type: "continue_from_period_navigation",
+      });
       if (next.step === "completed") announceGuidedCompletion();
       return;
     }
@@ -2017,7 +2047,7 @@ export default function HomePage() {
       const next = updateGuidedOnboarding({ type: "confirm_theme" });
       if (next.step === "completed") announceGuidedCompletion();
     }
-  }, [announceGuidedCompletion, setTheme, themeMode, updateGuidedOnboarding]);
+  }, [announceGuidedCompletion, isMobileCalendarUi, setTheme, themeMode, updateGuidedOnboarding]);
 
   const handleGuidedCalendarOpen = React.useCallback(() => {
     if (readGuidedOnboardingState().step === "calendar_instruction") {
@@ -2115,6 +2145,16 @@ export default function HomePage() {
 
   React.useEffect(() => {
     if (
+      isMobileCalendarUi !== true ||
+      guidedOnboarding?.step !== "period_navigation_instruction"
+    ) {
+      return;
+    }
+    updateGuidedOnboarding({ type: "continue_from_period_navigation" });
+  }, [guidedOnboarding?.step, isMobileCalendarUi, updateGuidedOnboarding]);
+
+  React.useEffect(() => {
+    if (
       !isHabitsPrototypeEnabled ||
       guidedToolbarNotice?.target !== "theme"
     ) {
@@ -2202,7 +2242,9 @@ export default function HomePage() {
           "z-30 shrink-0 bg-background",
           isMobileCalendarUi
             ? "shrink-0 pb-2"
-            : "pb-2"
+            : isHabitsSurfaceActive
+              ? "pb-3"
+              : "pb-2"
         )}
       >
         <AppHeader
@@ -2350,6 +2392,16 @@ export default function HomePage() {
               }
               onDismissGuidedYearNotice={dismissGuidedOnboarding}
               onGuidedYearAction={() => handleGuidedToolbarAction("year")}
+              guidedPeriodNotice={
+                guidedToolbarNotice?.target === "period-navigation"
+                  ? guidedToolbarNotice
+                  : null
+              }
+              onDismissGuidedPeriodNotice={dismissGuidedOnboarding}
+              onGuidedPeriodAction={() =>
+                handleGuidedToolbarAction("period-navigation")
+              }
+              showScaleControl={!isHabitsPrototypeEnabled}
             />
           </div>
         </div>

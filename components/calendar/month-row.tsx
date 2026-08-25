@@ -134,6 +134,7 @@ export function MonthRow({
   onMonthLabelClick,
   monthLabelAriaLabel,
   monthLabelActive = false,
+  monthLabelHighlighted = false,
   isMobileInteractionMode = false,
   onDayCellActivate,
   habitPresentation,
@@ -176,6 +177,7 @@ export function MonthRow({
   onMonthLabelClick?: () => void;
   monthLabelAriaLabel?: string;
   monthLabelActive?: boolean;
+  monthLabelHighlighted?: boolean;
   isMobileInteractionMode?: boolean;
   onDayCellActivate?: (payload: { monthIndex: number; dateIso: string }) => void;
   habitPresentation?: DayCellHabitPresentation;
@@ -574,8 +576,10 @@ export function MonthRow({
             className={cn(
               LATERAL_KEY_BASE_CLASS,
               "h-full px-1 py-2.5 min-[420px]:px-1.5 md:px-2",
-              monthLabelActive ? LATERAL_KEY_ACTIVE_CLASS : LATERAL_KEY_REST_CLASS
+              monthLabelActive ? LATERAL_KEY_ACTIVE_CLASS : LATERAL_KEY_REST_CLASS,
+              monthLabelHighlighted && "product-spotlight-target"
             )}
+            data-onboarding-period-control={monthLabelHighlighted ? "true" : undefined}
             style={{ minHeight: `${minHeightPx}px` }}
           >
             <span className="text-[9.5px] font-medium uppercase tracking-[0.12em] min-[420px]:text-[10px] min-[420px]:tracking-[0.14em] md:text-[10.5px]">
