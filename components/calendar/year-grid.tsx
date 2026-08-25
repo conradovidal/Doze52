@@ -1,6 +1,8 @@
 "use client";
 
 import * as React from "react";
+import { AnimatePresence, m } from "motion/react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import {
   addDays,
   differenceInCalendarDays,
@@ -25,7 +27,12 @@ import {
   isSingleDayEvent,
 } from "@/lib/event-order";
 import { cn } from "@/lib/utils";
+import { getYearTransitionDirection } from "@/lib/calendar-year-transition";
 import { SegmentedControl } from "@/components/ui/segmented-control";
+import {
+  GuidedToolbarNoticeCard,
+  type GuidedToolbarNotice,
+} from "@/components/onboarding/guided-toolbar-notice";
 import {
   LATERAL_KEY_ACTIVE_CLASS,
   LATERAL_KEY_BASE_CLASS,
@@ -126,6 +133,10 @@ export function YearGrid({
   onApplyDayReorder,
   isMobileInteractionMode = false,
   habitPresentation,
+  onYearChange,
+  guidedYearNotice,
+  onDismissGuidedYearNotice,
+  onGuidedYearAction,
 }: {
   year: number;
   todayIso: string;
@@ -149,6 +160,10 @@ export function YearGrid({
   }) => void;
   isMobileInteractionMode?: boolean;
   habitPresentation?: DayCellHabitPresentation;
+  onYearChange: (year: number) => void;
+  guidedYearNotice?: GuidedToolbarNotice | null;
+  onDismissGuidedYearNotice?: () => void;
+  onGuidedYearAction?: () => void;
 }) {
   const profiles = useStore((s) => s.profiles as CalendarProfile[]);
   const categories = useStore((s) => s.categories as CategoryItem[]);
@@ -161,6 +176,18 @@ export function YearGrid({
   const focusQuarter = useStore((s) => s.focusQuarter);
   const focusMonth = useStore((s) => s.focusMonth);
   const setCalendarZoomPercent = useStore((s) => s.setCalendarZoomPercent);
+  const [yearDirection, setYearDirection] = React.useState<1 | -1>(1);
+  const [isYearTransitioning, setIsYearTransitioning] = React.useState(false);
+  const requestYearChange = React.useCallback(
+    (nextYear: number) => {
+      if (isYearTransitioning || nextYear === year) return;
+      setYearDirection(getYearTransitionDirection(year, nextYear));
+      setIsYearTransitioning(true);
+      onYearChange(nextYear);
+      if (guidedYearNotice?.target === "year") onGuidedYearAction?.();
+    },
+    [guidedYearNotice?.target, isYearTransitioning, onGuidedYearAction, onYearChange, year]
+  );
   const visibleCategoryIds = React.useMemo(
     () => {
       const selectedProfiles = new Set(selectedProfileIds);
@@ -721,13 +748,74 @@ export function YearGrid({
               : undefined
           }
         >
-          {annualContent}
+          <AnimatePresence initial={false} custom={yearDirection} mode="popLayout">
+            <m.div
+              key={year}
+              custom={yearDirection}
+              initial={{ opacity: 0, x: yearDirection * 10 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: yearDirection * -10 }}
+              transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+              className={cn(isYearTransitioning && "pointer-events-none")}
+              onAnimationComplete={() => setIsYearTransitioning(false)}
+            >
+              {annualContent}
+            </m.div>
+          </AnimatePresence>
         </div>
       </div>
 
       <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 border-t border-border bg-card px-3 py-2.5 md:px-4 md:py-3">
         <span aria-hidden="true" />
-        <div data-calendar-scale-control className="justify-self-center">
+        <div data-calendar-footer-center className="flex items-center justify-center gap-2 justify-self-center">
+          <div
+            data-calendar-year-stepper
+            data-onboarding-highlighted={
+              guidedYearNotice?.target === "year" ? "true" : undefined
+            }
+            className={cn(
+              "relative inline-flex h-8 items-center overflow-visible rounded-[10px] border border-border bg-card",
+              guidedYearNotice?.target === "year" && "product-spotlight-target"
+            )}
+          >
+            <button
+              type="button"
+              data-onboarding-year-control
+              aria-label={`Voltar para ${year - 1}`}
+              title={`Voltar para ${year - 1}`}
+              disabled={isYearTransitioning}
+              className="grid size-8 place-items-center rounded-[9px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-45"
+              onClick={() => requestYearChange(year - 1)}
+            >
+              <ChevronLeft className="size-3.5" />
+            </button>
+            <span
+              aria-label={`Ano ${year}`}
+              aria-live="polite"
+              className="min-w-11 text-center text-xs font-semibold tabular-nums text-foreground"
+            >
+              {year}
+            </span>
+            <button
+              type="button"
+              aria-label={`Avançar para ${year + 1}`}
+              title={`Avançar para ${year + 1}`}
+              disabled={isYearTransitioning}
+              className="grid size-8 place-items-center rounded-[9px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-45"
+              onClick={() => requestYearChange(year + 1)}
+            >
+              <ChevronRight className="size-3.5" />
+            </button>
+            {guidedYearNotice?.target === "year" && onDismissGuidedYearNotice ? (
+              <GuidedToolbarNoticeCard
+                notice={guidedYearNotice}
+                onClose={onDismissGuidedYearNotice}
+                onAction={onGuidedYearAction}
+                placement="above"
+              />
+            ) : null}
+          </div>
+          <div data-calendar-scale-control>
           <SegmentedControl
             value={viewMode}
             options={CALENDAR_VIEW_OPTIONS}
@@ -736,9 +824,10 @@ export function YearGrid({
               habitPresentation ? "Escala dos hábitos" : "Escala do calendário"
             }
           />
+          </div>
         </div>
         {hasFocusZoom ? (
-          <label className="flex w-[10.75rem] items-center justify-end justify-self-end gap-2.5 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground min-[420px]:w-[11.5rem] md:w-[12.25rem]">
+          <label className="flex w-[10.75rem] items-center justify-end justify-self-end gap-2.5 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground min-[420px]:w-[11.5rem] md:w-[12.25rem] max-[900px]:col-span-3 max-[900px]:row-start-2">
             <span className="shrink-0">Zoom</span>
             <input
               type="range"

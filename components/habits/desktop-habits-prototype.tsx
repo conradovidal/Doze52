@@ -21,8 +21,10 @@ export function DesktopHabitsPrototype({
   isEditing,
   archivedHabits,
   onEditHabit,
-  onMoveHabit,
+  onReorderHabits,
   onReactivateHabit,
+  onToggleEditing,
+  onYearChange,
 }: {
   year: number;
   todayIso: string;
@@ -38,8 +40,10 @@ export function DesktopHabitsPrototype({
   isEditing: boolean;
   archivedHabits: Habit[];
   onEditHabit: (habitId: string) => void;
-  onMoveHabit: (habitId: string, direction: -1 | 1) => void;
+  onReorderHabits: (orderedIds: string[]) => void;
   onReactivateHabit: (habitId: string) => void;
+  onToggleEditing?: () => void;
+  onYearChange: (year: number) => void;
 }) {
   return (
     <section
@@ -58,8 +62,9 @@ export function DesktopHabitsPrototype({
         isEditing={isEditing}
         archivedHabits={archivedHabits}
         onEditHabit={onEditHabit}
-        onMoveHabit={onMoveHabit}
+        onReorderHabits={onReorderHabits}
         onReactivateHabit={onReactivateHabit}
+        onToggleEditing={onToggleEditing}
       />
 
       <div
@@ -68,6 +73,7 @@ export function DesktopHabitsPrototype({
       >
         <YearGrid
           year={year}
+          onYearChange={onYearChange}
           todayIso={todayIso}
           events={[]}
           onEditEvent={noop}

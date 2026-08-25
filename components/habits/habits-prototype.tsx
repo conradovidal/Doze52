@@ -27,10 +27,10 @@ import {
 } from "@/lib/category-palette";
 import {
   buildHabitPrototypeWeeks,
+  applyActiveHabitOrder,
   getDesktopVisibleHabits,
   getHabitDayAction,
   getHabitCheckInKey,
-  moveActiveHabit,
   orderActiveHabits,
   setHabitArchived,
 } from "@/lib/habits-prototype";
@@ -198,12 +198,16 @@ export function HabitsPrototype({
   isMobile,
   onRequireAuth,
   isEditing = false,
+  onToggleEditing,
+  onYearChange,
 }: {
   year: number;
   todayIso: string;
   isMobile: boolean;
   onRequireAuth?: () => void;
   isEditing?: boolean;
+  onToggleEditing?: () => void;
+  onYearChange: (year: number) => void;
 }) {
   const { notify } = useFeedback();
   const { limits, isPro, isLoading: isBillingLoading, error: billingError } =
@@ -367,11 +371,9 @@ export function HabitsPrototype({
     setCreateDialogOpen(true);
   };
 
-  const moveHabit = (habitId: string, direction: -1 | 1) => {
+  const reorderHabits = (orderedIds: string[]) => {
     const timestamp = new Date().toISOString();
-    setHabits((current) =>
-      moveActiveHabit(current, habitId, direction, timestamp)
-    );
+    setHabits((current) => applyActiveHabitOrder(current, orderedIds, timestamp));
   };
 
   const archiveEditingHabit = () => {
@@ -471,8 +473,10 @@ export function HabitsPrototype({
           isEditing={isEditing}
           archivedHabits={archivedHabits}
           onEditHabit={requestEditHabit}
-          onMoveHabit={moveHabit}
+          onReorderHabits={reorderHabits}
           onReactivateHabit={reactivateHabit}
+          onToggleEditing={onToggleEditing}
+          onYearChange={onYearChange}
         />
         {createDialog}
         <ProUpgradeDialog
@@ -499,6 +503,12 @@ export function HabitsPrototype({
         creationDisabledLabel={creationDisabledLabel}
         onSelectHabit={setSelectedHabitId}
         onRequestCreate={requestCreateHabit}
+        isEditing={isEditing}
+        archivedHabits={archivedHabits}
+        onEditHabit={requestEditHabit}
+        onReorderHabits={reorderHabits}
+        onReactivateHabit={reactivateHabit}
+        onToggleEditing={onToggleEditing}
       />
 
       <div
@@ -573,7 +583,7 @@ export function HabitsPrototype({
                           isFuture: day.isFuture,
                           hasSelectedHabit: Boolean(selectedHabit),
                         });
-                        const disabled = dayAction === "blocked";
+                        const disabled = dayAction === "blocked" || isEditing;
                         const dateLabel = formatAccessibleDate(day.dateIso);
                         const actionLabel = completed ? "Desmarcar" : "Marcar";
 
@@ -583,7 +593,9 @@ export function HabitsPrototype({
                             type="button"
                             aria-pressed={completed}
                             aria-label={
-                              disabled
+                              isEditing
+                                ? `${dateLabel}: finalize a edição para registrar hábitos`
+                                : disabled
                                 ? `${dateLabel}: data futura, indisponível`
                                 : selectedHabit
                                   ? `${actionLabel} ${selectedHabit.name} em ${dateLabel}`
@@ -607,6 +619,7 @@ export function HabitsPrototype({
                                 : undefined
                             }
                             onClick={() => {
+                              if (isEditing) return;
                               if (dayAction === "toggle" && selectedHabit) {
                                 toggleHabitDay(selectedHabit, day.dateIso);
                               } else if (dayAction === "create") {

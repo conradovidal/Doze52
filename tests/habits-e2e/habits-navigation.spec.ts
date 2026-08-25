@@ -169,8 +169,19 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
   }
   expect(profileBox.y).toBeLessThan(annualBox.y);
   expect(annualBox.y).toBeLessThan(habitsBox.y);
+  expect(Math.round(profileBox.y)).toBe(16);
+  await expect(rail.locator("[data-rail-divider]")).toHaveCount(1);
+  expect(Math.round((await rail.locator("[data-rail-divider]").boundingBox())?.width ?? 0)).toBe(24);
+  await expect(rail.getByRole("button", { name: "Editar", exact: true })).toHaveCount(0);
+  await expect(rail.locator("[data-rail-year-stepper]")).toHaveCount(0);
   await expect(page.locator('[data-calendar-ui-mode="desktop"]')).toBeVisible();
-  const scaleBox = await page.locator("[data-calendar-scale-control]").boundingBox();
+  const contextualEdit = page.getByRole("button", { name: "Editar", exact: true });
+  const collapseCategories = page.getByRole("button", { name: "Recolher categorias" });
+  const contextualEditBox = await contextualEdit.boundingBox();
+  const collapseBox = await collapseCategories.boundingBox();
+  if (!contextualEditBox || !collapseBox) throw new Error("Controles contextuais não puderam ser medidos.");
+  expect(contextualEditBox.x).toBeLessThan(collapseBox.x);
+  const scaleBox = await page.locator("[data-calendar-footer-center]").boundingBox();
   const desktopViewport = page.viewportSize();
   if (!scaleBox || !desktopViewport) throw new Error("Escala não pôde ser medida.");
   const usableCenter = 52 + (desktopViewport.width - 52) / 2;
@@ -253,7 +264,7 @@ test("desktop mantém a grade anual disponível antes do primeiro hábito", asyn
   await expect(habits.locator('[data-day-cell][aria-disabled="true"]').first()).toBeVisible();
 });
 
-test("desktop edita hábitos pela rail e preserva o histórico local", async ({
+test("desktop edita e reordena hábitos nos controles contextuais", async ({
   page,
 }, testInfo) => {
   test.skip(!testInfo.project.name.startsWith("desktop-"), "Cenário desktop");
@@ -278,14 +289,31 @@ test("desktop edita hábitos pela rail e preserva o histórico local", async ({
   });
   await page.goto("/?surface=habits");
 
-  const rail = page.locator('[data-product-navigation="desktop"]');
-  const edit = rail.getByRole("button", { name: "Editar", exact: true });
+  const controls = page.locator('[data-habit-controls-layout="desktop"]');
+  const edit = controls.getByRole("button", { name: "Editar", exact: true });
   await edit.click();
-  await expect(rail.getByRole("button", { name: "Finalizar edição" })).toBeVisible();
+  await expect(controls.getByRole("button", { name: "Finalizar edição" })).toBeVisible();
   await expect(page.locator('[data-day-cell][aria-disabled="true"]').first()).toBeVisible();
 
-  const controls = page.locator('[data-habit-controls-layout="desktop"]');
-  await controls.getByRole("button", { name: "Mover Caminhar para a direita" }).click();
+  const reorderCaminhar = controls.getByRole("button", { name: "Reordenar hábito Caminhar" });
+  const reorderLer = controls.getByRole("button", { name: "Reordenar hábito Ler" });
+  const sourceBox = await reorderCaminhar.boundingBox();
+  const targetBox = await reorderLer.boundingBox();
+  if (!sourceBox || !targetBox) throw new Error("Alças de hábitos não puderam ser medidas.");
+  await page.mouse.move(sourceBox.x + sourceBox.width / 2, sourceBox.y + sourceBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(targetBox.x + targetBox.width / 2, targetBox.y + targetBox.height / 2, { steps: 8 });
+  await page.mouse.up();
+  await expect.poll(async () => {
+    const raw = await page.evaluate(() =>
+      window.sessionStorage.getItem("doze52:habits-prototype:v1")
+    );
+    return [...(JSON.parse(raw ?? "{}").habits ?? [])]
+      .sort((left, right) => left.position - right.position)
+      .map((habit) => habit.id)
+      .join(",");
+  }).toBe("habit-b,habit-a");
+  await page.waitForTimeout(300);
   await controls.getByRole("button", { name: "Editar hábito Caminhar" }).click();
   await page.getByLabel("Nome do hábito").fill("Corrida");
   await page.getByRole("button", { name: "Salvar alterações" }).click();
@@ -299,11 +327,77 @@ test("desktop edita hábitos pela rail e preserva o histórico local", async ({
   await expect(controls.getByRole("button", { name: "Editar hábito Corrida" })).toBeVisible();
 
   const currentYear = new Date().getFullYear();
-  await rail.getByRole("button", { name: `Avançar para ${currentYear + 1}` }).click();
-  await expect(rail.getByLabel(`Ano ${currentYear + 1}`)).toBeVisible();
+  const yearStepper = page.locator("[data-calendar-year-stepper]");
+  await yearStepper.getByRole("button", { name: `Avançar para ${currentYear + 1}` }).click();
+  await expect(yearStepper.getByLabel(`Ano ${currentYear + 1}`)).toBeVisible();
 
   await page.reload();
   await expect(page.locator('[data-habit-controls-layout="desktop"]')).toContainText("Corrida");
+});
+
+test("mobile reordena hábitos pelo mesmo DnD e persiste a posição", async ({
+  page,
+}, testInfo) => {
+  test.skip(!testInfo.project.name.startsWith("mobile-"), "Cenário mobile");
+
+  await installCompletedOnboarding(page);
+  await page.addInitScript(() => {
+    if (window.sessionStorage.getItem("doze52:habits-mobile-dnd-seeded")) return;
+    const habits = [
+      { id: "mobile-a", name: "Caminhar", color: "#2563eb", position: 0 },
+      { id: "mobile-b", name: "Ler", color: "#14b8a6", position: 1 },
+    ].map((habit, index) => ({
+      ...habit,
+      icon: "circle-check",
+      createdAt: `2026-01-0${index + 1}T00:00:00.000Z`,
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    }));
+    window.sessionStorage.setItem(
+      "doze52:habits-prototype:v1",
+      JSON.stringify({ habits, checkIns: {}, selectedHabitId: "mobile-a" })
+    );
+    window.sessionStorage.setItem("doze52:habits-mobile-dnd-seeded", "1");
+  });
+  await page.goto("/?surface=habits");
+
+  const controls = page.locator('[data-habit-controls-layout="mobile"]');
+  await controls.getByRole("button", { name: "Editar", exact: true }).click();
+  const handle = controls.getByRole("button", { name: "Reordenar hábito Caminhar" });
+  await handle.focus();
+  await page.keyboard.press("Space");
+  await page.waitForTimeout(100);
+  await page.keyboard.press(
+    testInfo.project.name === "mobile-430" ? "ArrowRight" : "ArrowDown"
+  );
+  await page.waitForTimeout(100);
+  await page.keyboard.press("Space");
+
+  await expect.poll(async () => {
+    const raw = await page.evaluate(() =>
+      window.sessionStorage.getItem("doze52:habits-prototype:v1")
+    );
+    const session = JSON.parse(raw ?? "{}");
+    return [...(session.habits ?? [])]
+      .sort((left, right) => left.position - right.position)
+      .map((habit) => habit.id)
+      .join(",");
+  }).toBe("mobile-b,mobile-a");
+
+  await page.reload();
+  await controls.getByRole("button", { name: "Editar", exact: true }).click();
+  const chips = controls.locator("[data-habit-edit-chip]");
+  await expect(chips.first()).toHaveAttribute("data-habit-edit-chip", "mobile-b");
+  await controls.getByRole("button", { name: "Editar hábito Caminhar" }).click();
+  await page.getByLabel("Nome do hábito").fill("Caminhar mobile");
+  await page.getByRole("button", { name: "Salvar alterações" }).click();
+  await controls.getByRole("button", { name: "Editar hábito Caminhar mobile" }).click();
+  await page.getByRole("button", { name: "Arquivar" }).click();
+  await controls.getByRole("button", { name: "Editar hábito Ler" }).click();
+  await page.getByRole("button", { name: "Arquivar" }).click();
+  await controls.getByRole("button", { name: "Caminhar mobile", exact: true }).click();
+  await expect(
+    controls.getByRole("button", { name: "Editar hábito Caminhar mobile" })
+  ).toBeVisible();
 });
 
 test("onboarding de tema usa o painel de Configurações", async ({

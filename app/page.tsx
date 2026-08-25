@@ -2167,30 +2167,6 @@ export default function HomePage() {
             authLoading={authLoading}
             onDestinationSelect={handleDestinationSelect}
             onOpenUtilityPanel={handleOpenUtilityPanel}
-            year={year}
-            onYearChange={handleYearChange}
-            editActive={
-              workspaceEditMode ===
-                (activeDestination === "habits" ? "habits" : "calendar") ||
-              (activeDestination === "annual" &&
-                guidedOnboarding?.step === "edit_preview")
-            }
-            editDisabled={isMobileExamplePreview}
-            onToggleEdit={() => {
-              const currentSurfaceMode =
-                activeDestination === "habits" ? "habits" : "calendar";
-              setWorkspaceEditMode((current) =>
-                current === currentSurfaceMode ? null : currentSurfaceMode
-              );
-            }}
-            guidedToolbarNotice={
-              guidedToolbarNotice?.target === "edit" ||
-              guidedToolbarNotice?.target === "year"
-                ? guidedToolbarNotice
-                : null
-            }
-            onDismissGuidedNotice={dismissGuidedOnboarding}
-            onGuidedToolbarAction={handleGuidedToolbarAction}
           />
           <AppUtilityPanel
             open={utilityPanelOpen}
@@ -2292,7 +2268,13 @@ export default function HomePage() {
           year={year}
           todayIso={todayIso}
           isMobile={isMobileCalendarUi}
-          isEditing={!isMobileCalendarUi && workspaceEditMode === "habits"}
+          isEditing={workspaceEditMode === "habits"}
+          onYearChange={handleYearChange}
+          onToggleEditing={() =>
+            setWorkspaceEditMode((current) =>
+              current === "habits" ? null : "habits"
+            )
+          }
           onRequireAuth={() => {
             setAuthDialogInitialMode("login");
             setAuthDialogAnchorPoint(undefined);
@@ -2345,6 +2327,7 @@ export default function HomePage() {
           >
             <YearGrid
               year={year}
+              onYearChange={handleYearChange}
               todayIso={todayIso}
               events={renderEvents}
               onEditEvent={handleEditEvent}
@@ -2360,6 +2343,13 @@ export default function HomePage() {
                 normalizeDayOrder(dayIso, orderedIds);
               }}
               isMobileInteractionMode={false}
+              guidedYearNotice={
+                guidedToolbarNotice?.target === "year"
+                  ? guidedToolbarNotice
+                  : null
+              }
+              onDismissGuidedYearNotice={dismissGuidedOnboarding}
+              onGuidedYearAction={() => handleGuidedToolbarAction("year")}
             />
           </div>
         </div>

@@ -80,6 +80,16 @@ export const setHabitArchived = (
       : habit
   );
 
+export const applyActiveHabitOrder = (
+  habits: Habit[],
+  orderedIds: string[],
+  updatedAt: string
+) =>
+  habits.map((habit) => {
+    const position = orderedIds.indexOf(habit.id);
+    return position >= 0 ? { ...habit, position, updatedAt } : habit;
+  });
+
 export const getDesktopHabitSlot = (
   totalVisibleHabits: number,
   habitIndex: number
