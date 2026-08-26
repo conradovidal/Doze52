@@ -7,7 +7,7 @@ const installCompletedOnboarding = async (
     window.localStorage.setItem(
       "doze52:onboarding:v2",
       JSON.stringify({
-        version: 12,
+        version: 13,
         step: "completed",
         completedAt: new Date().toISOString(),
       })
@@ -474,7 +474,7 @@ test("onboarding desktop conclui navegação, hábito, perfil e tema", async ({
     window.localStorage.setItem(
       "doze52:onboarding:v2",
       JSON.stringify({
-        version: 12,
+        version: 13,
         step: "year_instruction",
         context: "personal",
         startedAt: new Date().toISOString(),
@@ -495,15 +495,38 @@ test("onboarding desktop conclui navegação, hábito, perfil e tema", async ({
   );
   await expect(periodNotice).toBeVisible();
   await expect(page.locator('[data-onboarding-period-control="true"]')).toHaveCount(4);
+  await expect(page.locator('[data-onboarding-period-outline="true"]')).toHaveCount(1);
   await expect(page.locator(".product-spotlight-target")).toHaveCount(0);
+  const periodNoticeBox = await periodNotice.boundingBox();
+  const periodAnchorBox = await page.locator("[data-onboarding-period-anchor]").boundingBox();
+  expect(periodNoticeBox).not.toBeNull();
+  expect(periodAnchorBox).not.toBeNull();
+  expect(Math.abs((periodNoticeBox?.y ?? 0) + (periodNoticeBox?.height ?? 0) / 2 - ((periodAnchorBox?.y ?? 0) + (periodAnchorBox?.height ?? 0) / 2))).toBeLessThan(24);
   await page.getByTitle("1o trimestre").click();
   await expect(page.locator("[data-month-row]")).toHaveCount(3);
+  await expect(page.locator('[data-onboarding-period-outline="true"]')).toHaveCount(0);
   await periodNotice.getByRole("button", { name: "Continuar" }).click();
+  await expect(page.locator('[data-product-navigation="desktop"] a[aria-current="page"]')).toHaveAttribute("title", "Anual");
+  const habitSurfaceNotice = page.locator(
+    '[data-guided-toolbar-notice][data-guided-toolbar-target="habit-surface"]'
+  );
+  await expect(habitSurfaceNotice).toBeVisible();
+  const habitsDestination = page.locator(
+    '[data-product-navigation="desktop"] [data-product-destination="habits"]'
+  );
+  await expect(habitsDestination).toHaveClass(/guided-control-target-subtle/);
+  await habitsDestination.click();
   await expect(page.locator('[data-product-navigation="desktop"] a[aria-current="page"]')).toHaveAttribute("title", "Hábitos");
   const habitNotice = page.locator(
     '[data-guided-toolbar-notice][data-guided-toolbar-target="habit"]'
   );
   await expect(habitNotice).toBeVisible();
+  const habitCreate = page.locator('[data-onboarding-habit-create="true"]');
+  const habitNoticeBox = await habitNotice.boundingBox();
+  const habitCreateBox = await habitCreate.boundingBox();
+  expect(habitNoticeBox).not.toBeNull();
+  expect(habitCreateBox).not.toBeNull();
+  expect(Math.abs((habitNoticeBox?.x ?? 0) + (habitNoticeBox?.width ?? 0) / 2 - ((habitCreateBox?.x ?? 0) + (habitCreateBox?.width ?? 0) / 2))).toBeLessThan(24);
   await page.getByRole("button", { name: "Criar novo hábito" }).click();
   await page.getByLabel("Nome do hábito").fill("Leitura");
   await page.getByRole("button", { name: "Criar hábito" }).click();
@@ -517,6 +540,7 @@ test("onboarding desktop conclui navegação, hábito, perfil e tema", async ({
     '[data-guided-toolbar-notice][data-guided-toolbar-target="profile"]'
   );
   await expect(profileNotice).toBeVisible();
+  await expect(page.locator('[data-product-account="desktop"]')).toHaveClass(/guided-control-target-subtle/);
   await page.locator('[data-product-account="desktop"]').click();
 
   const panel = page.locator("[data-app-utility-panel]");

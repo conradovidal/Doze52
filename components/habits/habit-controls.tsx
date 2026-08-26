@@ -366,6 +366,7 @@ export function HabitControls({
 
       <button
         type="button"
+        data-onboarding-habit-create={guidedNotice?.target === "habit" ? "true" : undefined}
         aria-label="Criar novo hábito"
         title={creationDisabledLabel ?? "Criar novo hábito"}
         disabled={creationDisabled}
@@ -448,6 +449,7 @@ export function HabitControls({
   return (
     <section
       data-habit-controls
+      data-onboarding-habit-controls
       data-habit-controls-layout={mobile ? "mobile" : "desktop"}
       className={cn(
         "shrink-0",
@@ -585,6 +587,12 @@ export function HabitControls({
           onAction={onGuidedNoticeAction}
           placement="viewport"
           portaled
+          anchorSelector={
+            guidedNotice.target === "habit"
+              ? "[data-onboarding-habit-create]"
+              : "[data-onboarding-habit-controls]"
+          }
+          anchorPlacement="below-center"
         />
       ) : null}
     </section>

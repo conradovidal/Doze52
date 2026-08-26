@@ -405,6 +405,9 @@ export function AppHeader({
               onDestinationSelect={onDestinationSelect}
               onOpenUtilityPanel={onOpenUtilityPanel}
               highlightProfile={guidedToolbarNotice?.target === "profile"}
+              highlightDestination={
+                guidedToolbarNotice?.target === "habit-surface" ? "habits" : undefined
+              }
             />
           ) : null}
           {guidedToolbarNotice?.target === "profile" &&
@@ -414,6 +417,19 @@ export function AppHeader({
               onClose={onDismissGuidedSelection}
               placement="viewport"
               portaled
+              anchorSelector="[data-product-account='desktop']"
+              anchorPlacement="below-end"
+            />
+          ) : null}
+          {guidedToolbarNotice?.target === "habit-surface" &&
+          onDismissGuidedSelection ? (
+            <GuidedToolbarNoticeCard
+              notice={guidedToolbarNotice}
+              onClose={onDismissGuidedSelection}
+              placement="viewport"
+              portaled
+              anchorSelector="[data-product-navigation='desktop'] [data-product-destination='habits']"
+              anchorPlacement="below-center"
             />
           ) : null}
 
@@ -770,6 +786,7 @@ export function AppHeader({
                       highlightCreate={guidedToolbarNotice?.target === "calendars"}
                     />
                     {guidedToolbarNotice?.target === "calendars" &&
+                    !categoryCreateOpen &&
                     onDismissGuidedSelection ? (
                       <GuidedToolbarNoticeCard
                         notice={guidedToolbarNotice}
@@ -897,12 +914,15 @@ export function AppHeader({
                       highlightCreate={guidedToolbarNotice?.target === "calendars"}
                     />
                     {guidedToolbarNotice?.target === "calendars" &&
+                    !categoryCreateOpen &&
                     onDismissGuidedSelection ? (
                       <GuidedToolbarNoticeCard
                         notice={guidedToolbarNotice}
                         onClose={onDismissGuidedSelection}
                         placement="viewport"
                         portaled
+                        anchorSelector="[data-onboarding-calendar-control]"
+                        anchorPlacement="below-center"
                       />
                     ) : null}
                   </div>

@@ -33,6 +33,7 @@ type ProductNavigationProps = {
     trigger: HTMLElement
   ) => void;
   highlightProfile?: boolean;
+  highlightDestination?: ProductDestinationId;
 };
 
 const ICON_BY_NAME: Record<
@@ -125,11 +126,13 @@ function DestinationButton({
   active,
   mobile = false,
   onSelect,
+  highlighted = false,
 }: {
   destination: (typeof PRODUCT_DESTINATIONS)[number];
   active: boolean;
   mobile?: boolean;
   onSelect: (destination: ProductDestinationId) => void;
+  highlighted?: boolean;
 }) {
   const Icon = ICON_BY_NAME[destination.icon];
 
@@ -138,9 +141,11 @@ function DestinationButton({
       href={destination.href}
       aria-current={active ? "page" : undefined}
       title={destination.label}
+      data-product-destination={destination.id}
       className={cn(
         "group relative inline-flex items-center justify-center rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
         mobile ? "min-h-12 min-w-16 flex-1 flex-col gap-0.5 px-2" : "size-10",
+        highlighted && "guided-control-target guided-control-target-subtle",
         active
           ? "text-foreground"
           : "text-muted-foreground/55 hover:bg-muted/45 hover:text-foreground/80"
@@ -177,6 +182,7 @@ export function DesktopProductNavigation({
   onDestinationSelect,
   onOpenUtilityPanel,
   highlightProfile = false,
+  highlightDestination,
 }: ProductNavigationProps) {
   const handleAccount = (event: React.MouseEvent<HTMLButtonElement>) => {
     if (authLoading) return;
@@ -196,6 +202,7 @@ export function DesktopProductNavigation({
             destination={destination}
             active={activeDestination === destination.id}
             onSelect={onDestinationSelect}
+            highlighted={highlightDestination === destination.id}
           />
         ))}
       </nav>
@@ -209,7 +216,7 @@ export function DesktopProductNavigation({
         disabled={authLoading}
         className={cn(
           "col-start-3 hidden size-10 place-items-center justify-self-end rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 disabled:opacity-45 md:grid",
-          highlightProfile && "guided-control-target"
+          highlightProfile && "guided-control-target guided-control-target-subtle"
         )}
         onClick={handleAccount}
       >

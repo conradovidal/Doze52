@@ -140,6 +140,8 @@ export function YearGrid({
   guidedPeriodNotice,
   onDismissGuidedPeriodNotice,
   onGuidedPeriodAction,
+  onGuidedPeriodInteraction,
+  guidedPeriodInteracted = false,
   showScaleControl = true,
 }: {
   year: number;
@@ -171,6 +173,8 @@ export function YearGrid({
   guidedPeriodNotice?: GuidedToolbarNotice | null;
   onDismissGuidedPeriodNotice?: () => void;
   onGuidedPeriodAction?: () => void;
+  onGuidedPeriodInteraction?: () => void;
+  guidedPeriodInteracted?: boolean;
   showScaleControl?: boolean;
 }) {
   const profiles = useStore((s) => s.profiles as CalendarProfile[]);
@@ -481,6 +485,9 @@ export function YearGrid({
 
   const handleQuarterRailClick = React.useCallback(
     (quarterIndex: QuarterIndex) => {
+      if (guidedPeriodNotice?.target === "period-navigation") {
+        onGuidedPeriodInteraction?.();
+      }
       if (quarterIndex === resolvedQuarter && viewMode === "quarter") {
         setCalendarViewMode("year");
         return;
@@ -493,18 +500,21 @@ export function YearGrid({
 
       focusQuarter(quarterIndex);
     },
-    [focusQuarter, resolvedQuarter, setCalendarViewMode, viewMode]
+    [focusQuarter, guidedPeriodNotice?.target, onGuidedPeriodInteraction, resolvedQuarter, setCalendarViewMode, viewMode]
   );
 
   const handleMonthLabelClick = React.useCallback(
     (monthIndex: MonthIndex) => {
+      if (guidedPeriodNotice?.target === "period-navigation") {
+        onGuidedPeriodInteraction?.();
+      }
       if (viewMode === "month" && monthIndex === resolvedMonth) {
         focusQuarter(resolvedQuarter);
         return;
       }
       focusMonth(monthIndex);
     },
-    [focusMonth, focusQuarter, resolvedMonth, resolvedQuarter, viewMode]
+    [focusMonth, focusQuarter, guidedPeriodNotice?.target, onGuidedPeriodInteraction, resolvedMonth, resolvedQuarter, viewMode]
   );
 
   const handleMobileDayCellActivate = React.useCallback(
@@ -631,7 +641,18 @@ export function YearGrid({
   );
 
   const annualContent = (
-    <div className="overflow-hidden">
+    <div className="relative overflow-hidden">
+      {guidedPeriodNotice?.target === "period-navigation" ? (
+        <div
+          data-onboarding-period-anchor
+          data-onboarding-period-outline={!guidedPeriodInteracted ? "true" : undefined}
+          className={cn(
+            "pointer-events-none absolute inset-y-0 left-0 z-[60] w-[5.05rem] rounded-l-[1.25rem] min-[420px]:w-[5.1rem] md:w-[5.5rem]",
+            !guidedPeriodInteracted && "border border-foreground/32"
+          )}
+          aria-hidden="true"
+        />
+      ) : null}
       {quarterGroups.map((group, groupIndex) => {
         const isActiveQuarter = viewMode !== "year" && group.quarterIndex === resolvedQuarter;
         const isQuarterSelected = isActiveQuarter;
@@ -687,6 +708,8 @@ export function YearGrid({
                 onAction={onGuidedPeriodAction}
                 placement="viewport"
                 portaled
+                anchorSelector="[data-onboarding-period-anchor]"
+                anchorPlacement="right-center"
               />
             ) : null}
 

@@ -1987,6 +1987,17 @@ export default function HomePage() {
       };
     }
     if (
+      guidedOnboarding.step === "habit_surface_instruction" &&
+      isMobileCalendarUi !== true
+    ) {
+      return {
+        target: "habit-surface",
+        title: "Conheça seus hábitos.",
+        instruction: "Clique em Hábitos no topo para mudar de tela.",
+        stepLabel: "Passo 8 de 10",
+      };
+    }
+    if (
       guidedOnboarding.step === "habit_instruction" &&
       isMobileCalendarUi !== true
     ) {
@@ -2081,7 +2092,6 @@ export default function HomePage() {
         type: "continue_from_period_navigation",
         showHabit: true,
       });
-      setActiveDestination("habits");
       if (next.step === "completed") announceGuidedCompletion();
       return;
     }
@@ -2151,6 +2161,12 @@ export default function HomePage() {
   const handleDestinationSelect = React.useCallback(
     (destination: ProductDestinationId) => {
       if (destination === activeDestination) return;
+      if (
+        destination === "habits" &&
+        readGuidedOnboardingState().step === "habit_surface_instruction"
+      ) {
+        updateGuidedOnboarding({ type: "open_habits_surface" });
+      }
       if (activeDestination === "annual" && isMobileCalendarUi === false) {
         desktopCalendarScrollTopRef.current =
           desktopCalendarScrollRef.current?.scrollTop ?? 0;
@@ -2163,7 +2179,7 @@ export default function HomePage() {
         buildProductDestinationUrl(window.location.href, destination)
       );
     },
-    [activeDestination, isMobileCalendarUi]
+    [activeDestination, isMobileCalendarUi, updateGuidedOnboarding]
   );
 
   const handleOpenUtilityPanel = React.useCallback(
@@ -2201,17 +2217,6 @@ export default function HomePage() {
     updateGuidedOnboarding({ type: "continue_from_period_navigation" });
   }, [guidedOnboarding?.step, isMobileCalendarUi, updateGuidedOnboarding]);
 
-  React.useEffect(() => {
-    if (
-      !isHabitsPrototypeEnabled ||
-      isMobileCalendarUi !== false ||
-      guidedOnboarding?.step !== "habit_instruction"
-    ) {
-      return;
-    }
-    setActiveDestination("habits");
-  }, [guidedOnboarding?.step, isMobileCalendarUi]);
-
   const isHabitsSurfaceActive =
     isHabitsPrototypeEnabled && activeDestination === "habits";
   const isCalendarSurfaceActive = !isHabitsSurfaceActive;
@@ -2219,6 +2224,7 @@ export default function HomePage() {
     isHabitsPrototypeEnabled &&
     (guidedToolbarNotice?.target === "theme" ||
       guidedToolbarNotice?.target === "appearance" ||
+      guidedToolbarNotice?.target === "year" ||
       guidedToolbarNotice?.target === "habit" ||
       guidedToolbarNotice?.target === "habit-created")
       ? null
@@ -2480,6 +2486,12 @@ export default function HomePage() {
               onGuidedPeriodAction={() =>
                 handleGuidedToolbarAction("period-navigation")
               }
+              onGuidedPeriodInteraction={() =>
+                updateGuidedOnboarding({ type: "interact_with_period_navigation" })
+              }
+              guidedPeriodInteracted={Boolean(
+                guidedOnboarding?.periodNavigationInteractedAt
+              )}
               showScaleControl={!isHabitsPrototypeEnabled}
             />
           </div>

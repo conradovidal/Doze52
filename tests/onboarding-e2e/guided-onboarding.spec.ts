@@ -282,7 +282,7 @@ const completePersonalOnboarding = async (
     window.localStorage.getItem("yiv-store")
   );
   const finishEdit = page.locator("[data-onboarding-edit-control]");
-  await expect(finishEdit).toContainText("Finalizar");
+  await expect(finishEdit).toHaveAttribute("aria-label", "Finalizar edição");
   await finishEdit.click();
   expect(await page.evaluate(() => window.localStorage.getItem("yiv-store"))).toBe(
     beforeEditPreview
@@ -298,7 +298,27 @@ const completePersonalOnboarding = async (
   await expect(toolbarNotice).toContainText(
     "adicione os feriados do seu estado."
   );
-  await page.locator("[data-onboarding-calendar-control]").click();
+  const calendarControl = page.locator("[data-onboarding-calendar-control]");
+  if (!mobile) {
+    const calendarNoticeBox = await toolbarNotice.boundingBox();
+    const calendarControlBox = await calendarControl.boundingBox();
+    if (!calendarNoticeBox || !calendarControlBox) {
+      throw new Error("Balão de calendários não foi ancorado ao botão +");
+    }
+    expect(
+      Math.abs(
+        calendarNoticeBox.x + calendarNoticeBox.width / 2 -
+          (calendarControlBox.x + calendarControlBox.width / 2)
+      )
+    ).toBeLessThan(28);
+  }
+  await calendarControl.click();
+  const categoryDialog = page.getByRole("dialog", { name: "Adicionar categoria" });
+  await expect(categoryDialog).toBeVisible();
+  await expect(toolbarNotice).toBeHidden();
+  await categoryDialog
+    .getByRole("button", { name: /Adicionar calendário pronto/ })
+    .click();
   const calendarDialog = page.getByRole("dialog", {
     name: "Adicione os feriados do seu estado",
   });
@@ -331,7 +351,7 @@ const completePersonalOnboarding = async (
     "data-guided-toolbar-target",
     "year"
   );
-  const yearControl = page.locator("[data-onboarding-year-control]").first();
+  const yearControl = page.locator("[data-year-grid] [data-onboarding-year-control]").first();
   await expect(yearControl).toBeEnabled();
   await yearControl.click();
   await expect(toolbarNotice).toBeHidden();
@@ -439,7 +459,7 @@ test("monta contexto Pessoal de forma incremental", async ({ page }, testInfo) =
   }));
 
   expect(stored.onboarding).toMatchObject({
-    version: 12,
+    version: 13,
     step: "completed",
     context: "personal",
   });
@@ -1145,7 +1165,7 @@ test("edição preserva categoria não inicial no desktop e no mobile", async ({
       localStorage.setItem(
         "doze52:onboarding:v2",
         JSON.stringify({
-          version: 12,
+          version: 13,
           step: "completed",
           context: "personal",
           completedAt: new Date().toISOString(),
@@ -1316,7 +1336,7 @@ test("saída após criar contexto preserva o ano e convida após três criaçõe
     JSON.parse(localStorage.getItem("doze52:onboarding:v2") ?? "null")
   );
   expect(persistedStep).toMatchObject({
-    version: 12,
+    version: 13,
     step: "dismissed_preserved",
   });
 
@@ -1688,7 +1708,7 @@ test("Profissional permite categorias específica e genérica", async ({
       "doze52:onboarding:v2",
       JSON.stringify({
         ...current,
-        version: 12,
+        version: 13,
         step: "period_category_selection",
         dateItemsCreated: 2,
         categoryRevealStartedAt: undefined,

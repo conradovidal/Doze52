@@ -404,6 +404,10 @@ export function AppUtilityPanel({
               notice={guidedAppearanceNotice}
               onClose={onDismissGuidedNotice}
               placement="panel"
+              portaled
+              portalTargetSelector="[data-app-utility-panel]"
+              anchorSelector="[data-onboarding-appearance-topic='true']"
+              anchorPlacement="right-center"
             />
           ) : null}
           {guidedThemeNotice && onDismissGuidedNotice ? (
@@ -419,6 +423,10 @@ export function AppUtilityPanel({
                   : undefined
               }
               placement="panel"
+              portaled
+              portalTargetSelector="[data-app-utility-panel]"
+              anchorSelector="[data-onboarding-spotlight-target='true']"
+              anchorPlacement="below-center"
             />
           ) : null}
         </DialogContent>

@@ -221,6 +221,12 @@
     0 0 0 4px color-mix(in srgb, var(--foreground) 34%, transparent);
 }
 
+.guided-control-target-subtle {
+  box-shadow:
+    0 0 0 1px var(--background),
+    0 0 0 2px color-mix(in srgb, var(--foreground) 24%, transparent);
+}
+
 [data-onboarding-toolbar-spotlight="true"] > * {
   transition: opacity 180ms ease;
 }
