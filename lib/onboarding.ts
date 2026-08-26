@@ -155,7 +155,7 @@ export const PRODUCT_ONBOARDING_STORAGE_KEY = "doze52:onboarding:v1";
 export const GUIDED_ONBOARDING_STORAGE_KEY = "doze52:onboarding:v2";
 export const PRODUCT_ONBOARDING_RESET_EVENT = "doze52:onboarding-reset";
 export const GUIDED_ONBOARDING_CHANGE_EVENT = "doze52:onboarding-change";
-export const GUIDED_CATEGORY_REVEAL_MS = 1_800;
+export const GUIDED_CATEGORY_REVEAL_MS = 1_250;
 export const GUIDED_DEMO_INTERACTION_THRESHOLD = 5;
 
 export const getGuidedCategoryRevealRemainingMs = (

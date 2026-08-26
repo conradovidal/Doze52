@@ -2124,7 +2124,7 @@ export default function HomePage() {
       target === "period-navigation" &&
       current.step === "period_navigation_instruction"
     ) {
-      useStore.getState().setCalendarViewMode("year");
+      resetCalendarFocusOnYearChange();
       const next = updateGuidedOnboarding({
         type: "continue_from_period_navigation",
         showHabit: true,
@@ -2139,7 +2139,12 @@ export default function HomePage() {
       });
       if (next.step === "completed") announceGuidedCompletion();
     }
-  }, [announceGuidedCompletion, isMobileCalendarUi, updateGuidedOnboarding]);
+  }, [
+    announceGuidedCompletion,
+    isMobileCalendarUi,
+    resetCalendarFocusOnYearChange,
+    updateGuidedOnboarding,
+  ]);
 
   const handleGuidedCalendarOpen = React.useCallback(() => {
     if (readGuidedOnboardingState().step === "calendar_instruction") {

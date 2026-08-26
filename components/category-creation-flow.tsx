@@ -116,17 +116,19 @@ export function CategoryCreationFlow({
             >
               <CalendarDays className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
               <span className="min-w-0">
-                {guidedCalendarSelection ? (
-                  <span className="mb-1.5 inline-flex rounded-full bg-primary px-2.5 py-1 text-[10px] font-semibold uppercase leading-none tracking-[0.08em] text-primary-foreground">
-                    Clique aqui
-                  </span>
-                ) : null}
                 <span className="block whitespace-normal font-semibold leading-5">
                   Adicionar calendário pronto
                 </span>
                 <span className="mt-1 block whitespace-normal text-xs font-normal leading-4 text-muted-foreground">
                   Assine ou gerencie calendários disponíveis no{" "}
-                  <span className="whitespace-nowrap">Doze 52.</span>
+                  <span className="inline-flex items-center whitespace-nowrap">
+                    <span>Doze 52.</span>
+                    {guidedCalendarSelection ? (
+                      <span className="ml-1.5 inline-flex rounded-full bg-primary px-2 py-0.5 align-middle text-[9px] font-semibold uppercase leading-none tracking-[0.08em] text-primary-foreground">
+                        Clique aqui
+                      </span>
+                    ) : null}
+                  </span>
                 </span>
               </span>
               <ArrowRight className="mt-0.5 size-4 shrink-0 text-muted-foreground" />

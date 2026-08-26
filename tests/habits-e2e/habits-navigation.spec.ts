@@ -628,8 +628,11 @@ test("onboarding desktop apresenta o exemplo e termina no hábito real", async (
   expect(Math.abs((periodNoticeBox?.y ?? 0) + (periodNoticeBox?.height ?? 0) / 2 - ((periodAnchorBox?.y ?? 0) + (periodAnchorBox?.height ?? 0) / 2))).toBeLessThan(24);
   await page.getByTitle("1o trimestre").click();
   await expect(page.locator("[data-month-row]")).toHaveCount(3);
+  await page.getByTitle("Abrir Janeiro").click();
+  await expect(page.locator("[data-month-row]")).toHaveCount(1);
   await expect(page.locator('[data-onboarding-period-outline="true"]')).toHaveCount(0);
   await periodNotice.getByRole("button", { name: "Continuar" }).click();
+  await expect(page.locator("[data-month-row]")).toHaveCount(12);
   await expect(page.locator('[data-product-navigation="desktop"] a[aria-current="page"]')).toHaveAttribute("title", "Anual");
   const habitSurfaceNotice = page.locator(
     '[data-guided-toolbar-notice][data-guided-toolbar-target="habit-surface"]'
@@ -816,16 +819,14 @@ test("onboarding mantém a edição aberta até importar o calendário", async (
     name: /Adicionar calendário pronto/,
   });
   const clickHint = readyCalendarOption.getByText("Clique aqui", { exact: true });
-  const description = readyCalendarOption.getByText(/Assine ou gerencie/);
+  const doze52Label = readyCalendarOption.getByText("Doze 52.", { exact: true });
   await expect(clickHint).toBeVisible();
-  await expect(readyCalendarOption.getByText("Doze 52.", { exact: true })).toHaveCSS(
-    "white-space",
-    "nowrap"
-  );
+  await expect(doze52Label.locator("..")).toHaveCSS("white-space", "nowrap");
   const hintBox = await clickHint.boundingBox();
-  const descriptionBox = await description.boundingBox();
-  if (!hintBox || !descriptionBox) throw new Error("Opção pronta não pôde ser medida.");
-  expect(hintBox.y).toBeLessThan(descriptionBox.y);
+  const doze52Box = await doze52Label.boundingBox();
+  if (!hintBox || !doze52Box) throw new Error("Opção pronta não pôde ser medida.");
+  expect(Math.abs(hintBox.y - doze52Box.y)).toBeLessThanOrEqual(4);
+  expect(hintBox.x).toBeGreaterThan(doze52Box.x + doze52Box.width);
   await choice
     .getByRole("button", { name: /Adicionar calendário pronto/ })
     .click();

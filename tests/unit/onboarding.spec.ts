@@ -72,21 +72,21 @@ test("métrica regional aceita apenas as 27 UFs na versão atual", () => {
   expect(isBrazilUf("rs")).toBe(false);
 });
 
-test("revelação de categoria dura 1,8 s e retoma pelo tempo restante", () => {
-  expect(GUIDED_CATEGORY_REVEAL_MS).toBe(1_800);
+test("revelação de categoria dura 1,25 s e retoma pelo tempo restante", () => {
+  expect(GUIDED_CATEGORY_REVEAL_MS).toBe(1_250);
   expect(
     getGuidedCategoryRevealRemainingMs(
       "2026-07-20T10:00:00.000Z",
       Date.parse("2026-07-20T10:00:00.350Z")
     )
-  ).toBe(1_450);
+  ).toBe(900);
   expect(
     getGuidedCategoryRevealRemainingMs(
       "2026-07-20T10:00:00.000Z",
       Date.parse("2026-07-20T10:00:02.000Z")
     )
   ).toBe(0);
-  expect(getGuidedCategoryRevealRemainingMs(undefined)).toBe(1_800);
+  expect(getGuidedCategoryRevealRemainingMs(undefined)).toBe(1_250);
 });
 
 test("organiza 24 cores e mantém padrões distintos no onboarding", () => {
