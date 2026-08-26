@@ -1,9 +1,7 @@
 "use client";
 
-import { Check } from "lucide-react";
 import {
   getDesktopHabitSlot,
-  getDesktopHabitMarkerSize,
   getHabitDayAction,
   getHabitCheckInKey,
 } from "@/lib/habits-prototype";
@@ -272,10 +270,12 @@ export function DayCell({
           data-day-habit-markers
           className={cn(
             "pointer-events-none absolute inset-x-0 top-7 bottom-1 grid place-items-center",
+            habitPresentation.habits.length === 1 &&
+              "mx-auto size-[clamp(12px,1.1vw,18px)] grid-cols-1 grid-rows-1",
             habitPresentation.habits.length === 2 &&
-              "mx-auto w-fit grid-cols-2 grid-rows-1 gap-1",
+              "mx-auto h-[clamp(9px,0.85vw,13px)] w-[clamp(18px,1.7vw,26px)] grid-cols-2 grid-rows-1 gap-px",
             habitPresentation.habits.length > 2 &&
-              "mx-auto w-fit grid-cols-2 grid-rows-2 gap-px"
+              "mx-auto size-[clamp(18px,1.7vw,26px)] grid-cols-2 grid-rows-2 gap-px"
           )}
           aria-hidden="true"
         >
@@ -285,38 +285,17 @@ export function DayCell({
               habitPresentation.habits.length,
               habitIndex
             );
-            const markerSize = getDesktopHabitMarkerSize(
-              habitPresentation.habits.length
-            );
             return (
               <span
                 key={habit.id}
                 data-habit-marker={completed ? habit.id : undefined}
                 data-habit-slot={slot ?? undefined}
                 className={cn(
-                  "grid place-items-center rounded-full border border-black/10 text-slate-950",
-                  markerSize === "single"
-                    ? "size-[clamp(12px,1.1vw,18px)]"
-                    : markerSize === "pair"
-                      ? "size-[clamp(10px,0.95vw,15px)]"
-                      : "size-[clamp(7px,0.78vw,11px)]",
+                  "col-span-1 row-span-1 h-full w-full rounded-[clamp(2px,0.25vw,4px)] border border-black/10",
                   !completed && "invisible"
                 )}
                 style={completed ? { backgroundColor: habit.color } : undefined}
-              >
-                {completed ? (
-                  <Check
-                    className={cn(
-                      markerSize === "single"
-                        ? "size-[clamp(7px,0.66vw,11px)]"
-                        : markerSize === "pair"
-                          ? "size-[clamp(6px,0.58vw,9px)]"
-                          : "size-[clamp(4px,0.46vw,7px)]"
-                    )}
-                    strokeWidth={3}
-                  />
-                ) : null}
-              </span>
+              />
             );
           })}
         </div>

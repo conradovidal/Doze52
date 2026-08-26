@@ -2008,8 +2008,9 @@ export default function HomePage() {
     if (guidedOnboarding.step === "year_instruction") {
       return {
         target: "year",
-        title: "Explore outros anos.",
-        instruction: "Aqui você consulta o ano anterior, o atual e o próximo.",
+        title: "Aqui você troca o ano.",
+        instruction:
+          "Depois do guia, use estas setas para consultar o ano anterior ou o próximo.",
         actionLabel: "Continuar",
         stepLabel: `Passo 6 de ${totalSteps}`,
       };

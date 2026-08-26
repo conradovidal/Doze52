@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { eachDayOfInterval } from "date-fns";
 
 import {
   buildHabitPrototypeWeeks,
@@ -135,12 +136,24 @@ test("monta quatro hábitos demonstrativos coerentes com o ano de exemplo", () =
   const smokeFreeCount = Object.values(showcase.checkIns).filter(
     (checkIn) => checkIn.habitId === smokeFree.id
   ).length;
-  expect(smokeFreeCount).toBeGreaterThan(250);
-  expect(smokeFreeCount).toBeLessThan(365);
+  expect(smokeFreeCount).toBeGreaterThan(150);
+  expect(smokeFreeCount).toBeLessThan(240);
+
+  const exerciseCount = Object.values(showcase.checkIns).filter(
+    (checkIn) => checkIn.habitId === exercise.id
+  ).length;
+  const readingCount = Object.values(showcase.checkIns).filter(
+    (checkIn) => checkIn.habitId === reading.id
+  ).length;
+  expect(exerciseCount).toBeGreaterThan(readingCount);
+  expect(exerciseCount).toBeLessThan(160);
+  expect(readingCount).toBeLessThan(100);
 
   const markerCounts = new Set<number>();
-  for (let day = 1; day <= 5; day += 1) {
-    const dateIso = `2026-01-0${day}`;
+  for (const dateIso of eachDayOfInterval({
+    start: new Date("2026-01-01T12:00:00Z"),
+    end: new Date("2026-12-31T12:00:00Z"),
+  }).map((date) => date.toISOString().slice(0, 10))) {
     markerCounts.add(
       showcase.habits.filter((habit) => completed(habit.id, dateIso)).length
     );

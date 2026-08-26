@@ -191,7 +191,57 @@ export function AppUtilityPanel({
   const [spreadsheetOpen, setSpreadsheetOpen] = React.useState(false);
   const [spreadsheetUpgradeOpen, setSpreadsheetUpgradeOpen] = React.useState(false);
   const [feedbackOpen, setFeedbackOpen] = React.useState(false);
+  const [desktopPosition, setDesktopPosition] = React.useState<{
+    right: number;
+    top: number;
+  } | null>(null);
   const spreadsheetRequiresPro = isCalendarSpreadsheetProGateEnabled();
+
+  React.useLayoutEffect(() => {
+    if (!open || isMobile) {
+      setDesktopPosition(null);
+      return;
+    }
+
+    const updatePosition = () => {
+      const trigger = returnFocusRef.current;
+      const panel = document.querySelector<HTMLElement>("[data-app-utility-panel]");
+      if (!trigger || !panel) return;
+
+      const triggerRect = trigger.getBoundingClientRect();
+      const panelRect = panel.getBoundingClientRect();
+      const viewportPadding = 16;
+      const gap = 8;
+      const right = Math.max(viewportPadding, window.innerWidth - triggerRect.right);
+      const top = Math.max(
+        viewportPadding,
+        Math.min(
+          triggerRect.bottom + gap,
+          window.innerHeight - panelRect.height - viewportPadding
+        )
+      );
+
+      setDesktopPosition((current) =>
+        current && current.right === right && current.top === top
+          ? current
+          : { right, top }
+      );
+    };
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    const observer = new ResizeObserver(updatePosition);
+    if (returnFocusRef.current) observer.observe(returnFocusRef.current);
+    const panel = document.querySelector<HTMLElement>("[data-app-utility-panel]");
+    if (panel) observer.observe(panel);
+
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+      observer.disconnect();
+    };
+  }, [isMobile, open, returnFocusRef]);
 
   React.useEffect(() => {
     if (!open) return;
@@ -384,7 +434,20 @@ export function AppUtilityPanel({
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent
           data-app-utility-panel
-          className={cn("overflow-hidden p-0", isMobile ? "inset-0 h-dvh w-screen max-w-none translate-x-0 translate-y-0 rounded-none border-0 sm:max-w-none" : "h-[min(680px,88dvh)] w-[min(880px,calc(100vw-5rem))] max-w-[880px] sm:max-w-[880px]")}
+          data-desktop-anchor-positioned={
+            !isMobile && desktopPosition ? "true" : undefined
+          }
+          className={cn("overflow-hidden p-0", isMobile ? "inset-0 h-dvh w-screen max-w-none translate-x-0 translate-y-0 rounded-none border-0 sm:max-w-none" : "h-[min(680px,88dvh)] w-[min(880px,calc(100vw-5rem))] max-w-[880px] translate-x-0 translate-y-0 sm:max-w-[880px]")}
+          style={
+            !isMobile && desktopPosition
+              ? {
+                  left: "auto",
+                  right: desktopPosition.right,
+                  top: desktopPosition.top,
+                  transform: "none",
+                }
+              : undefined
+          }
           onCloseAutoFocus={(event) => { event.preventDefault(); returnFocusRef.current?.focus(); }}
         >
           <DialogDescription className="sr-only">Gerencie sua conta, plano, aparência, dados e canais do Doze 52.</DialogDescription>

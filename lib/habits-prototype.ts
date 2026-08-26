@@ -149,36 +149,56 @@ export const buildOnboardingHabitShowcase = ({
     start: parseISO(yearStartIso),
     end: parseISO(cutoffIso),
   }).map((date) => format(date, "yyyy-MM-dd"));
+  const yearStartWeekOffset = (parseISO(yearStartIso).getDay() + 6) % 7;
+  const exercisePatterns: ReadonlyArray<ReadonlyArray<number>> = [
+    [1, 3, 5],
+    [1, 2, 4],
+    [2, 4, 6],
+    [1, 3, 5],
+  ] as const;
   const completions = new Map<string, Set<string>>();
   dates.forEach((dateIso, dayIndex) => {
     const weekday = parseISO(dateIso).getDay();
+    const weekIndex = Math.floor((dayIndex + yearStartWeekOffset) / 7);
+    const exerciseDays = exercisePatterns[weekIndex % exercisePatterns.length];
     const completed = new Set<string>();
     const blackout = transitionDates.has(dateIso);
     if (!blackout) {
       if (
-        [1, 3, 5, 6].includes(weekday) &&
-        !travelOrVacationDates.has(dateIso)
+        exerciseDays.includes(weekday) &&
+        !travelOrVacationDates.has(dateIso) &&
+        !(weekIndex % 6 === 4 && weekday === exerciseDays[2])
       ) {
         completed.add(habits[0].id);
       }
       if (
-        [0, 1, 4].includes(weekday) ||
-        (readingBoostDates.has(dateIso) && dayIndex % 2 === 0)
+        (readingBoostDates.has(dateIso) && dayIndex % 3 !== 1) ||
+        (weekIndex % 3 === 0 && weekday === 2) ||
+        (weekIndex % 5 === 2 && weekday === 0)
       ) {
         completed.add(habits[1].id);
       }
-      if (weekday <= 4 && !socialDates.has(dateIso)) {
+      if (
+        [0, 1, 2, 3, 4].includes(weekday) &&
+        !socialDates.has(dateIso) &&
+        (dayIndex + weekIndex) % 4 !== 0
+      ) {
         completed.add(habits[2].id);
       }
-      if (dayIndex % 13 !== 0 && !socialDates.has(dateIso)) {
+      if (
+        [0, 1, 3, 5].includes(weekday) &&
+        (dayIndex * 7 + weekIndex) % 7 !== 0 &&
+        !socialDates.has(dateIso)
+      ) {
         completed.add(habits[3].id);
       }
     }
     completions.set(dateIso, completed);
   });
 
-  if (dates.length >= 5) {
-    dates.slice(0, 5).forEach((dateIso, markerCount) => {
+  if (dates.length >= 35) {
+    [0.04, 0.21, 0.39, 0.62, 0.83].forEach((ratio, markerCount) => {
+      const dateIso = dates[Math.min(dates.length - 1, Math.floor(dates.length * ratio))];
       completions.set(
         dateIso,
         new Set(habits.slice(0, markerCount).map((habit) => habit.id))

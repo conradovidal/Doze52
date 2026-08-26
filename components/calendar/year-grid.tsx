@@ -191,15 +191,15 @@ export function YearGrid({
   const setCalendarZoomPercent = useStore((s) => s.setCalendarZoomPercent);
   const [yearDirection, setYearDirection] = React.useState<1 | -1>(1);
   const [isYearTransitioning, setIsYearTransitioning] = React.useState(false);
+  const guidedYearLocked = guidedYearNotice?.target === "year";
   const requestYearChange = React.useCallback(
     (nextYear: number) => {
-      if (isYearTransitioning || nextYear === year) return;
+      if (guidedYearLocked || isYearTransitioning || nextYear === year) return;
       setYearDirection(getYearTransitionDirection(year, nextYear));
       setIsYearTransitioning(true);
       onYearChange(nextYear);
-      if (guidedYearNotice?.target === "year") onGuidedYearAction?.();
     },
-    [guidedYearNotice?.target, isYearTransitioning, onGuidedYearAction, onYearChange, year]
+    [guidedYearLocked, isYearTransitioning, onYearChange, year]
   );
   const visibleCategoryIds = React.useMemo(
     () => {
@@ -829,7 +829,7 @@ export function YearGrid({
               data-onboarding-year-control
               aria-label={`Voltar para ${year - 1}`}
               title={`Voltar para ${year - 1}`}
-              disabled={isYearTransitioning}
+              disabled={guidedYearLocked || isYearTransitioning}
               className="grid size-8 place-items-center rounded-[9px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-45"
               onClick={() => requestYearChange(year - 1)}
             >
@@ -846,7 +846,7 @@ export function YearGrid({
               type="button"
               aria-label={`Avançar para ${year + 1}`}
               title={`Avançar para ${year + 1}`}
-              disabled={isYearTransitioning}
+              disabled={guidedYearLocked || isYearTransitioning}
               className="grid size-8 place-items-center rounded-[9px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-45"
               onClick={() => requestYearChange(year + 1)}
             >

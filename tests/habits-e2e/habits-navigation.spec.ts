@@ -242,11 +242,27 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
   await profile.click();
   const panel = page.locator("[data-app-utility-panel]");
   await expect(panel).toBeVisible();
+  await expect(panel).toHaveAttribute("data-desktop-anchor-positioned", "true");
   const viewport = page.viewportSize();
   if (!viewport) throw new Error("Viewport desktop indisponível.");
   await expect.poll(async () => Math.round((await panel.boundingBox())?.width ?? 0)).toBe(
     Math.min(880, viewport.width - 80)
   );
+  const panelBox = await panel.boundingBox();
+  const profileTriggerBox = await profile.boundingBox();
+  if (!panelBox || !profileTriggerBox) {
+    throw new Error("Perfil e painel não puderam ser medidos.");
+  }
+  expect(
+    Math.abs(
+      panelBox.x + panelBox.width -
+        (profileTriggerBox.x + profileTriggerBox.width)
+    )
+  ).toBeLessThanOrEqual(16);
+  expect(panelBox.y).toBeLessThanOrEqual(
+    profileTriggerBox.y + profileTriggerBox.height + 9
+  );
+  expect(panelBox.y + panelBox.height).toBeLessThanOrEqual(viewport.height - 15);
   expect((await calendarRegion.boundingBox())?.width).toBe(widthBefore);
   await expect(panel.getByText("Aparência", { exact: true })).toBeVisible();
   await expect(panel.getByText("Dados", { exact: true })).toHaveCount(0);
@@ -289,6 +305,19 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
   await expect(completedDay.locator('[data-habit-slot="top-right"]')).toBeVisible();
   await expect(completedDay.locator('[data-habit-slot="bottom-left"]')).toBeVisible();
   await expect(completedDay.locator('[data-habit-slot="bottom-right"]')).toBeVisible();
+  const markerGeometry = await completedDay.locator("[data-day-habit-markers]").evaluate(
+    (element) => {
+      const marker = element.querySelector<HTMLElement>("[data-habit-marker]");
+      const style = getComputedStyle(element);
+      return {
+        columns: style.gridTemplateColumns.split(" ").length,
+        rows: style.gridTemplateRows.split(" ").length,
+        markerRadius: marker ? getComputedStyle(marker).borderRadius : "",
+      };
+    }
+  );
+  expect(markerGeometry).toMatchObject({ columns: 2, rows: 2 });
+  expect(markerGeometry.markerRadius).not.toBe("9999px");
   await completedDay.click();
   const dayPicker = page.locator("[data-habit-day-picker]");
   await expect(dayPicker).toBeVisible();
@@ -571,7 +600,20 @@ test("onboarding desktop apresenta o exemplo e termina no hábito real", async (
   const yearNotice = page.locator(
     '[data-guided-toolbar-notice][data-guided-toolbar-target="year"]'
   );
+  await expect(yearNotice).toContainText("Aqui você troca o ano.");
+  const visibleYearStepper = page.locator("[data-calendar-year-stepper]:visible");
+  const guidedYearControls = visibleYearStepper.locator(":scope > button");
+  expect(
+    await guidedYearControls.evaluateAll((controls) =>
+      controls.length > 0 &&
+      controls.every((control) => (control as HTMLButtonElement).disabled)
+    )
+  ).toBe(true);
+  const guidedYear = await visibleYearStepper.locator("span").first().textContent();
   await yearNotice.getByRole("button", { name: "Continuar" }).click();
+  await expect(
+    page.locator("[data-calendar-year-stepper]:visible span").first()
+  ).toHaveText(guidedYear ?? "");
   const periodNotice = page.locator(
     '[data-guided-toolbar-notice][data-guided-toolbar-target="period-navigation"]'
   );
