@@ -33,6 +33,7 @@ import {
   GuidedToolbarNoticeCard,
   type GuidedToolbarNotice,
 } from "@/components/onboarding/guided-toolbar-notice";
+import { GuidedTargetOutline } from "@/components/onboarding/guided-target-outline";
 import {
   LATERAL_KEY_ACTIVE_CLASS,
   LATERAL_KEY_BASE_CLASS,
@@ -820,8 +821,7 @@ export function YearGrid({
               guidedYearNotice?.target === "year" ? "true" : undefined
             }
             className={cn(
-              "relative inline-flex h-8 items-center overflow-visible rounded-[10px] border border-border bg-card",
-              guidedYearNotice?.target === "year" && "product-spotlight-target"
+              "relative inline-flex h-8 items-center overflow-visible rounded-[10px] border border-border bg-card"
             )}
           >
             <button
@@ -853,12 +853,15 @@ export function YearGrid({
               <ChevronRight className="size-3.5" />
             </button>
             {guidedYearNotice?.target === "year" && onDismissGuidedYearNotice ? (
-              <GuidedToolbarNoticeCard
-                notice={guidedYearNotice}
-                onClose={onDismissGuidedYearNotice}
-                onAction={onGuidedYearAction}
-                placement="above"
-              />
+              <>
+                <GuidedTargetOutline selector="[data-calendar-year-stepper]" />
+                <GuidedToolbarNoticeCard
+                  notice={guidedYearNotice}
+                  onClose={onDismissGuidedYearNotice}
+                  onAction={onGuidedYearAction}
+                  placement="above"
+                />
+              </>
             ) : null}
           </div>
           {showScaleControl ? (

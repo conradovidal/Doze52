@@ -41,6 +41,7 @@ export function GuidedToolbarNoticeCard({
   placement = "below",
   portaled = false,
   anchorSelector,
+  anchorMultiple = false,
   anchorPlacement = "below-center",
   portalTargetSelector,
 }: {
@@ -51,6 +52,7 @@ export function GuidedToolbarNoticeCard({
   placement?: "below" | "right" | "above" | "viewport" | "panel";
   portaled?: boolean;
   anchorSelector?: string;
+  anchorMultiple?: boolean;
   anchorPlacement?: AnchorPlacement;
   portalTargetSelector?: string;
 }) {
@@ -61,9 +63,13 @@ export function GuidedToolbarNoticeCard({
 
   React.useLayoutEffect(() => {
     if (!mounted || !anchorSelector || !portaled) return;
-    const anchor = document.querySelector<HTMLElement>(anchorSelector);
+    const anchors = anchorMultiple
+      ? Array.from(document.querySelectorAll<HTMLElement>(anchorSelector))
+      : [document.querySelector<HTMLElement>(anchorSelector)].filter(
+          (element): element is HTMLElement => Boolean(element)
+        );
     const cardElement = cardRef.current;
-    if (!anchor || !cardElement) return;
+    if (anchors.length === 0 || !cardElement) return;
 
     const gap = 12;
     const edge = 12;
@@ -95,7 +101,23 @@ export function GuidedToolbarNoticeCard({
         setAnchorPosition(null);
         return;
       }
-      const anchorRect = anchor.getBoundingClientRect();
+      const rects = anchors
+        .filter((anchor) => anchor.isConnected)
+        .map((anchor) => anchor.getBoundingClientRect())
+        .filter((rect) => rect.width > 0 && rect.height > 0);
+      if (rects.length === 0) return;
+      const left = Math.min(...rects.map((rect) => rect.left));
+      const top = Math.min(...rects.map((rect) => rect.top));
+      const right = Math.max(...rects.map((rect) => rect.right));
+      const bottom = Math.max(...rects.map((rect) => rect.bottom));
+      const anchorRect = {
+        left,
+        top,
+        right,
+        bottom,
+        width: right - left,
+        height: bottom - top,
+      } as DOMRect;
       const cardRect = cardElement.getBoundingClientRect();
       const rootRect = portalTargetSelector
         ? document.querySelector<HTMLElement>(portalTargetSelector)?.getBoundingClientRect()
@@ -123,7 +145,7 @@ export function GuidedToolbarNoticeCard({
     };
     const frame = requestAnimationFrame(update);
     const observer = new ResizeObserver(update);
-    observer.observe(anchor);
+    anchors.forEach((anchor) => observer.observe(anchor));
     observer.observe(cardElement);
     window.addEventListener("resize", update);
     window.addEventListener("scroll", update, { capture: true, passive: true });
@@ -135,7 +157,7 @@ export function GuidedToolbarNoticeCard({
       window.removeEventListener("scroll", update, true);
       desktopMedia.removeEventListener("change", update);
     };
-  }, [anchorPlacement, anchorSelector, mounted, portaled, portalTargetSelector]);
+  }, [anchorMultiple, anchorPlacement, anchorSelector, mounted, portaled, portalTargetSelector]);
 
   const card = (
     <aside

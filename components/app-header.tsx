@@ -11,6 +11,7 @@ import {
   GuidedToolbarNoticeCard,
   type GuidedToolbarNotice,
 } from "@/components/onboarding/guided-toolbar-notice";
+import { GuidedTargetOutline } from "@/components/onboarding/guided-target-outline";
 import { CategoryBar } from "@/components/category-bar";
 import { CategoryCreationFlow } from "@/components/category-creation-flow";
 import { CategoryManager } from "@/components/category-manager";
@@ -364,8 +365,20 @@ export function AppHeader({
     setCategoryEditOpen(true);
   }, []);
 
+  const guidedOutlineSelector =
+    guidedToolbarNotice?.target === "edit"
+      ? '[data-onboarding-edit-control][data-onboarding-highlighted="true"]'
+      : guidedToolbarNotice?.target === "calendars"
+        ? '[data-onboarding-calendar-control][data-onboarding-highlighted="true"]'
+        : guidedToolbarNotice?.target === "habit-surface"
+          ? '[data-product-navigation="desktop"] [data-product-destination="habits"]'
+          : null;
+
   return (
     <>
+      {guidedOutlineSelector ? (
+        <GuidedTargetOutline selector={guidedOutlineSelector} />
+      ) : null}
       <header
         className={cn(
           "space-y-3 bg-background",
@@ -467,11 +480,7 @@ export function AppHeader({
                     variant="premium"
                     size="sm"
                     disabled={inlineEditDisabled}
-                    className={cn(
-                      utilityActiveEditClass,
-                      guidedToolbarNotice?.target === "edit" &&
-                        "product-spotlight-target"
-                    )}
+                    className={utilityActiveEditClass}
                     onClick={toggleInlineEditMode}
                     aria-label="Finalizar edição de contextos e categorias"
                     title="Finalizar edição de contextos e categorias"
@@ -491,11 +500,7 @@ export function AppHeader({
                     variant="outline"
                     size="icon-sm"
                     disabled={inlineEditDisabled}
-                    className={cn(
-                      utilityIconClass,
-                      guidedToolbarNotice?.target === "edit" &&
-                        "product-spotlight-target"
-                    )}
+                    className={utilityIconClass}
                     onClick={toggleInlineEditMode}
                     aria-label="Editar contextos e categorias"
                     title="Editar contextos e categorias"
@@ -702,8 +707,6 @@ export function AppHeader({
                       disabled={inlineEditDisabled}
                       className={cn(
                         categoryToggleClass,
-                        guidedToolbarNotice?.target === "edit" &&
-                          "product-spotlight-target",
                         effectiveInlineEditMode &&
                           "border-foreground bg-foreground text-background hover:bg-foreground/90 hover:text-background"
                       )}
@@ -828,8 +831,6 @@ export function AppHeader({
                           disabled={inlineEditDisabled}
                           className={cn(
                             categoryToggleClass,
-                            guidedToolbarNotice?.target === "edit" &&
-                              "product-spotlight-target",
                             effectiveInlineEditMode &&
                               "border-foreground bg-foreground text-background hover:bg-foreground/90 hover:text-background"
                           )}

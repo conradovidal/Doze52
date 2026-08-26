@@ -89,7 +89,7 @@ export function CategoryCreationFlow({
             <Button
               type="button"
               variant="outline"
-              className="grid h-auto min-h-24 grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-3 rounded-xl p-4 text-left"
+              className="grid h-auto min-h-24 grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1 rounded-xl p-4 text-left"
               disabled={!profile}
               onClick={() => setStep("custom")}
             >
@@ -110,23 +110,24 @@ export function CategoryCreationFlow({
               data-onboarding-calendar-choice={
                 guidedCalendarSelection ? "true" : undefined
               }
-              className="grid h-auto min-h-24 grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-3 rounded-xl p-4 text-left"
+              className="grid h-auto min-h-24 grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1 rounded-xl p-4 text-left"
               disabled={!profile}
               onClick={chooseCalendarPacks}
             >
               <CalendarDays className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
               <span className="min-w-0">
+                {guidedCalendarSelection ? (
+                  <span className="mb-1.5 inline-flex rounded-full bg-primary px-2.5 py-1 text-[10px] font-semibold uppercase leading-none tracking-[0.08em] text-primary-foreground">
+                    Clique aqui
+                  </span>
+                ) : null}
                 <span className="block whitespace-normal font-semibold leading-5">
                   Adicionar calendário pronto
                 </span>
                 <span className="mt-1 block whitespace-normal text-xs font-normal leading-4 text-muted-foreground">
-                  Assine ou gerencie calendários disponíveis no Doze 52.
+                  Assine ou gerencie calendários disponíveis no{" "}
+                  <span className="whitespace-nowrap">Doze 52.</span>
                 </span>
-                {guidedCalendarSelection ? (
-                  <span className="mt-2 inline-flex rounded-full bg-primary px-2.5 py-1 text-[10px] font-semibold uppercase leading-none tracking-[0.08em] text-primary-foreground">
-                    Clique aqui
-                  </span>
-                ) : null}
               </span>
               <ArrowRight className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
             </Button>

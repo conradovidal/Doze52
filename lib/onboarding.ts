@@ -44,7 +44,7 @@ export type GuidedOnboardingStep =
   | "dismissed";
 
 export type GuidedOnboardingState = {
-  version: 14;
+  version: 15;
   step: GuidedOnboardingStep;
   context?: OnboardingContext;
   startedAt?: string;
@@ -58,6 +58,7 @@ export type GuidedOnboardingState = {
   firstPeriodCreatedAt?: string;
   themeConfirmedAt?: string;
   firstHabitCreatedAt?: string;
+  habitRetrospectiveInteractedAt?: string;
   periodNavigationInteractedAt?: string;
   profileOpenedAt?: string;
   appearanceOpenedAt?: string;
@@ -96,6 +97,7 @@ export type GuidedOnboardingAction =
   | { type: "open_habits_surface"; at?: string }
   | { type: "continue_from_habit_showcase"; hasExistingHabit?: boolean; at?: string }
   | { type: "habit_saved"; at?: string }
+  | { type: "interact_with_habit_retrospective"; at?: string }
   | { type: "finish_habit_onboarding"; at?: string }
   | { type: "return_to_year"; at?: string }
   | { type: "open_profile"; at?: string }
@@ -132,6 +134,7 @@ type LegacyGuidedOnboardingState = {
   categoryRevealStartedAt?: string;
   themeConfirmedAt?: string;
   firstHabitCreatedAt?: string;
+  habitRetrospectiveInteractedAt?: string;
   periodNavigationInteractedAt?: string;
   profileOpenedAt?: string;
   appearanceOpenedAt?: string;
@@ -168,7 +171,7 @@ export const getGuidedCategoryRevealRemainingMs = (
 };
 
 const initialGuidedState = (): GuidedOnboardingState => ({
-  version: 14,
+  version: 15,
   step: "context_selection",
 });
 
@@ -252,7 +255,7 @@ export const migrateGuidedOnboardingState = (
   };
 
   if (
-    (candidate.version === 9 || candidate.version === 10 || candidate.version === 11 || candidate.version === 12 || candidate.version === 13 || candidate.version === 14) &&
+    (candidate.version === 9 || candidate.version === 10 || candidate.version === 11 || candidate.version === 12 || candidate.version === 13 || candidate.version === 14 || candidate.version === 15) &&
     isGuidedStep(candidate.step)
   ) {
     const demoInteractionKeys = Array.isArray(candidate.demoInteractionKeys)
@@ -275,7 +278,7 @@ export const migrateGuidedOnboardingState = (
           ? "completed"
           : candidate.step;
     return {
-      version: 14,
+      version: 15,
       step: migratedStep,
       context: isContext(candidate.context) ? candidate.context : undefined,
       startedAt: candidate.startedAt,
@@ -304,6 +307,8 @@ export const migrateGuidedOnboardingState = (
       firstPeriodCreatedAt: candidate.firstPeriodCreatedAt,
       themeConfirmedAt: candidate.themeConfirmedAt,
       firstHabitCreatedAt: candidate.firstHabitCreatedAt,
+      habitRetrospectiveInteractedAt:
+        candidate.habitRetrospectiveInteractedAt,
       periodNavigationInteractedAt: candidate.periodNavigationInteractedAt,
       profileOpenedAt: candidate.profileOpenedAt,
       appearanceOpenedAt: candidate.appearanceOpenedAt,
@@ -336,7 +341,7 @@ export const migrateGuidedOnboardingState = (
 
   if (candidate.version === 8 && isGuidedStep(candidate.step)) {
     return {
-      version: 14,
+      version: 15,
       step: candidate.step,
       context: isContext(candidate.context) ? candidate.context : undefined,
       startedAt: candidate.startedAt,
@@ -428,7 +433,7 @@ export const migrateGuidedOnboardingState = (
     }
 
     return {
-      version: 14,
+      version: 15,
       step,
       context: isContext(candidate.context) ? candidate.context : undefined,
       startedAt: candidate.startedAt,
@@ -465,7 +470,7 @@ export const migrateGuidedOnboardingState = (
       candidate.step === "completed" || candidate.step === "dismissed";
     const preserveAsCompleted = !terminal && hasLegacyProgress(candidate);
     return {
-      version: 14,
+      version: 15,
       step: terminal
         ? (candidate.step as "completed" | "dismissed")
         : preserveAsCompleted
@@ -663,6 +668,14 @@ export const reduceGuidedOnboardingState = (
             firstHabitCreatedAt: action.at ?? nowIso(),
           }
         : state;
+    case "interact_with_habit_retrospective":
+      return state.step === "habit_created_confirmation" &&
+        !state.habitRetrospectiveInteractedAt
+        ? {
+            ...state,
+            habitRetrospectiveInteractedAt: action.at ?? nowIso(),
+          }
+        : state;
     case "finish_habit_onboarding":
       return state.step === "habit_created_confirmation"
         ? {
@@ -740,7 +753,7 @@ export const reduceGuidedOnboardingState = (
     }
     case "enter_demo_exploration":
       return {
-        version: 14,
+        version: 15,
         step: "demo_exploration",
         demoExplorationStartedAt: action.at ?? nowIso(),
         demoInteractionKeys: [],

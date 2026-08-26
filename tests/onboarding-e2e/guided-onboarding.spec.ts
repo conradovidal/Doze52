@@ -480,7 +480,7 @@ test("monta contexto Pessoal de forma incremental", async ({ page }, testInfo) =
   }));
 
   expect(stored.onboarding).toMatchObject({
-    version: 14,
+    version: 15,
     step: "completed",
     context: "personal",
   });

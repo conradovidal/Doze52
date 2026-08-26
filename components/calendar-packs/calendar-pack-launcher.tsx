@@ -460,8 +460,7 @@ export function CalendarPackLauncher({
           mobileDense
             ? "h-10 justify-start rounded-[8px] text-left"
             : "h-8 px-2.5 pr-3 md:h-9 md:px-3 md:pr-3.5 md:text-sm",
-          className,
-          highlighted && "product-spotlight-target"
+          className
         )}
         disabled={disabled}
         data-onboarding-calendar-control

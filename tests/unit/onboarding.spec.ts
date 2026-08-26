@@ -51,12 +51,12 @@ import {
 } from "../../lib/category-palette";
 
 const initialState = (): GuidedOnboardingState => ({
-  version: 14,
+  version: 15,
   step: "context_selection",
 });
 
 const completedState = (): GuidedOnboardingState => ({
-  version: 14,
+  version: 15,
   step: "completed",
   context: "personal",
   completedAt: "2026-07-20T10:05:00.000Z",
@@ -289,7 +289,21 @@ test("onboarding desktop termina em Hábitos sem retornar ao ano", () => {
     firstHabitCreatedAt: "2026-08-26T12:00:00.000Z",
   });
 
-  const completed = reduceGuidedOnboardingState(habitCreated, {
+  const retrospective = reduceGuidedOnboardingState(habitCreated, {
+    type: "interact_with_habit_retrospective",
+    at: "2026-08-26T12:00:30.000Z",
+  });
+  expect(retrospective.habitRetrospectiveInteractedAt).toBe(
+    "2026-08-26T12:00:30.000Z"
+  );
+  expect(
+    reduceGuidedOnboardingState(retrospective, {
+      type: "interact_with_habit_retrospective",
+      at: "2026-08-26T12:00:45.000Z",
+    })
+  ).toEqual(retrospective);
+
+  const completed = reduceGuidedOnboardingState(retrospective, {
     type: "finish_habit_onboarding",
     at: "2026-08-26T12:01:00.000Z",
   });
@@ -356,7 +370,7 @@ test("sandbox qualifica o convite com cinco alvos únicos", () => {
     { type: "enter_demo_exploration", at: "2026-07-20T11:00:00.000Z" }
   );
   expect(state).toMatchObject({
-    version: 14,
+    version: 15,
     step: "demo_exploration",
     demoInteractionKeys: [],
   });
@@ -399,7 +413,7 @@ test("saída antecipada preserva progresso e convida após três criações úni
     at: "2026-08-03T10:00:00.000Z",
   });
   expect(state).toMatchObject({
-    version: 14,
+    version: 15,
     step: "dismissed_preserved",
     context: "personal",
     postExitCreationKeys: [],
@@ -441,7 +455,7 @@ test("migra v3 com progresso sem reabrir fluxo incompatível", () => {
       firstDateCreatedAt: "2026-07-20T10:01:00.000Z",
     })
   ).toMatchObject({
-    version: 14,
+    version: 15,
     step: "completed",
     context: "personal",
     dateItemsCreated: 2,
@@ -453,7 +467,7 @@ test("migra v3 com progresso sem reabrir fluxo incompatível", () => {
       step: "completed",
       completedAt: "2026-07-20T10:03:00.000Z",
     })
-  ).toMatchObject({ version: 14, step: "completed" });
+  ).toMatchObject({ version: 15, step: "completed" });
 
   expect(
     migrateGuidedOnboardingState({
@@ -464,7 +478,7 @@ test("migra v3 com progresso sem reabrir fluxo incompatível", () => {
       periodItemsCreated: 2,
     })
   ).toMatchObject({
-    version: 14,
+    version: 15,
     step: "calendar_instruction",
     context: "personal",
   });
@@ -480,7 +494,7 @@ test("migra v6 sem perder períodos e posiciona calendários depois deles", () =
       periodItemsCreated: 0,
     })
   ).toMatchObject({
-    version: 14,
+    version: 15,
     step: "period_category_selection",
     dateItemsCreated: 2,
   });
@@ -494,7 +508,7 @@ test("migra v6 sem perder períodos e posiciona calendários depois deles", () =
       periodItemsCreated: 1,
     })
   ).toMatchObject({
-    version: 14,
+    version: 15,
     step: "period_instruction",
     periodItemsCreated: 1,
   });
@@ -507,7 +521,7 @@ test("migra v6 sem perder períodos e posiciona calendários depois deles", () =
     periodItemsCreated: 2,
   });
   expect(state).toMatchObject({
-    version: 14,
+    version: 15,
     step: "calendar_instruction",
     periodItemsCreated: 2,
   });
@@ -524,7 +538,7 @@ test("migra v6 com tema confirmado e preserva a confirmação", () => {
       themeConfirmedAt: "2026-07-20T10:04:30.000Z",
     })
   ).toMatchObject({
-    version: 14,
+    version: 15,
     step: "calendar_instruction",
     themeConfirmedAt: "2026-07-20T10:04:30.000Z",
   });
@@ -538,7 +552,7 @@ test("migra v7 sem reabrir terminais e consolida o passo de contexto", () => {
       context: "personal",
     })
   ).toMatchObject({
-    version: 14,
+    version: 15,
     step: "date_category_selection",
   });
 
@@ -552,7 +566,7 @@ test("migra v7 sem reabrir terminais e consolida o passo de contexto", () => {
       themeConfirmedAt: "2026-07-20T10:04:30.000Z",
     })
   ).toMatchObject({
-    version: 14,
+    version: 15,
     step: "calendar_instruction",
     themeConfirmedAt: "2026-07-20T10:04:30.000Z",
   });
@@ -563,7 +577,7 @@ test("migra v7 sem reabrir terminais e consolida o passo de contexto", () => {
       step: "completed",
       completedAt: "2026-07-20T10:05:00.000Z",
     })
-  ).toMatchObject({ version: 14, step: "completed" });
+  ).toMatchObject({ version: 15, step: "completed" });
 });
 
 test("migra v8 sem repetir revelações e preserva estados terminais", () => {
@@ -575,7 +589,7 @@ test("migra v8 sem repetir revelações e preserva estados terminais", () => {
       dateCategoryId: ONBOARDING_CATEGORY_IDS.workDeliveries,
     })
   ).toMatchObject({
-    version: 14,
+    version: 15,
     step: "date_instruction",
     context: "work",
   });
@@ -586,7 +600,7 @@ test("migra v8 sem repetir revelações e preserva estados terminais", () => {
       step: "completed",
       completedAt: "2026-07-20T10:05:00.000Z",
     })
-  ).toMatchObject({ version: 14, step: "completed" });
+  ).toMatchObject({ version: 15, step: "completed" });
 });
 
 test("migra sessões antigas de Perfil e tema para conclusão", () => {
@@ -597,7 +611,7 @@ test("migra sessões antigas de Perfil e tema para conclusão", () => {
       context: "personal",
     })
   ).toMatchObject({
-    version: 14,
+    version: 15,
     step: "completed",
     context: "personal",
   });
@@ -612,7 +626,7 @@ test("migra v12 preservando quem já chegou à criação do hábito", () => {
       firstPeriodCreatedAt: "2026-08-26T10:00:00.000Z",
     })
   ).toMatchObject({
-    version: 14,
+    version: 15,
     step: "habit_instruction",
     context: "personal",
   });
@@ -625,7 +639,7 @@ test("migra v13 preservando a etapa útil e encerrando etapas removidas", () => 
       step: "edit_preview",
       context: "personal",
     })
-  ).toMatchObject({ version: 14, step: "calendar_instruction" });
+  ).toMatchObject({ version: 15, step: "calendar_instruction" });
 
   expect(
     migrateGuidedOnboardingState({
@@ -633,7 +647,7 @@ test("migra v13 preservando a etapa útil e encerrando etapas removidas", () => 
       step: "habit_instruction",
       context: "personal",
     })
-  ).toMatchObject({ version: 14, step: "habit_instruction" });
+  ).toMatchObject({ version: 15, step: "habit_instruction" });
 
   expect(
     migrateGuidedOnboardingState({
@@ -642,7 +656,7 @@ test("migra v13 preservando a etapa útil e encerrando etapas removidas", () => 
       firstHabitCreatedAt: "2026-08-26T12:00:00.000Z",
     })
   ).toMatchObject({
-    version: 14,
+    version: 15,
     step: "habit_created_confirmation",
     firstHabitCreatedAt: "2026-08-26T12:00:00.000Z",
   });
@@ -653,10 +667,25 @@ test("migra v13 preservando a etapa útil e encerrando etapas removidas", () => 
     "theme_instruction",
   ] as const) {
     expect(migrateGuidedOnboardingState({ version: 13, step })).toMatchObject({
-      version: 14,
+      version: 15,
       step: "completed",
     });
   }
+});
+
+test("migra v14 para a retrospectiva sem inventar interação", () => {
+  expect(
+    migrateGuidedOnboardingState({
+      version: 14,
+      step: "habit_created_confirmation",
+      context: "personal",
+      firstHabitCreatedAt: "2026-08-26T12:00:00.000Z",
+    })
+  ).toMatchObject({
+    version: 15,
+    step: "habit_created_confirmation",
+    firstHabitCreatedAt: "2026-08-26T12:00:00.000Z",
+  });
 });
 
 test("dispensa e conclusão são terminais para a elegibilidade", () => {

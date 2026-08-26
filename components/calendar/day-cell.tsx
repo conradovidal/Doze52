@@ -12,12 +12,16 @@ import { cn } from "@/lib/utils";
 
 export type DayCellHabitPresentation = {
   habits: Habit[];
+  allHabits?: Habit[];
   checkIns: Record<string, HabitCheckIn>;
   selectedHabit: Habit | null;
   onToggle: (dateIso: string) => void;
+  onOpenPicker?: (dateIso: string, anchor: HTMLElement) => void;
   onCreateRequest: () => void;
   isEditing?: boolean;
   readOnly?: boolean;
+  retrospectiveDates?: ReadonlySet<string>;
+  retrospectiveHighlighted?: boolean;
 };
 
 const ACCESSIBLE_DATE_FORMATTER = new Intl.DateTimeFormat("pt-BR", {
@@ -108,6 +112,12 @@ export function DayCell({
       )
     : false;
   const completedNames = completedHabits.map((habit) => habit.name).join(", ");
+  const registeredHabitCount =
+    habitPresentation?.allHabits?.length ?? habitPresentation?.habits.length ?? 0;
+  const usesHabitPicker = registeredHabitCount > 1 && Boolean(habitPresentation?.onOpenPicker);
+  const isRetrospectiveDate = Boolean(
+    habitPresentation?.retrospectiveDates?.has(dateIso)
+  );
   const habitAriaLabel = habitPresentation
     ? isFuture
       ? `${formatAccessibleDate(dateIso)}: data futura, indisponível para hábitos`
@@ -115,6 +125,8 @@ export function DayCell({
         ? `${formatAccessibleDate(dateIso)}: exemplo de hábitos do guia inicial`
       : habitPresentation.isEditing
         ? `${formatAccessibleDate(dateIso)}: finalize a edição para registrar hábitos`
+      : usesHabitPicker
+        ? `Abrir hábitos de ${formatAccessibleDate(dateIso)}.${completedNames ? ` Concluídos visíveis: ${completedNames}.` : " Nenhum hábito visível concluído."}`
       : habitPresentation.selectedHabit
         ? `${selectedHabitCompleted ? "Desmarcar" : "Marcar"} ${habitPresentation.selectedHabit.name} em ${formatAccessibleDate(dateIso)}.${completedNames ? ` Concluídos: ${completedNames}.` : " Nenhum hábito concluído."}`
         : `${formatAccessibleDate(dateIso)}: crie um hábito para fazer check-in`
@@ -144,7 +156,8 @@ export function DayCell({
   const habitCanActivate =
     !habitPresentation?.readOnly &&
     !habitPresentation?.isEditing &&
-    (habitDayAction === "toggle" || habitDayAction === "create");
+    habitDayAction !== "blocked" &&
+    (usesHabitPicker || habitDayAction === "toggle" || habitDayAction === "create");
 
   return (
     <div
@@ -155,6 +168,12 @@ export function DayCell({
       aria-label={habitAriaLabel ?? `Adicionar evento em ${dateIso}`}
       aria-disabled={isHabitMode && !habitCanActivate ? true : undefined}
       data-range-selected={isRangeSelected ? "true" : undefined}
+      data-onboarding-retrospective-date={isRetrospectiveDate ? "true" : undefined}
+      data-onboarding-retrospective-highlighted={
+        isRetrospectiveDate && habitPresentation?.retrospectiveHighlighted
+          ? "true"
+          : undefined
+      }
       className={`group relative flex w-full flex-col px-1 py-1 ring-1 ring-inset transition-[background-color,box-shadow] duration-150 ${dayToneClass} ${
         isHabitMode
           ? habitCanActivate
@@ -177,6 +196,10 @@ export function DayCell({
           : ""
       } ${
         isDropActive ? "bg-foreground/8 ring-border" : ""
+      } ${
+        isRetrospectiveDate && habitPresentation?.retrospectiveHighlighted
+          ? "bg-foreground/8 ring-foreground/45"
+          : ""
       } select-none`}
       style={{ minHeight: `${minHeightPx}px` }}
       onDragOver={(e) => {
@@ -194,7 +217,9 @@ export function DayCell({
       onClick={(event) => {
         event.currentTarget.focus();
          if (isHabitMode) {
-           if (habitCanToggle) {
+           if (usesHabitPicker && habitCanActivate) {
+             habitPresentation?.onOpenPicker?.(dateIso, event.currentTarget);
+           } else if (habitCanToggle) {
              habitPresentation?.onToggle(dateIso);
           } else if (habitCanActivate) {
             habitPresentation?.onCreateRequest();
@@ -207,7 +232,9 @@ export function DayCell({
         if (event.key !== "Enter" && event.key !== " ") return;
         event.preventDefault();
          if (isHabitMode) {
-           if (habitCanToggle) {
+           if (usesHabitPicker && habitCanActivate) {
+             habitPresentation?.onOpenPicker?.(dateIso, event.currentTarget);
+           } else if (habitCanToggle) {
              habitPresentation?.onToggle(dateIso);
           } else if (habitCanActivate) {
             habitPresentation?.onCreateRequest();

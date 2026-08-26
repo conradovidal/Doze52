@@ -9,6 +9,7 @@ import {
   getDesktopVisibleHabits,
   getHabitDayAction,
   getHabitCheckInKey,
+  getHabitRetrospectiveDates,
   moveActiveHabit,
   orderActiveHabits,
   setHabitArchived,
@@ -113,6 +114,10 @@ test("monta quatro hábitos demonstrativos coerentes com o ano de exemplo", () =
     "Dormir antes das 23h",
     "Dia sem fumar",
   ]);
+  expect(showcase.visibleHabitIds).toEqual(
+    showcase.habits.slice(0, 3).map((habit) => habit.id)
+  );
+  expect(showcase.visibleHabitIds).not.toContain(showcase.habits[3]?.id);
 
   const [exercise, reading, sleep, smokeFree] = showcase.habits;
   const completed = (habitId: string, dateIso: string) =>
@@ -155,6 +160,32 @@ test("não cria check-ins demonstrativos no futuro", () => {
       (checkIn) => checkIn.date <= "2026-08-26"
     )
   ).toBe(true);
+});
+
+test("calcula retrospectiva inclusiva de 14 dias limitada ao ano", () => {
+  expect(getHabitRetrospectiveDates(2026, "2026-08-26")).toEqual([
+    "2026-08-13",
+    "2026-08-14",
+    "2026-08-15",
+    "2026-08-16",
+    "2026-08-17",
+    "2026-08-18",
+    "2026-08-19",
+    "2026-08-20",
+    "2026-08-21",
+    "2026-08-22",
+    "2026-08-23",
+    "2026-08-24",
+    "2026-08-25",
+    "2026-08-26",
+  ]);
+  expect(getHabitRetrospectiveDates(2026, "2026-01-05")).toEqual([
+    "2026-01-01",
+    "2026-01-02",
+    "2026-01-03",
+    "2026-01-04",
+    "2026-01-05",
+  ]);
 });
 
 test("resolve dias vazios como criação sem liberar futuro ou dias externos", () => {

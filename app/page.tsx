@@ -2440,6 +2440,19 @@ export default function HomePage() {
           onHabitCreated={() =>
             updateGuidedOnboarding({ type: "habit_saved" })
           }
+          retrospectiveInteracted={Boolean(
+            guidedOnboarding?.habitRetrospectiveInteractedAt
+          )}
+          onHabitCheckIn={() => {
+            if (
+              readGuidedOnboardingState().step ===
+              "habit_created_confirmation"
+            ) {
+              updateGuidedOnboarding({
+                type: "interact_with_habit_retrospective",
+              });
+            }
+          }}
           onGuidedNoticeAction={(input) => {
             const current = readGuidedOnboardingState();
             if (current.step === "habit_showcase_instruction") {

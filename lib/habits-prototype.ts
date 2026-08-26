@@ -26,7 +26,7 @@ export const HABITS_DESKTOP_MAX = 4;
 export type OnboardingHabitShowcase = {
   habits: Habit[];
   checkIns: Record<string, HabitCheckIn>;
-  selectedHabitId: string;
+  visibleHabitIds: string[];
 };
 
 const ONBOARDING_HABIT_SHOWCASE_DEFINITIONS = [
@@ -97,7 +97,11 @@ export const buildOnboardingHabitShowcase = ({
     })
   );
   if (cutoffIso < yearStartIso) {
-    return { habits, checkIns: {}, selectedHabitId: habits[0].id };
+    return {
+      habits,
+      checkIns: {},
+      visibleHabitIds: habits.slice(0, 3).map((habit) => habit.id),
+    };
   }
 
   const categoryNameById = new Map(
@@ -195,7 +199,21 @@ export const buildOnboardingHabitShowcase = ({
     });
   });
 
-  return { habits, checkIns, selectedHabitId: habits[0].id };
+  return {
+    habits,
+    checkIns,
+    visibleHabitIds: habits.slice(0, 3).map((habit) => habit.id),
+  };
+};
+
+export const getHabitRetrospectiveDates = (year: number, todayIso: string) => {
+  const today = parseISO(todayIso);
+  if (Number.isNaN(today.getTime())) return [];
+  return Array.from({ length: 14 }, (_, offset) =>
+    format(addDays(today, -offset), "yyyy-MM-dd")
+  )
+    .filter((dateIso) => Number(dateIso.slice(0, 4)) === year)
+    .toReversed();
 };
 
 export type DesktopHabitSlot =
