@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  getDesktopHabitSlot,
+  getCompletedHabitsForDate,
   getHabitDayAction,
   getHabitCheckInKey,
 } from "@/lib/habits-prototype";
@@ -96,12 +96,13 @@ export function DayCell({
   const isFuture = dateIso > todayIso;
   const completedHabits = isFuture
     ? []
-    : habitPresentation?.habits.filter((habit) =>
-        Boolean(
-          habitPresentation.checkIns[getHabitCheckInKey(habit.id, dateIso)]
-            ?.completed
+    : habitPresentation
+      ? getCompletedHabitsForDate(
+          habitPresentation.habits,
+          habitPresentation.checkIns,
+          dateIso
         )
-      ) ?? [];
+      : [];
   const selectedHabitCompleted = habitPresentation?.selectedHabit
     ? Boolean(
         habitPresentation.checkIns[
@@ -268,33 +269,20 @@ export function DayCell({
       {habitPresentation && completedHabits.length > 0 ? (
         <div
           data-day-habit-markers
-          className={cn(
-            "pointer-events-none absolute inset-x-0 top-7 bottom-1 grid place-items-center",
-            habitPresentation.habits.length === 1 &&
-              "mx-auto size-[clamp(12px,1.1vw,18px)] grid-cols-1 grid-rows-1",
-            habitPresentation.habits.length === 2 &&
-              "mx-auto h-[clamp(9px,0.85vw,13px)] w-[clamp(18px,1.7vw,26px)] grid-cols-2 grid-rows-1 gap-px",
-            habitPresentation.habits.length > 2 &&
-              "mx-auto size-[clamp(18px,1.7vw,26px)] grid-cols-2 grid-rows-2 gap-px"
-          )}
+          className="pointer-events-none absolute inset-x-0 top-6 bottom-0 flex flex-col items-center justify-center overflow-visible"
           aria-hidden="true"
         >
-          {habitPresentation.habits.map((habit, habitIndex) => {
-            const completed = completedHabits.some((entry) => entry.id === habit.id);
-            const slot = getDesktopHabitSlot(
-              habitPresentation.habits.length,
-              habitIndex
-            );
+          {completedHabits.map((habit, completedIndex) => {
             return (
               <span
                 key={habit.id}
-                data-habit-marker={completed ? habit.id : undefined}
-                data-habit-slot={slot ?? undefined}
+                data-habit-marker={habit.id}
+                data-habit-slot={`stack-${completedIndex + 1}`}
                 className={cn(
-                  "col-span-1 row-span-1 h-full w-full rounded-[clamp(2px,0.25vw,4px)] border border-black/10",
-                  !completed && "invisible"
+                  "size-[clamp(12px,1.1vw,18px)] shrink-0 rounded-[clamp(2px,0.25vw,4px)] border border-black/10",
+                  completedIndex > 0 && "-mt-[clamp(8px,0.75vw,13px)]"
                 )}
-                style={completed ? { backgroundColor: habit.color } : undefined}
+                style={{ backgroundColor: habit.color }}
               />
             );
           })}

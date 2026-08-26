@@ -5,8 +5,7 @@ import {
   buildHabitPrototypeWeeks,
   buildOnboardingHabitShowcase,
   applyActiveHabitOrder,
-  getDesktopHabitSlot,
-  getDesktopHabitMarkerSize,
+  getCompletedHabitsForDate,
   getDesktopVisibleHabits,
   getHabitDayAction,
   getHabitCheckInKey,
@@ -260,30 +259,37 @@ test("ordena hábitos ativos e limita a apresentação desktop aos quatro primei
   ]);
 });
 
-test("dimensiona e fixa os marcadores conforme a quantidade de hábitos", () => {
-  expect(getDesktopHabitSlot(1, 0)).toBe("center");
-  expect([0, 1].map((index) => getDesktopHabitSlot(2, index))).toEqual([
-    "middle-left",
-    "middle-right",
-  ]);
-  expect([0, 1, 2].map((index) => getDesktopHabitSlot(3, index))).toEqual([
-    "top-left",
-    "top-right",
-    "bottom-left",
-  ]);
-  expect([0, 1, 2, 3].map((index) => getDesktopHabitSlot(4, index))).toEqual([
-    "top-left",
-    "top-right",
-    "bottom-left",
-    "bottom-right",
-  ]);
-  expect(getDesktopHabitSlot(4, 4)).toBeNull();
-  expect([1, 2, 3, 4].map(getDesktopHabitMarkerSize)).toEqual([
-    "single",
-    "pair",
-    "grid",
-    "grid",
-  ]);
+test("empilha apenas hábitos concluídos preservando a ordem visível", () => {
+  const habits = ["primeiro", "segundo", "terceiro", "quarto"].map(
+    (id, position): Habit => ({
+      id,
+      name: id,
+      color: "#2563eb",
+      icon: "circle-check",
+      position,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    })
+  );
+  const dateIso = "2026-08-26";
+  const checkIns = {
+    [`segundo:${dateIso}`]: {
+      habitId: "segundo",
+      date: dateIso,
+      completed: true,
+      updatedAt: "2026-08-26T12:00:00.000Z",
+    },
+    [`quarto:${dateIso}`]: {
+      habitId: "quarto",
+      date: dateIso,
+      completed: true,
+      updatedAt: "2026-08-26T12:00:00.000Z",
+    },
+  };
+
+  expect(
+    getCompletedHabitsForDate(habits, checkIns, dateIso).map((habit) => habit.id)
+  ).toEqual(["segundo", "quarto"]);
 });
 
 test("reordena, arquiva e restaura hábitos sem apagar os demais dados", () => {

@@ -236,22 +236,6 @@ export const getHabitRetrospectiveDates = (year: number, todayIso: string) => {
     .toReversed();
 };
 
-export type DesktopHabitSlot =
-  | "center"
-  | "middle-left"
-  | "middle-right"
-  | "top-left"
-  | "top-right"
-  | "bottom-left"
-  | "bottom-right";
-
-const DESKTOP_HABIT_QUADRANTS: readonly DesktopHabitSlot[] = [
-  "top-left",
-  "top-right",
-  "bottom-left",
-  "bottom-right",
-];
-
 export const orderActiveHabits = (habits: Habit[]) =>
   habits
     .filter((habit) => !habit.archivedAt)
@@ -315,28 +299,6 @@ export const applyActiveHabitOrder = (
     return position >= 0 ? { ...habit, position, updatedAt } : habit;
   });
 
-export const getDesktopHabitSlot = (
-  totalVisibleHabits: number,
-  habitIndex: number
-): DesktopHabitSlot | null => {
-  if (habitIndex < 0 || habitIndex >= totalVisibleHabits) return null;
-  if (totalVisibleHabits === 1) return "center";
-  if (totalVisibleHabits === 2) {
-    return (["middle-left", "middle-right"] as const)[habitIndex] ?? null;
-  }
-  return DESKTOP_HABIT_QUADRANTS[habitIndex] ?? null;
-};
-
-export type DesktopHabitMarkerSize = "single" | "pair" | "grid";
-
-export const getDesktopHabitMarkerSize = (
-  totalVisibleHabits: number
-): DesktopHabitMarkerSize => {
-  if (totalVisibleHabits <= 1) return "single";
-  if (totalVisibleHabits === 2) return "pair";
-  return "grid";
-};
-
 export type HabitPrototypeDay = {
   dateIso: string;
   dayOfMonth: number;
@@ -368,6 +330,15 @@ const MONTH_LABELS = [
 
 export const getHabitCheckInKey = (habitId: string, dateIso: string) =>
   `${habitId}:${dateIso}`;
+
+export const getCompletedHabitsForDate = (
+  habits: Habit[],
+  checkIns: Record<string, HabitCheckIn>,
+  dateIso: string
+) =>
+  habits.filter((habit) =>
+    Boolean(checkIns[getHabitCheckInKey(habit.id, dateIso)]?.completed)
+  );
 
 export type HabitDayAction = "blocked" | "create" | "toggle";
 

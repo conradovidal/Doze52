@@ -301,22 +301,28 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
   await expect(habits.locator('[data-year-grid-surface="habits"]')).toBeVisible();
   const completedDay = habits.locator('[data-day-cell][data-day-iso$="-01-01"]');
   await expect(completedDay.locator("[data-habit-marker]")).toHaveCount(4);
-  await expect(completedDay.locator('[data-habit-slot="top-left"]')).toBeVisible();
-  await expect(completedDay.locator('[data-habit-slot="top-right"]')).toBeVisible();
-  await expect(completedDay.locator('[data-habit-slot="bottom-left"]')).toBeVisible();
-  await expect(completedDay.locator('[data-habit-slot="bottom-right"]')).toBeVisible();
+  for (const stackPosition of [1, 2, 3, 4]) {
+    await expect(
+      completedDay.locator(`[data-habit-slot="stack-${stackPosition}"]`)
+    ).toBeVisible();
+  }
+  const completedDayBox = await completedDay.boundingBox();
+  if (!completedDayBox) throw new Error("Célula de hábitos não pôde ser medida.");
+  expect(completedDayBox.height).toBeLessThanOrEqual(48);
   const markerGeometry = await completedDay.locator("[data-day-habit-markers]").evaluate(
     (element) => {
       const marker = element.querySelector<HTMLElement>("[data-habit-marker]");
       const style = getComputedStyle(element);
       return {
-        columns: style.gridTemplateColumns.split(" ").length,
-        rows: style.gridTemplateRows.split(" ").length,
+        direction: style.flexDirection,
+        markerWidth: marker?.getBoundingClientRect().width ?? 0,
         markerRadius: marker ? getComputedStyle(marker).borderRadius : "",
       };
     }
   );
-  expect(markerGeometry).toMatchObject({ columns: 2, rows: 2 });
+  expect(markerGeometry.direction).toBe("column");
+  expect(markerGeometry.markerWidth).toBeGreaterThanOrEqual(12);
+  expect(markerGeometry.markerWidth).toBeLessThanOrEqual(18);
   expect(markerGeometry.markerRadius).not.toBe("9999px");
   await completedDay.click();
   const dayPicker = page.locator("[data-habit-day-picker]");
@@ -334,6 +340,14 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
   expect(pickerBox.y + pickerBox.height).toBeLessThanOrEqual(pickerViewport.height);
   await walkingChoice.click();
   await expect(completedDay.locator("[data-habit-marker]")).toHaveCount(3);
+  await expect(completedDay.locator("[data-habit-marker]").first()).toHaveAttribute(
+    "data-habit-marker",
+    "habit-2"
+  );
+  await expect(completedDay.locator("[data-habit-marker]").first()).toHaveAttribute(
+    "data-habit-slot",
+    "stack-1"
+  );
   await expect(dayPicker).toBeVisible();
   await dayPicker.getByRole("button", { name: "Marcar Caminhar" }).click();
   await expect(completedDay.locator("[data-habit-marker]")).toHaveCount(4);
