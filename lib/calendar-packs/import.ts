@@ -1,5 +1,6 @@
 import type { CalendarSnapshot } from "@/lib/sync";
 import type { CalendarEvent, CalendarProfile, CategoryItem } from "@/lib/types";
+import { CATEGORY_COLOR_BASE_ZINC } from "@/lib/category-palette";
 import type {
   CalendarPack,
   CalendarPackCategory,
@@ -41,6 +42,8 @@ export type CalendarPackAvailability = {
   brazilEventCount: number;
   totalBrazilEventCount: number;
 };
+
+export const DEFAULT_CALENDAR_PACK_CATEGORY_COLOR = CATEGORY_COLOR_BASE_ZINC;
 
 const normalizeLabel = (value: string) =>
   value
@@ -943,7 +946,7 @@ export const importCalendarPack = (
         id: categoryId,
         profileId,
         name: packCategory.name,
-        color: packCategory.color,
+        color: DEFAULT_CALENDAR_PACK_CATEGORY_COLOR,
         visible: true,
         calendarPackGroupId: groupId,
         calendarPackVariantId: pack.id,

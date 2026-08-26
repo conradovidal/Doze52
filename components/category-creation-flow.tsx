@@ -107,6 +107,9 @@ export function CategoryCreationFlow({
             <Button
               type="button"
               variant="outline"
+              data-onboarding-calendar-choice={
+                guidedCalendarSelection ? "true" : undefined
+              }
               className="grid h-auto min-h-24 grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-3 rounded-xl p-4 text-left"
               disabled={!profile}
               onClick={chooseCalendarPacks}
@@ -119,6 +122,11 @@ export function CategoryCreationFlow({
                 <span className="mt-1 block whitespace-normal text-xs font-normal leading-4 text-muted-foreground">
                   Assine ou gerencie calendários disponíveis no Doze 52.
                 </span>
+                {guidedCalendarSelection ? (
+                  <span className="mt-2 inline-flex rounded-full bg-primary px-2.5 py-1 text-[10px] font-semibold uppercase leading-none tracking-[0.08em] text-primary-foreground">
+                    Clique aqui
+                  </span>
+                ) : null}
               </span>
               <ArrowRight className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
             </Button>

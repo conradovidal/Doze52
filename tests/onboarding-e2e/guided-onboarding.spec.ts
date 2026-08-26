@@ -316,6 +316,10 @@ const completePersonalOnboarding = async (
   const categoryDialog = page.getByRole("dialog", { name: "Adicionar categoria" });
   if (await categoryDialog.isVisible()) {
     await expect(toolbarNotice).toBeHidden();
+    const guidedCalendarChoice = categoryDialog.locator(
+      '[data-onboarding-calendar-choice="true"]'
+    );
+    await expect(guidedCalendarChoice).toContainText("Clique aqui");
     await categoryDialog
       .getByRole("button", { name: /Adicionar calendário pronto/ })
       .click();
