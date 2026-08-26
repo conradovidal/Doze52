@@ -17,6 +17,7 @@ export type DayCellHabitPresentation = {
   onToggle: (dateIso: string) => void;
   onCreateRequest: () => void;
   isEditing?: boolean;
+  readOnly?: boolean;
 };
 
 const ACCESSIBLE_DATE_FORMATTER = new Intl.DateTimeFormat("pt-BR", {
@@ -110,6 +111,8 @@ export function DayCell({
   const habitAriaLabel = habitPresentation
     ? isFuture
       ? `${formatAccessibleDate(dateIso)}: data futura, indisponível para hábitos`
+      : habitPresentation.readOnly
+        ? `${formatAccessibleDate(dateIso)}: exemplo de hábitos do guia inicial`
       : habitPresentation.isEditing
         ? `${formatAccessibleDate(dateIso)}: finalize a edição para registrar hábitos`
       : habitPresentation.selectedHabit
@@ -139,6 +142,7 @@ export function DayCell({
     : null;
   const habitCanToggle = habitDayAction === "toggle";
   const habitCanActivate =
+    !habitPresentation?.readOnly &&
     !habitPresentation?.isEditing &&
     (habitDayAction === "toggle" || habitDayAction === "create");
 

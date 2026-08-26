@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 
 import {
   buildHabitPrototypeWeeks,
+  buildOnboardingHabitShowcase,
   applyActiveHabitOrder,
   getDesktopHabitSlot,
   getDesktopHabitMarkerSize,
@@ -14,7 +15,7 @@ import {
 } from "../../lib/habits-prototype";
 import { getYearTransitionDirection } from "../../lib/calendar-year-transition";
 import { PLAN_LIMITS, PRO_UPGRADE_COPY } from "../../lib/entitlements";
-import type { Habit } from "../../lib/types";
+import type { CalendarEvent, CategoryItem, Habit } from "../../lib/types";
 import { isHabitsPrototypeAvailable } from "../../lib/feature-flags";
 import {
   buildProductDestinationUrl,
@@ -63,6 +64,97 @@ test("gera chave de check-in estável por hábito e data", () => {
   expect(getHabitCheckInKey("habit-1", "2026-08-24")).toBe(
     "habit-1:2026-08-24"
   );
+});
+
+test("monta quatro hábitos demonstrativos coerentes com o ano de exemplo", () => {
+  const categories: CategoryItem[] = [
+    { id: "travel", profileId: "personal", name: "Viagens", color: "#fff", visible: true },
+    { id: "friends", profileId: "personal", name: "Amigos", color: "#fff", visible: true },
+    { id: "events", profileId: "personal", name: "Eventos", color: "#fff", visible: true },
+  ];
+  const event = (
+    id: string,
+    title: string,
+    categoryId: string,
+    startDate: string,
+    endDate = startDate
+  ): CalendarEvent => ({
+    id,
+    title,
+    categoryId,
+    color: "#fff",
+    startDate,
+    endDate,
+    createdAt: "2026-01-01T00:00:00.000Z",
+    dayOrder: 0,
+  });
+  const events = [
+    event("trip", "Férias em família — Maceió", "travel", "2026-07-25", "2026-07-30"),
+    event("social", "Noite de fondue", "friends", "2026-08-20"),
+    event("books", "Feira do Livro", "events", "2026-10-30", "2026-11-15"),
+  ];
+  const showcase = buildOnboardingHabitShowcase({
+    year: 2026,
+    todayIso: "2026-12-31",
+    events,
+    categories,
+  });
+  const repeated = buildOnboardingHabitShowcase({
+    year: 2026,
+    todayIso: "2026-12-31",
+    events,
+    categories,
+  });
+
+  expect(showcase).toEqual(repeated);
+  expect(showcase.habits.map((habit) => habit.name)).toEqual([
+    "Exercício",
+    "Ler 20 minutos",
+    "Dormir antes das 23h",
+    "Dia sem fumar",
+  ]);
+
+  const [exercise, reading, sleep, smokeFree] = showcase.habits;
+  const completed = (habitId: string, dateIso: string) =>
+    Boolean(showcase.checkIns[getHabitCheckInKey(habitId, dateIso)]?.completed);
+  for (const dateIso of ["2026-07-25", "2026-07-26", "2026-07-27", "2026-07-28", "2026-07-29", "2026-07-30"]) {
+    expect(completed(exercise.id, dateIso)).toBe(false);
+  }
+  expect(
+    ["2026-07-25", "2026-07-26", "2026-07-27", "2026-07-28", "2026-07-29", "2026-07-30"].some(
+      (dateIso) => completed(reading.id, dateIso)
+    )
+  ).toBe(true);
+  expect(completed(sleep.id, "2026-08-20")).toBe(false);
+
+  const smokeFreeCount = Object.values(showcase.checkIns).filter(
+    (checkIn) => checkIn.habitId === smokeFree.id
+  ).length;
+  expect(smokeFreeCount).toBeGreaterThan(250);
+  expect(smokeFreeCount).toBeLessThan(365);
+
+  const markerCounts = new Set<number>();
+  for (let day = 1; day <= 5; day += 1) {
+    const dateIso = `2026-01-0${day}`;
+    markerCounts.add(
+      showcase.habits.filter((habit) => completed(habit.id, dateIso)).length
+    );
+  }
+  expect([...markerCounts].toSorted()).toEqual([0, 1, 2, 3, 4]);
+});
+
+test("não cria check-ins demonstrativos no futuro", () => {
+  const showcase = buildOnboardingHabitShowcase({
+    year: 2026,
+    todayIso: "2026-08-26",
+    events: [],
+    categories: [],
+  });
+  expect(
+    Object.values(showcase.checkIns).every(
+      (checkIn) => checkIn.date <= "2026-08-26"
+    )
+  ).toBe(true);
 });
 
 test("resolve dias vazios como criação sem liberar futuro ou dias externos", () => {

@@ -271,8 +271,10 @@ const completePersonalOnboarding = async (
   await expect(
     toolbarNotice.getByRole("button", { name: "Encerrar guia inicial" })
   ).toHaveCSS("position", "absolute");
+  const adaptiveDesktop =
+    !mobile &&
+    (await page.locator('[data-product-navigation="desktop"]').isVisible());
   await page.locator("[data-onboarding-edit-control]").click();
-  await expect(toolbarNotice).toContainText("Este é o modo de edição");
   const filterRegion = page.locator("[data-onboarding-filter-region]");
   await expect(filterRegion.locator(":scope > div").first()).not.toHaveAttribute(
     "inert",
@@ -283,7 +285,15 @@ const completePersonalOnboarding = async (
   );
   const finishEdit = page.locator("[data-onboarding-edit-control]");
   await expect(finishEdit).toHaveAttribute("aria-label", /Finalizar edição/);
-  await finishEdit.click();
+  if (adaptiveDesktop) {
+    await expect(toolbarNotice).toHaveAttribute(
+      "data-guided-toolbar-target",
+      "calendars"
+    );
+  } else {
+    await expect(toolbarNotice).toContainText("Este é o modo de edição");
+    await finishEdit.click();
+  }
   expect(await page.evaluate(() => window.localStorage.getItem("yiv-store"))).toBe(
     beforeEditPreview
   );
@@ -343,6 +353,12 @@ const completePersonalOnboarding = async (
     .getByRole("button", { name: "Adicionar feriados" })
     .click();
   await expect(calendarDialog).toBeHidden();
+  if (adaptiveDesktop) {
+    await expect(page.locator("[data-onboarding-edit-control]")).toHaveAttribute(
+      "aria-label",
+      /Editar/
+    );
+  }
   const importedHolidayTitles = await page.evaluate(() => {
     const payload = JSON.parse(window.localStorage.getItem("yiv-store") ?? "{}");
     return (payload.state?.events ?? []).map(
@@ -464,7 +480,7 @@ test("monta contexto Pessoal de forma incremental", async ({ page }, testInfo) =
   }));
 
   expect(stored.onboarding).toMatchObject({
-    version: 13,
+    version: 14,
     step: "completed",
     context: "personal",
   });

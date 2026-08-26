@@ -33,6 +33,7 @@ import {
   getHabitCheckInKey,
   orderActiveHabits,
   setHabitArchived,
+  type OnboardingHabitShowcase,
 } from "@/lib/habits-prototype";
 import type { Habit, HabitCheckIn } from "@/lib/types";
 import { useBilling } from "@/lib/use-billing";
@@ -201,6 +202,7 @@ export function HabitsPrototype({
   onToggleEditing,
   onYearChange,
   guidedNotice = null,
+  showcase = null,
   onDismissGuidedNotice,
   onGuidedNoticeAction,
   onHabitCreated,
@@ -213,8 +215,9 @@ export function HabitsPrototype({
   onToggleEditing?: () => void;
   onYearChange: (year: number) => void;
   guidedNotice?: import("@/components/onboarding/guided-toolbar-notice").GuidedToolbarNotice | null;
+  showcase?: OnboardingHabitShowcase | null;
   onDismissGuidedNotice?: () => void;
-  onGuidedNoticeAction?: () => void;
+  onGuidedNoticeAction?: (input?: { hasExistingHabit: boolean }) => void;
   onHabitCreated?: () => void;
 }) {
   const { notify } = useFeedback();
@@ -228,6 +231,8 @@ export function HabitsPrototype({
   const [selectedHabitId, setSelectedHabitId] = React.useState<string | null>(
     initialSession.selectedHabitId
   );
+  const [showcaseSelectedHabitId, setShowcaseSelectedHabitId] =
+    React.useState<string | null>(showcase?.selectedHabitId ?? null);
   const [createDialogOpen, setCreateDialogOpen] = React.useState(false);
   const [editingHabitId, setEditingHabitId] = React.useState<string | null>(null);
   const [upgradeOpen, setUpgradeOpen] = React.useState(false);
@@ -240,6 +245,9 @@ export function HabitsPrototype({
     () => orderActiveHabits(habits),
     [habits]
   );
+  const showcaseActive = Boolean(showcase);
+  const presentedHabits = showcase?.habits ?? activeHabits;
+  const presentedCheckIns = showcase?.checkIns ?? checkIns;
   const archivedHabits = React.useMemo(
     () => habits.filter((habit) => Boolean(habit.archivedAt)),
     [habits]
@@ -251,26 +259,42 @@ export function HabitsPrototype({
       null,
     [activeHabits, selectedHabitId]
   );
+  const presentedSelectedHabit = React.useMemo(
+    () =>
+      presentedHabits.find(
+        (habit) => habit.id === (showcaseActive ? showcaseSelectedHabitId : selectedHabitId)
+      ) ??
+      presentedHabits[0] ??
+      null,
+    [
+      presentedHabits,
+      selectedHabitId,
+      showcaseActive,
+      showcaseSelectedHabitId,
+    ]
+  );
   const weeks = React.useMemo(
     () => (todayIso ? buildHabitPrototypeWeeks(year, todayIso) : []),
     [todayIso, year]
   );
   const desktopHabits = React.useMemo(
-    () => getDesktopVisibleHabits(activeHabits),
-    [activeHabits]
+    () => getDesktopVisibleHabits(presentedHabits),
+    [presentedHabits]
   );
   const desktopSelectedHabit = React.useMemo(
     () =>
-      desktopHabits.find((habit) => habit.id === selectedHabitId) ??
+      desktopHabits.find((habit) => habit.id === presentedSelectedHabit?.id) ??
       desktopHabits[0] ??
       null,
-    [desktopHabits, selectedHabitId]
+    [desktopHabits, presentedSelectedHabit?.id]
   );
   const creationUnavailable = isBillingLoading || Boolean(billingError);
   const reachedHabitLimit = activeHabits.length >= limits.maxHabits;
-  const creationDisabled =
+  const creationDisabled = showcaseActive ||
     creationUnavailable || (isPro && reachedHabitLimit);
-  const creationDisabledLabel = creationUnavailable
+  const creationDisabledLabel = showcaseActive
+    ? null
+    : creationUnavailable
     ? "Aguarde a confirmação do seu plano para criar outro hábito."
     : isPro && reachedHabitLimit
       ? "O plano Pro permite até 4 hábitos neste protótipo."
@@ -281,10 +305,10 @@ export function HabitsPrototype({
     const currentWeek = currentWeekRef.current;
     if (!region || !currentWeek) return;
 
-    if (selectedHabit) {
+    if (presentedSelectedHabit && !showcaseActive) {
       const savedScroll = Number(
         window.sessionStorage.getItem(
-          getHabitScrollStorageKey(year, selectedHabit.id)
+          getHabitScrollStorageKey(year, presentedSelectedHabit.id)
         )
       );
       if (Number.isFinite(savedScroll) && savedScroll > 0) {
@@ -297,7 +321,11 @@ export function HabitsPrototype({
       0,
       currentWeek.offsetTop - region.offsetTop - region.clientHeight / 3
     );
-  }, [selectedHabit, year]);
+  }, [presentedSelectedHabit, showcaseActive, year]);
+
+  React.useEffect(() => {
+    setShowcaseSelectedHabitId(showcase?.selectedHabitId ?? null);
+  }, [showcase]);
 
   React.useEffect(() => {
     try {
@@ -311,6 +339,7 @@ export function HabitsPrototype({
   }, [checkIns, habits, selectedHabitId]);
 
   const requestCreateHabit = () => {
+    if (showcaseActive) return;
     if (creationUnavailable) {
       notify({
         tone: "info",
@@ -432,7 +461,7 @@ export function HabitsPrototype({
   };
 
   const toggleHabitDay = (habit: Habit | null, dateIso: string) => {
-    if (!habit) return;
+    if (!habit || showcaseActive) return;
     const key = getHabitCheckInKey(habit.id, dateIso);
     setCheckIns((current) => {
       const completed = !current[key]?.completed;
@@ -469,26 +498,32 @@ export function HabitsPrototype({
           year={year}
           todayIso={todayIso}
           habits={desktopHabits}
-          totalActiveHabits={activeHabits.length}
-          checkIns={checkIns}
+          totalActiveHabits={presentedHabits.length}
+          checkIns={presentedCheckIns}
           selectedHabit={desktopSelectedHabit}
           creationDisabled={creationDisabled}
           creationDisabledLabel={creationDisabledLabel}
-          onSelectHabit={setSelectedHabitId}
+          onSelectHabit={(habitId) => {
+            if (showcaseActive) setShowcaseSelectedHabitId(habitId);
+            else setSelectedHabitId(habitId);
+          }}
           onToggleDay={(dateIso) =>
             toggleHabitDay(desktopSelectedHabit, dateIso)
           }
           onRequestCreate={requestCreateHabit}
-          isEditing={isEditing}
-          archivedHabits={archivedHabits}
+          isEditing={showcaseActive ? false : isEditing}
+          readOnly={showcaseActive}
+          archivedHabits={showcaseActive ? [] : archivedHabits}
           onEditHabit={requestEditHabit}
           onReorderHabits={reorderHabits}
           onReactivateHabit={reactivateHabit}
-          onToggleEditing={onToggleEditing}
+          onToggleEditing={showcaseActive ? undefined : onToggleEditing}
           onYearChange={onYearChange}
           guidedNotice={guidedNotice}
           onDismissGuidedNotice={onDismissGuidedNotice}
-          onGuidedNoticeAction={onGuidedNoticeAction}
+          onGuidedNoticeAction={() =>
+            onGuidedNoticeAction?.({ hasExistingHabit: activeHabits.length > 0 })
+          }
         />
         {createDialog}
         <ProUpgradeDialog

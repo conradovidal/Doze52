@@ -77,6 +77,7 @@ import {
 } from "@/lib/product-metrics";
 import { getSupabaseBrowserClient, hasSupabaseEnv } from "@/lib/supabase";
 import { expandEventsForYear } from "@/lib/recurrence";
+import { buildOnboardingHabitShowcase } from "@/lib/habits-prototype";
 import {
   ensureSnapshotCoverage,
   materializeUserOwnedSnapshot,
@@ -451,6 +452,27 @@ export default function HomePage() {
   const renderEvents = React.useMemo(
     () => expandEventsForYear(events, year),
     [events, year]
+  );
+  const onboardingHabitShowcase = React.useMemo(
+    () =>
+      guidedOnboarding?.step === "habit_showcase_instruction" &&
+      isMobileCalendarUi === false &&
+      todayIso
+        ? buildOnboardingHabitShowcase({
+            year,
+            todayIso,
+            events: renderEvents,
+            categories,
+          })
+        : null,
+    [
+      categories,
+      guidedOnboarding?.step,
+      isMobileCalendarUi,
+      renderEvents,
+      todayIso,
+      year,
+    ]
   );
 
   const centerTodayInDesktopCalendar = React.useCallback(() => {
@@ -1258,9 +1280,28 @@ export default function HomePage() {
       guidedOnboarding?.step === "edit_instruction" &&
       inlineEditModeActive
     ) {
-      updateGuidedOnboarding({ type: "open_edit_preview" });
+      updateGuidedOnboarding({
+        type: "open_edit_preview",
+        continueToCalendar:
+          isHabitsPrototypeEnabled && isMobileCalendarUi !== true,
+      });
     }
-  }, [guidedOnboarding?.step, inlineEditModeActive, updateGuidedOnboarding]);
+  }, [
+    guidedOnboarding?.step,
+    inlineEditModeActive,
+    isMobileCalendarUi,
+    updateGuidedOnboarding,
+  ]);
+
+  React.useEffect(() => {
+    if (
+      guidedOnboarding?.step !== "calendar_instruction" &&
+      guidedOnboarding?.step !== "calendar_selection"
+    ) {
+      return;
+    }
+    if (!inlineEditModeActive) setWorkspaceEditMode("calendar");
+  }, [guidedOnboarding?.step, inlineEditModeActive]);
 
   const recordDemoInteraction = React.useCallback(
     (key: string) => {
@@ -1932,7 +1973,7 @@ export default function HomePage() {
   const guidedToolbarNotice = React.useMemo<GuidedToolbarNotice | null>(() => {
     if (!showGuidedOnboarding || !guidedOnboarding) return null;
     const totalSteps =
-      isHabitsPrototypeEnabled && isMobileCalendarUi !== true ? 10 : 7;
+      isHabitsPrototypeEnabled && isMobileCalendarUi !== true ? 8 : 7;
     if (guidedOnboarding.step === "edit_instruction") {
       return {
         target: "edit",
@@ -1983,7 +2024,7 @@ export default function HomePage() {
         instruction:
           "Teste navegar pelos trimestres e pelos meses clicando nos rótulos Q1–Q4 e JAN–DEZ.",
         actionLabel: "Continuar",
-        stepLabel: "Passo 7 de 10",
+        stepLabel: "Passo 7 de 8",
       };
     }
     if (
@@ -1994,7 +2035,20 @@ export default function HomePage() {
         target: "habit-surface",
         title: "Conheça seus hábitos.",
         instruction: "Clique em Hábitos no topo para mudar de tela.",
-        stepLabel: "Passo 8 de 10",
+        stepLabel: "Passo 8 de 8",
+      };
+    }
+    if (
+      guidedOnboarding.step === "habit_showcase_instruction" &&
+      isMobileCalendarUi !== true
+    ) {
+      return {
+        target: "habit-showcase",
+        title: "Hábitos também contam a história do seu ano.",
+        instruction:
+          "Veja como viagens, férias e noites especiais mudam o ritmo de quatro hábitos ao longo do tempo.",
+        actionLabel: "Criar meu hábito",
+        stepLabel: "Passo 8 de 8",
       };
     }
     if (
@@ -2006,7 +2060,7 @@ export default function HomePage() {
         title: "Crie seu primeiro hábito.",
         instruction:
           "Abra o +, dê um nome ao hábito e escolha uma cor para começar a acompanhar.",
-        stepLabel: "Passo 8 de 10",
+        stepLabel: "Passo 8 de 8",
       };
     }
     if (
@@ -2016,32 +2070,10 @@ export default function HomePage() {
       return {
         target: "habit-created",
         title: "Seu primeiro hábito está pronto.",
-        instruction: "Agora volte ao calendário para concluir o guia.",
-        actionLabel: "Voltar ao meu ano",
-        stepLabel: "Passo 8 de 10",
-      };
-    }
-    if (
-      guidedOnboarding.step === "profile_instruction" &&
-      isMobileCalendarUi !== true
-    ) {
-      return {
-        target: "profile",
-        title: "Seu perfil reúne mais opções.",
         instruction:
-          "Abra o Perfil para conhecer sua conta, plano, aparência e outras configurações.",
-        stepLabel: "Passo 9 de 10",
-      };
-    }
-    if (
-      guidedOnboarding.step === "appearance_instruction" &&
-      isMobileCalendarUi !== true
-    ) {
-      return {
-        target: "appearance",
-        title: "Conheça as opções de aparência.",
-        instruction: "Abra Aparência para escolher o tema da aplicação.",
-        stepLabel: "Passo 10 de 10",
+          "Lembre como foram as duas últimas semanas e marque os dias que conseguir. Você pode continuar por aqui depois do guia.",
+        actionLabel: "Finalizar guia",
+        stepLabel: "Passo 8 de 8",
       };
     }
     if (guidedOnboarding.step === "theme_instruction") {
@@ -2067,7 +2099,11 @@ export default function HomePage() {
   ) => {
     const current = readGuidedOnboardingState();
     if (target === "edit" && current.step === "edit_instruction") {
-      updateGuidedOnboarding({ type: "open_edit_preview" });
+      updateGuidedOnboarding({
+        type: "open_edit_preview",
+        continueToCalendar:
+          isHabitsPrototypeEnabled && isMobileCalendarUi !== true,
+      });
       return;
     }
     if (target === "edit" && current.step === "edit_preview") {
@@ -2120,6 +2156,7 @@ export default function HomePage() {
     if (!uf) return;
     const next = updateGuidedOnboarding({ type: "calendar_added", uf });
     if (next.step === "year_instruction" && uf) {
+      setWorkspaceEditMode(null);
       void trackOnboardingRegion(uf);
     }
   }, [updateGuidedOnboarding]);
@@ -2225,6 +2262,7 @@ export default function HomePage() {
     (guidedToolbarNotice?.target === "theme" ||
       guidedToolbarNotice?.target === "appearance" ||
       guidedToolbarNotice?.target === "year" ||
+      guidedToolbarNotice?.target === "habit-showcase" ||
       guidedToolbarNotice?.target === "habit" ||
       guidedToolbarNotice?.target === "habit-created")
       ? null
@@ -2391,20 +2429,31 @@ export default function HomePage() {
             setAuthDialogOpen(true);
           }}
           guidedNotice={
+            guidedToolbarNotice?.target === "habit-showcase" ||
             guidedToolbarNotice?.target === "habit" ||
             guidedToolbarNotice?.target === "habit-created"
               ? guidedToolbarNotice
               : null
           }
+          showcase={onboardingHabitShowcase}
           onDismissGuidedNotice={dismissGuidedOnboarding}
           onHabitCreated={() =>
             updateGuidedOnboarding({ type: "habit_saved" })
           }
-          onGuidedNoticeAction={() => {
+          onGuidedNoticeAction={(input) => {
             const current = readGuidedOnboardingState();
+            if (current.step === "habit_showcase_instruction") {
+              updateGuidedOnboarding({
+                type: "continue_from_habit_showcase",
+                hasExistingHabit: input?.hasExistingHabit,
+              });
+              return;
+            }
             if (current.step !== "habit_created_confirmation") return;
-            updateGuidedOnboarding({ type: "return_to_year" });
-            handleDestinationSelect("annual");
+            const next = updateGuidedOnboarding({
+              type: "finish_habit_onboarding",
+            });
+            if (next.step === "completed") announceGuidedCompletion();
           }}
         />
       ) : isMobileCalendarUi === true ? (

@@ -465,7 +465,7 @@ test("mobile reordena hábitos pelo mesmo DnD e persiste a posição", async ({
   ).toBeVisible();
 });
 
-test("onboarding desktop conclui navegação, hábito, perfil e tema", async ({
+test("onboarding desktop apresenta o exemplo e termina no hábito real", async ({
   page,
 }, testInfo) => {
   test.skip(!testInfo.project.name.startsWith("desktop-"), "Cenário desktop");
@@ -517,10 +517,40 @@ test("onboarding desktop conclui navegação, hábito, perfil e tema", async ({
   await expect(habitsDestination).toHaveClass(/guided-control-target-subtle/);
   await habitsDestination.click();
   await expect(page.locator('[data-product-navigation="desktop"] a[aria-current="page"]')).toHaveAttribute("title", "Hábitos");
+  const showcaseNotice = page.locator(
+    '[data-guided-toolbar-notice][data-guided-toolbar-target="habit-showcase"]'
+  );
+  await expect(showcaseNotice).toBeVisible();
+  for (const name of [
+    "Exercício",
+    "Ler 20 minutos",
+    "Dormir antes das 23h",
+    "Dia sem fumar",
+  ]) {
+    await expect(page.getByRole("button", { name, exact: true })).toBeVisible();
+  }
+  expect(
+    await page.locator("[data-day-habit-markers]").evaluateAll((markers) =>
+      markers.some(
+        (marker) => marker.querySelectorAll("[data-habit-marker]").length === 4
+      )
+    )
+  ).toBe(true);
+  expect(
+    await page.evaluate(() => {
+      const stored = JSON.parse(
+        window.sessionStorage.getItem("doze52:habits-prototype:v1") ?? "{}"
+      );
+      return (stored.habits ?? []).length;
+    })
+  ).toBe(0);
+  await showcaseNotice.getByRole("button", { name: "Criar meu hábito" }).click();
+
   const habitNotice = page.locator(
     '[data-guided-toolbar-notice][data-guided-toolbar-target="habit"]'
   );
   await expect(habitNotice).toBeVisible();
+  await expect(page.getByRole("button", { name: "Exercício", exact: true })).toHaveCount(0);
   const habitCreate = page.locator('[data-onboarding-habit-create="true"]');
   const habitNoticeBox = await habitNotice.boundingBox();
   const habitCreateBox = await habitCreate.boundingBox();
@@ -534,42 +564,45 @@ test("onboarding desktop conclui navegação, hábito, perfil e tema", async ({
   const createdNotice = page.locator(
     '[data-guided-toolbar-notice][data-guided-toolbar-target="habit-created"]'
   );
-  await createdNotice.getByRole("button", { name: "Voltar ao meu ano" }).click();
-  await expect(page.locator("[data-month-row]")).toHaveCount(12);
-  const profileNotice = page.locator(
-    '[data-guided-toolbar-notice][data-guided-toolbar-target="profile"]'
-  );
-  await expect(profileNotice).toBeVisible();
-  await expect(page.locator('[data-product-account="desktop"]')).toHaveClass(/guided-control-target-subtle/);
-  await page.locator('[data-product-account="desktop"]').click();
-
-  const panel = page.locator("[data-app-utility-panel]");
-  await expect(panel).toBeVisible();
-  const appearanceNotice = page.locator(
-    '[data-guided-toolbar-notice][data-guided-toolbar-target="appearance"]'
-  );
-  await expect(appearanceNotice).toBeVisible();
-  await panel.getByRole("button", { name: /^Aparência/ }).click();
-  const themeNotice = page.locator(
-    '[data-guided-toolbar-notice][data-guided-toolbar-target="theme"]'
-  );
-  await expect(themeNotice).toBeVisible();
-  await page.locator("[data-onboarding-theme-control]").click();
-  await themeNotice.getByRole("button", { name: "Finalizar guia" }).click();
-  await expect(panel).toBeHidden();
+  await expect(createdNotice).toContainText("duas últimas semanas");
+  await page
+    .locator('[data-day-cell][aria-label^="Marcar Leitura"]')
+    .last()
+    .click();
+  await createdNotice.getByRole("button", { name: "Finalizar guia" }).click();
+  await expect(
+    page.locator('[data-product-navigation="desktop"] a[aria-current="page"]')
+  ).toHaveAttribute("title", "Hábitos");
+  await expect(
+    page.locator('[data-guided-toolbar-target="profile"]')
+  ).toHaveCount(0);
+  expect(
+    await page.evaluate(() => {
+      const onboarding = JSON.parse(
+        window.localStorage.getItem("doze52:onboarding:v2") ?? "{}"
+      );
+      const habits = JSON.parse(
+        window.sessionStorage.getItem("doze52:habits-prototype:v1") ?? "{}"
+      );
+      return {
+        step: onboarding.step,
+        habitCount: (habits.habits ?? []).length,
+        checkInCount: Object.keys(habits.checkIns ?? {}).length,
+      };
+    })
+  ).toMatchObject({ step: "completed", habitCount: 1, checkInCount: 1 });
 });
 
-test("sessão v11 de tema retoma pela descoberta do Perfil", async ({
+test("onboarding mantém a edição aberta até importar o calendário", async ({
   page,
 }, testInfo) => {
   test.skip(!testInfo.project.name.startsWith("desktop-"), "Cenário desktop");
-
   await page.addInitScript(() => {
     window.localStorage.setItem(
       "doze52:onboarding:v2",
       JSON.stringify({
-        version: 11,
-        step: "theme_instruction",
+        version: 14,
+        step: "edit_instruction",
         context: "personal",
         startedAt: new Date().toISOString(),
         dateItemsCreated: 2,
@@ -579,24 +612,113 @@ test("sessão v11 de tema retoma pela descoberta do Perfil", async ({
   });
   await page.goto("/?surface=annual");
 
-  const profileNotice = page.locator(
-    '[data-guided-toolbar-notice][data-guided-toolbar-target="profile"]'
+  const edit = page.locator("[data-onboarding-edit-control]");
+  await edit.click();
+  await expect(edit).toHaveAttribute("aria-label", /Finalizar edição/);
+  await expect(
+    page.locator(
+      '[data-guided-toolbar-notice][data-guided-toolbar-target="calendars"]'
+    )
+  ).toBeVisible();
+
+  await page.locator("[data-onboarding-calendar-control]").click();
+  const choice = page.getByRole("dialog", { name: "Adicionar categoria" });
+  await choice
+    .getByRole("button", { name: /Adicionar calendário pronto/ })
+    .click();
+  const gallery = page.getByRole("dialog", {
+    name: "Adicione os feriados do seu estado",
+  });
+  await gallery.getByRole("button", { name: "Adicionar feriados" }).click();
+
+  await expect(
+    page.locator('[data-guided-toolbar-notice][data-guided-toolbar-target="year"]')
+  ).toBeVisible();
+  await expect(edit).toHaveAttribute("aria-label", /^Editar/);
+});
+
+test("demonstração não apaga um hábito real já existente", async ({
+  page,
+}, testInfo) => {
+  test.skip(!testInfo.project.name.startsWith("desktop-"), "Cenário desktop");
+  await page.addInitScript(() => {
+    const timestamp = new Date().toISOString();
+    window.localStorage.setItem(
+      "doze52:onboarding:v2",
+      JSON.stringify({
+        version: 14,
+        step: "habit_surface_instruction",
+        context: "personal",
+        startedAt: timestamp,
+      })
+    );
+    window.sessionStorage.setItem(
+      "doze52:habits-prototype:v1",
+      JSON.stringify({
+        habits: [
+          {
+            id: "real-habit",
+            name: "Meu hábito preservado",
+            color: "#4F8FD6",
+            icon: "circle-check",
+            position: 0,
+            createdAt: timestamp,
+            updatedAt: timestamp,
+          },
+        ],
+        checkIns: {},
+        selectedHabitId: "real-habit",
+      })
+    );
+  });
+  await page.goto("/?surface=annual");
+  await page
+    .locator('[data-product-navigation="desktop"] [data-product-destination="habits"]')
+    .click();
+  const showcaseNotice = page.locator(
+    '[data-guided-toolbar-notice][data-guided-toolbar-target="habit-showcase"]'
   );
-  await expect(profileNotice).toBeVisible();
-  await page.locator('[data-product-account="desktop"]').click();
-  const panel = page.locator("[data-app-utility-panel]");
-  await expect(panel).toBeVisible();
-  await panel.getByRole("button", { name: /^Aparência/ }).click();
-  const notice = page.locator(
-    '[data-guided-toolbar-notice][data-guided-toolbar-target="theme"]'
-  );
-  await expect(notice).toBeVisible();
-  await expect(page.locator("[data-onboarding-theme-control]")).toHaveAttribute(
-    "data-onboarding-highlighted",
-    "true"
-  );
-  await page.locator("[data-onboarding-theme-control]").click();
-  await notice.getByRole("button", { name: "Finalizar guia" }).click();
-  await expect(panel).toBeHidden();
-  await expect(notice).toBeHidden();
+  await expect(showcaseNotice).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Meu hábito preservado", exact: true })
+  ).toHaveCount(0);
+  await showcaseNotice.getByRole("button", { name: "Criar meu hábito" }).click();
+
+  await expect(
+    page.getByRole("button", { name: "Meu hábito preservado", exact: true })
+  ).toBeVisible();
+  await expect(
+    page.locator(
+      '[data-guided-toolbar-notice][data-guided-toolbar-target="habit-created"]'
+    )
+  ).toBeVisible();
+  expect(
+    await page.evaluate(() => {
+      const stored = JSON.parse(
+        window.sessionStorage.getItem("doze52:habits-prototype:v1") ?? "{}"
+      );
+      return stored.habits?.map((habit: { id: string }) => habit.id);
+    })
+  ).toEqual(["real-habit"]);
+});
+
+test("sessão v13 em Perfil é tratada como concluída", async ({ page }, testInfo) => {
+  test.skip(!testInfo.project.name.startsWith("desktop-"), "Cenário desktop");
+
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      "doze52:onboarding:v2",
+      JSON.stringify({
+        version: 13,
+        step: "profile_instruction",
+        context: "personal",
+        startedAt: new Date().toISOString(),
+      })
+    );
+  });
+  await page.goto("/?surface=annual");
+  await expect(
+    page.locator("[data-guided-toolbar-notice]")
+  ).toHaveCount(0);
+  await expect(page.locator("[data-onboarding-panel]")).toHaveCount(0);
 });

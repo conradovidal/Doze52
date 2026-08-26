@@ -32,6 +32,7 @@ export type GuidedOnboardingStep =
   | "year_instruction"
   | "period_navigation_instruction"
   | "habit_surface_instruction"
+  | "habit_showcase_instruction"
   | "habit_instruction"
   | "habit_created_confirmation"
   | "profile_instruction"
@@ -43,7 +44,7 @@ export type GuidedOnboardingStep =
   | "dismissed";
 
 export type GuidedOnboardingState = {
-  version: 13;
+  version: 14;
   step: GuidedOnboardingStep;
   context?: OnboardingContext;
   startedAt?: string;
@@ -84,7 +85,7 @@ export type GuidedOnboardingAction =
   | { type: "choose_period_category"; categoryId: string; at?: string }
   | { type: "select_period" }
   | { type: "period_saved"; at?: string }
-  | { type: "open_edit_preview" }
+  | { type: "open_edit_preview"; continueToCalendar?: boolean }
   | { type: "finish_edit_preview" }
   | { type: "open_calendar" }
   | { type: "close_calendar" }
@@ -93,7 +94,9 @@ export type GuidedOnboardingAction =
   | { type: "continue_from_period_navigation"; showHabit?: boolean; at?: string }
   | { type: "interact_with_period_navigation"; at?: string }
   | { type: "open_habits_surface"; at?: string }
+  | { type: "continue_from_habit_showcase"; hasExistingHabit?: boolean; at?: string }
   | { type: "habit_saved"; at?: string }
+  | { type: "finish_habit_onboarding"; at?: string }
   | { type: "return_to_year"; at?: string }
   | { type: "open_profile"; at?: string }
   | { type: "open_appearance"; at?: string }
@@ -165,7 +168,7 @@ export const getGuidedCategoryRevealRemainingMs = (
 };
 
 const initialGuidedState = (): GuidedOnboardingState => ({
-  version: 13,
+  version: 14,
   step: "context_selection",
 });
 
@@ -212,6 +215,7 @@ const isGuidedStep = (value: unknown): value is GuidedOnboardingStep =>
   value === "year_instruction" ||
   value === "period_navigation_instruction" ||
   value === "habit_surface_instruction" ||
+  value === "habit_showcase_instruction" ||
   value === "habit_instruction" ||
   value === "habit_created_confirmation" ||
   value === "profile_instruction" ||
@@ -248,7 +252,7 @@ export const migrateGuidedOnboardingState = (
   };
 
   if (
-    (candidate.version === 9 || candidate.version === 10 || candidate.version === 11 || candidate.version === 12 || candidate.version === 13) &&
+    (candidate.version === 9 || candidate.version === 10 || candidate.version === 11 || candidate.version === 12 || candidate.version === 13 || candidate.version === 14) &&
     isGuidedStep(candidate.step)
   ) {
     const demoInteractionKeys = Array.isArray(candidate.demoInteractionKeys)
@@ -261,12 +265,18 @@ export const migrateGuidedOnboardingState = (
           ),
         ]
       : [];
+    const migratedStep: GuidedOnboardingStep =
+      candidate.version <= 13 && candidate.step === "edit_preview"
+        ? "calendar_instruction"
+        : candidate.version <= 13 &&
+            (candidate.step === "profile_instruction" ||
+              candidate.step === "appearance_instruction" ||
+              candidate.step === "theme_instruction")
+          ? "completed"
+          : candidate.step;
     return {
-      version: 13,
-      step:
-        candidate.version === 11 && candidate.step === "theme_instruction"
-          ? "profile_instruction"
-          : candidate.step,
+      version: 14,
+      step: migratedStep,
       context: isContext(candidate.context) ? candidate.context : undefined,
       startedAt: candidate.startedAt,
       profileConfiguredAt: candidate.profileConfiguredAt,
@@ -316,14 +326,17 @@ export const migrateGuidedOnboardingState = (
         ? [...new Set(candidate.postExitCreationKeys.filter((key): key is string => typeof key === "string" && key.length > 0))]
         : [],
       exitConfirmedAt: candidate.exitConfirmedAt,
-      completedAt: candidate.completedAt,
+      completedAt:
+        migratedStep === "completed"
+          ? candidate.completedAt ?? nowIso()
+          : candidate.completedAt,
       dismissedAt: candidate.dismissedAt,
     };
   }
 
   if (candidate.version === 8 && isGuidedStep(candidate.step)) {
     return {
-      version: 13,
+      version: 14,
       step: candidate.step,
       context: isContext(candidate.context) ? candidate.context : undefined,
       startedAt: candidate.startedAt,
@@ -415,7 +428,7 @@ export const migrateGuidedOnboardingState = (
     }
 
     return {
-      version: 13,
+      version: 14,
       step,
       context: isContext(candidate.context) ? candidate.context : undefined,
       startedAt: candidate.startedAt,
@@ -452,7 +465,7 @@ export const migrateGuidedOnboardingState = (
       candidate.step === "completed" || candidate.step === "dismissed";
     const preserveAsCompleted = !terminal && hasLegacyProgress(candidate);
     return {
-      version: 13,
+      version: 14,
       step: terminal
         ? (candidate.step as "completed" | "dismissed")
         : preserveAsCompleted
@@ -570,7 +583,12 @@ export const reduceGuidedOnboardingState = (
       };
     case "open_edit_preview":
       return state.step === "edit_instruction"
-        ? { ...state, step: "edit_preview" }
+        ? {
+            ...state,
+            step: action.continueToCalendar
+              ? "calendar_instruction"
+              : "edit_preview",
+          }
         : state;
     case "finish_edit_preview":
       return state.step === "edit_preview"
@@ -624,7 +642,18 @@ export const reduceGuidedOnboardingState = (
         : state;
     case "open_habits_surface":
       return state.step === "habit_surface_instruction"
-        ? { ...state, step: "habit_instruction" }
+        ? { ...state, step: "habit_showcase_instruction" }
+        : state;
+    case "continue_from_habit_showcase":
+      return state.step === "habit_showcase_instruction"
+        ? action.hasExistingHabit
+          ? {
+              ...state,
+              step: "habit_created_confirmation",
+              firstHabitCreatedAt:
+                state.firstHabitCreatedAt ?? action.at ?? nowIso(),
+            }
+          : { ...state, step: "habit_instruction" }
         : state;
     case "habit_saved":
       return state.step === "habit_instruction"
@@ -632,6 +661,18 @@ export const reduceGuidedOnboardingState = (
             ...state,
             step: "habit_created_confirmation",
             firstHabitCreatedAt: action.at ?? nowIso(),
+          }
+        : state;
+    case "finish_habit_onboarding":
+      return state.step === "habit_created_confirmation"
+        ? {
+            ...state,
+            step: "completed",
+            postOnboardingEventsCreated: 0,
+            postOnboardingCategoriesCreated: 0,
+            accountNudgeShownAt: undefined,
+            completedAt: action.at ?? nowIso(),
+            dismissedAt: undefined,
           }
         : state;
     case "return_to_year":
@@ -699,7 +740,7 @@ export const reduceGuidedOnboardingState = (
     }
     case "enter_demo_exploration":
       return {
-        version: 13,
+        version: 14,
         step: "demo_exploration",
         demoExplorationStartedAt: action.at ?? nowIso(),
         demoInteractionKeys: [],

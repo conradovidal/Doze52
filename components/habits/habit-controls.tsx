@@ -59,6 +59,7 @@ type HabitControlsProps = {
   selectedHabit: Habit | null;
   archivedHabits?: Habit[];
   isEditing?: boolean;
+  readOnly?: boolean;
   mobile?: boolean;
   creationDisabled: boolean;
   creationDisabledLabel: string | null;
@@ -222,6 +223,7 @@ export function HabitControls({
   selectedHabit,
   archivedHabits = [],
   isEditing = false,
+  readOnly = false,
   mobile = false,
   creationDisabled,
   creationDisabledLabel,
@@ -450,6 +452,9 @@ export function HabitControls({
     <section
       data-habit-controls
       data-onboarding-habit-controls
+      data-onboarding-habit-showcase={
+        guidedNotice?.target === "habit-showcase" ? "true" : undefined
+      }
       data-habit-controls-layout={mobile ? "mobile" : "desktop"}
       className={cn(
         "shrink-0",
@@ -477,8 +482,9 @@ export function HabitControls({
               aria-pressed={isEditing}
               aria-label={isEditing ? "Finalizar edição" : "Editar"}
               title={isEditing ? "Finalizar edição" : "Editar"}
+              disabled={readOnly}
               className={cn(
-                "grid size-8 place-items-center rounded-[10px] border border-border text-foreground/70",
+                "grid size-8 place-items-center rounded-[10px] border border-border text-foreground/70 disabled:cursor-not-allowed disabled:opacity-45",
                 isEditing && "border-foreground bg-foreground text-background"
               )}
               onClick={onToggleEditing}
@@ -513,8 +519,9 @@ export function HabitControls({
             aria-pressed={isEditing}
             aria-label={isEditing ? "Finalizar edição" : "Editar"}
             title={isEditing ? "Finalizar edição" : "Editar"}
+            disabled={readOnly}
             className={cn(
-              "inline-flex size-8 items-center justify-center rounded-[10px] border border-border bg-card text-foreground/70",
+              "inline-flex size-8 items-center justify-center rounded-[10px] border border-border bg-card text-foreground/70 disabled:cursor-not-allowed disabled:opacity-45",
               isEditing && "border-foreground bg-foreground text-background"
             )}
             onClick={onToggleEditing}

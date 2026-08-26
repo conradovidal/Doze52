@@ -1,5 +1,6 @@
 import {
   addDays,
+  eachDayOfInterval,
   endOfWeek,
   endOfYear,
   format,
@@ -7,9 +8,195 @@ import {
   startOfWeek,
   startOfYear,
 } from "date-fns";
-import type { Habit } from "@/lib/types";
+import {
+  CATEGORY_COLOR_BASE_BLUE,
+  CATEGORY_COLOR_BASE_TEAL,
+  CATEGORY_COLOR_BASE_VIOLET,
+  CATEGORY_COLOR_BASE_YELLOW,
+} from "@/lib/category-palette";
+import type {
+  CalendarEvent,
+  CategoryItem,
+  Habit,
+  HabitCheckIn,
+} from "@/lib/types";
 
 export const HABITS_DESKTOP_MAX = 4;
+
+export type OnboardingHabitShowcase = {
+  habits: Habit[];
+  checkIns: Record<string, HabitCheckIn>;
+  selectedHabitId: string;
+};
+
+const ONBOARDING_HABIT_SHOWCASE_DEFINITIONS = [
+  {
+    id: "onboarding-habit-exercise",
+    name: "Exercício",
+    color: CATEGORY_COLOR_BASE_BLUE,
+  },
+  {
+    id: "onboarding-habit-reading",
+    name: "Ler 20 minutos",
+    color: CATEGORY_COLOR_BASE_VIOLET,
+  },
+  {
+    id: "onboarding-habit-sleep",
+    name: "Dormir antes das 23h",
+    color: CATEGORY_COLOR_BASE_TEAL,
+  },
+  {
+    id: "onboarding-habit-smoke-free",
+    name: "Dia sem fumar",
+    color: CATEGORY_COLOR_BASE_YELLOW,
+  },
+] as const;
+
+const normalizeShowcaseLabel = (value: string) =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("pt-BR");
+
+const addEventDates = (
+  target: Set<string>,
+  event: Pick<CalendarEvent, "startDate" | "endDate">,
+  yearStartIso: string,
+  cutoffIso: string
+) => {
+  const startIso = event.startDate < yearStartIso ? yearStartIso : event.startDate;
+  const endIso = event.endDate > cutoffIso ? cutoffIso : event.endDate;
+  if (startIso > endIso) return;
+  eachDayOfInterval({ start: parseISO(startIso), end: parseISO(endIso) }).forEach(
+    (date) => target.add(format(date, "yyyy-MM-dd"))
+  );
+};
+
+export const buildOnboardingHabitShowcase = ({
+  year,
+  todayIso,
+  events,
+  categories,
+}: {
+  year: number;
+  todayIso: string;
+  events: CalendarEvent[];
+  categories: CategoryItem[];
+}): OnboardingHabitShowcase => {
+  const yearStartIso = `${year}-01-01`;
+  const yearEndIso = `${year}-12-31`;
+  const cutoffIso = todayIso < yearEndIso ? todayIso : yearEndIso;
+  const createdAt = `${yearStartIso}T12:00:00.000Z`;
+  const habits = ONBOARDING_HABIT_SHOWCASE_DEFINITIONS.map(
+    (definition, position): Habit => ({
+      ...definition,
+      icon: "circle-check",
+      position,
+      createdAt,
+      updatedAt: createdAt,
+    })
+  );
+  if (cutoffIso < yearStartIso) {
+    return { habits, checkIns: {}, selectedHabitId: habits[0].id };
+  }
+
+  const categoryNameById = new Map(
+    categories.map((category) => [category.id, normalizeShowcaseLabel(category.name)])
+  );
+  const travelOrVacationDates = new Set<string>();
+  const readingBoostDates = new Set<string>();
+  const socialDates = new Set<string>();
+  const transitionDates = new Set<string>();
+
+  events.forEach((event) => {
+    const title = normalizeShowcaseLabel(event.title);
+    const categoryName = categoryNameById.get(event.categoryId) ?? "";
+    const isTravelOrVacation =
+      categoryName.includes("viagen") ||
+      title.includes("ferias") ||
+      title.includes("carnaval") ||
+      title.includes("fim de semana") ||
+      title.includes("ano novo");
+    const isReadingBoost = isTravelOrVacation || title.includes("feira do livro");
+    const isSocial =
+      categoryName.includes("amigo") ||
+      title.includes("casamento") ||
+      title.includes("show") ||
+      title.includes("concerto");
+
+    if (isTravelOrVacation) {
+      addEventDates(travelOrVacationDates, event, yearStartIso, cutoffIso);
+      if (event.startDate >= yearStartIso && event.startDate <= cutoffIso) {
+        transitionDates.add(event.startDate);
+      }
+      if (event.endDate >= yearStartIso && event.endDate <= cutoffIso) {
+        transitionDates.add(event.endDate);
+      }
+    }
+    if (isReadingBoost) {
+      addEventDates(readingBoostDates, event, yearStartIso, cutoffIso);
+    }
+    if (isSocial && event.startDate >= yearStartIso && event.startDate <= cutoffIso) {
+      socialDates.add(event.startDate);
+    }
+  });
+
+  const dates = eachDayOfInterval({
+    start: parseISO(yearStartIso),
+    end: parseISO(cutoffIso),
+  }).map((date) => format(date, "yyyy-MM-dd"));
+  const completions = new Map<string, Set<string>>();
+  dates.forEach((dateIso, dayIndex) => {
+    const weekday = parseISO(dateIso).getDay();
+    const completed = new Set<string>();
+    const blackout = transitionDates.has(dateIso);
+    if (!blackout) {
+      if (
+        [1, 3, 5, 6].includes(weekday) &&
+        !travelOrVacationDates.has(dateIso)
+      ) {
+        completed.add(habits[0].id);
+      }
+      if (
+        [0, 1, 4].includes(weekday) ||
+        (readingBoostDates.has(dateIso) && dayIndex % 2 === 0)
+      ) {
+        completed.add(habits[1].id);
+      }
+      if (weekday <= 4 && !socialDates.has(dateIso)) {
+        completed.add(habits[2].id);
+      }
+      if (dayIndex % 13 !== 0 && !socialDates.has(dateIso)) {
+        completed.add(habits[3].id);
+      }
+    }
+    completions.set(dateIso, completed);
+  });
+
+  if (dates.length >= 5) {
+    dates.slice(0, 5).forEach((dateIso, markerCount) => {
+      completions.set(
+        dateIso,
+        new Set(habits.slice(0, markerCount).map((habit) => habit.id))
+      );
+    });
+  }
+
+  const checkIns: Record<string, HabitCheckIn> = {};
+  completions.forEach((habitIds, dateIso) => {
+    habitIds.forEach((habitId) => {
+      const key = getHabitCheckInKey(habitId, dateIso);
+      checkIns[key] = {
+        habitId,
+        date: dateIso,
+        completed: true,
+        updatedAt: `${dateIso}T12:00:00.000Z`,
+      };
+    });
+  });
+
+  return { habits, checkIns, selectedHabitId: habits[0].id };
+};
 
 export type DesktopHabitSlot =
   | "center"

@@ -20,6 +20,7 @@ export function DesktopHabitsPrototype({
   onToggleDay,
   onRequestCreate,
   isEditing,
+  readOnly = false,
   archivedHabits,
   onEditHabit,
   onReorderHabits,
@@ -42,6 +43,7 @@ export function DesktopHabitsPrototype({
   onToggleDay: (dateIso: string) => void;
   onRequestCreate: () => void;
   isEditing: boolean;
+  readOnly?: boolean;
   archivedHabits: Habit[];
   onEditHabit: (habitId: string) => void;
   onReorderHabits: (orderedIds: string[]) => void;
@@ -67,6 +69,7 @@ export function DesktopHabitsPrototype({
         onSelectHabit={onSelectHabit}
         onRequestCreate={onRequestCreate}
         isEditing={isEditing}
+        readOnly={readOnly}
         archivedHabits={archivedHabits}
         onEditHabit={onEditHabit}
         onReorderHabits={onReorderHabits}
@@ -101,6 +104,7 @@ export function DesktopHabitsPrototype({
             onToggle: onToggleDay,
             onCreateRequest: onRequestCreate,
             isEditing,
+            readOnly,
           }}
         />
       </div>

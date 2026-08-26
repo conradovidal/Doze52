@@ -13,6 +13,7 @@ export type GuidedToolbarNotice = {
     | "year"
     | "period-navigation"
     | "habit-surface"
+    | "habit-showcase"
     | "habit"
     | "habit-created"
     | "profile"
