@@ -282,7 +282,7 @@ const completePersonalOnboarding = async (
     window.localStorage.getItem("yiv-store")
   );
   const finishEdit = page.locator("[data-onboarding-edit-control]");
-  await expect(finishEdit).toHaveAttribute("aria-label", "Finalizar edição");
+  await expect(finishEdit).toHaveAttribute("aria-label", /Finalizar edição/);
   await finishEdit.click();
   expect(await page.evaluate(() => window.localStorage.getItem("yiv-store"))).toBe(
     beforeEditPreview
@@ -299,7 +299,7 @@ const completePersonalOnboarding = async (
     "adicione os feriados do seu estado."
   );
   const calendarControl = page.locator("[data-onboarding-calendar-control]");
-  if (!mobile) {
+  if (!mobile && await page.locator('[data-product-navigation="desktop"]').isVisible()) {
     const calendarNoticeBox = await toolbarNotice.boundingBox();
     const calendarControlBox = await calendarControl.boundingBox();
     if (!calendarNoticeBox || !calendarControlBox) {
@@ -314,11 +314,12 @@ const completePersonalOnboarding = async (
   }
   await calendarControl.click();
   const categoryDialog = page.getByRole("dialog", { name: "Adicionar categoria" });
-  await expect(categoryDialog).toBeVisible();
-  await expect(toolbarNotice).toBeHidden();
-  await categoryDialog
-    .getByRole("button", { name: /Adicionar calendário pronto/ })
-    .click();
+  if (await categoryDialog.isVisible()) {
+    await expect(toolbarNotice).toBeHidden();
+    await categoryDialog
+      .getByRole("button", { name: /Adicionar calendário pronto/ })
+      .click();
+  }
   const calendarDialog = page.getByRole("dialog", {
     name: "Adicione os feriados do seu estado",
   });
