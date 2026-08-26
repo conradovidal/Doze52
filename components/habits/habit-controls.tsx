@@ -32,6 +32,10 @@ import {
 } from "lucide-react";
 
 import { CollapsibleControlRegion } from "@/components/ui/collapsible-control-region";
+import {
+  GuidedToolbarNoticeCard,
+  type GuidedToolbarNotice,
+} from "@/components/onboarding/guided-toolbar-notice";
 import { getCategoryColorToken } from "@/lib/category-palette";
 import {
   arraysEqual,
@@ -64,6 +68,9 @@ type HabitControlsProps = {
   onReorderHabits?: (orderedIds: string[]) => void;
   onReactivateHabit?: (habitId: string) => void;
   onToggleEditing?: () => void;
+  guidedNotice?: GuidedToolbarNotice | null;
+  onDismissGuidedNotice?: () => void;
+  onGuidedNoticeAction?: () => void;
 };
 
 type DragState = { id: string; width: number | null };
@@ -224,6 +231,9 @@ export function HabitControls({
   onReorderHabits,
   onReactivateHabit,
   onToggleEditing,
+  guidedNotice = null,
+  onDismissGuidedNotice,
+  onGuidedNoticeAction,
 }: HabitControlsProps) {
   const { mode: themeMode } = useTheme();
   const [expanded, setExpanded] = React.useState(true);
@@ -361,7 +371,8 @@ export function HabitControls({
         disabled={creationDisabled}
         className={cn(
           "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-border bg-card text-foreground shadow-none transition-all duration-[160ms] ease-[cubic-bezier(0.22,1,0.36,1)] hover:border-foreground/20 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45 disabled:cursor-not-allowed disabled:text-muted-foreground/55 disabled:hover:border-border disabled:hover:bg-card",
-          mobile && "h-10 w-full rounded-[8px]"
+          mobile && "h-10 w-full rounded-[8px]",
+          guidedNotice?.target === "habit" && "guided-control-target"
         )}
         onClick={onRequestCreate}
       >
@@ -442,7 +453,7 @@ export function HabitControls({
         "shrink-0",
         mobile
           ? "w-full overflow-hidden rounded-[10px] border border-border bg-card"
-          : "mx-auto mb-2 flex w-full max-w-[50rem] flex-col items-center gap-1.5 border-t border-border/45 pt-3"
+          : "mx-auto mb-2 flex w-full max-w-[50rem] flex-col items-center gap-2 border-t border-border/45 pt-3"
       )}
     >
       <h1 className="sr-only">Hábitos</h1>
@@ -567,6 +578,15 @@ export function HabitControls({
             </p>
           ) : null}
       </CollapsibleControlRegion>
+      {guidedNotice && onDismissGuidedNotice ? (
+        <GuidedToolbarNoticeCard
+          notice={guidedNotice}
+          onClose={onDismissGuidedNotice}
+          onAction={onGuidedNoticeAction}
+          placement="viewport"
+          portaled
+        />
+      ) : null}
     </section>
   );
 }

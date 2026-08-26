@@ -23,7 +23,7 @@ test("normaliza UTMs e limita o tamanho dos valores", () => {
 
 test("converte o onboarding local em upsert idempotente", () => {
   const state: GuidedOnboardingState = {
-    version: 11,
+    version: 12,
     step: "completed",
     context: "work",
     startedAt: "2026-08-11T10:00:00.000Z",

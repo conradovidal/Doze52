@@ -7,7 +7,7 @@ const installCompletedOnboarding = async (
     window.localStorage.setItem(
       "doze52:onboarding:v2",
       JSON.stringify({
-        version: 11,
+        version: 12,
         step: "completed",
         completedAt: new Date().toISOString(),
       })
@@ -223,6 +223,17 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
   await page.getByRole("button", { name: "Mostrar categorias" }).click();
   await expect(categoryRegion).toHaveAttribute("aria-hidden", "false");
 
+  const calendarControlSpacing = await page
+    .locator("[data-onboarding-filter-region]")
+    .evaluate((element) => {
+      const style = getComputedStyle(element);
+      return {
+        maxWidth: style.maxWidth,
+        paddingTop: style.paddingTop,
+        rowGap: style.rowGap,
+      };
+    });
+
   const calendarRegion = page.locator("[data-desktop-calendar-scroll-region]");
   const widthBefore = (await calendarRegion.boundingBox())?.width;
   await expect(page.getByRole("button", { name: "Abrir configurações" })).toHaveCount(0);
@@ -250,6 +261,17 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
   await page.getByRole("link", { name: "Hábitos" }).click();
   const habitControlsBox = await page.locator('[data-habit-controls-layout="desktop"]').boundingBox();
   if (!habitControlsBox) throw new Error("Controles de hábitos não puderam ser medidos.");
+  const habitControlSpacing = await page
+    .locator('[data-habit-controls-layout="desktop"]')
+    .evaluate((element) => {
+      const style = getComputedStyle(element);
+      return {
+        maxWidth: style.maxWidth,
+        paddingTop: style.paddingTop,
+        rowGap: style.rowGap,
+      };
+    });
+  expect(habitControlSpacing).toEqual(calendarControlSpacing);
   expect(
     Math.abs(
       habitControlsBox.x + habitControlsBox.width / 2 - desktopViewport.width / 2
@@ -443,7 +465,7 @@ test("mobile reordena hábitos pelo mesmo DnD e persiste a posição", async ({
   ).toBeVisible();
 });
 
-test("onboarding desktop ensina navegação de período depois do ano", async ({
+test("onboarding desktop conclui navegação, hábito, perfil e tema", async ({
   page,
 }, testInfo) => {
   test.skip(!testInfo.project.name.startsWith("desktop-"), "Cenário desktop");
@@ -452,7 +474,7 @@ test("onboarding desktop ensina navegação de período depois do ano", async ({
     window.localStorage.setItem(
       "doze52:onboarding:v2",
       JSON.stringify({
-        version: 11,
+        version: 12,
         step: "year_instruction",
         context: "personal",
         startedAt: new Date().toISOString(),
@@ -460,6 +482,7 @@ test("onboarding desktop ensina navegação de período depois do ano", async ({
         periodItemsCreated: 2,
       })
     );
+    window.sessionStorage.removeItem("doze52:habits-prototype:v1");
   });
   await page.goto("/?surface=annual");
 
@@ -471,14 +494,48 @@ test("onboarding desktop ensina navegação de período depois do ano", async ({
     '[data-guided-toolbar-notice][data-guided-toolbar-target="period-navigation"]'
   );
   await expect(periodNotice).toBeVisible();
-  await expect(page.locator('[data-onboarding-period-control="true"]')).toHaveCount(16);
+  await expect(page.locator('[data-onboarding-period-control="true"]')).toHaveCount(4);
+  await expect(page.locator(".product-spotlight-target")).toHaveCount(0);
   await page.getByTitle("1o trimestre").click();
   await expect(page.locator("[data-month-row]")).toHaveCount(3);
   await periodNotice.getByRole("button", { name: "Continuar" }).click();
+  await expect(page.locator('[data-product-navigation="desktop"] a[aria-current="page"]')).toHaveAttribute("title", "Hábitos");
+  const habitNotice = page.locator(
+    '[data-guided-toolbar-notice][data-guided-toolbar-target="habit"]'
+  );
+  await expect(habitNotice).toBeVisible();
+  await page.getByRole("button", { name: "Criar novo hábito" }).click();
+  await page.getByLabel("Nome do hábito").fill("Leitura");
+  await page.getByRole("button", { name: "Criar hábito" }).click();
+
+  const createdNotice = page.locator(
+    '[data-guided-toolbar-notice][data-guided-toolbar-target="habit-created"]'
+  );
+  await createdNotice.getByRole("button", { name: "Voltar ao meu ano" }).click();
   await expect(page.locator("[data-month-row]")).toHaveCount(12);
+  const profileNotice = page.locator(
+    '[data-guided-toolbar-notice][data-guided-toolbar-target="profile"]'
+  );
+  await expect(profileNotice).toBeVisible();
+  await page.locator('[data-product-account="desktop"]').click();
+
+  const panel = page.locator("[data-app-utility-panel]");
+  await expect(panel).toBeVisible();
+  const appearanceNotice = page.locator(
+    '[data-guided-toolbar-notice][data-guided-toolbar-target="appearance"]'
+  );
+  await expect(appearanceNotice).toBeVisible();
+  await panel.getByRole("button", { name: /^Aparência/ }).click();
+  const themeNotice = page.locator(
+    '[data-guided-toolbar-notice][data-guided-toolbar-target="theme"]'
+  );
+  await expect(themeNotice).toBeVisible();
+  await page.locator("[data-onboarding-theme-control]").click();
+  await themeNotice.getByRole("button", { name: "Finalizar guia" }).click();
+  await expect(panel).toBeHidden();
 });
 
-test("onboarding de tema usa o painel de Configurações", async ({
+test("sessão v11 de tema retoma pela descoberta do Perfil", async ({
   page,
 }, testInfo) => {
   test.skip(!testInfo.project.name.startsWith("desktop-"), "Cenário desktop");
@@ -498,12 +555,14 @@ test("onboarding de tema usa o painel de Configurações", async ({
   });
   await page.goto("/?surface=annual");
 
+  const profileNotice = page.locator(
+    '[data-guided-toolbar-notice][data-guided-toolbar-target="profile"]'
+  );
+  await expect(profileNotice).toBeVisible();
+  await page.locator('[data-product-account="desktop"]').click();
   const panel = page.locator("[data-app-utility-panel]");
   await expect(panel).toBeVisible();
-  await expect(panel.getByRole("button", { name: /^Aparência/ })).toHaveAttribute(
-    "aria-current",
-    "page"
-  );
+  await panel.getByRole("button", { name: /^Aparência/ }).click();
   const notice = page.locator(
     '[data-guided-toolbar-notice][data-guided-toolbar-target="theme"]'
   );
@@ -513,7 +572,7 @@ test("onboarding de tema usa o painel de Configurações", async ({
     "true"
   );
   await page.locator("[data-onboarding-theme-control]").click();
-  await notice.getByRole("button", { name: "Explorar meu ano" }).click();
+  await notice.getByRole("button", { name: "Finalizar guia" }).click();
   await expect(panel).toBeHidden();
   await expect(notice).toBeHidden();
 });

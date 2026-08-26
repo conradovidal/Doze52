@@ -32,6 +32,7 @@ type ProductNavigationProps = {
     section: UtilityPanelSection,
     trigger: HTMLElement
   ) => void;
+  highlightProfile?: boolean;
 };
 
 const ICON_BY_NAME: Record<
@@ -175,6 +176,7 @@ export function DesktopProductNavigation({
   authLoading,
   onDestinationSelect,
   onOpenUtilityPanel,
+  highlightProfile = false,
 }: ProductNavigationProps) {
   const handleAccount = (event: React.MouseEvent<HTMLButtonElement>) => {
     if (authLoading) return;
@@ -205,7 +207,10 @@ export function DesktopProductNavigation({
         aria-label="Abrir perfil"
         title="Perfil"
         disabled={authLoading}
-        className="col-start-3 hidden size-10 place-items-center justify-self-end rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 disabled:opacity-45 md:grid"
+        className={cn(
+          "col-start-3 hidden size-10 place-items-center justify-self-end rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 disabled:opacity-45 md:grid",
+          highlightProfile && "guided-control-target"
+        )}
         onClick={handleAccount}
       >
         {authLoading ? null : <AccountGlyph desktopHeader />}

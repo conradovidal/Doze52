@@ -404,6 +404,16 @@ export function AppHeader({
               authLoading={authLoading}
               onDestinationSelect={onDestinationSelect}
               onOpenUtilityPanel={onOpenUtilityPanel}
+              highlightProfile={guidedToolbarNotice?.target === "profile"}
+            />
+          ) : null}
+          {guidedToolbarNotice?.target === "profile" &&
+          onDismissGuidedSelection ? (
+            <GuidedToolbarNoticeCard
+              notice={guidedToolbarNotice}
+              onClose={onDismissGuidedSelection}
+              placement="viewport"
+              portaled
             />
           ) : null}
 
@@ -891,6 +901,8 @@ export function AppHeader({
                       <GuidedToolbarNoticeCard
                         notice={guidedToolbarNotice}
                         onClose={onDismissGuidedSelection}
+                        placement="viewport"
+                        portaled
                       />
                     ) : null}
                   </div>

@@ -3,6 +3,7 @@
 import { YearGrid } from "@/components/calendar/year-grid";
 import { HabitControls } from "@/components/habits/habit-controls";
 import type { Habit, HabitCheckIn } from "@/lib/types";
+import type { GuidedToolbarNotice } from "@/components/onboarding/guided-toolbar-notice";
 
 const noop = () => undefined;
 
@@ -25,6 +26,9 @@ export function DesktopHabitsPrototype({
   onReactivateHabit,
   onToggleEditing,
   onYearChange,
+  guidedNotice,
+  onDismissGuidedNotice,
+  onGuidedNoticeAction,
 }: {
   year: number;
   todayIso: string;
@@ -44,6 +48,9 @@ export function DesktopHabitsPrototype({
   onReactivateHabit: (habitId: string) => void;
   onToggleEditing?: () => void;
   onYearChange: (year: number) => void;
+  guidedNotice?: GuidedToolbarNotice | null;
+  onDismissGuidedNotice?: () => void;
+  onGuidedNoticeAction?: () => void;
 }) {
   return (
     <section
@@ -65,6 +72,9 @@ export function DesktopHabitsPrototype({
         onReorderHabits={onReorderHabits}
         onReactivateHabit={onReactivateHabit}
         onToggleEditing={onToggleEditing}
+        guidedNotice={guidedNotice}
+        onDismissGuidedNotice={onDismissGuidedNotice}
+        onGuidedNoticeAction={onGuidedNoticeAction}
       />
 
       <div

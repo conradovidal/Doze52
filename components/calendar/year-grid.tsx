@@ -666,9 +666,7 @@ export function YearGrid({
                 LATERAL_KEY_BASE_CLASS,
                 "h-auto self-stretch w-[1.95rem] shrink-0 border-r border-border px-0 min-[420px]:w-[2.1rem] md:w-[2.25rem]",
                 quarterRailShapeClass,
-                isQuarterSelected ? LATERAL_KEY_ACTIVE_CLASS : LATERAL_KEY_REST_CLASS,
-                guidedPeriodNotice?.target === "period-navigation" &&
-                  "product-spotlight-target"
+                isQuarterSelected ? LATERAL_KEY_ACTIVE_CLASS : LATERAL_KEY_REST_CLASS
               )}
               data-onboarding-period-control={
                 guidedPeriodNotice?.target === "period-navigation" ? "true" : undefined
@@ -687,7 +685,8 @@ export function YearGrid({
                 notice={guidedPeriodNotice}
                 onClose={onDismissGuidedPeriodNotice}
                 onAction={onGuidedPeriodAction}
-                placement="right"
+                placement="viewport"
+                portaled
               />
             ) : null}
 
@@ -727,9 +726,7 @@ export function YearGrid({
                         : `Abrir ${MONTH_TITLE_LABELS[monthIndex]}`
                     }
                     monthLabelActive={isActiveMonth}
-                    monthLabelHighlighted={
-                      guidedPeriodNotice?.target === "period-navigation"
-                    }
+                    monthLabelHighlighted={false}
                     isMobileInteractionMode={isMobileInteractionMode}
                     onDayCellActivate={
                       isMobileInteractionMode && viewMode !== "month"

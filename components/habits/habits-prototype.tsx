@@ -200,6 +200,10 @@ export function HabitsPrototype({
   isEditing = false,
   onToggleEditing,
   onYearChange,
+  guidedNotice = null,
+  onDismissGuidedNotice,
+  onGuidedNoticeAction,
+  onHabitCreated,
 }: {
   year: number;
   todayIso: string;
@@ -208,6 +212,10 @@ export function HabitsPrototype({
   isEditing?: boolean;
   onToggleEditing?: () => void;
   onYearChange: (year: number) => void;
+  guidedNotice?: import("@/components/onboarding/guided-toolbar-notice").GuidedToolbarNotice | null;
+  onDismissGuidedNotice?: () => void;
+  onGuidedNoticeAction?: () => void;
+  onHabitCreated?: () => void;
 }) {
   const { notify } = useFeedback();
   const { limits, isPro, isLoading: isBillingLoading, error: billingError } =
@@ -360,6 +368,7 @@ export function HabitsPrototype({
     setHabits((current) => [...current, habit]);
     setSelectedHabitId(habit.id);
     setCreateDialogOpen(false);
+    onHabitCreated?.();
   };
 
   const requestEditHabit = (habitId: string) => {
@@ -477,6 +486,9 @@ export function HabitsPrototype({
           onReactivateHabit={reactivateHabit}
           onToggleEditing={onToggleEditing}
           onYearChange={onYearChange}
+          guidedNotice={guidedNotice}
+          onDismissGuidedNotice={onDismissGuidedNotice}
+          onGuidedNoticeAction={onGuidedNoticeAction}
         />
         {createDialog}
         <ProUpgradeDialog
