@@ -1,8 +1,11 @@
 "use client";
 
+import * as React from "react";
 import { YearGrid } from "@/components/calendar/year-grid";
 import { HabitControls } from "@/components/habits/habit-controls";
+import { GuidedToolbarNoticeCard } from "@/components/onboarding/guided-toolbar-notice";
 import type { Habit, HabitCheckIn } from "@/lib/types";
+import type { GuidedToolbarNotice } from "@/components/onboarding/guided-toolbar-notice";
 
 const noop = () => undefined;
 
@@ -10,41 +13,76 @@ export function DesktopHabitsPrototype({
   year,
   todayIso,
   habits,
+  visibleHabits,
+  allHabits,
   totalActiveHabits,
   checkIns,
   selectedHabit,
+  visibleHabitIds,
   creationDisabled,
   creationDisabledLabel,
   onSelectHabit,
   onToggleDay,
+  onOpenDayPicker,
   onRequestCreate,
   isEditing,
+  readOnly = false,
   archivedHabits,
   onEditHabit,
   onReorderHabits,
   onReactivateHabit,
   onToggleEditing,
   onYearChange,
+  guidedNotice,
+  retrospectiveDates,
+  retrospectiveHighlighted = false,
+  onDismissGuidedNotice,
+  onGuidedNoticeAction,
 }: {
   year: number;
   todayIso: string;
   habits: Habit[];
+  visibleHabits: Habit[];
+  allHabits: Habit[];
   totalActiveHabits: number;
   checkIns: Record<string, HabitCheckIn>;
   selectedHabit: Habit | null;
+  visibleHabitIds: ReadonlySet<string>;
   creationDisabled: boolean;
   creationDisabledLabel: string | null;
   onSelectHabit: (habitId: string) => void;
   onToggleDay: (dateIso: string) => void;
+  onOpenDayPicker: (dateIso: string, anchor: HTMLElement) => void;
   onRequestCreate: () => void;
   isEditing: boolean;
+  readOnly?: boolean;
   archivedHabits: Habit[];
   onEditHabit: (habitId: string) => void;
   onReorderHabits: (orderedIds: string[]) => void;
   onReactivateHabit: (habitId: string) => void;
   onToggleEditing?: () => void;
   onYearChange: (year: number) => void;
+  guidedNotice?: GuidedToolbarNotice | null;
+  retrospectiveDates?: ReadonlySet<string>;
+  retrospectiveHighlighted?: boolean;
+  onDismissGuidedNotice?: () => void;
+  onGuidedNoticeAction?: () => void;
 }) {
+  const scrollRegionRef = React.useRef<HTMLDivElement | null>(null);
+
+  React.useLayoutEffect(() => {
+    if (!retrospectiveDates?.size) return;
+    const region = scrollRegionRef.current;
+    const target = Array.from(
+      region?.querySelectorAll<HTMLElement>(
+        '[data-onboarding-retrospective-date="true"]'
+      ) ?? []
+    ).at(-1);
+    target?.scrollIntoView({ block: "center", inline: "center" });
+  }, [retrospectiveDates]);
+
+  const controlsNotice =
+    guidedNotice?.target === "habit-created" ? null : guidedNotice;
   return (
     <section
       data-habits-prototype
@@ -55,19 +93,26 @@ export function DesktopHabitsPrototype({
         habits={habits}
         totalActiveHabits={totalActiveHabits}
         selectedHabit={selectedHabit}
+        visibleHabitIds={visibleHabitIds}
         creationDisabled={creationDisabled}
         creationDisabledLabel={creationDisabledLabel}
         onSelectHabit={onSelectHabit}
+        onToggleHabitVisibility={onSelectHabit}
         onRequestCreate={onRequestCreate}
         isEditing={isEditing}
+        readOnly={readOnly}
         archivedHabits={archivedHabits}
         onEditHabit={onEditHabit}
         onReorderHabits={onReorderHabits}
         onReactivateHabit={onReactivateHabit}
         onToggleEditing={onToggleEditing}
+        guidedNotice={controlsNotice}
+        onDismissGuidedNotice={onDismissGuidedNotice}
+        onGuidedNoticeAction={onGuidedNoticeAction}
       />
 
       <div
+        ref={scrollRegionRef}
         data-desktop-habits-scroll-region
         className="min-h-0 flex-1 overflow-auto pb-1 [scrollbar-gutter:stable_both-edges]"
       >
@@ -85,15 +130,32 @@ export function DesktopHabitsPrototype({
           onApplyDayReorder={noop}
           showScaleControl={false}
           habitPresentation={{
-            habits,
+            habits: visibleHabits,
+            allHabits,
             checkIns,
             selectedHabit,
             onToggle: onToggleDay,
+            onOpenPicker: onOpenDayPicker,
             onCreateRequest: onRequestCreate,
             isEditing,
+            readOnly,
+            retrospectiveDates,
+            retrospectiveHighlighted,
           }}
         />
       </div>
+      {guidedNotice?.target === "habit-created" && onDismissGuidedNotice ? (
+        <GuidedToolbarNoticeCard
+          notice={guidedNotice}
+          onClose={onDismissGuidedNotice}
+          onAction={onGuidedNoticeAction}
+          placement="viewport"
+          portaled
+          anchorSelector='[data-onboarding-retrospective-date="true"]'
+          anchorMultiple
+          anchorPlacement="above-center"
+        />
+      ) : null}
     </section>
   );
 }

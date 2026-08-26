@@ -338,9 +338,11 @@ export function MonthRow({
     baseEventsTopOffset +
     eventBandHeightPx +
     layoutDensity.monthRowBottomPaddingPx;
-  const minHeightPx = scaleVerticalSpacing(
-    Math.max(layoutDensity.monthRowBaseMinHeightPx, baseContentHeight)
-  );
+  const minHeightPx = isHabitMode
+    ? scaleVerticalSpacing(44)
+    : scaleVerticalSpacing(
+        Math.max(layoutDensity.monthRowBaseMinHeightPx, baseContentHeight)
+      );
 
   const rangeBounds = React.useMemo(() => {
     const a = creatingRange?.startIso ?? guidedSelectionRange?.startDate;

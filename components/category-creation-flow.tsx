@@ -4,7 +4,6 @@ import * as React from "react";
 import { ArrowRight, CalendarDays, Tags } from "lucide-react";
 import { CalendarPackLauncher } from "@/components/calendar-packs/calendar-pack-launcher";
 import { CategoryManager } from "@/components/category-manager";
-import { ProfileIcon } from "@/components/profile-icon";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -83,56 +82,56 @@ export function CategoryCreationFlow({
         <DialogContent className="p-5 sm:max-w-[480px] sm:p-6">
           <DialogHeader className="text-left">
             <DialogTitle>Adicionar categoria</DialogTitle>
-            <DialogDescription>
-              {profile
-                ? `Escolha o que deseja adicionar ao contexto ${profile.name}.`
-                : "Escolha como deseja adicionar uma categoria."}
-            </DialogDescription>
+            <DialogDescription>Escolha o que deseja adicionar.</DialogDescription>
           </DialogHeader>
-
-          {profile ? (
-            <div className="inline-flex w-fit items-center gap-2 rounded-[10px] border border-border bg-muted/35 px-3 py-2 text-xs font-semibold text-foreground">
-              <ProfileIcon icon={profile.icon} size={13} />
-              {profile.name}
-            </div>
-          ) : null}
 
           <div className="grid gap-2 sm:grid-cols-2">
             <Button
               type="button"
               variant="outline"
-              className="relative h-auto min-h-24 items-start justify-start rounded-xl p-4 pr-10 text-left"
+              className="grid h-auto min-h-24 grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1 rounded-xl p-4 text-left"
               disabled={!profile}
               onClick={() => setStep("custom")}
             >
-              <span className="flex min-w-0 items-start gap-3">
-                <Tags className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                <span>
-                  <span className="block font-semibold">Criar minha categoria</span>
-                  <span className="mt-1 block whitespace-normal text-xs font-normal text-muted-foreground">
-                    Defina nome e cor para organizar seus próprios eventos.
-                  </span>
+              <Tags className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+              <span className="min-w-0">
+                <span className="block whitespace-normal font-semibold leading-5">
+                  Criar minha categoria
+                </span>
+                <span className="mt-1 block whitespace-normal text-xs font-normal leading-4 text-muted-foreground">
+                  Defina nome e cor para organizar seus próprios eventos.
                 </span>
               </span>
-              <ArrowRight className="absolute top-4 right-4 size-4 text-muted-foreground" />
+              <ArrowRight className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
             </Button>
             <Button
               type="button"
               variant="outline"
-              className="relative h-auto min-h-24 items-start justify-start rounded-xl p-4 pr-10 text-left"
+              data-onboarding-calendar-choice={
+                guidedCalendarSelection ? "true" : undefined
+              }
+              className="grid h-auto min-h-24 grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1 rounded-xl p-4 text-left"
               disabled={!profile}
               onClick={chooseCalendarPacks}
             >
-              <span className="flex min-w-0 items-start gap-3">
-                <CalendarDays className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                <span>
-                  <span className="block font-semibold">Adicionar calendário pronto</span>
-                  <span className="mt-1 block whitespace-normal text-xs font-normal text-muted-foreground">
-                    Assine ou gerencie calendários disponíveis no Doze 52.
+              <CalendarDays className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+              <span className="min-w-0">
+                <span className="block whitespace-normal font-semibold leading-5">
+                  Adicionar calendário pronto
+                </span>
+                <span className="mt-1 block whitespace-normal text-xs font-normal leading-4 text-muted-foreground">
+                  Assine ou gerencie calendários disponíveis no{" "}
+                  <span className="inline-flex items-center whitespace-nowrap">
+                    <span>Doze 52.</span>
+                    {guidedCalendarSelection ? (
+                      <span className="ml-1.5 inline-flex rounded-full bg-primary px-2 py-0.5 align-middle text-[9px] font-semibold uppercase leading-none tracking-[0.08em] text-primary-foreground">
+                        Clique aqui
+                      </span>
+                    ) : null}
                   </span>
                 </span>
               </span>
-              <ArrowRight className="absolute top-4 right-4 size-4 text-muted-foreground" />
+              <ArrowRight className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
             </Button>
           </div>
         </DialogContent>

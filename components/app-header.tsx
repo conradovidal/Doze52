@@ -11,10 +11,15 @@ import {
   GuidedToolbarNoticeCard,
   type GuidedToolbarNotice,
 } from "@/components/onboarding/guided-toolbar-notice";
+import { GuidedTargetOutline } from "@/components/onboarding/guided-target-outline";
 import { CategoryBar } from "@/components/category-bar";
 import { CategoryCreationFlow } from "@/components/category-creation-flow";
 import { CategoryManager } from "@/components/category-manager";
 import { CalendarPackLauncher } from "@/components/calendar-packs/calendar-pack-launcher";
+import {
+  DesktopProductNavigation,
+  type UtilityPanelSection,
+} from "@/components/navigation/adaptive-navigation";
 import { ProfileBar } from "@/components/profile-bar";
 import { ProfileIcon } from "@/components/profile-icon";
 import {
@@ -34,6 +39,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { CollapsibleControlRegion } from "@/components/ui/collapsible-control-region";
 import { useStore } from "@/lib/store";
 import type { OnboardingFocusTarget } from "@/lib/onboarding";
+import type { ProductDestinationId } from "@/lib/product-navigation";
 import type { AnchorPoint } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -45,6 +51,12 @@ type AppHeaderProps = {
   isMobileCalendarUi?: boolean;
   showCalendarControls?: boolean;
   useAdaptiveNavigation?: boolean;
+  activeDestination?: ProductDestinationId;
+  onDestinationSelect?: (destination: ProductDestinationId) => void;
+  onOpenUtilityPanel?: (
+    section: UtilityPanelSection,
+    trigger: HTMLElement
+  ) => void;
   onOpenAuthDialog: (anchorPoint?: AnchorPoint) => void;
   onCalendarPackFocusYear: (year: number) => void;
   onboardingFocusTarget?: OnboardingFocusTarget;
@@ -83,6 +95,9 @@ export function AppHeader({
   isMobileCalendarUi = false,
   showCalendarControls = true,
   useAdaptiveNavigation = false,
+  activeDestination = "annual",
+  onDestinationSelect,
+  onOpenUtilityPanel,
   onOpenAuthDialog,
   onCalendarPackFocusYear,
   onboardingFocusTarget = null,
@@ -350,8 +365,20 @@ export function AppHeader({
     setCategoryEditOpen(true);
   }, []);
 
+  const guidedOutlineSelector =
+    guidedToolbarNotice?.target === "edit"
+      ? '[data-onboarding-edit-control][data-onboarding-highlighted="true"]'
+      : guidedToolbarNotice?.target === "calendars"
+        ? '[data-onboarding-calendar-control][data-onboarding-highlighted="true"]'
+        : guidedToolbarNotice?.target === "habit-surface"
+          ? '[data-product-navigation="desktop"] [data-product-destination="habits"]'
+          : null;
+
   return (
     <>
+      {guidedOutlineSelector ? (
+        <GuidedTargetOutline selector={guidedOutlineSelector} />
+      ) : null}
       <header
         className={cn(
           "space-y-3 bg-background",
@@ -367,24 +394,64 @@ export function AppHeader({
           className={cn(
             "relative min-h-9 md:min-h-10",
             useAdaptiveNavigation
-              ? "flex items-start justify-end md:items-center"
+              ? "flex items-start justify-end md:grid md:grid-cols-[1fr_auto_1fr] md:items-center"
               : "grid grid-cols-[auto_minmax(0,1fr)] items-start gap-2.5 md:grid-cols-[minmax(0,1fr)_auto] md:items-center md:gap-4"
           )}
         >
           <div
             data-brand-logo-position={
-              useAdaptiveNavigation ? "header-center" : undefined
+              useAdaptiveNavigation ? "header-adaptive" : undefined
             }
             className={cn(
               useAdaptiveNavigation
-                ? "absolute top-0 left-1/2 -translate-x-1/2"
+                ? "absolute top-0 left-1/2 -translate-x-1/2 md:static md:translate-x-0 md:justify-self-start"
                 : "justify-self-start"
             )}
           >
             <BrandLogo />
           </div>
 
-          <div className="w-full min-w-0 justify-self-end">
+          {useAdaptiveNavigation && onDestinationSelect && onOpenUtilityPanel ? (
+            <DesktopProductNavigation
+              activeDestination={activeDestination}
+              authLoading={authLoading}
+              onDestinationSelect={onDestinationSelect}
+              onOpenUtilityPanel={onOpenUtilityPanel}
+              highlightProfile={guidedToolbarNotice?.target === "profile"}
+              highlightDestination={
+                guidedToolbarNotice?.target === "habit-surface" ? "habits" : undefined
+              }
+            />
+          ) : null}
+          {guidedToolbarNotice?.target === "profile" &&
+          onDismissGuidedSelection ? (
+            <GuidedToolbarNoticeCard
+              notice={guidedToolbarNotice}
+              onClose={onDismissGuidedSelection}
+              placement="viewport"
+              portaled
+              anchorSelector="[data-product-account='desktop']"
+              anchorPlacement="below-end"
+            />
+          ) : null}
+          {guidedToolbarNotice?.target === "habit-surface" &&
+          onDismissGuidedSelection ? (
+            <GuidedToolbarNoticeCard
+              notice={guidedToolbarNotice}
+              onClose={onDismissGuidedSelection}
+              placement="viewport"
+              portaled
+              anchorSelector="[data-product-navigation='desktop'] [data-product-destination='habits']"
+              anchorPlacement="below-center"
+            />
+          ) : null}
+
+          <div
+            className={cn(
+              "w-full min-w-0 justify-self-end",
+              useAdaptiveNavigation && "md:hidden"
+            )}
+          >
             <div
               data-onboarding-toolbar-spotlight={
                 guidedToolbarNotice ? "true" : undefined
@@ -413,11 +480,7 @@ export function AppHeader({
                     variant="premium"
                     size="sm"
                     disabled={inlineEditDisabled}
-                    className={cn(
-                      utilityActiveEditClass,
-                      guidedToolbarNotice?.target === "edit" &&
-                        "product-spotlight-target"
-                    )}
+                    className={utilityActiveEditClass}
                     onClick={toggleInlineEditMode}
                     aria-label="Finalizar edição de contextos e categorias"
                     title="Finalizar edição de contextos e categorias"
@@ -437,11 +500,7 @@ export function AppHeader({
                     variant="outline"
                     size="icon-sm"
                     disabled={inlineEditDisabled}
-                    className={cn(
-                      utilityIconClass,
-                      guidedToolbarNotice?.target === "edit" &&
-                        "product-spotlight-target"
-                    )}
+                    className={utilityIconClass}
                     onClick={toggleInlineEditMode}
                     aria-label="Editar contextos e categorias"
                     title="Editar contextos e categorias"
@@ -648,8 +707,6 @@ export function AppHeader({
                       disabled={inlineEditDisabled}
                       className={cn(
                         categoryToggleClass,
-                        guidedToolbarNotice?.target === "edit" &&
-                          "product-spotlight-target",
                         effectiveInlineEditMode &&
                           "border-foreground bg-foreground text-background hover:bg-foreground/90 hover:text-background"
                       )}
@@ -732,6 +789,7 @@ export function AppHeader({
                       highlightCreate={guidedToolbarNotice?.target === "calendars"}
                     />
                     {guidedToolbarNotice?.target === "calendars" &&
+                    !categoryCreateOpen &&
                     onDismissGuidedSelection ? (
                       <GuidedToolbarNoticeCard
                         notice={guidedToolbarNotice}
@@ -773,8 +831,6 @@ export function AppHeader({
                           disabled={inlineEditDisabled}
                           className={cn(
                             categoryToggleClass,
-                            guidedToolbarNotice?.target === "edit" &&
-                              "product-spotlight-target",
                             effectiveInlineEditMode &&
                               "border-foreground bg-foreground text-background hover:bg-foreground/90 hover:text-background"
                           )}
@@ -859,10 +915,15 @@ export function AppHeader({
                       highlightCreate={guidedToolbarNotice?.target === "calendars"}
                     />
                     {guidedToolbarNotice?.target === "calendars" &&
+                    !categoryCreateOpen &&
                     onDismissGuidedSelection ? (
                       <GuidedToolbarNoticeCard
                         notice={guidedToolbarNotice}
                         onClose={onDismissGuidedSelection}
+                        placement="viewport"
+                        portaled
+                        anchorSelector="[data-onboarding-calendar-control]"
+                        anchorPlacement="below-center"
                       />
                     ) : null}
                   </div>

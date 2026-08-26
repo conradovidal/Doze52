@@ -33,6 +33,7 @@ import {
   GuidedToolbarNoticeCard,
   type GuidedToolbarNotice,
 } from "@/components/onboarding/guided-toolbar-notice";
+import { GuidedTargetOutline } from "@/components/onboarding/guided-target-outline";
 import {
   LATERAL_KEY_ACTIVE_CLASS,
   LATERAL_KEY_BASE_CLASS,
@@ -140,6 +141,8 @@ export function YearGrid({
   guidedPeriodNotice,
   onDismissGuidedPeriodNotice,
   onGuidedPeriodAction,
+  onGuidedPeriodInteraction,
+  guidedPeriodInteracted = false,
   showScaleControl = true,
 }: {
   year: number;
@@ -171,6 +174,8 @@ export function YearGrid({
   guidedPeriodNotice?: GuidedToolbarNotice | null;
   onDismissGuidedPeriodNotice?: () => void;
   onGuidedPeriodAction?: () => void;
+  onGuidedPeriodInteraction?: () => void;
+  guidedPeriodInteracted?: boolean;
   showScaleControl?: boolean;
 }) {
   const profiles = useStore((s) => s.profiles as CalendarProfile[]);
@@ -186,15 +191,15 @@ export function YearGrid({
   const setCalendarZoomPercent = useStore((s) => s.setCalendarZoomPercent);
   const [yearDirection, setYearDirection] = React.useState<1 | -1>(1);
   const [isYearTransitioning, setIsYearTransitioning] = React.useState(false);
+  const guidedYearLocked = guidedYearNotice?.target === "year";
   const requestYearChange = React.useCallback(
     (nextYear: number) => {
-      if (isYearTransitioning || nextYear === year) return;
+      if (guidedYearLocked || isYearTransitioning || nextYear === year) return;
       setYearDirection(getYearTransitionDirection(year, nextYear));
       setIsYearTransitioning(true);
       onYearChange(nextYear);
-      if (guidedYearNotice?.target === "year") onGuidedYearAction?.();
     },
-    [guidedYearNotice?.target, isYearTransitioning, onGuidedYearAction, onYearChange, year]
+    [guidedYearLocked, isYearTransitioning, onYearChange, year]
   );
   const visibleCategoryIds = React.useMemo(
     () => {
@@ -481,6 +486,9 @@ export function YearGrid({
 
   const handleQuarterRailClick = React.useCallback(
     (quarterIndex: QuarterIndex) => {
+      if (guidedPeriodNotice?.target === "period-navigation") {
+        onGuidedPeriodInteraction?.();
+      }
       if (quarterIndex === resolvedQuarter && viewMode === "quarter") {
         setCalendarViewMode("year");
         return;
@@ -493,18 +501,21 @@ export function YearGrid({
 
       focusQuarter(quarterIndex);
     },
-    [focusQuarter, resolvedQuarter, setCalendarViewMode, viewMode]
+    [focusQuarter, guidedPeriodNotice?.target, onGuidedPeriodInteraction, resolvedQuarter, setCalendarViewMode, viewMode]
   );
 
   const handleMonthLabelClick = React.useCallback(
     (monthIndex: MonthIndex) => {
+      if (guidedPeriodNotice?.target === "period-navigation") {
+        onGuidedPeriodInteraction?.();
+      }
       if (viewMode === "month" && monthIndex === resolvedMonth) {
         focusQuarter(resolvedQuarter);
         return;
       }
       focusMonth(monthIndex);
     },
-    [focusMonth, focusQuarter, resolvedMonth, resolvedQuarter, viewMode]
+    [focusMonth, focusQuarter, guidedPeriodNotice?.target, onGuidedPeriodInteraction, resolvedMonth, resolvedQuarter, viewMode]
   );
 
   const handleMobileDayCellActivate = React.useCallback(
@@ -631,7 +642,18 @@ export function YearGrid({
   );
 
   const annualContent = (
-    <div className="overflow-hidden">
+    <div className="relative overflow-hidden">
+      {guidedPeriodNotice?.target === "period-navigation" ? (
+        <div
+          data-onboarding-period-anchor
+          data-onboarding-period-outline={!guidedPeriodInteracted ? "true" : undefined}
+          className={cn(
+            "pointer-events-none absolute inset-y-0 left-0 z-[60] w-[5.05rem] rounded-l-[1.25rem] min-[420px]:w-[5.1rem] md:w-[5.5rem]",
+            !guidedPeriodInteracted && "border border-foreground/32"
+          )}
+          aria-hidden="true"
+        />
+      ) : null}
       {quarterGroups.map((group, groupIndex) => {
         const isActiveQuarter = viewMode !== "year" && group.quarterIndex === resolvedQuarter;
         const isQuarterSelected = isActiveQuarter;
@@ -666,9 +688,7 @@ export function YearGrid({
                 LATERAL_KEY_BASE_CLASS,
                 "h-auto self-stretch w-[1.95rem] shrink-0 border-r border-border px-0 min-[420px]:w-[2.1rem] md:w-[2.25rem]",
                 quarterRailShapeClass,
-                isQuarterSelected ? LATERAL_KEY_ACTIVE_CLASS : LATERAL_KEY_REST_CLASS,
-                guidedPeriodNotice?.target === "period-navigation" &&
-                  "product-spotlight-target"
+                isQuarterSelected ? LATERAL_KEY_ACTIVE_CLASS : LATERAL_KEY_REST_CLASS
               )}
               data-onboarding-period-control={
                 guidedPeriodNotice?.target === "period-navigation" ? "true" : undefined
@@ -687,7 +707,10 @@ export function YearGrid({
                 notice={guidedPeriodNotice}
                 onClose={onDismissGuidedPeriodNotice}
                 onAction={onGuidedPeriodAction}
-                placement="right"
+                placement="viewport"
+                portaled
+                anchorSelector="[data-onboarding-period-anchor]"
+                anchorPlacement="right-center"
               />
             ) : null}
 
@@ -727,9 +750,7 @@ export function YearGrid({
                         : `Abrir ${MONTH_TITLE_LABELS[monthIndex]}`
                     }
                     monthLabelActive={isActiveMonth}
-                    monthLabelHighlighted={
-                      guidedPeriodNotice?.target === "period-navigation"
-                    }
+                    monthLabelHighlighted={false}
                     isMobileInteractionMode={isMobileInteractionMode}
                     onDayCellActivate={
                       isMobileInteractionMode && viewMode !== "month"
@@ -800,8 +821,7 @@ export function YearGrid({
               guidedYearNotice?.target === "year" ? "true" : undefined
             }
             className={cn(
-              "relative inline-flex h-8 items-center overflow-visible rounded-[10px] border border-border bg-card",
-              guidedYearNotice?.target === "year" && "product-spotlight-target"
+              "relative inline-flex h-8 items-center overflow-visible rounded-[10px] border border-border bg-card"
             )}
           >
             <button
@@ -809,7 +829,7 @@ export function YearGrid({
               data-onboarding-year-control
               aria-label={`Voltar para ${year - 1}`}
               title={`Voltar para ${year - 1}`}
-              disabled={isYearTransitioning}
+              disabled={guidedYearLocked || isYearTransitioning}
               className="grid size-8 place-items-center rounded-[9px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-45"
               onClick={() => requestYearChange(year - 1)}
             >
@@ -826,19 +846,22 @@ export function YearGrid({
               type="button"
               aria-label={`Avançar para ${year + 1}`}
               title={`Avançar para ${year + 1}`}
-              disabled={isYearTransitioning}
+              disabled={guidedYearLocked || isYearTransitioning}
               className="grid size-8 place-items-center rounded-[9px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-45"
               onClick={() => requestYearChange(year + 1)}
             >
               <ChevronRight className="size-3.5" />
             </button>
             {guidedYearNotice?.target === "year" && onDismissGuidedYearNotice ? (
-              <GuidedToolbarNoticeCard
-                notice={guidedYearNotice}
-                onClose={onDismissGuidedYearNotice}
-                onAction={onGuidedYearAction}
-                placement="above"
-              />
+              <>
+                <GuidedTargetOutline selector="[data-calendar-year-stepper]" />
+                <GuidedToolbarNoticeCard
+                  notice={guidedYearNotice}
+                  onClose={onDismissGuidedYearNotice}
+                  onAction={onGuidedYearAction}
+                  placement="above"
+                />
+              </>
             ) : null}
           </div>
           {showScaleControl ? (

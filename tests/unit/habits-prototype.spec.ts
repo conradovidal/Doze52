@@ -1,20 +1,22 @@
 import { expect, test } from "@playwright/test";
+import { eachDayOfInterval } from "date-fns";
 
 import {
   buildHabitPrototypeWeeks,
+  buildOnboardingHabitShowcase,
   applyActiveHabitOrder,
-  getDesktopHabitSlot,
-  getDesktopHabitMarkerSize,
+  getCompletedHabitsForDate,
   getDesktopVisibleHabits,
   getHabitDayAction,
   getHabitCheckInKey,
+  getHabitRetrospectiveDates,
   moveActiveHabit,
   orderActiveHabits,
   setHabitArchived,
 } from "../../lib/habits-prototype";
 import { getYearTransitionDirection } from "../../lib/calendar-year-transition";
 import { PLAN_LIMITS, PRO_UPGRADE_COPY } from "../../lib/entitlements";
-import type { Habit } from "../../lib/types";
+import type { CalendarEvent, CategoryItem, Habit } from "../../lib/types";
 import { isHabitsPrototypeAvailable } from "../../lib/feature-flags";
 import {
   buildProductDestinationUrl,
@@ -63,6 +65,139 @@ test("gera chave de check-in estável por hábito e data", () => {
   expect(getHabitCheckInKey("habit-1", "2026-08-24")).toBe(
     "habit-1:2026-08-24"
   );
+});
+
+test("monta quatro hábitos demonstrativos coerentes com o ano de exemplo", () => {
+  const categories: CategoryItem[] = [
+    { id: "travel", profileId: "personal", name: "Viagens", color: "#fff", visible: true },
+    { id: "friends", profileId: "personal", name: "Amigos", color: "#fff", visible: true },
+    { id: "events", profileId: "personal", name: "Eventos", color: "#fff", visible: true },
+  ];
+  const event = (
+    id: string,
+    title: string,
+    categoryId: string,
+    startDate: string,
+    endDate = startDate
+  ): CalendarEvent => ({
+    id,
+    title,
+    categoryId,
+    color: "#fff",
+    startDate,
+    endDate,
+    createdAt: "2026-01-01T00:00:00.000Z",
+    dayOrder: 0,
+  });
+  const events = [
+    event("trip", "Férias em família — Maceió", "travel", "2026-07-25", "2026-07-30"),
+    event("social", "Noite de fondue", "friends", "2026-08-20"),
+    event("books", "Feira do Livro", "events", "2026-10-30", "2026-11-15"),
+  ];
+  const showcase = buildOnboardingHabitShowcase({
+    year: 2026,
+    todayIso: "2026-12-31",
+    events,
+    categories,
+  });
+  const repeated = buildOnboardingHabitShowcase({
+    year: 2026,
+    todayIso: "2026-12-31",
+    events,
+    categories,
+  });
+
+  expect(showcase).toEqual(repeated);
+  expect(showcase.habits.map((habit) => habit.name)).toEqual([
+    "Exercício",
+    "Ler 20 minutos",
+    "Dormir antes das 23h",
+    "Dia sem fumar",
+  ]);
+  expect(showcase.visibleHabitIds).toEqual(
+    showcase.habits.slice(0, 3).map((habit) => habit.id)
+  );
+  expect(showcase.visibleHabitIds).not.toContain(showcase.habits[3]?.id);
+
+  const [exercise, reading, sleep, smokeFree] = showcase.habits;
+  const completed = (habitId: string, dateIso: string) =>
+    Boolean(showcase.checkIns[getHabitCheckInKey(habitId, dateIso)]?.completed);
+  for (const dateIso of ["2026-07-25", "2026-07-26", "2026-07-27", "2026-07-28", "2026-07-29", "2026-07-30"]) {
+    expect(completed(exercise.id, dateIso)).toBe(false);
+  }
+  expect(
+    ["2026-07-25", "2026-07-26", "2026-07-27", "2026-07-28", "2026-07-29", "2026-07-30"].some(
+      (dateIso) => completed(reading.id, dateIso)
+    )
+  ).toBe(true);
+  expect(completed(sleep.id, "2026-08-20")).toBe(false);
+
+  const smokeFreeCount = Object.values(showcase.checkIns).filter(
+    (checkIn) => checkIn.habitId === smokeFree.id
+  ).length;
+  expect(smokeFreeCount).toBeGreaterThan(150);
+  expect(smokeFreeCount).toBeLessThan(240);
+
+  const exerciseCount = Object.values(showcase.checkIns).filter(
+    (checkIn) => checkIn.habitId === exercise.id
+  ).length;
+  const readingCount = Object.values(showcase.checkIns).filter(
+    (checkIn) => checkIn.habitId === reading.id
+  ).length;
+  expect(exerciseCount).toBeGreaterThan(readingCount);
+  expect(exerciseCount).toBeLessThan(160);
+  expect(readingCount).toBeLessThan(100);
+
+  const markerCounts = new Set<number>();
+  for (const dateIso of eachDayOfInterval({
+    start: new Date("2026-01-01T12:00:00Z"),
+    end: new Date("2026-12-31T12:00:00Z"),
+  }).map((date) => date.toISOString().slice(0, 10))) {
+    markerCounts.add(
+      showcase.habits.filter((habit) => completed(habit.id, dateIso)).length
+    );
+  }
+  expect([...markerCounts].toSorted()).toEqual([0, 1, 2, 3, 4]);
+});
+
+test("não cria check-ins demonstrativos no futuro", () => {
+  const showcase = buildOnboardingHabitShowcase({
+    year: 2026,
+    todayIso: "2026-08-26",
+    events: [],
+    categories: [],
+  });
+  expect(
+    Object.values(showcase.checkIns).every(
+      (checkIn) => checkIn.date <= "2026-08-26"
+    )
+  ).toBe(true);
+});
+
+test("calcula retrospectiva inclusiva de 14 dias limitada ao ano", () => {
+  expect(getHabitRetrospectiveDates(2026, "2026-08-26")).toEqual([
+    "2026-08-13",
+    "2026-08-14",
+    "2026-08-15",
+    "2026-08-16",
+    "2026-08-17",
+    "2026-08-18",
+    "2026-08-19",
+    "2026-08-20",
+    "2026-08-21",
+    "2026-08-22",
+    "2026-08-23",
+    "2026-08-24",
+    "2026-08-25",
+    "2026-08-26",
+  ]);
+  expect(getHabitRetrospectiveDates(2026, "2026-01-05")).toEqual([
+    "2026-01-01",
+    "2026-01-02",
+    "2026-01-03",
+    "2026-01-04",
+    "2026-01-05",
+  ]);
 });
 
 test("resolve dias vazios como criação sem liberar futuro ou dias externos", () => {
@@ -124,30 +259,37 @@ test("ordena hábitos ativos e limita a apresentação desktop aos quatro primei
   ]);
 });
 
-test("dimensiona e fixa os marcadores conforme a quantidade de hábitos", () => {
-  expect(getDesktopHabitSlot(1, 0)).toBe("center");
-  expect([0, 1].map((index) => getDesktopHabitSlot(2, index))).toEqual([
-    "middle-left",
-    "middle-right",
-  ]);
-  expect([0, 1, 2].map((index) => getDesktopHabitSlot(3, index))).toEqual([
-    "top-left",
-    "top-right",
-    "bottom-left",
-  ]);
-  expect([0, 1, 2, 3].map((index) => getDesktopHabitSlot(4, index))).toEqual([
-    "top-left",
-    "top-right",
-    "bottom-left",
-    "bottom-right",
-  ]);
-  expect(getDesktopHabitSlot(4, 4)).toBeNull();
-  expect([1, 2, 3, 4].map(getDesktopHabitMarkerSize)).toEqual([
-    "single",
-    "pair",
-    "grid",
-    "grid",
-  ]);
+test("empilha apenas hábitos concluídos preservando a ordem visível", () => {
+  const habits = ["primeiro", "segundo", "terceiro", "quarto"].map(
+    (id, position): Habit => ({
+      id,
+      name: id,
+      color: "#2563eb",
+      icon: "circle-check",
+      position,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    })
+  );
+  const dateIso = "2026-08-26";
+  const checkIns = {
+    [`segundo:${dateIso}`]: {
+      habitId: "segundo",
+      date: dateIso,
+      completed: true,
+      updatedAt: "2026-08-26T12:00:00.000Z",
+    },
+    [`quarto:${dateIso}`]: {
+      habitId: "quarto",
+      date: dateIso,
+      completed: true,
+      updatedAt: "2026-08-26T12:00:00.000Z",
+    },
+  };
+
+  expect(
+    getCompletedHabitsForDate(habits, checkIns, dateIso).map((habit) => habit.id)
+  ).toEqual(["segundo", "quarto"]);
 });
 
 test("reordena, arquiva e restaura hábitos sem apagar os demais dados", () => {

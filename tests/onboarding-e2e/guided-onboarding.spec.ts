@@ -156,6 +156,9 @@ const completePersonalOnboarding = async (
   await expect(
     page.locator("[data-guided-calendar-notice]")
   ).toHaveAttribute("data-guided-selection-mode", "date");
+  await expect(
+    page.locator('[data-onboarding-category-id][title="Aniversários"]')
+  ).not.toHaveAttribute("data-onboarding-highlighted", "true");
 
   await selectGuidedDate(page, mobile, "2026-02-10");
   await expect(panel).toHaveAttribute(
@@ -215,6 +218,9 @@ const completePersonalOnboarding = async (
   await expect(
     page.locator("[data-guided-calendar-notice]")
   ).toHaveAttribute("data-guided-selection-mode", "period");
+  await expect(
+    page.locator('[data-onboarding-category-id][title="Férias e viagens"]')
+  ).not.toHaveAttribute("data-onboarding-highlighted", "true");
 
   await selectGuidedPeriod(page, mobile, "2026-03-10", "2026-03-16");
   if (mobile) {
@@ -265,8 +271,10 @@ const completePersonalOnboarding = async (
   await expect(
     toolbarNotice.getByRole("button", { name: "Encerrar guia inicial" })
   ).toHaveCSS("position", "absolute");
+  const adaptiveDesktop =
+    !mobile &&
+    (await page.locator('[data-product-navigation="desktop"]').isVisible());
   await page.locator("[data-onboarding-edit-control]").click();
-  await expect(toolbarNotice).toContainText("Este é o modo de edição");
   const filterRegion = page.locator("[data-onboarding-filter-region]");
   await expect(filterRegion.locator(":scope > div").first()).not.toHaveAttribute(
     "inert",
@@ -276,8 +284,16 @@ const completePersonalOnboarding = async (
     window.localStorage.getItem("yiv-store")
   );
   const finishEdit = page.locator("[data-onboarding-edit-control]");
-  await expect(finishEdit).toContainText("Finalizar");
-  await finishEdit.click();
+  await expect(finishEdit).toHaveAttribute("aria-label", /Finalizar edição/);
+  if (adaptiveDesktop) {
+    await expect(toolbarNotice).toHaveAttribute(
+      "data-guided-toolbar-target",
+      "calendars"
+    );
+  } else {
+    await expect(toolbarNotice).toContainText("Este é o modo de edição");
+    await finishEdit.click();
+  }
   expect(await page.evaluate(() => window.localStorage.getItem("yiv-store"))).toBe(
     beforeEditPreview
   );
@@ -290,9 +306,34 @@ const completePersonalOnboarding = async (
     "Complemente seu ano com calendários prontos."
   );
   await expect(toolbarNotice).toContainText(
-    "Adicione os feriados do seu estado."
+    "adicione os feriados do seu estado."
   );
-  await page.locator("[data-onboarding-calendar-control]").click();
+  const calendarControl = page.locator("[data-onboarding-calendar-control]");
+  if (!mobile && await page.locator('[data-product-navigation="desktop"]').isVisible()) {
+    const calendarNoticeBox = await toolbarNotice.boundingBox();
+    const calendarControlBox = await calendarControl.boundingBox();
+    if (!calendarNoticeBox || !calendarControlBox) {
+      throw new Error("Balão de calendários não foi ancorado ao botão +");
+    }
+    expect(
+      Math.abs(
+        calendarNoticeBox.x + calendarNoticeBox.width / 2 -
+          (calendarControlBox.x + calendarControlBox.width / 2)
+      )
+    ).toBeLessThan(28);
+  }
+  await calendarControl.click();
+  const categoryDialog = page.getByRole("dialog", { name: "Adicionar categoria" });
+  if (await categoryDialog.isVisible()) {
+    await expect(toolbarNotice).toBeHidden();
+    const guidedCalendarChoice = categoryDialog.locator(
+      '[data-onboarding-calendar-choice="true"]'
+    );
+    await expect(guidedCalendarChoice).toContainText("Clique aqui");
+    await categoryDialog
+      .getByRole("button", { name: /Adicionar calendário pronto/ })
+      .click();
+  }
   const calendarDialog = page.getByRole("dialog", {
     name: "Adicione os feriados do seu estado",
   });
@@ -312,6 +353,12 @@ const completePersonalOnboarding = async (
     .getByRole("button", { name: "Adicionar feriados" })
     .click();
   await expect(calendarDialog).toBeHidden();
+  if (adaptiveDesktop) {
+    await expect(page.locator("[data-onboarding-edit-control]")).toHaveAttribute(
+      "aria-label",
+      /Editar/
+    );
+  }
   const importedHolidayTitles = await page.evaluate(() => {
     const payload = JSON.parse(window.localStorage.getItem("yiv-store") ?? "{}");
     return (payload.state?.events ?? []).map(
@@ -325,7 +372,7 @@ const completePersonalOnboarding = async (
     "data-guided-toolbar-target",
     "year"
   );
-  const yearControl = page.locator("[data-onboarding-year-control]");
+  const yearControl = page.locator("[data-year-grid] [data-onboarding-year-control]").first();
   await expect(yearControl).toBeEnabled();
   await yearControl.click();
   await expect(toolbarNotice).toBeHidden();
@@ -360,7 +407,7 @@ const completePersonalOnboarding = async (
   ).toHaveCount(0);
   await page.locator("[data-onboarding-theme-control]").click();
   await page.locator("[data-onboarding-theme-control]").click();
-  await toolbarNotice.getByRole("button", { name: "Explorar meu ano" }).click();
+  await toolbarNotice.getByRole("button", { name: "Finalizar guia" }).click();
   await expect(panel).toBeHidden();
   await expect(toolbarNotice).toBeHidden();
 };
@@ -433,7 +480,7 @@ test("monta contexto Pessoal de forma incremental", async ({ page }, testInfo) =
   }));
 
   expect(stored.onboarding).toMatchObject({
-    version: 11,
+    version: 15,
     step: "completed",
     context: "personal",
   });
@@ -564,11 +611,25 @@ test("ano de exemplo gerencia Feriados do RS e Corridas F1 sem duplicar", async 
       })
     )
     .toBeGreaterThanOrEqual(3);
+  await page
+    .getByRole("region", { name: "Guia inicial do Doze 52" })
+    .getByRole("button", { name: "Encerrar guia inicial" })
+    .click();
+  await page.getByRole("button", { name: "Encerrar e explorar" }).click();
 
-  const openCalendars = () =>
-    page
-      .getByRole("button", { name: "Adicionar ou gerenciar calendários." })
-      .click();
+  const openCalendars = async () => {
+    const button = page.getByRole("button", {
+      name: "Adicionar ou gerenciar calendários.",
+    });
+    const calendarDialog = page.getByRole("dialog", { name: "Calendários" });
+    await expect(button).toBeVisible();
+    await button.click();
+    if (!(await calendarDialog.isVisible())) {
+      await page.waitForTimeout(250);
+      await button.click();
+    }
+    await expect(calendarDialog).toBeVisible();
+  };
   const waitForHolidayVariant = (variantId: string | null) =>
     expect
       .poll(() =>
@@ -629,8 +690,16 @@ test("ano de exemplo gerencia Feriados do RS e Corridas F1 sem duplicar", async 
   await page.reload();
   await waitForHolidayVariant("holidays-sao-paulo");
   await openCalendars();
-  await expect(stateSelect).toHaveText(/São Paulo \(SP\)/i);
-  await holidayCard.getByRole("button", { name: "Remover" }).click();
+  await expect(dialog).toBeVisible();
+  const reopenedHolidayCard = dialog.locator(
+    '[data-calendar-pack-group="holidays-by-state"]'
+  );
+  await expect(
+    reopenedHolidayCard.getByRole("combobox", {
+      name: /Estado para Feriados nacionais/i,
+    })
+  ).toHaveText(/São Paulo \(SP\)/i);
+  await reopenedHolidayCard.getByRole("button", { name: "Remover" }).click();
   await page.keyboard.press("Escape");
   await page.reload();
   await waitForHolidayVariant(null);
@@ -1117,7 +1186,7 @@ test("edição preserva categoria não inicial no desktop e no mobile", async ({
       localStorage.setItem(
         "doze52:onboarding:v2",
         JSON.stringify({
-          version: 11,
+          version: 13,
           step: "completed",
           context: "personal",
           completedAt: new Date().toISOString(),
@@ -1288,7 +1357,7 @@ test("saída após criar contexto preserva o ano e convida após três criaçõe
     JSON.parse(localStorage.getItem("doze52:onboarding:v2") ?? "null")
   );
   expect(persistedStep).toMatchObject({
-    version: 11,
+    version: 13,
     step: "dismissed_preserved",
   });
 
@@ -1511,7 +1580,7 @@ test("centraliza cards e mantém a instrução visível no cabeçalho fixo", asy
   await expect(filterControls).toHaveAttribute("aria-hidden", "true");
   await expect(page.locator("[data-onboarding-edit-control]")).toBeEnabled();
   await expect(page.locator("[data-onboarding-calendar-control]")).toBeEnabled();
-  await expect(page.locator("[data-onboarding-year-control]")).toBeEnabled();
+  await expect(page.locator("[data-onboarding-year-control]").first()).toBeEnabled();
   await expect(page.locator("[data-onboarding-theme-control]")).toBeEnabled();
   const noticeTitleFontSize = await notice
     .locator("p")
@@ -1660,7 +1729,7 @@ test("Profissional permite categorias específica e genérica", async ({
       "doze52:onboarding:v2",
       JSON.stringify({
         ...current,
-        version: 11,
+        version: 13,
         step: "period_category_selection",
         dateItemsCreated: 2,
         categoryRevealStartedAt: undefined,

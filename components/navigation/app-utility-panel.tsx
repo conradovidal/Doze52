@@ -144,10 +144,13 @@ type AppUtilityPanelProps = {
   isMobile: boolean;
   returnFocusRef: React.RefObject<HTMLElement | null>;
   guidedThemeNotice?: GuidedToolbarNotice | null;
+  guidedAppearanceNotice?: GuidedToolbarNotice | null;
   onOpenChange: (open: boolean) => void;
   onOpenAuthDialog: () => void;
   onDismissGuidedNotice?: () => void;
   onGuidedThemeAction?: () => void;
+  onGuidedThemeChange?: () => void;
+  onGuidedAppearanceOpen?: () => void;
 };
 
 export function AppUtilityPanel({
@@ -156,10 +159,13 @@ export function AppUtilityPanel({
   isMobile,
   returnFocusRef,
   guidedThemeNotice = null,
+  guidedAppearanceNotice = null,
   onOpenChange,
   onOpenAuthDialog,
   onDismissGuidedNotice,
   onGuidedThemeAction,
+  onGuidedThemeChange,
+  onGuidedAppearanceOpen,
 }: AppUtilityPanelProps) {
   const router = useRouter();
   const { notify } = useFeedback();
@@ -185,13 +191,63 @@ export function AppUtilityPanel({
   const [spreadsheetOpen, setSpreadsheetOpen] = React.useState(false);
   const [spreadsheetUpgradeOpen, setSpreadsheetUpgradeOpen] = React.useState(false);
   const [feedbackOpen, setFeedbackOpen] = React.useState(false);
+  const [desktopPosition, setDesktopPosition] = React.useState<{
+    right: number;
+    top: number;
+  } | null>(null);
   const spreadsheetRequiresPro = isCalendarSpreadsheetProGateEnabled();
+
+  React.useLayoutEffect(() => {
+    if (!open || isMobile) {
+      setDesktopPosition(null);
+      return;
+    }
+
+    const updatePosition = () => {
+      const trigger = returnFocusRef.current;
+      const panel = document.querySelector<HTMLElement>("[data-app-utility-panel]");
+      if (!trigger || !panel) return;
+
+      const triggerRect = trigger.getBoundingClientRect();
+      const panelRect = panel.getBoundingClientRect();
+      const viewportPadding = 16;
+      const gap = 8;
+      const right = Math.max(viewportPadding, window.innerWidth - triggerRect.right);
+      const top = Math.max(
+        viewportPadding,
+        Math.min(
+          triggerRect.bottom + gap,
+          window.innerHeight - panelRect.height - viewportPadding
+        )
+      );
+
+      setDesktopPosition((current) =>
+        current && current.right === right && current.top === top
+          ? current
+          : { right, top }
+      );
+    };
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    const observer = new ResizeObserver(updatePosition);
+    if (returnFocusRef.current) observer.observe(returnFocusRef.current);
+    const panel = document.querySelector<HTMLElement>("[data-app-utility-panel]");
+    if (panel) observer.observe(panel);
+
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+      observer.disconnect();
+    };
+  }, [isMobile, open, returnFocusRef]);
 
   React.useEffect(() => {
     if (!open) return;
     setActiveSection(section);
-    setMobileDetailOpen(Boolean(guidedThemeNotice) || section !== "account");
-  }, [guidedThemeNotice, open, section]);
+    setMobileDetailOpen(section !== "account");
+  }, [open, section]);
 
   React.useEffect(() => {
     if (!open || !session) {
@@ -326,8 +382,7 @@ export function AppUtilityPanel({
         return (
           <div data-onboarding-spotlight-target={guidedThemeNotice ? "true" : undefined} className="relative flex max-w-xl items-center justify-between rounded-2xl border border-border bg-card p-4">
             <div className="flex items-center gap-3"><Palette className="size-5 text-muted-foreground" /><div><p className="font-medium text-foreground">Tema</p><p className="text-sm text-muted-foreground">Alterne entre claro e escuro.</p></div></div>
-            <ThemeToggle highlighted={Boolean(guidedThemeNotice)} />
-            {guidedThemeNotice && onDismissGuidedNotice ? <GuidedToolbarNoticeCard notice={guidedThemeNotice} onClose={onDismissGuidedNotice} onAction={guidedThemeNotice.actionLabel ? () => { onGuidedThemeAction?.(); onOpenChange(false); } : undefined} align="start" /> : null}
+            <ThemeToggle highlighted={Boolean(guidedThemeNotice)} onThemeChange={onGuidedThemeChange} />
           </div>
         );
       case "data":
@@ -366,7 +421,7 @@ export function AppUtilityPanel({
         const Icon = topic.icon;
         const selected = activeSection === topic.id;
         return (
-          <button key={topic.id} type="button" aria-current={selected ? "page" : undefined} className={cn("flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60", selected ? "bg-foreground text-background" : "text-muted-foreground hover:bg-muted hover:text-foreground")} onClick={() => { setActiveSection(topic.id); if (isMobile) setMobileDetailOpen(true); }}>
+          <button key={topic.id} type="button" aria-current={selected ? "page" : undefined} data-onboarding-appearance-topic={topic.id === "appearance" ? "true" : undefined} className={cn("flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60", selected ? "bg-foreground text-background" : "text-muted-foreground hover:bg-muted hover:text-foreground", guidedAppearanceNotice && topic.id === "appearance" && "guided-control-target")} onClick={() => { setActiveSection(topic.id); if (topic.id === "appearance") onGuidedAppearanceOpen?.(); if (isMobile) setMobileDetailOpen(true); }}>
             <Icon className="size-4 shrink-0" /><span className="min-w-0"><span className="block text-sm font-semibold">{topic.label}</span><span className={cn("block truncate text-[11px]", selected ? "text-background/70" : "text-muted-foreground")}>{topic.description}</span></span>
           </button>
         );
@@ -379,7 +434,20 @@ export function AppUtilityPanel({
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent
           data-app-utility-panel
-          className={cn("overflow-hidden p-0", isMobile ? "inset-0 h-dvh w-screen max-w-none translate-x-0 translate-y-0 rounded-none border-0 sm:max-w-none" : "h-[min(680px,88dvh)] w-[min(880px,calc(100vw-5rem))] max-w-[880px] sm:max-w-[880px]")}
+          data-desktop-anchor-positioned={
+            !isMobile && desktopPosition ? "true" : undefined
+          }
+          className={cn("overflow-hidden p-0", isMobile ? "inset-0 h-dvh w-screen max-w-none translate-x-0 translate-y-0 rounded-none border-0 sm:max-w-none" : "h-[min(680px,88dvh)] w-[min(880px,calc(100vw-5rem))] max-w-[880px] translate-x-0 translate-y-0 sm:max-w-[880px]")}
+          style={
+            !isMobile && desktopPosition
+              ? {
+                  left: "auto",
+                  right: desktopPosition.right,
+                  top: desktopPosition.top,
+                  transform: "none",
+                }
+              : undefined
+          }
           onCloseAutoFocus={(event) => { event.preventDefault(); returnFocusRef.current?.focus(); }}
         >
           <DialogDescription className="sr-only">Gerencie sua conta, plano, aparência, dados e canais do Doze 52.</DialogDescription>
@@ -394,6 +462,36 @@ export function AppUtilityPanel({
               <section className="flex min-h-0 flex-col"><header className="shrink-0 border-b border-border px-7 py-5 pr-14"><h2 className="text-lg font-semibold text-foreground">{activeTopic?.label}</h2><p className="text-sm text-muted-foreground">{activeTopic?.description}</p></header><div className="min-h-0 flex-1 overflow-y-auto px-7 py-6">{renderSection()}</div></section>
             </div>
           )}
+          {guidedAppearanceNotice && onDismissGuidedNotice ? (
+            <GuidedToolbarNoticeCard
+              notice={guidedAppearanceNotice}
+              onClose={onDismissGuidedNotice}
+              placement="panel"
+              portaled
+              portalTargetSelector="[data-app-utility-panel]"
+              anchorSelector="[data-onboarding-appearance-topic='true']"
+              anchorPlacement="right-center"
+            />
+          ) : null}
+          {guidedThemeNotice && onDismissGuidedNotice ? (
+            <GuidedToolbarNoticeCard
+              notice={guidedThemeNotice}
+              onClose={onDismissGuidedNotice}
+              onAction={
+                guidedThemeNotice.actionLabel
+                  ? () => {
+                      onGuidedThemeAction?.();
+                      onOpenChange(false);
+                    }
+                  : undefined
+              }
+              placement="panel"
+              portaled
+              portalTargetSelector="[data-app-utility-panel]"
+              anchorSelector="[data-onboarding-spotlight-target='true']"
+              anchorPlacement="below-center"
+            />
+          ) : null}
         </DialogContent>
       </Dialog>
       <CalendarSpreadsheetDialog open={spreadsheetOpen} onOpenChange={setSpreadsheetOpen} />

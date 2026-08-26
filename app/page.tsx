@@ -77,13 +77,13 @@ import {
 } from "@/lib/product-metrics";
 import { getSupabaseBrowserClient, hasSupabaseEnv } from "@/lib/supabase";
 import { expandEventsForYear } from "@/lib/recurrence";
+import { buildOnboardingHabitShowcase } from "@/lib/habits-prototype";
 import {
   ensureSnapshotCoverage,
   materializeUserOwnedSnapshot,
 } from "@/lib/snapshot-ownership";
 import { cn } from "@/lib/utils";
 import type { AnchorPoint } from "@/lib/types";
-import { useTheme } from "@/lib/theme";
 import { trackOnboardingRegion } from "@/lib/onboarding-region";
 import { isHabitsPrototypeEnabled } from "@/lib/feature-flags";
 import {
@@ -310,7 +310,6 @@ const mergeSnapshots = (
 export default function HomePage() {
   const { calendarPacks } = useCalendarCatalog();
   const { notify } = useFeedback();
-  const { mode: themeMode, setTheme } = useTheme();
 
   const initialYear = React.useMemo(() => {
     const currentYear = new Date().getFullYear();
@@ -453,6 +452,27 @@ export default function HomePage() {
   const renderEvents = React.useMemo(
     () => expandEventsForYear(events, year),
     [events, year]
+  );
+  const onboardingHabitShowcase = React.useMemo(
+    () =>
+      guidedOnboarding?.step === "habit_showcase_instruction" &&
+      isMobileCalendarUi === false &&
+      todayIso
+        ? buildOnboardingHabitShowcase({
+            year,
+            todayIso,
+            events: renderEvents,
+            categories,
+          })
+        : null,
+    [
+      categories,
+      guidedOnboarding?.step,
+      isMobileCalendarUi,
+      renderEvents,
+      todayIso,
+      year,
+    ]
   );
 
   const centerTodayInDesktopCalendar = React.useCallback(() => {
@@ -1260,9 +1280,28 @@ export default function HomePage() {
       guidedOnboarding?.step === "edit_instruction" &&
       inlineEditModeActive
     ) {
-      updateGuidedOnboarding({ type: "open_edit_preview" });
+      updateGuidedOnboarding({
+        type: "open_edit_preview",
+        continueToCalendar:
+          isHabitsPrototypeEnabled && isMobileCalendarUi !== true,
+      });
     }
-  }, [guidedOnboarding?.step, inlineEditModeActive, updateGuidedOnboarding]);
+  }, [
+    guidedOnboarding?.step,
+    inlineEditModeActive,
+    isMobileCalendarUi,
+    updateGuidedOnboarding,
+  ]);
+
+  React.useEffect(() => {
+    if (
+      guidedOnboarding?.step !== "calendar_instruction" &&
+      guidedOnboarding?.step !== "calendar_selection"
+    ) {
+      return;
+    }
+    if (!inlineEditModeActive) setWorkspaceEditMode("calendar");
+  }, [guidedOnboarding?.step, inlineEditModeActive]);
 
   const recordDemoInteraction = React.useCallback(
     (key: string) => {
@@ -1890,34 +1929,24 @@ export default function HomePage() {
     if (!showGuidedOnboarding || !guidedOnboarding) return null;
     if (!guidedOnboarding.context) return null;
     if (
-      guidedOnboarding.step === "date_category_reveal" ||
-      guidedOnboarding.step === "date_instruction" ||
-      guidedOnboarding.step === "date_details"
+      guidedOnboarding.step === "date_category_reveal"
     ) {
       return guidedOnboarding.dateCategoryId
         ? {
             kind: "category",
             id: guidedOnboarding.dateCategoryId,
-            effect:
-              guidedOnboarding.step === "date_category_reveal"
-                ? "reveal"
-                : "focus",
+            effect: "reveal",
           }
         : null;
     }
     if (
-      guidedOnboarding.step === "period_category_reveal" ||
-      guidedOnboarding.step === "period_instruction" ||
-      guidedOnboarding.step === "period_details"
+      guidedOnboarding.step === "period_category_reveal"
     ) {
       return guidedOnboarding.periodCategoryId
         ? {
             kind: "category",
             id: guidedOnboarding.periodCategoryId,
-            effect:
-              guidedOnboarding.step === "period_category_reveal"
-                ? "reveal"
-                : "focus",
+            effect: "reveal",
           }
         : null;
     }
@@ -1971,15 +2000,17 @@ export default function HomePage() {
       return {
         target: "calendars",
         title: "Complemente seu ano com calendários prontos.",
-        instruction: "Adicione os feriados do seu estado.",
+        instruction:
+          "Use o + para abrir as opções e adicione os feriados do seu estado.",
         stepLabel: `Passo 5 de ${totalSteps}`,
       };
     }
     if (guidedOnboarding.step === "year_instruction") {
       return {
         target: "year",
-        title: "Explore outros anos.",
-        instruction: "Aqui você consulta o ano anterior, o atual e o próximo.",
+        title: "Aqui você troca o ano.",
+        instruction:
+          "Depois do guia, use estas setas para consultar o ano anterior ou o próximo.",
         actionLabel: "Continuar",
         stepLabel: `Passo 6 de ${totalSteps}`,
       };
@@ -1990,11 +2021,60 @@ export default function HomePage() {
     ) {
       return {
         target: "period-navigation",
-        title: "Aproxime-se de um período.",
+        title: "Navegue pelo seu ano.",
         instruction:
-          "Clique em Q1–Q4 ou em um mês para aproximar a visão. Clique novamente no rótulo ativo para voltar.",
+          "Teste navegar pelos trimestres e pelos meses clicando nos rótulos Q1–Q4 e JAN–DEZ.",
         actionLabel: "Continuar",
         stepLabel: "Passo 7 de 8",
+      };
+    }
+    if (
+      guidedOnboarding.step === "habit_surface_instruction" &&
+      isMobileCalendarUi !== true
+    ) {
+      return {
+        target: "habit-surface",
+        title: "Conheça seus hábitos.",
+        instruction: "Clique em Hábitos no topo para mudar de tela.",
+        stepLabel: "Passo 8 de 8",
+      };
+    }
+    if (
+      guidedOnboarding.step === "habit_showcase_instruction" &&
+      isMobileCalendarUi !== true
+    ) {
+      return {
+        target: "habit-showcase",
+        title: "Hábitos também contam a história do seu ano.",
+        instruction:
+          "Veja como viagens, férias e noites especiais mudam o ritmo de quatro hábitos ao longo do tempo.",
+        actionLabel: "Criar meu hábito",
+        stepLabel: "Passo 8 de 8",
+      };
+    }
+    if (
+      guidedOnboarding.step === "habit_instruction" &&
+      isMobileCalendarUi !== true
+    ) {
+      return {
+        target: "habit",
+        title: "Crie seu primeiro hábito.",
+        instruction:
+          "Abra o +, dê um nome ao hábito e escolha uma cor para começar a acompanhar.",
+        stepLabel: "Passo 8 de 8",
+      };
+    }
+    if (
+      guidedOnboarding.step === "habit_created_confirmation" &&
+      isMobileCalendarUi !== true
+    ) {
+      return {
+        target: "habit-created",
+        title: "Seu primeiro hábito está pronto.",
+        instruction:
+          "Lembre como foram as duas últimas semanas e marque os dias que conseguir. Você pode continuar por aqui depois do guia.",
+        actionLabel: "Finalizar guia",
+        stepLabel: "Passo 8 de 8",
       };
     }
     if (guidedOnboarding.step === "theme_instruction") {
@@ -2003,7 +2083,12 @@ export default function HomePage() {
         title: "Escolha o clima do seu ano.",
         instruction:
           "Teste o tema claro e escuro e fique com o que combina mais com você.",
-        actionLabel: "Explorar meu ano",
+        actionLabel:
+          !isHabitsPrototypeEnabled ||
+          isMobileCalendarUi === true ||
+          guidedOnboarding.themeConfirmedAt
+            ? "Finalizar guia"
+            : undefined,
         stepLabel: `Passo ${totalSteps} de ${totalSteps}`,
       };
     }
@@ -2015,7 +2100,11 @@ export default function HomePage() {
   ) => {
     const current = readGuidedOnboardingState();
     if (target === "edit" && current.step === "edit_instruction") {
-      updateGuidedOnboarding({ type: "open_edit_preview" });
+      updateGuidedOnboarding({
+        type: "open_edit_preview",
+        continueToCalendar:
+          isHabitsPrototypeEnabled && isMobileCalendarUi !== true,
+      });
       return;
     }
     if (target === "edit" && current.step === "edit_preview") {
@@ -2035,19 +2124,27 @@ export default function HomePage() {
       target === "period-navigation" &&
       current.step === "period_navigation_instruction"
     ) {
-      useStore.getState().setCalendarViewMode("year");
+      resetCalendarFocusOnYearChange();
       const next = updateGuidedOnboarding({
         type: "continue_from_period_navigation",
+        showHabit: true,
       });
       if (next.step === "completed") announceGuidedCompletion();
       return;
     }
     if (target === "theme" && current.step === "theme_instruction") {
-      setTheme(themeMode);
-      const next = updateGuidedOnboarding({ type: "confirm_theme" });
+      const next = updateGuidedOnboarding({
+        type: "confirm_theme",
+        complete: true,
+      });
       if (next.step === "completed") announceGuidedCompletion();
     }
-  }, [announceGuidedCompletion, isMobileCalendarUi, setTheme, themeMode, updateGuidedOnboarding]);
+  }, [
+    announceGuidedCompletion,
+    isMobileCalendarUi,
+    resetCalendarFocusOnYearChange,
+    updateGuidedOnboarding,
+  ]);
 
   const handleGuidedCalendarOpen = React.useCallback(() => {
     if (readGuidedOnboardingState().step === "calendar_instruction") {
@@ -2065,6 +2162,7 @@ export default function HomePage() {
     if (!uf) return;
     const next = updateGuidedOnboarding({ type: "calendar_added", uf });
     if (next.step === "year_instruction" && uf) {
+      setWorkspaceEditMode(null);
       void trackOnboardingRegion(uf);
     }
   }, [updateGuidedOnboarding]);
@@ -2106,6 +2204,12 @@ export default function HomePage() {
   const handleDestinationSelect = React.useCallback(
     (destination: ProductDestinationId) => {
       if (destination === activeDestination) return;
+      if (
+        destination === "habits" &&
+        readGuidedOnboardingState().step === "habit_surface_instruction"
+      ) {
+        updateGuidedOnboarding({ type: "open_habits_surface" });
+      }
       if (activeDestination === "annual" && isMobileCalendarUi === false) {
         desktopCalendarScrollTopRef.current =
           desktopCalendarScrollRef.current?.scrollTop ?? 0;
@@ -2118,7 +2222,7 @@ export default function HomePage() {
         buildProductDestinationUrl(window.location.href, destination)
       );
     },
-    [activeDestination, isMobileCalendarUi]
+    [activeDestination, isMobileCalendarUi, updateGuidedOnboarding]
   );
 
   const handleOpenUtilityPanel = React.useCallback(
@@ -2126,8 +2230,11 @@ export default function HomePage() {
       utilityPanelTriggerRef.current = trigger;
       setUtilityPanelSection(section);
       setUtilityPanelOpen(true);
+      if (readGuidedOnboardingState().step === "profile_instruction") {
+        updateGuidedOnboarding({ type: "open_profile" });
+      }
     },
-    []
+    [updateGuidedOnboarding]
   );
 
   React.useLayoutEffect(() => {
@@ -2153,22 +2260,17 @@ export default function HomePage() {
     updateGuidedOnboarding({ type: "continue_from_period_navigation" });
   }, [guidedOnboarding?.step, isMobileCalendarUi, updateGuidedOnboarding]);
 
-  React.useEffect(() => {
-    if (
-      !isHabitsPrototypeEnabled ||
-      guidedToolbarNotice?.target !== "theme"
-    ) {
-      return;
-    }
-    setUtilityPanelSection("appearance");
-    setUtilityPanelOpen(true);
-  }, [guidedToolbarNotice?.target]);
-
   const isHabitsSurfaceActive =
     isHabitsPrototypeEnabled && activeDestination === "habits";
   const isCalendarSurfaceActive = !isHabitsSurfaceActive;
   const headerGuidedToolbarNotice =
-    isHabitsPrototypeEnabled && guidedToolbarNotice?.target === "theme"
+    isHabitsPrototypeEnabled &&
+    (guidedToolbarNotice?.target === "theme" ||
+      guidedToolbarNotice?.target === "appearance" ||
+      guidedToolbarNotice?.target === "year" ||
+      guidedToolbarNotice?.target === "habit-showcase" ||
+      guidedToolbarNotice?.target === "habit" ||
+      guidedToolbarNotice?.target === "habit-created")
       ? null
       : guidedToolbarNotice;
 
@@ -2194,9 +2296,7 @@ export default function HomePage() {
             )
           : cn(
               "flex h-full min-h-0 flex-col overflow-hidden pt-3 pb-2 md:pb-4",
-              isHabitsPrototypeEnabled
-                ? "pr-1 pl-14"
-                : "px-4"
+              "px-4"
             )
       )}
     >
@@ -2218,6 +2318,11 @@ export default function HomePage() {
                 ? guidedToolbarNotice
                 : null
             }
+            guidedAppearanceNotice={
+              guidedToolbarNotice?.target === "appearance"
+                ? guidedToolbarNotice
+                : null
+            }
             onOpenChange={setUtilityPanelOpen}
             onOpenAuthDialog={() => {
               setAuthDialogInitialMode("login");
@@ -2226,6 +2331,12 @@ export default function HomePage() {
             }}
             onDismissGuidedNotice={dismissGuidedOnboarding}
             onGuidedThemeAction={() => handleGuidedToolbarAction("theme")}
+            onGuidedThemeChange={() =>
+              updateGuidedOnboarding({ type: "confirm_theme" })
+            }
+            onGuidedAppearanceOpen={() =>
+              updateGuidedOnboarding({ type: "open_appearance" })
+            }
           />
         </>
       ) : null}
@@ -2242,9 +2353,7 @@ export default function HomePage() {
           "z-30 shrink-0 bg-background",
           isMobileCalendarUi
             ? "shrink-0 pb-2"
-            : isHabitsSurfaceActive
-              ? "pb-3"
-              : "pb-2"
+            : "pb-2"
         )}
       >
         <AppHeader
@@ -2255,6 +2364,9 @@ export default function HomePage() {
           isMobileCalendarUi={isMobileCalendarUi === true}
           showCalendarControls={isCalendarSurfaceActive}
           useAdaptiveNavigation={isHabitsPrototypeEnabled}
+          activeDestination={activeDestination}
+          onDestinationSelect={handleDestinationSelect}
+          onOpenUtilityPanel={handleOpenUtilityPanel}
           onCalendarPackFocusYear={handleYearChange}
           onboardingFocusTarget={
             isCalendarSurfaceActive ? onboardingFocusTarget : null
@@ -2322,6 +2434,46 @@ export default function HomePage() {
             setAuthDialogAnchorPoint(undefined);
             setAuthDialogOpen(true);
           }}
+          guidedNotice={
+            guidedToolbarNotice?.target === "habit-showcase" ||
+            guidedToolbarNotice?.target === "habit" ||
+            guidedToolbarNotice?.target === "habit-created"
+              ? guidedToolbarNotice
+              : null
+          }
+          showcase={onboardingHabitShowcase}
+          onDismissGuidedNotice={dismissGuidedOnboarding}
+          onHabitCreated={() =>
+            updateGuidedOnboarding({ type: "habit_saved" })
+          }
+          retrospectiveInteracted={Boolean(
+            guidedOnboarding?.habitRetrospectiveInteractedAt
+          )}
+          onHabitCheckIn={() => {
+            if (
+              readGuidedOnboardingState().step ===
+              "habit_created_confirmation"
+            ) {
+              updateGuidedOnboarding({
+                type: "interact_with_habit_retrospective",
+              });
+            }
+          }}
+          onGuidedNoticeAction={(input) => {
+            const current = readGuidedOnboardingState();
+            if (current.step === "habit_showcase_instruction") {
+              updateGuidedOnboarding({
+                type: "continue_from_habit_showcase",
+                hasExistingHabit: input?.hasExistingHabit,
+              });
+              return;
+            }
+            if (current.step !== "habit_created_confirmation") return;
+            const next = updateGuidedOnboarding({
+              type: "finish_habit_onboarding",
+            });
+            if (next.step === "completed") announceGuidedCompletion();
+          }}
         />
       ) : isMobileCalendarUi === true ? (
         <MobileCalendarExperience
@@ -2386,6 +2538,7 @@ export default function HomePage() {
               }}
               isMobileInteractionMode={false}
               guidedYearNotice={
+                isHabitsPrototypeEnabled &&
                 guidedToolbarNotice?.target === "year"
                   ? guidedToolbarNotice
                   : null
@@ -2401,6 +2554,12 @@ export default function HomePage() {
               onGuidedPeriodAction={() =>
                 handleGuidedToolbarAction("period-navigation")
               }
+              onGuidedPeriodInteraction={() =>
+                updateGuidedOnboarding({ type: "interact_with_period_navigation" })
+              }
+              guidedPeriodInteracted={Boolean(
+                guidedOnboarding?.periodNavigationInteractedAt
+              )}
               showScaleControl={!isHabitsPrototypeEnabled}
             />
           </div>

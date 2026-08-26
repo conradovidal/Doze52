@@ -1,9 +1,7 @@
 "use client";
 
-import { Check } from "lucide-react";
 import {
-  getDesktopHabitSlot,
-  getDesktopHabitMarkerSize,
+  getCompletedHabitsForDate,
   getHabitDayAction,
   getHabitCheckInKey,
 } from "@/lib/habits-prototype";
@@ -12,11 +10,16 @@ import { cn } from "@/lib/utils";
 
 export type DayCellHabitPresentation = {
   habits: Habit[];
+  allHabits?: Habit[];
   checkIns: Record<string, HabitCheckIn>;
   selectedHabit: Habit | null;
   onToggle: (dateIso: string) => void;
+  onOpenPicker?: (dateIso: string, anchor: HTMLElement) => void;
   onCreateRequest: () => void;
   isEditing?: boolean;
+  readOnly?: boolean;
+  retrospectiveDates?: ReadonlySet<string>;
+  retrospectiveHighlighted?: boolean;
 };
 
 const ACCESSIBLE_DATE_FORMATTER = new Intl.DateTimeFormat("pt-BR", {
@@ -93,12 +96,13 @@ export function DayCell({
   const isFuture = dateIso > todayIso;
   const completedHabits = isFuture
     ? []
-    : habitPresentation?.habits.filter((habit) =>
-        Boolean(
-          habitPresentation.checkIns[getHabitCheckInKey(habit.id, dateIso)]
-            ?.completed
+    : habitPresentation
+      ? getCompletedHabitsForDate(
+          habitPresentation.habits,
+          habitPresentation.checkIns,
+          dateIso
         )
-      ) ?? [];
+      : [];
   const selectedHabitCompleted = habitPresentation?.selectedHabit
     ? Boolean(
         habitPresentation.checkIns[
@@ -107,11 +111,21 @@ export function DayCell({
       )
     : false;
   const completedNames = completedHabits.map((habit) => habit.name).join(", ");
+  const registeredHabitCount =
+    habitPresentation?.allHabits?.length ?? habitPresentation?.habits.length ?? 0;
+  const usesHabitPicker = registeredHabitCount > 1 && Boolean(habitPresentation?.onOpenPicker);
+  const isRetrospectiveDate = Boolean(
+    habitPresentation?.retrospectiveDates?.has(dateIso)
+  );
   const habitAriaLabel = habitPresentation
     ? isFuture
       ? `${formatAccessibleDate(dateIso)}: data futura, indisponível para hábitos`
+      : habitPresentation.readOnly
+        ? `${formatAccessibleDate(dateIso)}: exemplo de hábitos do guia inicial`
       : habitPresentation.isEditing
         ? `${formatAccessibleDate(dateIso)}: finalize a edição para registrar hábitos`
+      : usesHabitPicker
+        ? `Abrir hábitos de ${formatAccessibleDate(dateIso)}.${completedNames ? ` Concluídos visíveis: ${completedNames}.` : " Nenhum hábito visível concluído."}`
       : habitPresentation.selectedHabit
         ? `${selectedHabitCompleted ? "Desmarcar" : "Marcar"} ${habitPresentation.selectedHabit.name} em ${formatAccessibleDate(dateIso)}.${completedNames ? ` Concluídos: ${completedNames}.` : " Nenhum hábito concluído."}`
         : `${formatAccessibleDate(dateIso)}: crie um hábito para fazer check-in`
@@ -139,8 +153,10 @@ export function DayCell({
     : null;
   const habitCanToggle = habitDayAction === "toggle";
   const habitCanActivate =
+    !habitPresentation?.readOnly &&
     !habitPresentation?.isEditing &&
-    (habitDayAction === "toggle" || habitDayAction === "create");
+    habitDayAction !== "blocked" &&
+    (usesHabitPicker || habitDayAction === "toggle" || habitDayAction === "create");
 
   return (
     <div
@@ -151,6 +167,12 @@ export function DayCell({
       aria-label={habitAriaLabel ?? `Adicionar evento em ${dateIso}`}
       aria-disabled={isHabitMode && !habitCanActivate ? true : undefined}
       data-range-selected={isRangeSelected ? "true" : undefined}
+      data-onboarding-retrospective-date={isRetrospectiveDate ? "true" : undefined}
+      data-onboarding-retrospective-highlighted={
+        isRetrospectiveDate && habitPresentation?.retrospectiveHighlighted
+          ? "true"
+          : undefined
+      }
       className={`group relative flex w-full flex-col px-1 py-1 ring-1 ring-inset transition-[background-color,box-shadow] duration-150 ${dayToneClass} ${
         isHabitMode
           ? habitCanActivate
@@ -173,6 +195,10 @@ export function DayCell({
           : ""
       } ${
         isDropActive ? "bg-foreground/8 ring-border" : ""
+      } ${
+        isRetrospectiveDate && habitPresentation?.retrospectiveHighlighted
+          ? "bg-foreground/8 ring-foreground/45"
+          : ""
       } select-none`}
       style={{ minHeight: `${minHeightPx}px` }}
       onDragOver={(e) => {
@@ -190,7 +216,9 @@ export function DayCell({
       onClick={(event) => {
         event.currentTarget.focus();
          if (isHabitMode) {
-           if (habitCanToggle) {
+           if (usesHabitPicker && habitCanActivate) {
+             habitPresentation?.onOpenPicker?.(dateIso, event.currentTarget);
+           } else if (habitCanToggle) {
              habitPresentation?.onToggle(dateIso);
           } else if (habitCanActivate) {
             habitPresentation?.onCreateRequest();
@@ -203,7 +231,9 @@ export function DayCell({
         if (event.key !== "Enter" && event.key !== " ") return;
         event.preventDefault();
          if (isHabitMode) {
-           if (habitCanToggle) {
+           if (usesHabitPicker && habitCanActivate) {
+             habitPresentation?.onOpenPicker?.(dateIso, event.currentTarget);
+           } else if (habitCanToggle) {
              habitPresentation?.onToggle(dateIso);
           } else if (habitCanActivate) {
             habitPresentation?.onCreateRequest();
@@ -239,53 +269,21 @@ export function DayCell({
       {habitPresentation && completedHabits.length > 0 ? (
         <div
           data-day-habit-markers
-          className={cn(
-            "pointer-events-none absolute inset-x-0 top-7 bottom-1 grid place-items-center",
-            habitPresentation.habits.length === 2 &&
-              "mx-auto w-fit grid-cols-2 grid-rows-1 gap-1",
-            habitPresentation.habits.length > 2 &&
-              "mx-auto w-fit grid-cols-2 grid-rows-2 gap-px"
-          )}
+          className="pointer-events-none absolute inset-x-0 top-6 bottom-0 flex flex-col items-center justify-center overflow-visible"
           aria-hidden="true"
         >
-          {habitPresentation.habits.map((habit, habitIndex) => {
-            const completed = completedHabits.some((entry) => entry.id === habit.id);
-            const slot = getDesktopHabitSlot(
-              habitPresentation.habits.length,
-              habitIndex
-            );
-            const markerSize = getDesktopHabitMarkerSize(
-              habitPresentation.habits.length
-            );
+          {completedHabits.map((habit, completedIndex) => {
             return (
               <span
                 key={habit.id}
-                data-habit-marker={completed ? habit.id : undefined}
-                data-habit-slot={slot ?? undefined}
+                data-habit-marker={habit.id}
+                data-habit-slot={`stack-${completedIndex + 1}`}
                 className={cn(
-                  "grid place-items-center rounded-full border border-black/10 text-slate-950",
-                  markerSize === "single"
-                    ? "size-[clamp(12px,1.1vw,18px)]"
-                    : markerSize === "pair"
-                      ? "size-[clamp(10px,0.95vw,15px)]"
-                      : "size-[clamp(7px,0.78vw,11px)]",
-                  !completed && "invisible"
+                  "size-[clamp(12px,1.1vw,18px)] shrink-0 rounded-[clamp(2px,0.25vw,4px)] border border-black/10",
+                  completedIndex > 0 && "-mt-[clamp(8px,0.75vw,13px)]"
                 )}
-                style={completed ? { backgroundColor: habit.color } : undefined}
-              >
-                {completed ? (
-                  <Check
-                    className={cn(
-                      markerSize === "single"
-                        ? "size-[clamp(7px,0.66vw,11px)]"
-                        : markerSize === "pair"
-                          ? "size-[clamp(6px,0.58vw,9px)]"
-                          : "size-[clamp(4px,0.46vw,7px)]"
-                    )}
-                    strokeWidth={3}
-                  />
-                ) : null}
-              </span>
+                style={{ backgroundColor: habit.color }}
+              />
             );
           })}
         </div>

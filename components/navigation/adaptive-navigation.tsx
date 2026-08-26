@@ -24,7 +24,7 @@ export type UtilityPanelSection =
   | "about"
   | "admin";
 
-type AdaptiveNavigationProps = {
+type ProductNavigationProps = {
   activeDestination: ProductDestinationId;
   authLoading: boolean;
   onDestinationSelect: (destination: ProductDestinationId) => void;
@@ -32,6 +32,8 @@ type AdaptiveNavigationProps = {
     section: UtilityPanelSection,
     trigger: HTMLElement
   ) => void;
+  highlightProfile?: boolean;
+  highlightDestination?: ProductDestinationId;
 };
 
 const ICON_BY_NAME: Record<
@@ -44,10 +46,10 @@ const ICON_BY_NAME: Record<
 
 function AccountGlyph({
   compact = false,
-  desktopRail = false,
+  desktopHeader = false,
 }: {
   compact?: boolean;
-  desktopRail?: boolean;
+  desktopHeader?: boolean;
 }) {
   const { session } = useAuth();
   const { isPro, isLoading, error } = useBilling();
@@ -82,7 +84,7 @@ function AccountGlyph({
     );
   }
 
-  if (desktopRail) {
+  if (desktopHeader && !session) {
     return (
       <span
         className={cn(
@@ -124,11 +126,13 @@ function DestinationButton({
   active,
   mobile = false,
   onSelect,
+  highlighted = false,
 }: {
   destination: (typeof PRODUCT_DESTINATIONS)[number];
   active: boolean;
   mobile?: boolean;
   onSelect: (destination: ProductDestinationId) => void;
+  highlighted?: boolean;
 }) {
   const Icon = ICON_BY_NAME[destination.icon];
 
@@ -137,6 +141,8 @@ function DestinationButton({
       href={destination.href}
       aria-current={active ? "page" : undefined}
       title={destination.label}
+      data-product-destination={destination.id}
+      data-onboarding-highlighted={highlighted ? "true" : undefined}
       className={cn(
         "group relative inline-flex items-center justify-center rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
         mobile ? "min-h-12 min-w-16 flex-1 flex-col gap-0.5 px-2" : "size-10",
@@ -170,12 +176,14 @@ function DestinationButton({
   );
 }
 
-export function AdaptiveNavigation({
+export function DesktopProductNavigation({
   activeDestination,
   authLoading,
   onDestinationSelect,
   onOpenUtilityPanel,
-}: AdaptiveNavigationProps) {
+  highlightProfile = false,
+  highlightDestination,
+}: ProductNavigationProps) {
   const handleAccount = (event: React.MouseEvent<HTMLButtonElement>) => {
     if (authLoading) return;
     onOpenUtilityPanel("account", event.currentTarget);
@@ -186,60 +194,75 @@ export function AdaptiveNavigation({
       <nav
         aria-label="Navegação principal"
         data-product-navigation="desktop"
-        className="fixed inset-y-0 left-0 z-40 hidden w-[52px] flex-col items-center border-r border-border/70 bg-background/96 px-1.5 pt-4 pb-2 backdrop-blur md:flex"
+        className="col-start-2 hidden items-center justify-center gap-1 md:flex"
       >
-        <button
-          type="button"
-          data-onboarding-auth-entry
-          aria-label="Abrir perfil"
-          title="Perfil"
-          disabled={authLoading}
-          className="grid size-10 place-items-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 disabled:opacity-45"
-          onClick={handleAccount}
-        >
-          {authLoading ? null : <AccountGlyph desktopRail />}
-        </button>
-
-        <div data-rail-divider className="my-2 h-px w-6 bg-border/70" aria-hidden="true" />
-
-        <div className="flex flex-col items-center gap-1">
-          {PRODUCT_DESTINATIONS.map((destination) => (
-            <DestinationButton
-              key={destination.id}
-              destination={destination}
-              active={activeDestination === destination.id}
-              onSelect={onDestinationSelect}
-            />
-          ))}
-        </div>
-      </nav>
-
-      <nav
-        aria-label="Navegação principal"
-        data-product-navigation="mobile"
-        className="fixed inset-x-0 bottom-0 z-40 flex min-h-[calc(3.75rem+env(safe-area-inset-bottom,0px))] items-start border-t border-border/75 bg-background/96 px-2 pt-1.5 pb-[env(safe-area-inset-bottom,0px)] shadow-[0_-16px_36px_-30px_rgba(15,23,42,0.55)] backdrop-blur md:hidden"
-      >
-        {[...PRODUCT_DESTINATIONS].reverse().map((destination) => (
+        {PRODUCT_DESTINATIONS.map((destination) => (
           <DestinationButton
             key={destination.id}
             destination={destination}
             active={activeDestination === destination.id}
-            mobile
             onSelect={onDestinationSelect}
+            highlighted={highlightDestination === destination.id}
           />
         ))}
-        <button
-          type="button"
-          data-onboarding-auth-entry
-          aria-label="Abrir perfil"
-          disabled={authLoading}
-          className="inline-flex min-h-12 min-w-16 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-2 text-muted-foreground/55 transition-colors hover:bg-muted/45 hover:text-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 disabled:opacity-45"
-          onClick={handleAccount}
-        >
-          {authLoading ? null : <AccountGlyph compact />}
-          <span className="text-[10px] font-semibold leading-none">Perfil</span>
-        </button>
       </nav>
+
+      <button
+        type="button"
+        data-product-account="desktop"
+        data-onboarding-auth-entry
+        aria-label="Abrir perfil"
+        title="Perfil"
+        disabled={authLoading}
+        className={cn(
+          "col-start-3 hidden size-10 place-items-center justify-self-end rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 disabled:opacity-45 md:grid",
+          highlightProfile && "text-foreground"
+        )}
+        onClick={handleAccount}
+      >
+        {authLoading ? null : <AccountGlyph desktopHeader />}
+      </button>
     </>
+  );
+}
+
+export function AdaptiveNavigation({
+  activeDestination,
+  authLoading,
+  onDestinationSelect,
+  onOpenUtilityPanel,
+}: ProductNavigationProps) {
+  const handleAccount = (event: React.MouseEvent<HTMLButtonElement>) => {
+    if (authLoading) return;
+    onOpenUtilityPanel("account", event.currentTarget);
+  };
+
+  return (
+    <nav
+      aria-label="Navegação principal"
+      data-product-navigation="mobile"
+      className="fixed inset-x-0 bottom-0 z-40 flex min-h-[calc(3.75rem+env(safe-area-inset-bottom,0px))] items-start border-t border-border/75 bg-background/96 px-2 pt-1.5 pb-[env(safe-area-inset-bottom,0px)] shadow-[0_-16px_36px_-30px_rgba(15,23,42,0.55)] backdrop-blur md:hidden"
+    >
+      {[...PRODUCT_DESTINATIONS].reverse().map((destination) => (
+        <DestinationButton
+          key={destination.id}
+          destination={destination}
+          active={activeDestination === destination.id}
+          mobile
+          onSelect={onDestinationSelect}
+        />
+      ))}
+      <button
+        type="button"
+        data-onboarding-auth-entry
+        aria-label="Abrir perfil"
+        disabled={authLoading}
+        className="inline-flex min-h-12 min-w-16 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-2 text-muted-foreground/55 transition-colors hover:bg-muted/45 hover:text-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 disabled:opacity-45"
+        onClick={handleAccount}
+      >
+        {authLoading ? null : <AccountGlyph compact />}
+        <span className="text-[10px] font-semibold leading-none">Perfil</span>
+      </button>
+    </nav>
   );
 }

@@ -579,7 +579,7 @@ export function CategoryBar({
           <button
             type="button"
             onClick={onCreateCategory}
-            className={cn(CREATE_ACTION_CLASS, "product-spotlight-target")}
+            className={CREATE_ACTION_CLASS}
             data-onboarding-calendar-control
             data-onboarding-highlighted="true"
             aria-label="Adicionar categoria"
@@ -640,7 +640,6 @@ export function CategoryBar({
             disabled={!editingProfileId}
             className={cn(
               CREATE_ACTION_CLASS,
-              highlightCreate && "product-spotlight-target",
               mobileDense && "h-10 w-full rounded-[8px]",
               !editingProfileId &&
                 "cursor-not-allowed border-border bg-card text-muted-foreground/55 hover:border-border hover:bg-card hover:text-muted-foreground/55"

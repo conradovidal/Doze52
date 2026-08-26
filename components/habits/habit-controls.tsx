@@ -32,6 +32,11 @@ import {
 } from "lucide-react";
 
 import { CollapsibleControlRegion } from "@/components/ui/collapsible-control-region";
+import {
+  GuidedToolbarNoticeCard,
+  type GuidedToolbarNotice,
+} from "@/components/onboarding/guided-toolbar-notice";
+import { GuidedTargetOutline } from "@/components/onboarding/guided-target-outline";
 import { getCategoryColorToken } from "@/lib/category-palette";
 import {
   arraysEqual,
@@ -53,17 +58,23 @@ type HabitControlsProps = {
   habits: Habit[];
   totalActiveHabits: number;
   selectedHabit: Habit | null;
+  visibleHabitIds?: ReadonlySet<string>;
   archivedHabits?: Habit[];
   isEditing?: boolean;
+  readOnly?: boolean;
   mobile?: boolean;
   creationDisabled: boolean;
   creationDisabledLabel: string | null;
   onSelectHabit: (habitId: string) => void;
+  onToggleHabitVisibility?: (habitId: string) => void;
   onRequestCreate: () => void;
   onEditHabit?: (habitId: string) => void;
   onReorderHabits?: (orderedIds: string[]) => void;
   onReactivateHabit?: (habitId: string) => void;
   onToggleEditing?: () => void;
+  guidedNotice?: GuidedToolbarNotice | null;
+  onDismissGuidedNotice?: () => void;
+  onGuidedNoticeAction?: () => void;
 };
 
 type DragState = { id: string; width: number | null };
@@ -213,17 +224,23 @@ export function HabitControls({
   habits,
   totalActiveHabits,
   selectedHabit,
+  visibleHabitIds,
   archivedHabits = [],
   isEditing = false,
+  readOnly = false,
   mobile = false,
   creationDisabled,
   creationDisabledLabel,
   onSelectHabit,
+  onToggleHabitVisibility,
   onRequestCreate,
   onEditHabit,
   onReorderHabits,
   onReactivateHabit,
   onToggleEditing,
+  guidedNotice = null,
+  onDismissGuidedNotice,
+  onGuidedNoticeAction,
 }: HabitControlsProps) {
   const { mode: themeMode } = useTheme();
   const [expanded, setExpanded] = React.useState(true);
@@ -300,7 +317,9 @@ export function HabitControls({
       )}
     >
       {habits.map((habit) => {
-        const selected = selectedHabit?.id === habit.id;
+        const selected = mobile
+          ? selectedHabit?.id === habit.id
+          : visibleHabitIds?.has(habit.id) ?? true;
         const colorToken = getCategoryColorToken(habit.color, themeMode);
 
         return (
@@ -308,6 +327,7 @@ export function HabitControls({
             key={habit.id}
             type="button"
             aria-pressed={selected}
+            data-habit-filter={habit.id}
             title={habit.name}
             className={cn(
               "inline-flex items-center overflow-hidden border text-[0.78rem] font-semibold shadow-none transition-[background-color,border-color,color,transform] duration-[160ms] ease-[cubic-bezier(0.22,1,0.36,1)] active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45",
@@ -328,7 +348,13 @@ export function HabitControls({
                   }
                 : undefined
             }
-            onClick={() => onSelectHabit(habit.id)}
+            onClick={() => {
+              if (!mobile && onToggleHabitVisibility) {
+                onToggleHabitVisibility(habit.id);
+                return;
+              }
+              onSelectHabit(habit.id);
+            }}
           >
             <span
               className="inline-flex h-8 w-7 shrink-0 items-center justify-center"
@@ -356,12 +382,13 @@ export function HabitControls({
 
       <button
         type="button"
+        data-onboarding-habit-create={guidedNotice?.target === "habit" ? "true" : undefined}
         aria-label="Criar novo hábito"
         title={creationDisabledLabel ?? "Criar novo hábito"}
         disabled={creationDisabled}
         className={cn(
           "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-border bg-card text-foreground shadow-none transition-all duration-[160ms] ease-[cubic-bezier(0.22,1,0.36,1)] hover:border-foreground/20 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45 disabled:cursor-not-allowed disabled:text-muted-foreground/55 disabled:hover:border-border disabled:hover:bg-card",
-          mobile && "h-10 w-full rounded-[8px]"
+          mobile && "h-10 w-full rounded-[8px]",
         )}
         onClick={onRequestCreate}
       >
@@ -437,12 +464,16 @@ export function HabitControls({
   return (
     <section
       data-habit-controls
+      data-onboarding-habit-controls
+      data-onboarding-habit-showcase={
+        guidedNotice?.target === "habit-showcase" ? "true" : undefined
+      }
       data-habit-controls-layout={mobile ? "mobile" : "desktop"}
       className={cn(
         "shrink-0",
         mobile
           ? "w-full overflow-hidden rounded-[10px] border border-border bg-card"
-          : "mx-auto mb-2 flex w-full max-w-[50rem] flex-col items-center gap-1.5 border-t border-border/45 pt-3"
+          : "mx-auto mb-2 flex w-full max-w-[50rem] flex-col items-center gap-2 border-t border-border/45 pt-3"
       )}
     >
       <h1 className="sr-only">Hábitos</h1>
@@ -464,8 +495,9 @@ export function HabitControls({
               aria-pressed={isEditing}
               aria-label={isEditing ? "Finalizar edição" : "Editar"}
               title={isEditing ? "Finalizar edição" : "Editar"}
+              disabled={readOnly}
               className={cn(
-                "grid size-8 place-items-center rounded-[10px] border border-border text-foreground/70",
+                "grid size-8 place-items-center rounded-[10px] border border-border text-foreground/70 disabled:cursor-not-allowed disabled:opacity-45",
                 isEditing && "border-foreground bg-foreground text-background"
               )}
               onClick={onToggleEditing}
@@ -500,8 +532,9 @@ export function HabitControls({
             aria-pressed={isEditing}
             aria-label={isEditing ? "Finalizar edição" : "Editar"}
             title={isEditing ? "Finalizar edição" : "Editar"}
+            disabled={readOnly}
             className={cn(
-              "inline-flex size-8 items-center justify-center rounded-[10px] border border-border bg-card text-foreground/70",
+              "inline-flex size-8 items-center justify-center rounded-[10px] border border-border bg-card text-foreground/70 disabled:cursor-not-allowed disabled:opacity-45",
               isEditing && "border-foreground bg-foreground text-background"
             )}
             onClick={onToggleEditing}
@@ -567,6 +600,26 @@ export function HabitControls({
             </p>
           ) : null}
       </CollapsibleControlRegion>
+      {guidedNotice && onDismissGuidedNotice ? (
+        <>
+          {guidedNotice.target === "habit" ? (
+            <GuidedTargetOutline selector="[data-onboarding-habit-create]" />
+          ) : null}
+          <GuidedToolbarNoticeCard
+            notice={guidedNotice}
+            onClose={onDismissGuidedNotice}
+            onAction={onGuidedNoticeAction}
+            placement="viewport"
+            portaled
+            anchorSelector={
+              guidedNotice.target === "habit"
+                ? "[data-onboarding-habit-create]"
+                : "[data-onboarding-habit-controls]"
+            }
+            anchorPlacement="below-center"
+          />
+        </>
+      ) : null}
     </section>
   );
 }

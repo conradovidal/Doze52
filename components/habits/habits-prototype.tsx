@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ProUpgradeDialog } from "@/components/billing/pro-upgrade-dialog";
 import { DesktopHabitsPrototype } from "@/components/habits/desktop-habits-prototype";
 import { HabitControls } from "@/components/habits/habit-controls";
+import { HabitDayPicker } from "@/components/habits/habit-day-picker";
 import { useFeedback } from "@/components/ui/feedback-provider";
 import {
   Dialog,
@@ -31,8 +32,10 @@ import {
   getDesktopVisibleHabits,
   getHabitDayAction,
   getHabitCheckInKey,
+  getHabitRetrospectiveDates,
   orderActiveHabits,
   setHabitArchived,
+  type OnboardingHabitShowcase,
 } from "@/lib/habits-prototype";
 import type { Habit, HabitCheckIn } from "@/lib/types";
 import { useBilling } from "@/lib/use-billing";
@@ -61,12 +64,14 @@ type HabitsPrototypeSession = {
   habits: Habit[];
   checkIns: Record<string, HabitCheckIn>;
   selectedHabitId: string | null;
+  visibleHabitIds: string[];
 };
 
 const EMPTY_HABITS_SESSION: HabitsPrototypeSession = {
   habits: [],
   checkIns: {},
   selectedHabitId: null,
+  visibleHabitIds: [],
 };
 
 const readHabitsPrototypeSession = (): HabitsPrototypeSession => {
@@ -78,11 +83,22 @@ const readHabitsPrototypeSession = (): HabitsPrototypeSession => {
     if (!Array.isArray(parsed.habits) || typeof parsed.checkIns !== "object") {
       return EMPTY_HABITS_SESSION;
     }
+    const activeHabitIds = new Set(
+      parsed.habits.filter((habit) => !habit.archivedAt).map((habit) => habit.id)
+    );
     return {
       habits: parsed.habits,
       checkIns: (parsed.checkIns ?? {}) as Record<string, HabitCheckIn>,
       selectedHabitId:
         typeof parsed.selectedHabitId === "string" ? parsed.selectedHabitId : null,
+      visibleHabitIds: Array.isArray(parsed.visibleHabitIds)
+        ? parsed.visibleHabitIds.filter(
+            (id): id is string =>
+              typeof id === "string" && activeHabitIds.has(id)
+          )
+        : parsed.habits
+            .filter((habit) => !habit.archivedAt)
+            .map((habit) => habit.id),
     };
   } catch {
     return EMPTY_HABITS_SESSION;
@@ -137,8 +153,21 @@ function HabitEditorDialog({
                 maxLength={80}
                 autoFocus
                 placeholder="Ex.: Caminhar"
+                aria-describedby={
+                  editing ? undefined : "habit-prototype-name-suggestions"
+                }
                 onChange={(event) => onNameChange(event.target.value)}
               />
+              {!editing ? (
+                <p
+                  id="habit-prototype-name-suggestions"
+                  className="text-xs leading-4 text-muted-foreground"
+                >
+                  Para se inspirar: caminhar, correr, treinar força, estudar,
+                  meditar, praticar um idioma, beber água ou tocar um projeto
+                  paralelo.
+                </p>
+              ) : null}
             </div>
 
             <fieldset>
@@ -200,6 +229,13 @@ export function HabitsPrototype({
   isEditing = false,
   onToggleEditing,
   onYearChange,
+  guidedNotice = null,
+  showcase = null,
+  onDismissGuidedNotice,
+  onGuidedNoticeAction,
+  onHabitCreated,
+  onHabitCheckIn,
+  retrospectiveInteracted = false,
 }: {
   year: number;
   todayIso: string;
@@ -208,6 +244,13 @@ export function HabitsPrototype({
   isEditing?: boolean;
   onToggleEditing?: () => void;
   onYearChange: (year: number) => void;
+  guidedNotice?: import("@/components/onboarding/guided-toolbar-notice").GuidedToolbarNotice | null;
+  showcase?: OnboardingHabitShowcase | null;
+  onDismissGuidedNotice?: () => void;
+  onGuidedNoticeAction?: (input?: { hasExistingHabit: boolean }) => void;
+  onHabitCreated?: () => void;
+  onHabitCheckIn?: () => void;
+  retrospectiveInteracted?: boolean;
 }) {
   const { notify } = useFeedback();
   const { limits, isPro, isLoading: isBillingLoading, error: billingError } =
@@ -220,6 +263,16 @@ export function HabitsPrototype({
   const [selectedHabitId, setSelectedHabitId] = React.useState<string | null>(
     initialSession.selectedHabitId
   );
+  const [visibleHabitIds, setVisibleHabitIds] = React.useState<string[]>(
+    initialSession.visibleHabitIds
+  );
+  const [showcaseVisibleHabitIds, setShowcaseVisibleHabitIds] = React.useState<
+    string[]
+  >(showcase?.visibleHabitIds ?? []);
+  const [dayPicker, setDayPicker] = React.useState<{
+    dateIso: string;
+    anchor: HTMLElement;
+  } | null>(null);
   const [createDialogOpen, setCreateDialogOpen] = React.useState(false);
   const [editingHabitId, setEditingHabitId] = React.useState<string | null>(null);
   const [upgradeOpen, setUpgradeOpen] = React.useState(false);
@@ -227,10 +280,26 @@ export function HabitsPrototype({
   const [draftColor, setDraftColor] = React.useState<string>(HABIT_COLORS[0]);
   const scrollRegionRef = React.useRef<HTMLDivElement | null>(null);
   const currentWeekRef = React.useRef<HTMLDivElement | null>(null);
+  const closeDayPicker = React.useCallback(() => {
+    setDayPicker((current) => {
+      current?.anchor.focus();
+      return null;
+    });
+  }, []);
 
   const activeHabits = React.useMemo(
     () => orderActiveHabits(habits),
     [habits]
+  );
+  const showcaseActive = Boolean(showcase);
+  const presentedHabits = showcase?.habits ?? activeHabits;
+  const presentedCheckIns = showcase?.checkIns ?? checkIns;
+  const presentedVisibleHabitIds = showcaseActive
+    ? showcaseVisibleHabitIds
+    : visibleHabitIds;
+  const presentedVisibleHabitIdSet = React.useMemo(
+    () => new Set(presentedVisibleHabitIds),
+    [presentedVisibleHabitIds]
   );
   const archivedHabits = React.useMemo(
     () => habits.filter((habit) => Boolean(habit.archivedAt)),
@@ -248,21 +317,34 @@ export function HabitsPrototype({
     [todayIso, year]
   );
   const desktopHabits = React.useMemo(
-    () => getDesktopVisibleHabits(activeHabits),
-    [activeHabits]
+    () =>
+      getDesktopVisibleHabits(
+        presentedHabits.filter((habit) => presentedVisibleHabitIdSet.has(habit.id))
+      ),
+    [presentedHabits, presentedVisibleHabitIdSet]
+  );
+  const desktopAllHabits = React.useMemo(
+    () => getDesktopVisibleHabits(presentedHabits),
+    [presentedHabits]
   );
   const desktopSelectedHabit = React.useMemo(
+    () => (presentedHabits.length === 1 ? presentedHabits[0] ?? null : null),
+    [presentedHabits]
+  );
+  const retrospectiveDates = React.useMemo(
     () =>
-      desktopHabits.find((habit) => habit.id === selectedHabitId) ??
-      desktopHabits[0] ??
-      null,
-    [desktopHabits, selectedHabitId]
+      guidedNotice?.target === "habit-created"
+        ? new Set(getHabitRetrospectiveDates(year, todayIso))
+        : undefined,
+    [guidedNotice?.target, todayIso, year]
   );
   const creationUnavailable = isBillingLoading || Boolean(billingError);
   const reachedHabitLimit = activeHabits.length >= limits.maxHabits;
-  const creationDisabled =
+  const creationDisabled = showcaseActive ||
     creationUnavailable || (isPro && reachedHabitLimit);
-  const creationDisabledLabel = creationUnavailable
+  const creationDisabledLabel = showcaseActive
+    ? null
+    : creationUnavailable
     ? "Aguarde a confirmação do seu plano para criar outro hábito."
     : isPro && reachedHabitLimit
       ? "O plano Pro permite até 4 hábitos neste protótipo."
@@ -273,7 +355,7 @@ export function HabitsPrototype({
     const currentWeek = currentWeekRef.current;
     if (!region || !currentWeek) return;
 
-    if (selectedHabit) {
+    if (selectedHabit && !showcaseActive) {
       const savedScroll = Number(
         window.sessionStorage.getItem(
           getHabitScrollStorageKey(year, selectedHabit.id)
@@ -289,20 +371,25 @@ export function HabitsPrototype({
       0,
       currentWeek.offsetTop - region.offsetTop - region.clientHeight / 3
     );
-  }, [selectedHabit, year]);
+  }, [selectedHabit, showcaseActive, year]);
+
+  React.useEffect(() => {
+    setShowcaseVisibleHabitIds(showcase?.visibleHabitIds ?? []);
+  }, [showcase]);
 
   React.useEffect(() => {
     try {
       window.sessionStorage.setItem(
         HABITS_PROTOTYPE_SESSION_KEY,
-        JSON.stringify({ habits, checkIns, selectedHabitId })
+        JSON.stringify({ habits, checkIns, selectedHabitId, visibleHabitIds })
       );
     } catch {
       // O protótipo continua funcional na memória quando o storage não está disponível.
     }
-  }, [checkIns, habits, selectedHabitId]);
+  }, [checkIns, habits, selectedHabitId, visibleHabitIds]);
 
   const requestCreateHabit = () => {
+    if (showcaseActive) return;
     if (creationUnavailable) {
       notify({
         tone: "info",
@@ -359,7 +446,9 @@ export function HabitsPrototype({
     };
     setHabits((current) => [...current, habit]);
     setSelectedHabitId(habit.id);
+    setVisibleHabitIds((current) => [...new Set([...current, habit.id])]);
     setCreateDialogOpen(false);
+    onHabitCreated?.();
   };
 
   const requestEditHabit = (habitId: string) => {
@@ -386,6 +475,12 @@ export function HabitsPrototype({
     if (selectedHabitId === editingHabitId) {
       setSelectedHabitId(nextActive[0]?.id ?? null);
     }
+    setVisibleHabitIds((current) => {
+      const retained = current.filter((habitId) => habitId !== editingHabitId);
+      return nextActive.length === 1
+        ? [...new Set([...retained, nextActive[0].id])]
+        : retained;
+    });
     setCreateDialogOpen(false);
     setEditingHabitId(null);
   };
@@ -420,10 +515,11 @@ export function HabitsPrototype({
       )
     );
     setSelectedHabitId(habitId);
+    setVisibleHabitIds((current) => [...new Set([...current, habitId])]);
   };
 
   const toggleHabitDay = (habit: Habit | null, dateIso: string) => {
-    if (!habit) return;
+    if (!habit || showcaseActive) return;
     const key = getHabitCheckInKey(habit.id, dateIso);
     setCheckIns((current) => {
       const completed = !current[key]?.completed;
@@ -437,6 +533,19 @@ export function HabitsPrototype({
         },
       };
     });
+    onHabitCheckIn?.();
+  };
+
+  const toggleHabitVisibility = (habitId: string) => {
+    if (!showcaseActive && activeHabits.length === 1) return;
+    const setter = showcaseActive
+      ? setShowcaseVisibleHabitIds
+      : setVisibleHabitIds;
+    setter((current) =>
+      current.includes(habitId)
+        ? current.filter((id) => id !== habitId)
+        : [...current, habitId]
+    );
   };
 
   const createDialog = (
@@ -459,25 +568,49 @@ export function HabitsPrototype({
         <DesktopHabitsPrototype
           year={year}
           todayIso={todayIso}
-          habits={desktopHabits}
-          totalActiveHabits={activeHabits.length}
-          checkIns={checkIns}
+          habits={desktopAllHabits}
+          visibleHabits={desktopHabits}
+          allHabits={desktopAllHabits}
+          totalActiveHabits={presentedHabits.length}
+          checkIns={presentedCheckIns}
           selectedHabit={desktopSelectedHabit}
+          visibleHabitIds={presentedVisibleHabitIdSet}
           creationDisabled={creationDisabled}
           creationDisabledLabel={creationDisabledLabel}
-          onSelectHabit={setSelectedHabitId}
+          onSelectHabit={toggleHabitVisibility}
           onToggleDay={(dateIso) =>
             toggleHabitDay(desktopSelectedHabit, dateIso)
           }
+          onOpenDayPicker={(dateIso, anchor) => {
+            if (!showcaseActive) setDayPicker({ dateIso, anchor });
+          }}
           onRequestCreate={requestCreateHabit}
-          isEditing={isEditing}
-          archivedHabits={archivedHabits}
+          isEditing={showcaseActive ? false : isEditing}
+          readOnly={showcaseActive}
+          archivedHabits={showcaseActive ? [] : archivedHabits}
           onEditHabit={requestEditHabit}
           onReorderHabits={reorderHabits}
           onReactivateHabit={reactivateHabit}
-          onToggleEditing={onToggleEditing}
+          onToggleEditing={showcaseActive ? undefined : onToggleEditing}
           onYearChange={onYearChange}
+          guidedNotice={guidedNotice}
+          retrospectiveDates={retrospectiveDates}
+          retrospectiveHighlighted={!retrospectiveInteracted}
+          onDismissGuidedNotice={onDismissGuidedNotice}
+          onGuidedNoticeAction={() =>
+            onGuidedNoticeAction?.({ hasExistingHabit: activeHabits.length > 0 })
+          }
         />
+        {dayPicker ? (
+          <HabitDayPicker
+            dateIso={dayPicker.dateIso}
+            anchor={dayPicker.anchor}
+            habits={activeHabits}
+            checkIns={checkIns}
+            onToggle={toggleHabitDay}
+            onClose={closeDayPicker}
+          />
+        ) : null}
         {createDialog}
         <ProUpgradeDialog
           open={upgradeOpen}
