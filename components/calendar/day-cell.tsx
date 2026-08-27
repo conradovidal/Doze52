@@ -6,7 +6,6 @@ import {
   getHabitCheckInKey,
 } from "@/lib/habits-prototype";
 import type { Habit, HabitCheckIn } from "@/lib/types";
-import { cn } from "@/lib/utils";
 
 export type DayCellHabitPresentation = {
   habits: Habit[];
@@ -278,10 +277,7 @@ export function DayCell({
                 key={habit.id}
                 data-habit-marker={habit.id}
                 data-habit-slot={`stack-${completedIndex + 1}`}
-                className={cn(
-                  "size-[clamp(12px,1.1vw,18px)] shrink-0 rounded-[clamp(2px,0.25vw,4px)] border border-black/10",
-                  completedIndex > 0 && "-mt-[clamp(8px,0.75vw,13px)]"
-                )}
+                className="size-[clamp(12px,1.1vw,18px)] shrink-0 rounded-[clamp(2px,0.25vw,4px)] border border-black/10"
                 style={{ backgroundColor: habit.color }}
               />
             );

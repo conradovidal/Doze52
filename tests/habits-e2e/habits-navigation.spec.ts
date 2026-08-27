@@ -37,6 +37,65 @@ const expectCenteredLogo = async (
   expect(Math.abs(logoBox.x + logoBox.width / 2 - viewport.width / 2)).toBeLessThanOrEqual(1);
 };
 
+test("desktop antecipa a demonstração de hábitos e reinicia o guia no ano", async ({
+  page,
+}, testInfo) => {
+  test.skip(!testInfo.project.name.startsWith("desktop-"), "Cenário desktop");
+
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      "doze52:onboarding:v2",
+      JSON.stringify({ version: 15, step: "context_selection" })
+    );
+    window.sessionStorage.removeItem("doze52:habits-prototype:v1");
+  });
+  await page.goto("/?surface=annual");
+
+  const onboardingPanel = page.locator(
+    '[data-guided-onboarding-step="context_selection"]'
+  );
+  await expect(onboardingPanel).toContainText(
+    "Por qual contexto você quer começar?"
+  );
+  await page.getByRole("link", { name: "Hábitos" }).click();
+
+  const habits = page.locator("[data-habits-prototype]");
+  await expect(habits).toBeVisible();
+  for (const name of [
+    "Exercício",
+    "Ler 20 minutos",
+    "Dormir antes das 23h",
+    "Dia sem fumar",
+  ]) {
+    await expect(habits.getByRole("button", { name, exact: true })).toBeVisible();
+  }
+  await expect(
+    habits.getByRole("button", { name: "Dia sem fumar", exact: true })
+  ).toHaveAttribute("aria-pressed", "false");
+  const habitDay = habits.locator("[data-day-cell]").first();
+  await expect.poll(async () => (await habitDay.boundingBox())?.height).toBe(80);
+  await expect(habits.locator("[data-habit-marker]").first()).toBeVisible();
+
+  const currentYear = new Date().getFullYear();
+  await habits.getByTitle(`Avançar para ${currentYear + 1}`).click();
+  await expect(habits.getByLabel(`Ano ${currentYear + 1}`)).toBeVisible();
+  await habits.locator('button[title="Abrir Janeiro"]:visible').first().click();
+  await expect(habits.locator("[data-month-row]")).toHaveCount(1);
+
+  await page.getByRole("link", { name: "Anual" }).click();
+  await expect(onboardingPanel).toBeVisible();
+  await onboardingPanel
+    .getByRole("button")
+    .filter({ hasText: "Pessoal" })
+    .click();
+
+  await expect(page.locator('[data-product-navigation="desktop"] a[aria-current="page"]')).toHaveAttribute("title", "Anual");
+  await expect(page.locator("[data-calendar-year-stepper]:visible span").first()).toHaveText(
+    String(currentYear)
+  );
+  await expect(page.locator("[data-month-row]")).toHaveCount(12);
+});
+
 test("mobile abre em Hábitos e preserva a sessão entre superfícies", async ({
   page,
 }, testInfo) => {
@@ -308,7 +367,7 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
   }
   const completedDayBox = await completedDay.boundingBox();
   if (!completedDayBox) throw new Error("Célula de hábitos não pôde ser medida.");
-  expect(completedDayBox.height).toBeLessThanOrEqual(48);
+  expect(completedDayBox.height).toBeGreaterThanOrEqual(98);
   const markerGeometry = await completedDay.locator("[data-day-habit-markers]").evaluate(
     (element) => {
       const marker = element.querySelector<HTMLElement>("[data-habit-marker]");
@@ -316,14 +375,27 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
       return {
         direction: style.flexDirection,
         markerWidth: marker?.getBoundingClientRect().width ?? 0,
+        markerGap: style.rowGap,
         markerRadius: marker ? getComputedStyle(marker).borderRadius : "",
+        markerBoxes: Array.from(
+          element.querySelectorAll<HTMLElement>("[data-habit-marker]")
+        ).map((entry) => {
+          const box = entry.getBoundingClientRect();
+          return { y: box.y, height: box.height };
+        }),
       };
     }
   );
   expect(markerGeometry.direction).toBe("column");
   expect(markerGeometry.markerWidth).toBeGreaterThanOrEqual(12);
   expect(markerGeometry.markerWidth).toBeLessThanOrEqual(18);
+  expect(markerGeometry.markerGap).toBe("normal");
   expect(markerGeometry.markerRadius).not.toBe("9999px");
+  for (let index = 1; index < markerGeometry.markerBoxes.length; index += 1) {
+    const previous = markerGeometry.markerBoxes[index - 1];
+    const current = markerGeometry.markerBoxes[index];
+    expect(current.y).toBeGreaterThanOrEqual(previous.y + previous.height - 0.5);
+  }
   await completedDay.click();
   const dayPicker = page.locator("[data-habit-day-picker]");
   await expect(dayPicker).toBeVisible();
@@ -359,6 +431,7 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
   await hiddenFilter.click();
   await expect(hiddenFilter).toHaveAttribute("aria-pressed", "false");
   await expect(completedDay.locator("[data-habit-marker]")).toHaveCount(3);
+  await expect.poll(async () => (await completedDay.boundingBox())?.height).toBe(80);
   await completedDay.click();
   await expect(
     page.locator("[data-habit-day-picker]").getByRole("button", {
@@ -660,8 +733,17 @@ test("onboarding desktop apresenta o exemplo e termina no hábito real", async (
     "true"
   );
   await expect(page.locator("[data-guided-target-outline]")).toHaveCount(1);
+  const guidedCurrentYear = new Date().getFullYear();
+  await page.getByTitle(`Avançar para ${guidedCurrentYear + 1}`).click();
+  await expect(page.getByLabel(`Ano ${guidedCurrentYear + 1}`)).toBeVisible();
+  await page.locator('button[title="Abrir Janeiro"]:visible').first().click();
+  await expect(page.locator("[data-month-row]")).toHaveCount(1);
   await habitsDestination.click();
   await expect(page.locator('[data-product-navigation="desktop"] a[aria-current="page"]')).toHaveAttribute("title", "Hábitos");
+  await expect(page.locator("[data-calendar-year-stepper]:visible span").first()).toHaveText(
+    String(guidedCurrentYear)
+  );
+  await expect(page.locator("[data-month-row]")).toHaveCount(12);
   const showcaseNotice = page.locator(
     '[data-guided-toolbar-notice][data-guided-toolbar-target="habit-showcase"]'
   );
@@ -688,6 +770,8 @@ test("onboarding desktop apresenta o exemplo e termina no hábito real", async (
     exact: true,
   });
   await expect(smokeFilter).toHaveAttribute("aria-pressed", "false");
+  const showcaseDay = page.locator("[data-day-cell]").first();
+  await expect.poll(async () => (await showcaseDay.boundingBox())?.height).toBe(80);
   expect(
     await page.locator("[data-day-habit-markers]").evaluateAll((markers) =>
       markers.some(
@@ -697,6 +781,7 @@ test("onboarding desktop apresenta o exemplo e termina no hábito real", async (
   ).toBe(false);
   await smokeFilter.click();
   await expect(smokeFilter).toHaveAttribute("aria-pressed", "true");
+  await expect.poll(async () => (await showcaseDay.boundingBox())?.height).toBe(98);
   expect(
     await page.locator("[data-day-habit-markers]").evaluateAll((markers) =>
       markers.some(

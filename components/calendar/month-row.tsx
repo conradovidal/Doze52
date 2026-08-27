@@ -36,6 +36,7 @@ import {
   compareEventsByVisualPriority,
   isRenderableEventDateRange,
 } from "@/lib/event-order";
+import { getDesktopHabitRowMinHeight } from "@/lib/habits-prototype";
 import { cn } from "@/lib/utils";
 import { isOnboardingPersonalDemoGroup } from "@/lib/store";
 import {
@@ -339,7 +340,9 @@ export function MonthRow({
     eventBandHeightPx +
     layoutDensity.monthRowBottomPaddingPx;
   const minHeightPx = isHabitMode
-    ? scaleVerticalSpacing(44)
+    ? scaleVerticalSpacing(
+        getDesktopHabitRowMinHeight(habitPresentation?.habits.length ?? 0)
+      )
     : scaleVerticalSpacing(
         Math.max(layoutDensity.monthRowBaseMinHeightPx, baseContentHeight)
       );

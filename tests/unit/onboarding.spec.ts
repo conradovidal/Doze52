@@ -6,6 +6,7 @@ import {
   hasAuthorCalendarEvents,
   migrateGuidedOnboardingState,
   reduceGuidedOnboardingState,
+  shouldPresentOnboardingHabitShowcase,
   shouldShowGuidedOnboarding,
   type GuidedOnboardingState,
 } from "../../lib/onboarding";
@@ -720,6 +721,31 @@ test("modo de demonstração libera a interface sem reabrir o painel", () => {
       remoteReady: false,
     })
   ).toBe(false);
+});
+
+test("mantém a demonstração de hábitos disponível antes do passo guiado", () => {
+  for (const step of [
+    "context_selection",
+    "date_instruction",
+    "period_instruction",
+    "calendar_instruction",
+    "year_instruction",
+    "period_navigation_instruction",
+    "habit_surface_instruction",
+    "habit_showcase_instruction",
+    "demo_exploration",
+  ] as const) {
+    expect(shouldPresentOnboardingHabitShowcase(step)).toBe(true);
+  }
+
+  for (const step of [
+    "habit_instruction",
+    "habit_created_confirmation",
+    "completed",
+    "dismissed",
+  ] as const) {
+    expect(shouldPresentOnboardingHabitShowcase(step)).toBe(false);
+  }
 });
 
 test("conta autenticada só recebe o fluxo depois da carga remota", () => {

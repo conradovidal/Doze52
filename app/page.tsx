@@ -61,6 +61,7 @@ import {
   getGuidedCategoryRevealRemainingMs,
   readGuidedOnboardingState,
   readProductOnboardingState,
+  shouldPresentOnboardingHabitShowcase,
   shouldShowGuidedOnboarding,
   type GuidedOnboardingAction,
   type GuidedOnboardingState,
@@ -455,7 +456,9 @@ export default function HomePage() {
   );
   const onboardingHabitShowcase = React.useMemo(
     () =>
-      guidedOnboarding?.step === "habit_showcase_instruction" &&
+      guidedOnboarding &&
+      shouldPresentOnboardingHabitShowcase(guidedOnboarding.step) &&
+      activeDestination === "habits" &&
       isMobileCalendarUi === false &&
       todayIso
         ? buildOnboardingHabitShowcase({
@@ -467,7 +470,8 @@ export default function HomePage() {
         : null,
     [
       categories,
-      guidedOnboarding?.step,
+      activeDestination,
+      guidedOnboarding,
       isMobileCalendarUi,
       renderEvents,
       todayIso,
@@ -1387,11 +1391,19 @@ export default function HomePage() {
         });
         return;
       }
+      setYear(initialYear);
+      resetCalendarFocusOnYearChange();
       updateGuidedOnboarding({ type: "configure_profile", context });
       setGuidedDraft(null);
       setMobileGuidedRangeStart(null);
     },
-    [configureOnboardingContext, notify, updateGuidedOnboarding]
+    [
+      configureOnboardingContext,
+      initialYear,
+      notify,
+      resetCalendarFocusOnYearChange,
+      updateGuidedOnboarding,
+    ]
   );
 
   const handleChooseGuidedCategory = React.useCallback(
@@ -1464,12 +1476,26 @@ export default function HomePage() {
   }, [inlineEditModeActive, updateGuidedOnboarding]);
 
   const restartGuidedOnboardingFromDemo = React.useCallback(() => {
-    loadOnboardingPersonalDemo(year);
+    loadOnboardingPersonalDemo(initialYear);
     updateGuidedOnboarding({ type: "restart_from_demo" });
+    setYear(initialYear);
+    resetCalendarFocusOnYearChange();
+    setWorkspaceEditMode(null);
+    setActiveDestination("annual");
+    window.history.replaceState(
+      window.history.state,
+      "",
+      buildProductDestinationUrl(window.location.href, "annual")
+    );
     setGuidedDraft(null);
     setMobileGuidedRangeStart(null);
     setDemoInviteSuppressed(false);
-  }, [loadOnboardingPersonalDemo, updateGuidedOnboarding, year]);
+  }, [
+    initialYear,
+    loadOnboardingPersonalDemo,
+    resetCalendarFocusOnYearChange,
+    updateGuidedOnboarding,
+  ]);
 
   const trackPostOnboardingEvent = React.useCallback(
     () => {
@@ -2204,10 +2230,13 @@ export default function HomePage() {
   const handleDestinationSelect = React.useCallback(
     (destination: ProductDestinationId) => {
       if (destination === activeDestination) return;
+      const currentGuidedState = readGuidedOnboardingState();
       if (
         destination === "habits" &&
-        readGuidedOnboardingState().step === "habit_surface_instruction"
+        currentGuidedState.step === "habit_surface_instruction"
       ) {
+        setYear(initialYear);
+        resetCalendarFocusOnYearChange();
         updateGuidedOnboarding({ type: "open_habits_surface" });
       }
       if (activeDestination === "annual" && isMobileCalendarUi === false) {
@@ -2222,7 +2251,13 @@ export default function HomePage() {
         buildProductDestinationUrl(window.location.href, destination)
       );
     },
-    [activeDestination, isMobileCalendarUi, updateGuidedOnboarding]
+    [
+      activeDestination,
+      initialYear,
+      isMobileCalendarUi,
+      resetCalendarFocusOnYearChange,
+      updateGuidedOnboarding,
+    ]
   );
 
   const handleOpenUtilityPanel = React.useCallback(

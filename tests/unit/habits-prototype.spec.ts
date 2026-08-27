@@ -6,6 +6,7 @@ import {
   buildOnboardingHabitShowcase,
   applyActiveHabitOrder,
   getCompletedHabitsForDate,
+  getDesktopHabitRowMinHeight,
   getDesktopVisibleHabits,
   getHabitDayAction,
   getHabitCheckInKey,
@@ -290,6 +291,12 @@ test("empilha apenas hábitos concluídos preservando a ordem visível", () => {
   expect(
     getCompletedHabitsForDate(habits, checkIns, dateIso).map((habit) => habit.id)
   ).toEqual(["segundo", "quarto"]);
+});
+
+test("dimensiona a linha pelo total de hábitos visíveis", () => {
+  expect([0, 1, 2, 3, 4, 5].map(getDesktopHabitRowMinHeight)).toEqual([
+    44, 44, 62, 80, 98, 98,
+  ]);
 });
 
 test("reordena, arquiva e restaura hábitos sem apagar os demais dados", () => {

@@ -857,6 +857,31 @@ export const isGuidedOnboardingInProgress = (state: GuidedOnboardingState) =>
   state.step !== "completed" &&
   state.step !== "dismissed";
 
+const HABIT_SHOWCASE_PREVIEW_STEPS = new Set<GuidedOnboardingStep>([
+  "context_selection",
+  "date_category_selection",
+  "date_category_reveal",
+  "date_instruction",
+  "date_details",
+  "period_category_selection",
+  "period_category_reveal",
+  "period_instruction",
+  "period_details",
+  "edit_instruction",
+  "edit_preview",
+  "calendar_instruction",
+  "calendar_selection",
+  "year_instruction",
+  "period_navigation_instruction",
+  "habit_surface_instruction",
+  "habit_showcase_instruction",
+  "demo_exploration",
+]);
+
+export const shouldPresentOnboardingHabitShowcase = (
+  step: GuidedOnboardingStep
+) => HABIT_SHOWCASE_PREVIEW_STEPS.has(step);
+
 export const hasAuthorCalendarEvents = (
   events: Array<Pick<CalendarEvent, "calendarPackGroupId">>
 ) => events.some((event) => !event.calendarPackGroupId);
