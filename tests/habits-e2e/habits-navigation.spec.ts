@@ -196,7 +196,24 @@ test("mobile abre em Hábitos e preserva a sessão entre superfícies", async ({
   await expect(utilityPanel).toBeVisible();
   await utilityPanel.getByRole("button", { name: /^Conta/ }).click();
   await utilityPanel.getByRole("button", { name: "Entrar", exact: true }).click();
-  await expect(page.getByRole("dialog", { name: "Entrar" })).toBeVisible();
+  const authDialog = page.getByRole("dialog", { name: "Entrar" });
+  await expect(authDialog).toBeVisible();
+  const googleButton = authDialog.getByRole("button", {
+    name: "Entrar com Google",
+  });
+  await expect(googleButton).toBeVisible();
+  await expect(googleButton.locator("[data-google-logo]")).toHaveAttribute(
+    "src",
+    /google-g\.svg/
+  );
+  await authDialog.getByRole("button", { name: "Cadastro" }).click();
+  const createAccountDialog = page.getByRole("dialog", {
+    name: "Criar conta",
+  });
+  await expect(createAccountDialog).toBeVisible();
+  await expect(
+    createAccountDialog.getByRole("button", { name: "Entrar com Google" })
+  ).toBeVisible();
 });
 
 test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
@@ -373,7 +390,7 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
   ).toContainText("Grêmio");
   const defaultTeamCard = calendarGallery
     .getByRole("article")
-    .filter({ hasText: "Jogos do Grêmio" });
+    .filter({ hasText: "Jogos do seu time favorito" });
   await defaultTeamCard.getByRole("button", { name: "Adicionar calendário" }).click();
   await expect(defaultTeamCard.getByText("Meu ano", { exact: true })).toBeVisible();
   await calendarGallery.getByRole("button", { name: "Voltar para as opções de categoria" }).click();

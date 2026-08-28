@@ -588,8 +588,8 @@ export function CalendarPackLauncher({
                       />
                       <div className="min-w-0">
                         <h4 className="text-sm font-medium text-foreground">
-                          {isTeamGroup && !effectiveVariant
-                            ? "Jogos do seu time"
+                          {isTeamGroup
+                            ? "Jogos do seu time favorito"
                             : pack.name}
                         </h4>
                         <p className="mt-1.5 text-xs leading-5 text-muted-foreground">
