@@ -14,6 +14,7 @@ import { ThemeInitScript } from "@/components/theme-init-script";
 import { SiteFooter } from "@/components/site-footer";
 import { CalendarCatalogProvider } from "@/lib/calendar-catalog/runtime";
 import { MotionProvider } from "@/components/ui/motion-provider";
+import { isHabitsPrototypeEnabled } from "@/lib/feature-flags";
 
 export const metadata: Metadata = {
   applicationName: "Doze 52",
@@ -74,7 +75,7 @@ export default function RootLayout({
                       <div className="min-h-0 flex-1 overflow-auto">
                         {children}
                       </div>
-                      <SiteFooter />
+                      {isHabitsPrototypeEnabled ? null : <SiteFooter />}
                     </div>
                   </CalendarCatalogProvider>
                 </BillingProvider>

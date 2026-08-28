@@ -3,9 +3,14 @@ import { strToU8, zipSync } from "fflate";
 import { filterAuthorCalendarSnapshot } from "@/lib/calendar-export";
 import type { CalendarSnapshot } from "@/lib/sync";
 
+const CSV_FORMULA_PREFIX = /^[=+\-@\t\r\n]/;
+
+const neutralizeCsvFormula = (value: string) =>
+  CSV_FORMULA_PREFIX.test(value) ? `'${value}` : value;
+
 const escapeCsv = (value: unknown) => {
   const raw = typeof value === "string" ? value : JSON.stringify(value ?? "");
-  return `"${raw.replace(/"/g, '""')}"`;
+  return `"${neutralizeCsvFormula(raw).replace(/"/g, '""')}"`;
 };
 
 const toCsv = (rows: Record<string, unknown>[]) => {

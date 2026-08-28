@@ -1,8 +1,9 @@
 import { expect, test } from "@playwright/test";
+import { openAuthenticatedSettings } from "./support/browser";
 
 const submitFeedback = async (page: import("@playwright/test").Page, message: string) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "Abrir menu da conta" }).click();
+  await openAuthenticatedSettings(page, "help");
   await page.getByRole("button", { name: "Enviar feedback" }).click();
   const dialog = page.getByRole("dialog", { name: "Enviar feedback" });
   await dialog.getByLabel("Tipo").click();

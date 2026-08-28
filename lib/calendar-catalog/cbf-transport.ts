@@ -1,9 +1,14 @@
 import { request, type RequestOptions } from "node:https";
 import { X509Certificate } from "node:crypto";
 import { rootCertificates } from "node:tls";
+import {
+  CALENDAR_SOURCE_LIMITS,
+  CalendarSourceBudget,
+  CalendarSourceLimitError,
+} from "./source-transport";
 
 const CBF_HOSTS = new Set(["cbf.com.br", "www.cbf.com.br"]);
-const MAX_RESPONSE_BYTES = 12 * 1024 * 1024;
+const MAX_RESPONSE_BYTES = CALENDAR_SOURCE_LIMITS.cbfResponseBytes;
 
 // Public intermediate advertised by the CBF leaf certificate through AIA.
 // Source: http://crt.sectigo.com/SectigoPublicServerAuthenticationCAOVR36.crt
@@ -84,6 +89,7 @@ const tlsFailure = (error: unknown) => {
 };
 
 const requestFailure = (error: unknown) => {
+  if (error instanceof CalendarSourceLimitError) return error;
   const code = error && typeof error === "object" && "code" in error
     ? String((error as { code?: unknown }).code ?? "TRANSPORT_ERROR")
     : "TRANSPORT_ERROR";
@@ -94,42 +100,90 @@ const requestFailure = (error: unknown) => {
   return new Error(`cbf_transport_error: ${code}`, { cause: error });
 };
 
-export const fetchCbfOfficialSource = async (input: string) => {
+export const fetchCbfOfficialSource = async (
+  input: string,
+  sourceId: string,
+  budget: CalendarSourceBudget
+) => {
   const url = new URL(input);
   let options: RequestOptions;
   try { options = cbfRequestOptions(url); }
   catch (error) { throw tlsFailure(error); }
 
+  const startedAt = performance.now();
+  budget.beginRequest(sourceId);
   return new Promise<{ body: string; contentType: string }>((resolve, reject) => {
     let settled = false;
+    let status: number | undefined;
     const fail = (error: unknown) => {
       if (settled) return;
       settled = true;
-      reject(requestFailure(error));
+      const failure = requestFailure(error);
+      budget.fail(
+        sourceId,
+        failure instanceof CalendarSourceLimitError
+          ? failure.code
+          : "source_transport_error"
+      );
+      budget.finish(sourceId, startedAt, status);
+      reject(failure);
     };
     const clientRequest = request(url, options, (response) => {
-      const status = response.statusCode ?? 0;
+      const responseStatus = response.statusCode ?? 0;
+      status = responseStatus;
       const chunks: Buffer[] = [];
       let received = 0;
+      const contentType = String(response.headers["content-type"] ?? "").toLowerCase();
+      if (
+        contentType &&
+        !contentType.includes("application/json") &&
+        !contentType.includes("text/html")
+      ) {
+        response.destroy(new CalendarSourceLimitError("source_content_type_invalid"));
+        return;
+      }
+      const contentLength = Number(response.headers["content-length"] ?? "");
+      if (Number.isFinite(contentLength) && contentLength > MAX_RESPONSE_BYTES) {
+        response.destroy(new CalendarSourceLimitError("source_response_too_large"));
+        return;
+      }
       response.on("data", (chunk: Buffer) => {
         received += chunk.length;
+        try {
+          budget.addBytes(sourceId, chunk.length);
+        } catch (error) {
+          response.destroy(error as Error);
+          return;
+        }
         if (received > MAX_RESPONSE_BYTES) {
-          response.destroy(new Error("Resposta da CBF excedeu o limite permitido."));
+          response.destroy(new CalendarSourceLimitError("source_response_too_large"));
           return;
         }
         chunks.push(chunk);
       });
       response.on("end", () => {
         if (settled) return;
-        if (status < 200 || status >= 300) {
+        if (responseStatus < 200 || responseStatus >= 300) {
           settled = true;
-          reject(new Error(`${url}: HTTP ${status}`));
+          budget.fail(sourceId, `source_http_${responseStatus}`);
+          budget.finish(sourceId, startedAt, responseStatus);
+          reject(new Error(`${url}: HTTP ${responseStatus}`));
+          return;
+        }
+        let body: string;
+        try {
+          body = new TextDecoder("utf-8", { fatal: true }).decode(
+            Buffer.concat(chunks)
+          );
+        } catch {
+          fail(new CalendarSourceLimitError("source_response_invalid_utf8"));
           return;
         }
         settled = true;
+        budget.finish(sourceId, startedAt, responseStatus);
         resolve({
-          body: Buffer.concat(chunks).toString("utf8"),
-          contentType: String(response.headers["content-type"] ?? ""),
+          body,
+          contentType,
         });
       });
       response.on("error", fail);

@@ -30,6 +30,13 @@ export type GuidedOnboardingStep =
   | "calendar_instruction"
   | "calendar_selection"
   | "year_instruction"
+  | "period_navigation_instruction"
+  | "habit_surface_instruction"
+  | "habit_showcase_instruction"
+  | "habit_instruction"
+  | "habit_created_confirmation"
+  | "profile_instruction"
+  | "appearance_instruction"
   | "theme_instruction"
   | "demo_exploration"
   | "dismissed_preserved"
@@ -37,7 +44,7 @@ export type GuidedOnboardingStep =
   | "dismissed";
 
 export type GuidedOnboardingState = {
-  version: 11;
+  version: 15;
   step: GuidedOnboardingStep;
   context?: OnboardingContext;
   startedAt?: string;
@@ -50,6 +57,11 @@ export type GuidedOnboardingState = {
   firstDateCreatedAt?: string;
   firstPeriodCreatedAt?: string;
   themeConfirmedAt?: string;
+  firstHabitCreatedAt?: string;
+  habitRetrospectiveInteractedAt?: string;
+  periodNavigationInteractedAt?: string;
+  profileOpenedAt?: string;
+  appearanceOpenedAt?: string;
   holidayUf?: string;
   holidayCalendarAddedAt?: string;
   postOnboardingEventsCreated?: number;
@@ -74,13 +86,23 @@ export type GuidedOnboardingAction =
   | { type: "choose_period_category"; categoryId: string; at?: string }
   | { type: "select_period" }
   | { type: "period_saved"; at?: string }
-  | { type: "open_edit_preview" }
+  | { type: "open_edit_preview"; continueToCalendar?: boolean }
   | { type: "finish_edit_preview" }
   | { type: "open_calendar" }
   | { type: "close_calendar" }
   | { type: "calendar_added"; uf?: string; at?: string }
-  | { type: "continue_from_year"; at?: string }
-  | { type: "confirm_theme"; at?: string }
+  | { type: "continue_from_year"; showPeriodNavigation?: boolean; at?: string }
+  | { type: "continue_from_period_navigation"; showHabit?: boolean; at?: string }
+  | { type: "interact_with_period_navigation"; at?: string }
+  | { type: "open_habits_surface"; at?: string }
+  | { type: "continue_from_habit_showcase"; hasExistingHabit?: boolean; at?: string }
+  | { type: "habit_saved"; at?: string }
+  | { type: "interact_with_habit_retrospective"; at?: string }
+  | { type: "finish_habit_onboarding"; at?: string }
+  | { type: "return_to_year"; at?: string }
+  | { type: "open_profile"; at?: string }
+  | { type: "open_appearance"; at?: string }
+  | { type: "confirm_theme"; complete?: boolean; at?: string }
   | { type: "complete"; at?: string }
   | { type: "record_post_onboarding_event"; at?: string }
   | { type: "enter_demo_exploration"; at?: string }
@@ -111,6 +133,11 @@ type LegacyGuidedOnboardingState = {
   firstPeriodCreatedAt?: string;
   categoryRevealStartedAt?: string;
   themeConfirmedAt?: string;
+  firstHabitCreatedAt?: string;
+  habitRetrospectiveInteractedAt?: string;
+  periodNavigationInteractedAt?: string;
+  profileOpenedAt?: string;
+  appearanceOpenedAt?: string;
   holidayUf?: string;
   holidayCalendarAddedAt?: string;
   dateItemsCreated?: number;
@@ -128,7 +155,7 @@ export const PRODUCT_ONBOARDING_STORAGE_KEY = "doze52:onboarding:v1";
 export const GUIDED_ONBOARDING_STORAGE_KEY = "doze52:onboarding:v2";
 export const PRODUCT_ONBOARDING_RESET_EVENT = "doze52:onboarding-reset";
 export const GUIDED_ONBOARDING_CHANGE_EVENT = "doze52:onboarding-change";
-export const GUIDED_CATEGORY_REVEAL_MS = 1_800;
+export const GUIDED_CATEGORY_REVEAL_MS = 1_250;
 export const GUIDED_DEMO_INTERACTION_THRESHOLD = 5;
 
 export const getGuidedCategoryRevealRemainingMs = (
@@ -144,7 +171,7 @@ export const getGuidedCategoryRevealRemainingMs = (
 };
 
 const initialGuidedState = (): GuidedOnboardingState => ({
-  version: 11,
+  version: 15,
   step: "context_selection",
 });
 
@@ -189,6 +216,13 @@ const isGuidedStep = (value: unknown): value is GuidedOnboardingStep =>
   value === "calendar_instruction" ||
   value === "calendar_selection" ||
   value === "year_instruction" ||
+  value === "period_navigation_instruction" ||
+  value === "habit_surface_instruction" ||
+  value === "habit_showcase_instruction" ||
+  value === "habit_instruction" ||
+  value === "habit_created_confirmation" ||
+  value === "profile_instruction" ||
+  value === "appearance_instruction" ||
   value === "theme_instruction" ||
   value === "demo_exploration" ||
   value === "dismissed_preserved" ||
@@ -221,7 +255,7 @@ export const migrateGuidedOnboardingState = (
   };
 
   if (
-    (candidate.version === 9 || candidate.version === 10 || candidate.version === 11) &&
+    (candidate.version === 9 || candidate.version === 10 || candidate.version === 11 || candidate.version === 12 || candidate.version === 13 || candidate.version === 14 || candidate.version === 15) &&
     isGuidedStep(candidate.step)
   ) {
     const demoInteractionKeys = Array.isArray(candidate.demoInteractionKeys)
@@ -234,9 +268,18 @@ export const migrateGuidedOnboardingState = (
           ),
         ]
       : [];
+    const migratedStep: GuidedOnboardingStep =
+      candidate.version <= 13 && candidate.step === "edit_preview"
+        ? "calendar_instruction"
+        : candidate.version <= 13 &&
+            (candidate.step === "profile_instruction" ||
+              candidate.step === "appearance_instruction" ||
+              candidate.step === "theme_instruction")
+          ? "completed"
+          : candidate.step;
     return {
-      version: 11,
-      step: candidate.step,
+      version: 15,
+      step: migratedStep,
       context: isContext(candidate.context) ? candidate.context : undefined,
       startedAt: candidate.startedAt,
       profileConfiguredAt: candidate.profileConfiguredAt,
@@ -263,6 +306,12 @@ export const migrateGuidedOnboardingState = (
       firstDateCreatedAt: candidate.firstDateCreatedAt,
       firstPeriodCreatedAt: candidate.firstPeriodCreatedAt,
       themeConfirmedAt: candidate.themeConfirmedAt,
+      firstHabitCreatedAt: candidate.firstHabitCreatedAt,
+      habitRetrospectiveInteractedAt:
+        candidate.habitRetrospectiveInteractedAt,
+      periodNavigationInteractedAt: candidate.periodNavigationInteractedAt,
+      profileOpenedAt: candidate.profileOpenedAt,
+      appearanceOpenedAt: candidate.appearanceOpenedAt,
       holidayUf:
         typeof candidate.holidayUf === "string" ? candidate.holidayUf : undefined,
       holidayCalendarAddedAt: candidate.holidayCalendarAddedAt,
@@ -282,14 +331,17 @@ export const migrateGuidedOnboardingState = (
         ? [...new Set(candidate.postExitCreationKeys.filter((key): key is string => typeof key === "string" && key.length > 0))]
         : [],
       exitConfirmedAt: candidate.exitConfirmedAt,
-      completedAt: candidate.completedAt,
+      completedAt:
+        migratedStep === "completed"
+          ? candidate.completedAt ?? nowIso()
+          : candidate.completedAt,
       dismissedAt: candidate.dismissedAt,
     };
   }
 
   if (candidate.version === 8 && isGuidedStep(candidate.step)) {
     return {
-      version: 11,
+      version: 15,
       step: candidate.step,
       context: isContext(candidate.context) ? candidate.context : undefined,
       startedAt: candidate.startedAt,
@@ -381,7 +433,7 @@ export const migrateGuidedOnboardingState = (
     }
 
     return {
-      version: 11,
+      version: 15,
       step,
       context: isContext(candidate.context) ? candidate.context : undefined,
       startedAt: candidate.startedAt,
@@ -418,7 +470,7 @@ export const migrateGuidedOnboardingState = (
       candidate.step === "completed" || candidate.step === "dismissed";
     const preserveAsCompleted = !terminal && hasLegacyProgress(candidate);
     return {
-      version: 11,
+      version: 15,
       step: terminal
         ? (candidate.step as "completed" | "dismissed")
         : preserveAsCompleted
@@ -536,7 +588,12 @@ export const reduceGuidedOnboardingState = (
       };
     case "open_edit_preview":
       return state.step === "edit_instruction"
-        ? { ...state, step: "edit_preview" }
+        ? {
+            ...state,
+            step: action.continueToCalendar
+              ? "calendar_instruction"
+              : "edit_preview",
+          }
         : state;
     case "finish_edit_preview":
       return state.step === "edit_preview"
@@ -563,6 +620,9 @@ export const reduceGuidedOnboardingState = (
         : state;
     case "continue_from_year":
       if (state.step !== "year_instruction") return state;
+      if (action.showPeriodNavigation) {
+        return { ...state, step: "period_navigation_instruction" };
+      }
       if (!state.themeConfirmedAt) {
         return { ...state, step: "theme_instruction" };
       }
@@ -575,12 +635,52 @@ export const reduceGuidedOnboardingState = (
         completedAt: action.at ?? nowIso(),
         dismissedAt: undefined,
       };
-    case "confirm_theme":
-      return state.step === "theme_instruction"
+    case "continue_from_period_navigation":
+      if (state.step !== "period_navigation_instruction") return state;
+      return {
+        ...state,
+        step: action.showHabit ? "habit_surface_instruction" : "theme_instruction",
+      };
+    case "interact_with_period_navigation":
+      return state.step === "period_navigation_instruction" && !state.periodNavigationInteractedAt
+        ? { ...state, periodNavigationInteractedAt: action.at ?? nowIso() }
+        : state;
+    case "open_habits_surface":
+      return state.step === "habit_surface_instruction"
+        ? { ...state, step: "habit_showcase_instruction" }
+        : state;
+    case "continue_from_habit_showcase":
+      return state.step === "habit_showcase_instruction"
+        ? action.hasExistingHabit
+          ? {
+              ...state,
+              step: "habit_created_confirmation",
+              firstHabitCreatedAt:
+                state.firstHabitCreatedAt ?? action.at ?? nowIso(),
+            }
+          : { ...state, step: "habit_instruction" }
+        : state;
+    case "habit_saved":
+      return state.step === "habit_instruction"
+        ? {
+            ...state,
+            step: "habit_created_confirmation",
+            firstHabitCreatedAt: action.at ?? nowIso(),
+          }
+        : state;
+    case "interact_with_habit_retrospective":
+      return state.step === "habit_created_confirmation" &&
+        !state.habitRetrospectiveInteractedAt
+        ? {
+            ...state,
+            habitRetrospectiveInteractedAt: action.at ?? nowIso(),
+          }
+        : state;
+    case "finish_habit_onboarding":
+      return state.step === "habit_created_confirmation"
         ? {
             ...state,
             step: "completed",
-            themeConfirmedAt: action.at ?? nowIso(),
             postOnboardingEventsCreated: 0,
             postOnboardingCategoriesCreated: 0,
             accountNudgeShownAt: undefined,
@@ -588,8 +688,46 @@ export const reduceGuidedOnboardingState = (
             dismissedAt: undefined,
           }
         : state;
+    case "return_to_year":
+      return state.step === "habit_created_confirmation"
+        ? { ...state, step: "profile_instruction" }
+        : state;
+    case "open_profile":
+      return state.step === "profile_instruction"
+        ? {
+            ...state,
+            step: "appearance_instruction",
+            profileOpenedAt: action.at ?? nowIso(),
+          }
+        : state;
+    case "open_appearance":
+      return state.step === "appearance_instruction"
+        ? {
+            ...state,
+            step: "theme_instruction",
+            appearanceOpenedAt: action.at ?? nowIso(),
+          }
+        : state;
+    case "confirm_theme":
+      if (state.step !== "theme_instruction") return state;
+      if (!action.complete) {
+        return { ...state, themeConfirmedAt: action.at ?? nowIso() };
+      }
+      return {
+        ...state,
+        step: "completed",
+        themeConfirmedAt: state.themeConfirmedAt ?? action.at ?? nowIso(),
+        postOnboardingEventsCreated: 0,
+        postOnboardingCategoriesCreated: 0,
+        accountNudgeShownAt: undefined,
+        completedAt: action.at ?? nowIso(),
+        dismissedAt: undefined,
+      };
     case "complete":
-      if (state.step !== "theme_instruction" && state.step !== "year_instruction") {
+      if (
+        state.step !== "year_instruction" &&
+        (state.step !== "theme_instruction" || !state.themeConfirmedAt)
+      ) {
         return state;
       }
       return {
@@ -615,7 +753,7 @@ export const reduceGuidedOnboardingState = (
     }
     case "enter_demo_exploration":
       return {
-        version: 11,
+        version: 15,
         step: "demo_exploration",
         demoExplorationStartedAt: action.at ?? nowIso(),
         demoInteractionKeys: [],
@@ -718,6 +856,31 @@ export const isGuidedOnboardingInProgress = (state: GuidedOnboardingState) =>
   state.step !== "dismissed_preserved" &&
   state.step !== "completed" &&
   state.step !== "dismissed";
+
+const HABIT_SHOWCASE_PREVIEW_STEPS = new Set<GuidedOnboardingStep>([
+  "context_selection",
+  "date_category_selection",
+  "date_category_reveal",
+  "date_instruction",
+  "date_details",
+  "period_category_selection",
+  "period_category_reveal",
+  "period_instruction",
+  "period_details",
+  "edit_instruction",
+  "edit_preview",
+  "calendar_instruction",
+  "calendar_selection",
+  "year_instruction",
+  "period_navigation_instruction",
+  "habit_surface_instruction",
+  "habit_showcase_instruction",
+  "demo_exploration",
+]);
+
+export const shouldPresentOnboardingHabitShowcase = (
+  step: GuidedOnboardingStep
+) => HABIT_SHOWCASE_PREVIEW_STEPS.has(step);
 
 export const hasAuthorCalendarEvents = (
   events: Array<Pick<CalendarEvent, "calendarPackGroupId">>

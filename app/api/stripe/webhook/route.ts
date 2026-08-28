@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 
 import { processStripeWebhookEvent } from "@/lib/billing";
+import { PayloadTooLargeError, readLimitedText } from "@/lib/http-json";
 import { getStripe, getStripeWebhookSecret } from "@/lib/stripe";
+import { STRIPE_WEBHOOK_MAX_BODY_BYTES } from "@/lib/stripe-webhook";
 
 export const runtime = "nodejs";
 
@@ -14,10 +16,21 @@ export async function POST(request: Request) {
     );
   }
 
+  let payload: string;
+  try {
+    payload = await readLimitedText(request, STRIPE_WEBHOOK_MAX_BODY_BYTES);
+  } catch (error) {
+    if (!(error instanceof PayloadTooLargeError)) throw error;
+    return NextResponse.json(
+      { error: "Stripe webhook payload is too large." },
+      { status: 413 }
+    );
+  }
+
   let event;
   try {
     event = getStripe().webhooks.constructEvent(
-      await request.text(),
+      payload,
       signature,
       getStripeWebhookSecret()
     );

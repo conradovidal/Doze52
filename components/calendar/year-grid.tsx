@@ -1,6 +1,8 @@
 "use client";
 
 import * as React from "react";
+import { AnimatePresence, m } from "motion/react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import {
   addDays,
   differenceInCalendarDays,
@@ -25,13 +27,20 @@ import {
   isSingleDayEvent,
 } from "@/lib/event-order";
 import { cn } from "@/lib/utils";
+import { getYearTransitionDirection } from "@/lib/calendar-year-transition";
 import { SegmentedControl } from "@/components/ui/segmented-control";
+import {
+  GuidedToolbarNoticeCard,
+  type GuidedToolbarNotice,
+} from "@/components/onboarding/guided-toolbar-notice";
+import { GuidedTargetOutline } from "@/components/onboarding/guided-target-outline";
 import {
   LATERAL_KEY_ACTIVE_CLASS,
   LATERAL_KEY_BASE_CLASS,
   LATERAL_KEY_REST_CLASS,
 } from "./lateral-key-styles";
 import { MonthRow } from "./month-row";
+import type { DayCellHabitPresentation } from "./day-cell";
 
 type ReorderTarget = {
   dayIso: string;
@@ -124,6 +133,19 @@ export function YearGrid({
   onMoveEventByDelta,
   onApplyDayReorder,
   isMobileInteractionMode = false,
+  habitPresentation,
+  onYearChange,
+  guidedYearNotice,
+  onDismissGuidedYearNotice,
+  onGuidedYearAction,
+  guidedPeriodNotice,
+  onDismissGuidedPeriodNotice,
+  onGuidedPeriodAction,
+  onGuidedPeriodInteraction,
+  guidedPeriodInteracted = false,
+  showScaleControl = true,
+  scrollViewportRef,
+  scrollRegion,
 }: {
   year: number;
   todayIso: string;
@@ -146,6 +168,19 @@ export function YearGrid({
     orderedIds: string[];
   }) => void;
   isMobileInteractionMode?: boolean;
+  habitPresentation?: DayCellHabitPresentation;
+  onYearChange: (year: number) => void;
+  guidedYearNotice?: GuidedToolbarNotice | null;
+  onDismissGuidedYearNotice?: () => void;
+  onGuidedYearAction?: () => void;
+  guidedPeriodNotice?: GuidedToolbarNotice | null;
+  onDismissGuidedPeriodNotice?: () => void;
+  onGuidedPeriodAction?: () => void;
+  onGuidedPeriodInteraction?: () => void;
+  guidedPeriodInteracted?: boolean;
+  showScaleControl?: boolean;
+  scrollViewportRef?: React.Ref<HTMLDivElement>;
+  scrollRegion?: "calendar" | "habits";
 }) {
   const profiles = useStore((s) => s.profiles as CalendarProfile[]);
   const categories = useStore((s) => s.categories as CategoryItem[]);
@@ -158,6 +193,18 @@ export function YearGrid({
   const focusQuarter = useStore((s) => s.focusQuarter);
   const focusMonth = useStore((s) => s.focusMonth);
   const setCalendarZoomPercent = useStore((s) => s.setCalendarZoomPercent);
+  const [yearDirection, setYearDirection] = React.useState<1 | -1>(1);
+  const [isYearTransitioning, setIsYearTransitioning] = React.useState(false);
+  const guidedYearLocked = guidedYearNotice?.target === "year";
+  const requestYearChange = React.useCallback(
+    (nextYear: number) => {
+      if (guidedYearLocked || isYearTransitioning || nextYear === year) return;
+      setYearDirection(getYearTransitionDirection(year, nextYear));
+      setIsYearTransitioning(true);
+      onYearChange(nextYear);
+    },
+    [guidedYearLocked, isYearTransitioning, onYearChange, year]
+  );
   const visibleCategoryIds = React.useMemo(
     () => {
       const selectedProfiles = new Set(selectedProfileIds);
@@ -216,15 +263,21 @@ export function YearGrid({
   const didDropRef = React.useRef(false);
   const zoomViewportRef = React.useRef<HTMLDivElement | null>(null);
   const pendingViewportRatioRef = React.useRef<number | null>(null);
+  React.useImperativeHandle(
+    scrollViewportRef,
+    () => zoomViewportRef.current as HTMLDivElement
+  );
 
   const visibleEvents = React.useMemo(
     () =>
-      events.filter(
-        (event) =>
-          visibleCategoryIds.includes(event.categoryId) &&
-          isRenderableEventDateRange(event)
-      ),
-    [events, visibleCategoryIds]
+      habitPresentation
+        ? []
+        : events.filter(
+            (event) =>
+              visibleCategoryIds.includes(event.categoryId) &&
+              isRenderableEventDateRange(event)
+          ),
+    [events, habitPresentation, visibleCategoryIds]
   );
 
   const multiDaySlotById = React.useMemo(() => {
@@ -441,6 +494,9 @@ export function YearGrid({
 
   const handleQuarterRailClick = React.useCallback(
     (quarterIndex: QuarterIndex) => {
+      if (guidedPeriodNotice?.target === "period-navigation") {
+        onGuidedPeriodInteraction?.();
+      }
       if (quarterIndex === resolvedQuarter && viewMode === "quarter") {
         setCalendarViewMode("year");
         return;
@@ -453,18 +509,21 @@ export function YearGrid({
 
       focusQuarter(quarterIndex);
     },
-    [focusQuarter, resolvedQuarter, setCalendarViewMode, viewMode]
+    [focusQuarter, guidedPeriodNotice?.target, onGuidedPeriodInteraction, resolvedQuarter, setCalendarViewMode, viewMode]
   );
 
   const handleMonthLabelClick = React.useCallback(
     (monthIndex: MonthIndex) => {
+      if (guidedPeriodNotice?.target === "period-navigation") {
+        onGuidedPeriodInteraction?.();
+      }
       if (viewMode === "month" && monthIndex === resolvedMonth) {
         focusQuarter(resolvedQuarter);
         return;
       }
       focusMonth(monthIndex);
     },
-    [focusMonth, focusQuarter, resolvedMonth, resolvedQuarter, viewMode]
+    [focusMonth, focusQuarter, guidedPeriodNotice?.target, onGuidedPeriodInteraction, resolvedMonth, resolvedQuarter, viewMode]
   );
 
   const handleMobileDayCellActivate = React.useCallback(
@@ -591,7 +650,18 @@ export function YearGrid({
   );
 
   const annualContent = (
-    <div className="overflow-hidden">
+    <div className="relative overflow-hidden">
+      {guidedPeriodNotice?.target === "period-navigation" ? (
+        <div
+          data-onboarding-period-anchor
+          data-onboarding-period-outline={!guidedPeriodInteracted ? "true" : undefined}
+          className={cn(
+            "pointer-events-none absolute inset-y-0 left-0 z-[60] w-[5.05rem] rounded-l-[1.25rem] min-[420px]:w-[5.1rem] md:w-[5.5rem]",
+            !guidedPeriodInteracted && "border border-foreground/32"
+          )}
+          aria-hidden="true"
+        />
+      ) : null}
       {quarterGroups.map((group, groupIndex) => {
         const isActiveQuarter = viewMode !== "year" && group.quarterIndex === resolvedQuarter;
         const isQuarterSelected = isActiveQuarter;
@@ -608,7 +678,7 @@ export function YearGrid({
         return (
           <div
             key={group.key}
-            className="flex items-stretch border-b border-border/70 last:border-b-0"
+            className="relative flex items-stretch border-b border-border/70 last:border-b-0"
           >
             <button
               type="button"
@@ -628,6 +698,9 @@ export function YearGrid({
                 quarterRailShapeClass,
                 isQuarterSelected ? LATERAL_KEY_ACTIVE_CLASS : LATERAL_KEY_REST_CLASS
               )}
+              data-onboarding-period-control={
+                guidedPeriodNotice?.target === "period-navigation" ? "true" : undefined
+              }
             >
               <span
                 className="block -rotate-90 whitespace-nowrap text-[10px] font-medium uppercase tracking-[0.04em] min-[420px]:text-[10.5px] md:text-[11px]"
@@ -635,6 +708,19 @@ export function YearGrid({
                 {QUARTER_SHORT_LABELS[group.quarterIndex]}
               </span>
             </button>
+            {isFirstVisibleGroup &&
+            guidedPeriodNotice?.target === "period-navigation" &&
+            onDismissGuidedPeriodNotice ? (
+              <GuidedToolbarNoticeCard
+                notice={guidedPeriodNotice}
+                onClose={onDismissGuidedPeriodNotice}
+                onAction={onGuidedPeriodAction}
+                placement="viewport"
+                portaled
+                anchorSelector="[data-onboarding-period-anchor]"
+                anchorPlacement="right-center"
+              />
+            ) : null}
 
             <div className="min-w-0 flex-1">
               {group.monthIndices.map((monthIndex) => {
@@ -647,7 +733,7 @@ export function YearGrid({
                     monthIndex={monthIndex}
                     density={density}
                     verticalScale={verticalZoomScale}
-                    events={events}
+                    events={habitPresentation ? [] : events}
                     visibleCategoryIds={visibleCategoryIds}
                     profileIconByCategoryId={profileIconByCategoryId}
                     multiDaySlotById={multiDaySlotById}
@@ -672,12 +758,14 @@ export function YearGrid({
                         : `Abrir ${MONTH_TITLE_LABELS[monthIndex]}`
                     }
                     monthLabelActive={isActiveMonth}
+                    monthLabelHighlighted={false}
                     isMobileInteractionMode={isMobileInteractionMode}
                     onDayCellActivate={
                       isMobileInteractionMode && viewMode !== "month"
                         ? handleMobileDayCellActivate
                         : undefined
                     }
+                    habitPresentation={habitPresentation}
                   />
                 );
               })}
@@ -691,42 +779,130 @@ export function YearGrid({
   return (
     <div
       data-year-grid
-      className={cn(
-        "w-full overflow-hidden rounded-[1.35rem] border border-border bg-card shadow-[0_18px_42px_-34px_rgba(15,23,42,0.24)]",
-        canvasWidthClass
-      )}
+      data-year-grid-surface={habitPresentation ? "habits" : "calendar"}
+      className="flex max-h-full min-h-0 w-full flex-col"
     >
       <div
-        ref={zoomViewportRef}
-        className={cn(
-          "overflow-y-hidden",
-          hasFocusZoom ? "overflow-x-auto overscroll-x-contain" : "overflow-x-hidden"
-        )}
-        onWheel={handleViewportWheel}
+        data-year-grid-frame
+        className="flex min-h-0 shrink flex-col overflow-hidden rounded-[1.35rem] border border-border bg-card shadow-[0_18px_42px_-34px_rgba(15,23,42,0.24)]"
       >
         <div
-          style={
-            hasFocusZoom
-              ? {
-                  width: `${effectiveZoomPercent}%`,
-                  minWidth: `${effectiveZoomPercent}%`,
-                }
-              : undefined
+          ref={zoomViewportRef}
+          data-year-grid-scroll-viewport
+          data-desktop-calendar-scroll-region={
+            scrollRegion === "calendar" ? "true" : undefined
           }
+          data-desktop-habits-scroll-region={
+            scrollRegion === "habits" ? "true" : undefined
+          }
+          className={cn(
+            "min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:auto] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+            hasFocusZoom
+              ? "overflow-x-auto overscroll-x-contain"
+              : "overflow-x-hidden"
+          )}
+          onWheel={handleViewportWheel}
         >
-          {annualContent}
+          <div
+            data-year-grid-canvas
+            className={canvasWidthClass}
+            style={
+              hasFocusZoom
+                ? {
+                    width: `${effectiveZoomPercent}%`,
+                    minWidth: `${effectiveZoomPercent}%`,
+                  }
+                : undefined
+            }
+          >
+            <AnimatePresence initial={false} custom={yearDirection} mode="popLayout">
+              <m.div
+                key={year}
+                custom={yearDirection}
+                initial={{ opacity: 0, x: yearDirection * 10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: yearDirection * -10 }}
+                transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                className={cn(isYearTransitioning && "pointer-events-none")}
+                onAnimationComplete={() => setIsYearTransitioning(false)}
+              >
+                {annualContent}
+              </m.div>
+            </AnimatePresence>
+          </div>
         </div>
       </div>
 
-      <div className="flex items-center justify-between gap-4 border-t border-border bg-card px-3 py-2.5 md:px-4 md:py-3">
-        <SegmentedControl
-          value={viewMode}
-          options={CALENDAR_VIEW_OPTIONS}
-          onValueChange={handleViewModeChange}
-          aria-label="Escala do calendário"
-        />
+      <div
+        data-year-grid-dock
+        className="grid shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 px-1 pt-3"
+      >
+        <span aria-hidden="true" />
+        <div data-calendar-footer-center className="flex items-center justify-center gap-2 justify-self-center">
+          <div
+            data-calendar-year-stepper
+            data-onboarding-highlighted={
+              guidedYearNotice?.target === "year" ? "true" : undefined
+            }
+            className={cn(
+              "relative inline-flex h-8 items-center overflow-visible rounded-[10px] border border-border bg-card"
+            )}
+          >
+            <button
+              type="button"
+              data-onboarding-year-control
+              aria-label={`Voltar para ${year - 1}`}
+              title={`Voltar para ${year - 1}`}
+              disabled={guidedYearLocked || isYearTransitioning}
+              className="grid size-8 place-items-center rounded-[9px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-45"
+              onClick={() => requestYearChange(year - 1)}
+            >
+              <ChevronLeft className="size-3.5" />
+            </button>
+            <span
+              aria-label={`Ano ${year}`}
+              aria-live="polite"
+              className="min-w-11 text-center text-xs font-semibold tabular-nums text-foreground"
+            >
+              {year}
+            </span>
+            <button
+              type="button"
+              aria-label={`Avançar para ${year + 1}`}
+              title={`Avançar para ${year + 1}`}
+              disabled={guidedYearLocked || isYearTransitioning}
+              className="grid size-8 place-items-center rounded-[9px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-45"
+              onClick={() => requestYearChange(year + 1)}
+            >
+              <ChevronRight className="size-3.5" />
+            </button>
+            {guidedYearNotice?.target === "year" && onDismissGuidedYearNotice ? (
+              <>
+                <GuidedTargetOutline selector="[data-calendar-year-stepper]" />
+                <GuidedToolbarNoticeCard
+                  notice={guidedYearNotice}
+                  onClose={onDismissGuidedYearNotice}
+                  onAction={onGuidedYearAction}
+                  placement="above"
+                />
+              </>
+            ) : null}
+          </div>
+          {showScaleControl ? (
+            <div data-calendar-scale-control>
+              <SegmentedControl
+                value={viewMode}
+                options={CALENDAR_VIEW_OPTIONS}
+                onValueChange={handleViewModeChange}
+                aria-label={
+                  habitPresentation ? "Escala dos hábitos" : "Escala do calendário"
+                }
+              />
+            </div>
+          ) : null}
+        </div>
         {hasFocusZoom ? (
-          <label className="flex w-[10.75rem] items-center justify-end gap-2.5 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground min-[420px]:w-[11.5rem] md:w-[12.25rem]">
+          <label className="flex w-[10.75rem] items-center justify-end justify-self-end gap-2.5 rounded-[10px] border border-border bg-card px-3 py-2 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground shadow-[0_12px_30px_-26px_rgba(15,23,42,0.34)] min-[420px]:w-[11.5rem] md:w-[12.25rem] max-[900px]:col-span-3 max-[900px]:row-start-2">
             <span className="shrink-0">Zoom</span>
             <input
               type="range"

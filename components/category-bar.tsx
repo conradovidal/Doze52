@@ -46,9 +46,9 @@ const CHIP_SHELL_CLASS =
 const CHIP_LEADING_SLOT_CLASS =
   "inline-flex h-8 w-7 shrink-0 items-center justify-center";
 const CHIP_HANDLE_CLASS =
-  "inline-flex h-8 w-8 shrink-0 touch-none cursor-grab items-center justify-center rounded-[9px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground active:cursor-grabbing";
+  "inline-flex h-8 w-8 shrink-0 touch-none cursor-grab items-center justify-center rounded-[9px] text-muted-foreground active:cursor-grabbing focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45";
 const CHIP_EDIT_ACTION_CLASS =
-  "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground";
+  "inline-flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-[8px] text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45";
 const CHIP_PLACEHOLDER_CLASS =
   "pointer-events-none absolute inset-[3px] rounded-[8px] border border-dashed border-border bg-muted";
 const CHIP_OVERLAY_CLASS =
@@ -90,6 +90,7 @@ type CategoryBarProps = {
   onEditCategory?: (categoryId: string) => void;
   highlightedCategoryId?: string | null;
   highlightedCategoryEffect?: "focus" | "reveal";
+  highlightCreate?: boolean;
 };
 
 type DragState = {
@@ -150,7 +151,6 @@ function EditCategoryChip({
       className={cn(
         CHIP_SHELL_CLASS,
         mobileDense && "h-10 w-full rounded-[8px]",
-        "hover:brightness-[0.985]",
         isOverlay && CHIP_OVERLAY_CLASS,
         isPlaceholder && "bg-background/80"
       )}
@@ -339,6 +339,7 @@ export function CategoryBar({
   onEditCategory,
   highlightedCategoryId,
   highlightedCategoryEffect = "focus",
+  highlightCreate = false,
 }: CategoryBarProps) {
   const { mode: themeMode } = useTheme();
   const selectedProfileIds = useStore((s) => s.selectedProfileIds);
@@ -494,7 +495,7 @@ export function CategoryBar({
     ]
   );
 
-  if (!isInlineEditMode && displayedCategories.length === 0) {
+  if (!isInlineEditMode && displayedCategories.length === 0 && !highlightCreate) {
     return null;
   }
 
@@ -574,6 +575,20 @@ export function CategoryBar({
           );
         })}
 
+        {highlightCreate ? (
+          <button
+            type="button"
+            onClick={onCreateCategory}
+            className={CREATE_ACTION_CLASS}
+            data-onboarding-calendar-control
+            data-onboarding-highlighted="true"
+            aria-label="Adicionar categoria"
+            title="Adicionar categoria"
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </button>
+        ) : null}
+
         <button
           type="button"
           onClick={() => setCategoriesVisibility(displayedCategoryIds, !allDisplayedVisible)}
@@ -631,6 +646,8 @@ export function CategoryBar({
             )}
             aria-label="Criar nova categoria"
             title="Criar nova categoria"
+            data-onboarding-calendar-control={highlightCreate ? "true" : undefined}
+            data-onboarding-highlighted={highlightCreate ? "true" : undefined}
           >
             <Plus className="h-3.5 w-3.5" />
           </button>

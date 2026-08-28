@@ -44,11 +44,15 @@ test("contexto, sincronizacao e calendario pronto funcionam de ponta a ponta", a
     })
     .click();
   const calendarsDialog = page.getByRole("dialog", { name: "Calendários" });
-  await calendarsDialog.getByRole("combobox", { name: /Time para/ }).click();
-  await page.getByRole("option", { name: "Grêmio", exact: true }).click();
+  await expect(
+    calendarsDialog.getByRole("combobox", { name: /Estado para/ })
+  ).toContainText("São Paulo (SP)");
+  await expect(
+    calendarsDialog.getByRole("combobox", { name: /Time para/ })
+  ).toContainText("Grêmio");
   const teamCard = calendarsDialog
     .getByRole("article")
-    .filter({ hasText: "Jogos do Grêmio" });
+    .filter({ hasText: "Jogos do seu time favorito" });
   await teamCard.getByRole("button", { name: "Adicionar calendário" }).click();
   const targetProfile = teamCard.getByRole("combobox", {
     name: "Contexto para Jogos do Grêmio",
@@ -112,17 +116,19 @@ test("contexto, sincronizacao e calendario pronto funcionam de ponta a ponta", a
   const removeCard = page
     .getByRole("dialog", { name: "Calendários" })
     .getByRole("article")
-    .filter({ hasText: "Jogos do Grêmio" });
+    .filter({ hasText: "Jogos do seu time favorito" });
   const eventsRemoved = waitForSupabaseWrite(page, "events", ["DELETE"]);
   await removeCard.getByRole("button", { name: "Remover" }).click();
   await eventsRemoved;
   const availableTeamCard = calendarsDialog
     .getByRole("article")
-    .filter({ hasText: "Jogos do seu time" });
-  await expect(availableTeamCard.getByRole("combobox", { name: /Time para/ })).toBeVisible();
+    .filter({ hasText: "Jogos do seu time favorito" });
+  await expect(
+    availableTeamCard.getByRole("combobox", { name: /Time para/ })
+  ).toContainText("Grêmio");
   await expect(
     availableTeamCard.getByRole("button", { name: "Adicionar calendário" })
-  ).toBeDisabled();
+  ).toBeEnabled();
   await page.keyboard.press("Escape");
   await expect(page.getByText("Jogos do Grêmio", { exact: true })).toHaveCount(0);
   await waitForSyncReady(page);

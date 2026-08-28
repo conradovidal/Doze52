@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import {
+  ArrowLeft,
   CalendarDays,
   Check,
   Plus,
@@ -150,6 +151,21 @@ const buildCalendarPackCards = (calendarPacks: readonly CalendarPack[]) => {
   return cards;
 };
 
+const getDefaultVariant = (
+  groupId: string,
+  variants: readonly CalendarPack[]
+) => {
+  if (groupId === "holidays-by-state") {
+    return variants.find((variant) => variant.regionCode === "SP");
+  }
+  if (groupId === "brasileirao-2026-by-team") {
+    return variants.find(
+      (variant) => variant.variantGroup?.optionLabel === "Grêmio"
+    );
+  }
+  return undefined;
+};
+
 export function CalendarPackLauncher({
   onFocusYear,
   className,
@@ -163,6 +179,11 @@ export function CalendarPackLauncher({
   onClose,
   onImported,
   bypassLimits = false,
+  controlledOpen,
+  onControlledOpenChange,
+  hideTrigger = false,
+  fixedTargetProfileId,
+  onBack,
 }: {
   onFocusYear?: (year: number) => void;
   className?: string;
@@ -176,6 +197,11 @@ export function CalendarPackLauncher({
   onClose?: () => void;
   onImported?: (pack: CalendarPack) => void;
   bypassLimits?: boolean;
+  controlledOpen?: boolean;
+  onControlledOpenChange?: (open: boolean) => void;
+  hideTrigger?: boolean;
+  fixedTargetProfileId?: string;
+  onBack?: () => void;
 }) {
   const { calendarPacks } = useCalendarCatalog();
   const calendarPackCards = React.useMemo(
@@ -191,7 +217,8 @@ export function CalendarPackLauncher({
   const selectedProfileIds = useStore((state) => state.selectedProfileIds);
   const setSelectedProfiles = useStore((state) => state.setSelectedProfiles);
 
-  const [open, setOpen] = React.useState(false);
+  const [internalOpen, setInternalOpen] = React.useState(false);
+  const open = controlledOpen ?? internalOpen;
   const [flowByPack, setFlowByPack] = React.useState<Record<string, PackFlowState>>({});
   const [targetProfileByPack, setTargetProfileByPack] = React.useState<
     Record<string, string>
@@ -201,28 +228,6 @@ export function CalendarPackLauncher({
   >({});
   const [expandedPackId, setExpandedPackId] = React.useState<string | null>(null);
   const [upgradeDialogOpen, setUpgradeDialogOpen] = React.useState(false);
-
-  React.useEffect(() => {
-    if (
-      guidedVariantGroupId !== "holidays-by-state" ||
-      !requireExplicitVariant
-    ) {
-      return;
-    }
-
-    const saoPauloPack = calendarPacks.find(
-      (pack) =>
-        getCalendarPackGroupId(pack) === guidedVariantGroupId &&
-        pack.regionCode === "SP"
-    );
-    if (!saoPauloPack) return;
-
-    setSelectedVariantByGroup((current) =>
-      current[guidedVariantGroupId]
-        ? current
-        : { ...current, [guidedVariantGroupId]: saoPauloPack.id }
-    );
-  }, [calendarPacks, guidedVariantGroupId, requireExplicitVariant]);
 
   const snapshot = React.useMemo(
     () => ({ profiles, categories, events }),
@@ -255,13 +260,20 @@ export function CalendarPackLauncher({
     isLimitReached(subscribedPackCount, limits.maxCalendarSubscriptions);
   const launcherAriaCopy = "Adicionar ou gerenciar calendários.";
   const activeProfileId = React.useMemo(
-    () =>
-      selectedProfileIds.find((profileId) =>
+    () => {
+      if (
+        fixedTargetProfileId &&
+        profiles.some((profile) => profile.id === fixedTargetProfileId)
+      ) {
+        return fixedTargetProfileId;
+      }
+      return selectedProfileIds.find((profileId) =>
         profiles.some((profile) => profile.id === profileId)
       ) ??
       profiles[0]?.id ??
-      null,
-    [profiles, selectedProfileIds]
+      null;
+    },
+    [fixedTargetProfileId, profiles, selectedProfileIds]
   );
   const profileNameById = React.useMemo(
     () => new Map(profiles.map((profile) => [profile.id, profile.name])),
@@ -270,6 +282,9 @@ export function CalendarPackLauncher({
 
   const getTargetProfileId = React.useCallback(
     (packId: string, fallbackProfileId?: string | null) => {
+      if (fixedTargetProfileId && profileNameById.has(fixedTargetProfileId)) {
+        return fixedTargetProfileId;
+      }
       const savedProfileId = targetProfileByPack[packId];
       if (savedProfileId && profileNameById.has(savedProfileId)) {
         return savedProfileId;
@@ -279,7 +294,7 @@ export function CalendarPackLauncher({
       }
       return activeProfileId;
     },
-    [activeProfileId, profileNameById, targetProfileByPack]
+    [activeProfileId, fixedTargetProfileId, profileNameById, targetProfileByPack]
   );
 
   const setPackFlow = React.useCallback((packId: string, state: PackFlowState) => {
@@ -297,13 +312,14 @@ export function CalendarPackLauncher({
   );
 
   const handleOpenChange = React.useCallback((nextOpen: boolean) => {
-    setOpen(nextOpen);
+    setInternalOpen(nextOpen);
+    onControlledOpenChange?.(nextOpen);
     if (!nextOpen) {
       setFlowByPack({});
       setExpandedPackId(null);
       onClose?.();
     }
-  }, [onClose]);
+  }, [onClose, onControlledOpenChange]);
 
   const handleImport = React.useCallback(
     (
@@ -347,8 +363,7 @@ export function CalendarPackLauncher({
         if (result.status === "already-exists") {
           setPackFlow(pack.id, "exists");
           if (guidedVariantGroupId === getCalendarPackGroupId(pack)) {
-            setOpen(false);
-            onClose?.();
+            handleOpenChange(false);
           }
           onImported?.(pack);
           notify({
@@ -361,8 +376,7 @@ export function CalendarPackLauncher({
 
         setPackFlow(pack.id, "added");
         if (guidedVariantGroupId === getCalendarPackGroupId(pack)) {
-          setOpen(false);
-          onClose?.();
+          handleOpenChange(false);
         }
         onImported?.(pack);
         notify({
@@ -388,9 +402,9 @@ export function CalendarPackLauncher({
       availabilityByPack,
       focusPack,
       guidedVariantGroupId,
+      handleOpenChange,
       isCalendarSubscriptionLimitReached,
       notify,
-      onClose,
       onImported,
       profileNameById,
       replaceAllData,
@@ -437,7 +451,7 @@ export function CalendarPackLauncher({
 
   return (
     <>
-      <Button
+      {hideTrigger ? null : <Button
         type="button"
         variant="outline"
         size={mobileDense ? "lg" : "sm"}
@@ -446,31 +460,43 @@ export function CalendarPackLauncher({
           mobileDense
             ? "h-10 justify-start rounded-[8px] text-left"
             : "h-8 px-2.5 pr-3 md:h-9 md:px-3 md:pr-3.5 md:text-sm",
-          className,
-          highlighted && "product-spotlight-target"
+          className
         )}
         disabled={disabled}
         data-onboarding-calendar-control
         data-onboarding-highlighted={highlighted ? "true" : undefined}
         onClick={() => {
           onOpen?.();
-          setOpen(true);
+          handleOpenChange(true);
         }}
         aria-label={launcherAriaCopy}
         title="Calendários disponíveis"
       >
         <Plus className="size-3.5 text-muted-foreground" />
         <span>Calendários</span>
-      </Button>
+      </Button>}
 
       <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent className="max-h-[calc(100dvh-1.5rem)] overflow-x-hidden overflow-y-auto p-4 sm:max-w-[600px] sm:p-6">
           <DialogHeader className="pr-8 text-left">
-            <DialogTitle>
-              {guidedVariantGroupId
-                ? "Adicione os feriados do seu estado"
-                : "Calendários"}
-            </DialogTitle>
+            <div className="flex items-center gap-2">
+              {onBack ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="Voltar para as opções de categoria"
+                  onClick={onBack}
+                >
+                  <ArrowLeft className="size-4" />
+                </Button>
+              ) : null}
+              <DialogTitle>
+                {guidedVariantGroupId
+                  ? "Adicione os feriados do seu estado"
+                  : "Calendários"}
+              </DialogTitle>
+            </div>
             <DialogDescription>
               {guidedVariantGroupId
                 ? `Escolha sua UF para incluir este calendário no contexto ${
@@ -490,6 +516,7 @@ export function CalendarPackLauncher({
               const selectedVariant = variants.find(
                 (candidate) => candidate.id === selectedPackId
               );
+              const defaultVariant = getDefaultVariant(key, variants);
               const groupIsPresent = variants.some((candidate) => {
                 const candidateAvailability = availabilityByPack.get(candidate.id);
                 return (
@@ -501,16 +528,19 @@ export function CalendarPackLauncher({
                 variants.find((candidate) =>
                   isCalendarPackVariantInstalled(snapshot, candidate, variants)
                 ) ?? (groupIsPresent ? selectedVariant ?? variants[0] : undefined);
-              const pack =
+              const effectiveVariant =
                 selectedVariant ??
                 installedVariant ??
+                defaultVariant;
+              const pack =
+                effectiveVariant ??
                 variants[0];
               const isTeamGroup = key === "brasileirao-2026-by-team";
               const requiresExplicitSelection =
                 (isGuidedCard && requireExplicitVariant) || isTeamGroup;
               const hasRequiredVariant =
                 !requiresExplicitSelection ||
-                Boolean(selectedVariant || installedVariant);
+                Boolean(effectiveVariant);
               const availability = availabilityByPack.get(pack.id);
               const isPresent = groupIsPresent;
               const currentFlow = flowByPack[pack.id] ?? "idle";
@@ -528,6 +558,9 @@ export function CalendarPackLauncher({
               );
               const targetProfileName = targetProfileId
                 ? profileNameById.get(targetProfileId)
+                : null;
+              const targetProfile = targetProfileId
+                ? profiles.find((profile) => profile.id === targetProfileId) ?? null
                 : null;
               const showAddDetails =
                 !isPresent &&
@@ -555,8 +588,8 @@ export function CalendarPackLauncher({
                       />
                       <div className="min-w-0">
                         <h4 className="text-sm font-medium text-foreground">
-                          {isTeamGroup && !selectedVariant && !installedVariant
-                            ? "Jogos do seu time"
+                          {isTeamGroup
+                            ? "Jogos do seu time favorito"
                             : pack.name}
                         </h4>
                         <p className="mt-1.5 text-xs leading-5 text-muted-foreground">
@@ -567,7 +600,7 @@ export function CalendarPackLauncher({
                             <Select
                               value={
                                 requiresExplicitSelection
-                                  ? selectedVariant?.id ?? installedVariant?.id ?? ""
+                                  ? effectiveVariant?.id ?? ""
                                   : pack.id
                               }
                               disabled={isGuidedCardDisabled}
@@ -671,6 +704,18 @@ export function CalendarPackLauncher({
                           </AsyncStateButton>
                         ) : (
                         <div className="flex min-w-0 items-center justify-end gap-1.5">
+                          {fixedTargetProfileId ? (
+                            <span className="inline-flex h-7 max-w-[9rem] items-center gap-1.5 rounded-[9px] border border-border bg-card px-2.5 text-xs font-semibold text-foreground">
+                              {targetProfile ? (
+                                <ProfileIcon
+                                  icon={targetProfile.icon}
+                                  size={13}
+                                  className="shrink-0"
+                                />
+                              ) : null}
+                              <span className="truncate">{targetProfileName ?? "Contexto"}</span>
+                            </span>
+                          ) : (
                           <Select
                             value={targetProfileId ?? ""}
                             onValueChange={(profileId) =>
@@ -700,6 +745,7 @@ export function CalendarPackLauncher({
                               ))}
                             </SelectContent>
                           </Select>
+                          )}
                           <AsyncStateButton
                             type="button"
                             variant="premium"

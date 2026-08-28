@@ -5,6 +5,7 @@ import { holidays2026Packs } from "../../lib/calendar-packs/holidays-2026";
 import { worldCup2026Packs } from "../../lib/calendar-packs/world-cup-2026";
 import {
   findCalendarPackByCategoryId,
+  DEFAULT_CALENDAR_PACK_CATEGORY_COLOR,
   getCalendarPackAvailability,
   getCalendarPackEventNotes,
   getCalendarPackEventTitle,
@@ -108,6 +109,7 @@ test("recupera Grêmio misturado em Eventos sem mover conteúdo autoral", () => 
   );
 
   expect(managedCategory).toBeTruthy();
+  expect(managedCategory?.color).toBe(DEFAULT_CALENDAR_PACK_CATEGORY_COLOR);
   expect(
     first.snapshot.events.find((event) => event.title === "Evento autoral")
       ?.categoryId
@@ -136,6 +138,47 @@ test("recupera Grêmio misturado em Eventos sem mover conteúdo autoral", () => 
       (event) => event.calendarPackGroupId === pack.variantGroup?.id
     )
   ).toBe(false);
+});
+
+test("preserva a cor de um calendário pronto já instalado", () => {
+  const pack = gremioPack;
+  const first = importCalendarPack(
+    corruptedSnapshot(pack, 0),
+    pack,
+    "all",
+    profileId,
+    [pack]
+  );
+  const managedCategory = first.snapshot.categories.find(
+    (category) => category.calendarPackGroupId === pack.variantGroup?.id
+  )!;
+  const personalizedColor = "#B79AEF";
+  const personalizedSnapshot = {
+    ...first.snapshot,
+    categories: first.snapshot.categories.map((category) =>
+      category.id === managedCategory.id
+        ? { ...category, color: personalizedColor }
+        : category
+    ),
+    events: first.snapshot.events.map((event) =>
+      event.categoryId === managedCategory.id
+        ? { ...event, color: personalizedColor }
+        : event
+    ),
+  };
+
+  const refreshed = importCalendarPack(
+    personalizedSnapshot,
+    pack,
+    "all",
+    profileId,
+    [pack]
+  );
+  expect(
+    refreshed.snapshot.categories.find(
+      (category) => category.id === managedCategory.id
+    )?.color
+  ).toBe(personalizedColor);
 });
 
 test("preserva jogos históricos e reconcilia placares antigos do Grêmio", () => {

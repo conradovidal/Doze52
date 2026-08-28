@@ -8,10 +8,44 @@ import { diffCatalogs, materialHash } from "./material";
 import { fetchGeFootballFeed, missingOfficialMatchIssues, reconcileGeFootballFeed } from "./ge-feed";
 import { parseOfficialFixtureParticipantKeys, parseOfficialSource } from "./parsers";
 import { fallbackCatalog, getPublishedCatalog, listRunnableSources } from "./repository";
+import {
+  CALENDAR_SOURCE_LIMITS,
+  CalendarSourceBudget,
+  CalendarSourceLimitError,
+  fetchBoundedCalendarSource,
+} from "./source-transport";
 import type { FootballCandidatePayload, OfficialCalendarEvent } from "./types";
 import { validateOfficialCandidate } from "./validation";
 
 export type RefreshTrigger = "scheduled_midnight" | "scheduled_closing" | "manual";
+
+export class CalendarRefreshInProgressError extends Error {
+  constructor(
+    readonly activeRunId: string | null,
+    readonly retryAfterSeconds: number
+  ) {
+    super("Calendar catalog refresh is already in progress.");
+    this.name = "CalendarRefreshInProgressError";
+  }
+}
+
+class CalendarRefreshLeaseLostError extends Error {
+  constructor() {
+    super("Calendar catalog refresh lease was lost.");
+    this.name = "CalendarRefreshLeaseLostError";
+  }
+}
+
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const OFFICIAL_SOURCE_HOSTS: Record<string, ReadonlySet<string>> = {
+  conmebol: new Set(["gol.conmebol.com"]),
+  formula1: new Set(["formula1.com", "www.formula1.com"]),
+  fifa: new Set(["fifa.com", "www.fifa.com"]),
+  government_holidays: new Set(["gov.br", "www.gov.br"]),
+};
+const MAX_OFFICIAL_EVENTS_PER_SOURCE = 2_000;
 
 const OFFICIAL_FETCH_URLS: Record<string, readonly string[]> = {
   "cbf-brasileirao-2026": ["https://www.cbf.com.br/api/cbf/jogos/tabela-detalhada/campeonato/1260611"],
@@ -38,23 +72,30 @@ const stageError = (stage: string, error: unknown, url?: string) => {
   return new Error(`${stage}${url ? ` (${url})` : ""}: ${message}`, { cause: error });
 };
 
-const fetchOfficialEvents = async (source: Parameters<typeof parseOfficialSource>[2]) => {
+const fetchOfficialEvents = async (
+  source: Parameters<typeof parseOfficialSource>[2],
+  budget: CalendarSourceBudget
+) => {
   const urls = OFFICIAL_FETCH_URLS[source.id] ?? [source.official_url];
   const batches = await Promise.all(urls.map(async (url) => {
     let body: string;
     let contentType: string;
     try {
       if (source.parser_key === "cbf") {
-        ({ body, contentType } = await fetchCbfOfficialSource(url));
+        ({ body, contentType } = await fetchCbfOfficialSource(url, source.id, budget));
       } else {
-        const response = await fetch(url, {
-          headers: { "user-agent": "Doze52-Calendar-Updater/1.0 (+https://doze52.com)" },
-          signal: AbortSignal.timeout(20_000),
-          cache: "no-store",
-        });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        body = await response.text();
-        contentType = response.headers.get("content-type") ?? "";
+        const allowedHosts = OFFICIAL_SOURCE_HOSTS[source.parser_key];
+        if (!allowedHosts) {
+          throw new CalendarSourceLimitError("source_parser_not_allowed");
+        }
+        ({ body, contentType } = await fetchBoundedCalendarSource({
+          sourceId: source.id,
+          input: url,
+          allowedHosts,
+          acceptedContentTypes: ["application/json", "text/html"],
+          maxBytes: CALENDAR_SOURCE_LIMITS.officialResponseBytes,
+          budget,
+        }));
       }
     } catch (error) {
       throw stageError("official_fetch", error, url);
@@ -67,14 +108,78 @@ const fetchOfficialEvents = async (source: Parameters<typeof parseOfficialSource
         fixtureParticipantKeys: parseOfficialFixtureParticipantKeys(body, contentType, source, { sourceUrl: url }),
       };
     } catch (error) {
+      budget.fail(source.id, "official_parser_failed");
       throw stageError("official_parser", error, url);
     }
   }));
   const events = Array.from(new Map(batches.flatMap((batch) => batch.events)
     .map((event) => [event.externalId, event])).values())
     .sort((left, right) => `${left.date}T${left.time}`.localeCompare(`${right.date}T${right.time}`));
+  if (events.length > MAX_OFFICIAL_EVENTS_PER_SOURCE) {
+    budget.fail(source.id, "source_event_limit_exceeded");
+    throw new CalendarSourceLimitError("source_event_limit_exceeded");
+  }
   const fixtureParticipantKeys = new Set(batches.flatMap((batch) => [...batch.fixtureParticipantKeys]));
   return { events, fixtureParticipantKeys };
+};
+
+const positiveRetryAfter = (value: unknown) => {
+  const seconds = Number(value);
+  return Number.isSafeInteger(seconds) && seconds > 0 ? seconds : 1;
+};
+
+const claimCalendarRefresh = async (
+  trigger: RefreshTrigger,
+  requestedBy?: string
+) => {
+  const { data, error } = await getSupabaseAdminClient().rpc(
+    "claim_calendar_pack_refresh",
+    { p_trigger_kind: trigger, p_requested_by: requestedBy ?? null }
+  );
+  if (error) throw error;
+  const claim = data as Record<string, unknown> | null;
+  if (claim?.outcome === "in_progress") {
+    throw new CalendarRefreshInProgressError(
+      typeof claim.activeRunId === "string" && UUID_PATTERN.test(claim.activeRunId)
+        ? claim.activeRunId
+        : null,
+      positiveRetryAfter(claim.retryAfterSeconds)
+    );
+  }
+  if (
+    claim?.outcome !== "acquired" ||
+    typeof claim.runId !== "string" ||
+    !UUID_PATTERN.test(claim.runId) ||
+    typeof claim.leaseToken !== "string" ||
+    !UUID_PATTERN.test(claim.leaseToken)
+  ) {
+    throw new Error("Invalid calendar refresh claim response.");
+  }
+  return { runId: claim.runId, leaseToken: claim.leaseToken };
+};
+
+const renewCalendarRefresh = async (runId: string, leaseToken: string) => {
+  const { data, error } = await getSupabaseAdminClient().rpc(
+    "renew_calendar_pack_refresh",
+    { p_run_id: runId, p_lease_token: leaseToken }
+  );
+  if (error) throw error;
+  if (data !== true) throw new CalendarRefreshLeaseLostError();
+};
+
+const releaseCalendarRefresh = async (runId: string, leaseToken: string) => {
+  const { error } = await getSupabaseAdminClient().rpc(
+    "release_calendar_pack_refresh",
+    { p_run_id: runId, p_lease_token: leaseToken }
+  );
+  if (error) throw error;
+};
+
+const sourceErrorCode = (error: unknown) => {
+  if (error instanceof CalendarSourceLimitError) return error.code;
+  const message = error instanceof Error ? error.message : "";
+  const stage = message.match(/^([a-z_]+)/)?.[1];
+  return stage ? `${stage}_failed`.slice(0, 64) : "source_refresh_failed";
 };
 
 const candidateOfficialEvents = (payload: unknown) => {
@@ -91,26 +196,34 @@ export const refreshCalendarCatalog = async ({
   requestedBy?: string;
 }) => {
   const admin = getSupabaseAdminClient();
-  const { data: run, error: runError } = await admin
-    .from("calendar_pack_update_runs")
-    .insert({ trigger_kind: trigger, requested_by: requestedBy ?? null, publish_enabled: true })
-    .select("id")
-    .single();
-  if (runError) throw runError;
+  const lease = await claimCalendarRefresh(trigger, requestedBy);
+  const run = { id: lease.runId };
+  const budget = new CalendarSourceBudget();
 
-  const published = (await getPublishedCatalog()) ?? fallbackCatalog();
-  let candidatePacks: CalendarPack[] = published.packs;
-  const sources = await listRunnableSources();
-  const summary = { checked: 0, unchanged: 0, shadow: 0, publishable: 0, quarantined: 0, failed: 0, unmatched: 0 };
-  const publishableCandidateIds: string[] = [];
+  const summary = {
+    checked: 0,
+    unchanged: 0,
+    shadow: 0,
+    publishable: 0,
+    quarantined: 0,
+    failed: 0,
+    unmatched: 0,
+    sources: budget.snapshot(),
+  };
 
   try {
+    const published = (await getPublishedCatalog()) ?? fallbackCatalog();
+    let candidatePacks: CalendarPack[] = published.packs;
+    const sources = await listRunnableSources();
+    const publishableCandidateIds: string[] = [];
     for (const source of sources) {
+      await renewCalendarRefresh(run.id, lease.leaseToken);
       summary.checked += 1;
       try {
         const [officialSource, feedEvents, mappingResult] = await Promise.all([
-          fetchOfficialEvents(source),
-          fetchGeFootballFeed(source).catch((error) => { throw stageError("ge_feed", error); }),
+          fetchOfficialEvents(source, budget),
+          fetchGeFootballFeed(source, fetch, budget)
+            .catch((error) => { throw stageError("ge_feed", error); }),
           admin.from("calendar_pack_external_ids")
             .select("authority, external_id, canonical_id, participant_fingerprint")
             .eq("competition", source.competition)
@@ -236,19 +349,24 @@ export const refreshCalendarCatalog = async ({
         }).eq("id", source.id);
       } catch (error) {
         summary.failed += 1;
-        const message = error instanceof Error ? error.message : "Falha desconhecida";
-        console.error("[calendar-packs.refresh.source]", { sourceId: source.id, error: message });
+        const errorCode = sourceErrorCode(error);
+        console.error("[calendar-packs.refresh.source]", {
+          sourceId: source.id,
+          errorCode,
+        });
         await admin.from("calendar_pack_sources").update({
-          last_checked_at: new Date().toISOString(), last_error: message,
+          last_checked_at: new Date().toISOString(), last_error: errorCode,
         }).eq("id", source.id);
         await admin.from("calendar_pack_candidates").insert({
           run_id: run.id, source_id: source.id, base_release_id: published.releaseId,
           material_hash: published.materialHash, payload: [], diff: {},
-          validation_issues: [{ code: "invalid_shape", message }], status: "failed",
+          validation_issues: [{ code: "invalid_shape", message: errorCode }], status: "failed",
         });
       }
+      summary.sources = budget.snapshot();
     }
 
+    await renewCalendarRefresh(run.id, lease.leaseToken);
     const nextHash = materialHash(candidatePacks);
     let releaseId = published.releaseId;
     if (!published.releaseId || nextHash !== published.materialHash) {
@@ -272,14 +390,27 @@ export const refreshCalendarCatalog = async ({
         ? "quarantined"
         : "succeeded";
     await admin.from("calendar_pack_update_runs").update({
-      status, finished_at: new Date().toISOString(), summary,
+      status,
+      finished_at: new Date().toISOString(),
+      summary: { ...summary, sources: budget.snapshot() },
     }).eq("id", run.id);
     return { runId: run.id, releaseId, status, summary };
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Falha desconhecida";
     await admin.from("calendar_pack_update_runs").update({
-      status: "failed", finished_at: new Date().toISOString(), summary, error: message,
+      status: "failed",
+      finished_at: new Date().toISOString(),
+      summary: { ...summary, sources: budget.snapshot() },
+      error: sourceErrorCode(error),
     }).eq("id", run.id);
     throw error;
+  } finally {
+    try {
+      await releaseCalendarRefresh(run.id, lease.leaseToken);
+    } catch (releaseError) {
+      console.error("[calendar-packs.refresh.release]", {
+        runId: run.id,
+        errorCode: sourceErrorCode(releaseError),
+      });
+    }
   }
 };
