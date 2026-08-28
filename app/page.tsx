@@ -454,8 +454,46 @@ export default function HomePage() {
     () => expandEventsForYear(events, year),
     [events, year]
   );
+  const hasAuthorEvents = hasAuthorCalendarEvents(events);
+  // Existing accounts (created before the guided onboarding tour existed) can
+  // have zero "author" events yet still have real, user-customized setups —
+  // e.g. categories they renamed/created, or more than the single default
+  // profile. Treat those as established users too, so the tour (and the
+  // editing lock that comes with it) never traps someone who already has an
+  // account, not just someone with existing events.
+  const defaultOnboardingCategoryIds = React.useMemo(
+    () => new Set<string>(Object.values(ONBOARDING_CATEGORY_IDS)),
+    []
+  );
+  const hasCustomizedCategories = categories.some(
+    (category) => !defaultOnboardingCategoryIds.has(category.id)
+  );
+  const hasEstablishedSetup =
+    hasAuthorEvents || hasCustomizedCategories || profiles.length > 1;
+  const guidedOnboardingEligible = Boolean(
+    guidedOnboarding &&
+      calendarCreateOnboarding &&
+      isMobileCalendarUi !== null &&
+      shouldShowGuidedOnboarding({
+        state: guidedOnboarding,
+        legacyState: calendarCreateOnboarding,
+        hasAuthorEvents: hasEstablishedSetup,
+        authLoading,
+        isAuthenticated: Boolean(session?.user.id),
+        remoteReady,
+      })
+  );
+  const showGuidedOnboarding = Boolean(
+    guidedOnboardingEligible && isMobileCalendarUi === false
+  );
+
   const onboardingHabitShowcase = React.useMemo(
     () =>
+      // Only ever show the demo/example habits while the guided tour is
+      // actually eligible to run — otherwise an established account that
+      // merely has a leftover "context_selection" step in local storage
+      // would have its real Hábitos view replaced by undeletable demo data.
+      showGuidedOnboarding &&
       guidedOnboarding &&
       shouldPresentOnboardingHabitShowcase(guidedOnboarding.step) &&
       activeDestination === "habits" &&
@@ -474,6 +512,7 @@ export default function HomePage() {
       guidedOnboarding,
       isMobileCalendarUi,
       renderEvents,
+      showGuidedOnboarding,
       todayIso,
       year,
     ]
@@ -1217,38 +1256,6 @@ export default function HomePage() {
     windowContext,
   ]);
 
-  const hasAuthorEvents = hasAuthorCalendarEvents(events);
-  // Existing accounts (created before the guided onboarding tour existed) can
-  // have zero "author" events yet still have real, user-customized setups —
-  // e.g. categories they renamed/created, or more than the single default
-  // profile. Treat those as established users too, so the tour (and the
-  // editing lock that comes with it) never traps someone who already has an
-  // account, not just someone with existing events.
-  const defaultOnboardingCategoryIds = React.useMemo(
-    () => new Set<string>(Object.values(ONBOARDING_CATEGORY_IDS)),
-    []
-  );
-  const hasCustomizedCategories = categories.some(
-    (category) => !defaultOnboardingCategoryIds.has(category.id)
-  );
-  const hasEstablishedSetup =
-    hasAuthorEvents || hasCustomizedCategories || profiles.length > 1;
-  const guidedOnboardingEligible = Boolean(
-    guidedOnboarding &&
-      calendarCreateOnboarding &&
-      isMobileCalendarUi !== null &&
-      shouldShowGuidedOnboarding({
-        state: guidedOnboarding,
-        legacyState: calendarCreateOnboarding,
-        hasAuthorEvents: hasEstablishedSetup,
-        authLoading,
-        isAuthenticated: Boolean(session?.user.id),
-        remoteReady,
-      })
-  );
-  const showGuidedOnboarding = Boolean(
-    guidedOnboardingEligible && isMobileCalendarUi === false
-  );
   const isMobileOnboardingPending = Boolean(
     guidedOnboardingEligible && isMobileCalendarUi === true
   );
