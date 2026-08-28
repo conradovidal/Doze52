@@ -96,6 +96,7 @@ export function EventDialog({
   onSubmit,
   onDelete,
   allowManagedMutation = false,
+  mobileMode = "center",
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -107,6 +108,7 @@ export function EventDialog({
   onSubmit: (submission: EventDialogSubmission) => Promise<void> | void;
   onDelete?: () => Promise<void> | void;
   allowManagedMutation?: boolean;
+  mobileMode?: "sheet" | "center";
 }) {
   const { mode: themeMode } = useTheme();
   const categories = useStore((s) => s.categories);
@@ -802,7 +804,8 @@ export function EventDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showCloseButton={false}
-        className="max-h-[calc(100dvh-1.5rem)] overflow-y-auto p-5 sm:max-w-[520px] sm:p-6"
+        mobileMode={mobileMode}
+        className="doze52-material-solid max-h-[calc(100dvh-1.5rem)] overflow-y-auto p-5 sm:max-w-[520px] sm:p-6"
         onOpenAutoFocus={rememberAnchorFocus}
         onCloseAutoFocus={(event) => {
           event.preventDefault();

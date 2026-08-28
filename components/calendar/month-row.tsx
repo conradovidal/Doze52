@@ -120,6 +120,7 @@ export function MonthRow({
   dragState,
   hasDragContext,
   onEditEvent,
+  focusedRenderEventId,
   creatingRange,
   guidedSelectionRange,
   onStartCreateRange,
@@ -155,6 +156,7 @@ export function MonthRow({
     sourceEventId: string;
     anchorPoint: AnchorPoint;
   }) => void;
+  focusedRenderEventId?: string | null;
   creatingRange: { startIso: string; hoverIso: string; isDragging: boolean } | null;
   guidedSelectionRange?: { startDate: string; endDate: string } | null;
   onStartCreateRange: (startIso: string) => void;
@@ -745,6 +747,7 @@ export function MonthRow({
               >
                 <EventBar
                   event={seg.event}
+                  isFocused={focusedRenderEventId === seg.event.id}
                   profileIcon={profileIconByCategoryId.get(seg.event.categoryId)}
                   onClick={({ anchorPoint }) =>
                     onEditEvent({
@@ -991,6 +994,7 @@ export function MonthRow({
                           >
                             <EventBar
                               event={event}
+                              isFocused={focusedRenderEventId === event.id}
                               profileIcon={profileIconByCategoryId.get(event.categoryId)}
                               onClick={({ anchorPoint }) =>
                                 onEditEvent({

@@ -99,6 +99,15 @@
   --cal-cell-weekday-past: 220 14% 91%;
   --cal-cell-weekend-past: 220 13% 88.5%;
   --cal-cell-outside-past: 220 13% 89%;
+  --focus-accent: #343a40;
+  --focus-accent-strong: #20252a;
+  --focus-accent-foreground: #ffffff;
+  --material-tinted: color-mix(in srgb, #ffffff 91%, #dde2ff);
+  --material-stable: #ffffff;
+  --material-solid: #ffffff;
+  --material-border: color-mix(in srgb, var(--focus-accent) 28%, var(--border));
+  --material-highlight: color-mix(in srgb, var(--focus-accent) 20%, transparent);
+  --material-shadow: 0 28px 70px -34px rgb(30 35 80 / 0.42);
 }
 
 .dark {
@@ -139,6 +148,15 @@
   --cal-cell-weekday-past: 220 14% 15%;
   --cal-cell-weekend-past: 220 14% 13%;
   --cal-cell-outside-past: 220 14% 11%;
+  --focus-accent: #b8bdc2;
+  --focus-accent-strong: #d6d9dc;
+  --focus-accent-foreground: #17191b;
+  --material-tinted: color-mix(in srgb, #1f2937 91%, #34336a);
+  --material-stable: #1f2937;
+  --material-solid: #1f2937;
+  --material-border: color-mix(in srgb, var(--focus-accent) 38%, var(--border));
+  --material-highlight: color-mix(in srgb, var(--focus-accent) 24%, transparent);
+  --material-shadow: 0 30px 76px -32px rgb(0 0 0 / 0.78);
 }
 
 .inverse-product-surface {
@@ -274,6 +292,52 @@
 }
 
 @layer utilities {
+  .doze52-material-tinted {
+    background: var(--material-tinted);
+    border-color: var(--material-border);
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, white 36%, transparent),
+      var(--material-shadow);
+    -webkit-backdrop-filter: blur(18px) saturate(118%);
+    backdrop-filter: blur(18px) saturate(118%);
+  }
+
+  .doze52-material-solid {
+    background: var(--material-solid);
+  }
+
+  .doze52-temporal-preview {
+    border-color: color-mix(in srgb, var(--focus-accent) 58%, var(--material-border));
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, white 36%, transparent),
+      0 0 0 1px color-mix(in srgb, var(--focus-accent) 16%, transparent),
+      var(--material-shadow);
+  }
+
+  .doze52-focus-event {
+    position: relative;
+    z-index: 1;
+    border-color: var(--focus-accent) !important;
+    box-shadow:
+      0 0 0 2px var(--background),
+      0 0 0 4px var(--material-highlight),
+      0 16px 30px -22px var(--focus-accent);
+  }
+
+  .doze52-focus-action {
+    border-color: color-mix(in srgb, var(--focus-accent) 72%, transparent);
+    background: var(--focus-accent);
+    color: var(--focus-accent-foreground);
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, white 42%, transparent),
+      0 14px 28px -18px var(--focus-accent);
+  }
+
+  .doze52-focus-action:hover {
+    background: var(--focus-accent-strong);
+    color: var(--focus-accent-foreground);
+  }
+
   @keyframes doze52-calendar-mode-shift {
     from {
       opacity: 0.82;
@@ -304,5 +368,32 @@
     .doze52-calendar-mode-transition {
       animation: none;
     }
+  }
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .doze52-material-tinted {
+    background: var(--material-stable);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .doze52-material-tinted {
+    background: var(--material-stable);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .doze52-material-tinted,
+  .doze52-focus-event,
+  .doze52-focus-action {
+    border: 2px solid CanvasText;
+    background: Canvas;
+    color: CanvasText;
+    box-shadow: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
   }
 }

@@ -60,6 +60,7 @@ export function EventBar({
   onDragStart,
   onDragEnd,
   isDragging = false,
+  isFocused = false,
   isStart = true,
   isEnd = true,
   profileIcon,
@@ -71,6 +72,7 @@ export function EventBar({
   onDragStart?: (e: React.DragEvent<HTMLButtonElement>) => void;
   onDragEnd?: () => void;
   isDragging?: boolean;
+  isFocused?: boolean;
   isStart?: boolean;
   isEnd?: boolean;
   profileIcon?: ProfileIconId;
@@ -213,6 +215,8 @@ export function EventBar({
         ref={buttonRef}
         type="button"
         data-calendar-event-id={event.id}
+        data-calendar-render-event-id={event.id}
+        data-temporal-focus={isFocused ? "true" : undefined}
         draggable={draggable}
         onClick={(e) => {
           const justDragged = performance.now() - lastDragEndAtRef.current < 180;
@@ -259,7 +263,7 @@ export function EventBar({
           isDragging
             ? "brightness-[0.96] saturate-[0.96]"
             : "hover:-translate-y-px hover:brightness-[0.99] hover:shadow-[0_10px_18px_-16px_rgba(15,23,42,0.32),inset_0_1px_0_rgba(255,255,255,0.62)]"
-        } ${className ?? ""}`}
+        } ${isFocused ? "doze52-focus-event" : ""} ${className ?? ""}`}
         style={{
           backgroundColor: colorToken.eventSoft,
           borderColor: colorToken.eventBorder,

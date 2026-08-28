@@ -22,3 +22,26 @@ export const isHabitsPrototypeEnabled = isHabitsPrototypeAvailable({
   nodeEnv: process.env.NODE_ENV,
   appEnv: process.env.NEXT_PUBLIC_APP_ENV,
 });
+
+export const isTemporalFocusPreviewAvailable = (input: {
+  flag?: string;
+  deploymentEnv?: string;
+  nodeEnv?: string;
+  appEnv?: string;
+}) => {
+  if (input.flag !== "true") return false;
+  if (input.deploymentEnv) return input.deploymentEnv !== "production";
+  return (
+    input.nodeEnv === "development" ||
+    input.appEnv === "local" ||
+    input.appEnv === "dev"
+  );
+};
+
+export const isTemporalFocusPreviewEnabled =
+  isTemporalFocusPreviewAvailable({
+    flag: process.env.NEXT_PUBLIC_FEATURE_TEMPORAL_FOCUS_PREVIEW,
+    deploymentEnv: process.env.NEXT_PUBLIC_VERCEL_ENV,
+    nodeEnv: process.env.NODE_ENV,
+    appEnv: process.env.NEXT_PUBLIC_APP_ENV,
+  });

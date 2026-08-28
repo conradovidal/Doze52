@@ -85,7 +85,10 @@ import {
 import { cn } from "@/lib/utils";
 import type { AnchorPoint } from "@/lib/types";
 import { trackOnboardingRegion } from "@/lib/onboarding-region";
-import { isHabitsPrototypeEnabled } from "@/lib/feature-flags";
+import {
+  isHabitsPrototypeEnabled,
+  isTemporalFocusPreviewEnabled,
+} from "@/lib/feature-flags";
 import {
   buildProductDestinationUrl,
   resolveInitialProductDestination,
@@ -141,6 +144,12 @@ const MOBILE_CALENDAR_UI_MAX_WIDTH_PX = 767;
 const HabitsPrototype = dynamic(() =>
   import("@/components/habits/habits-prototype").then(
     (module) => module.HabitsPrototype
+  ),
+  { ssr: false }
+);
+const EventFocusPreview = dynamic(() =>
+  import("@/components/calendar/event-focus-preview").then(
+    (module) => module.EventFocusPreview
   ),
   { ssr: false }
 );
@@ -321,6 +330,7 @@ export default function HomePage() {
   const profiles = useStore((s) => s.profiles);
   const events = useStore((s) => s.events);
   const categories = useStore((s) => s.categories);
+  const selectedProfileIds = useStore((s) => s.selectedProfileIds);
   const ensureEventMetadata = useStore((s) => s.ensureEventMetadata);
   const replaceAllData = useStore((s) => s.replaceAllData);
   const resetToOnboardingData = useStore((s) => s.resetToOnboardingData);
@@ -348,6 +358,13 @@ export default function HomePage() {
   const { session, loading: authLoading } = useAuth();
 
   const [dialogOpen, setDialogOpen] = React.useState(false);
+  const [dialogOpenedFromTemporalPreview, setDialogOpenedFromTemporalPreview] =
+    React.useState(false);
+  const [temporalPreview, setTemporalPreview] = React.useState<{
+    renderEventId: string;
+    sourceEventId: string;
+    anchorPoint: AnchorPoint;
+  } | null>(null);
   const [authDialogOpen, setAuthDialogOpen] = React.useState(false);
   const [authDialogInitialMode, setAuthDialogInitialMode] = React.useState<
     "login" | "signup"
@@ -440,6 +457,7 @@ export default function HomePage() {
   const desktopCalendarScrollTopRef = React.useRef(0);
   const surfaceInitializedRef = React.useRef(false);
   const utilityPanelTriggerRef = React.useRef<HTMLElement | null>(null);
+  const temporalPreviewReturnFocusRef = React.useRef<HTMLElement | null>(null);
 
   React.useEffect(() => {
     profilesRef.current = profiles;
@@ -474,6 +492,35 @@ export default function HomePage() {
       year,
     ]
   );
+  const temporalPreviewEvent = React.useMemo(
+    () =>
+      temporalPreview
+        ? renderEvents.find((event) => event.id === temporalPreview.renderEventId) ??
+          null
+        : null,
+    [renderEvents, temporalPreview]
+  );
+  const temporalPreviewCategory = temporalPreviewEvent
+    ? categories.find((category) => category.id === temporalPreviewEvent.categoryId) ??
+      null
+    : null;
+  const temporalPreviewProfile = temporalPreviewCategory
+    ? profiles.find((profile) => profile.id === temporalPreviewCategory.profileId) ??
+      null
+    : null;
+  const temporalPreviewIsVisible = Boolean(
+    temporalPreviewCategory?.visible &&
+      selectedProfileIds.includes(temporalPreviewCategory.profileId)
+  );
+
+  React.useEffect(() => {
+    if (
+      temporalPreview &&
+      (!temporalPreviewEvent || !temporalPreviewIsVisible)
+    ) {
+      setTemporalPreview(null);
+    }
+  }, [temporalPreview, temporalPreviewEvent, temporalPreviewIsVisible]);
 
   const centerTodayInDesktopCalendar = React.useCallback(() => {
     if (isMobileCalendarUi !== false || !todayIso) return;
@@ -1258,13 +1305,40 @@ export default function HomePage() {
     sourceEventId: string;
     anchorPoint: AnchorPoint;
   }) => {
-    void payload.eventId;
+    if (isTemporalFocusPreviewEnabled) {
+      temporalPreviewReturnFocusRef.current = document
+        .elementFromPoint(payload.anchorPoint.x, payload.anchorPoint.y)
+        ?.closest<HTMLElement>("[data-calendar-render-event-id]") ?? null;
+      setTemporalPreview({
+        renderEventId: payload.eventId,
+        sourceEventId: payload.sourceEventId,
+        anchorPoint: payload.anchorPoint,
+      });
+      setDialogOpen(false);
+      setDialogOpenedFromTemporalPreview(false);
+      setSeedRange(null);
+      setCreatingRange(null);
+      return;
+    }
+
     setEditingId(payload.sourceEventId);
     setDialogAnchorPoint(payload.anchorPoint);
+    setDialogOpenedFromTemporalPreview(false);
     setSeedRange(null);
     setCreatingRange(null);
     setDialogOpen(true);
   };
+
+  const handleOpenTemporalEditor = React.useCallback(() => {
+    if (!temporalPreview) return;
+    setEditingId(temporalPreview.sourceEventId);
+    setDialogAnchorPoint(temporalPreview.anchorPoint);
+    setDialogOpenedFromTemporalPreview(true);
+    setSeedRange(null);
+    setCreatingRange(null);
+    setTemporalPreview(null);
+    setDialogOpen(true);
+  }, [temporalPreview]);
 
   const updateGuidedOnboarding = React.useCallback(
     (action: GuidedOnboardingAction) => {
@@ -1545,6 +1619,7 @@ export default function HomePage() {
     const fallbackTodayIso = dateIso || todayIso || format(new Date(), "yyyy-MM-dd");
 
     setEditingId(null);
+    setDialogOpenedFromTemporalPreview(false);
     setDialogAnchorPoint(undefined);
     setCreatingRange(null);
     setSeedRange({
@@ -1638,6 +1713,7 @@ export default function HomePage() {
 
         setEditingId(null);
         setDialogAnchorPoint(anchorPoint);
+        setDialogOpenedFromTemporalPreview(false);
         setDialogOpen(true);
 
         return null;
@@ -2484,6 +2560,7 @@ export default function HomePage() {
           onActiveDateChange={setMobileActiveDateIso}
           onYearChange={handleYearChange}
           onEditEvent={handleEditEvent}
+          focusedRenderEventId={temporalPreview?.renderEventId}
           guidedSelectionMode={
             showGuidedOnboarding &&
             (guidedOnboarding?.step === "date_instruction" ||
@@ -2525,6 +2602,7 @@ export default function HomePage() {
               todayIso={todayIso}
               events={renderEvents}
               onEditEvent={handleEditEvent}
+              focusedRenderEventId={temporalPreview?.renderEventId}
               creatingRange={creatingRange}
               guidedSelectionRange={guidedDraft}
               onStartCreateRange={handleStartCreateRange}
@@ -2667,12 +2745,32 @@ export default function HomePage() {
         </p>
       ) : null}
 
+      {isTemporalFocusPreviewEnabled &&
+      temporalPreview &&
+      temporalPreviewEvent &&
+      isMobileCalendarUi !== null ? (
+        <EventFocusPreview
+          open
+          event={temporalPreviewEvent}
+          category={temporalPreviewCategory}
+          profile={temporalPreviewProfile}
+          anchorPoint={temporalPreview.anchorPoint}
+          isMobile={isMobileCalendarUi}
+          returnFocusRef={temporalPreviewReturnFocusRef}
+          onOpenChange={(open) => {
+            if (!open) setTemporalPreview(null);
+          }}
+          onEdit={handleOpenTemporalEditor}
+        />
+      ) : null}
+
       <EventDialog
         open={dialogOpen}
           onOpenChange={(open) => {
           setDialogOpen(open);
 
           if (!open) {
+            setDialogOpenedFromTemporalPreview(false);
             setDialogAnchorPoint(undefined);
             setSeedRange(null);
             setCreatingRange(null);
@@ -2694,6 +2792,7 @@ export default function HomePage() {
           isOnboardingPersonalDemoGroup(editingEvent?.calendarPackGroupId) &&
           !session?.user.id
         }
+        mobileMode={dialogOpenedFromTemporalPreview ? "sheet" : "center"}
       />
 
       <AuthDialog

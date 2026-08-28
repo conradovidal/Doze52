@@ -125,6 +125,7 @@ export function YearGrid({
   todayIso,
   events,
   onEditEvent,
+  focusedRenderEventId,
   creatingRange,
   guidedSelectionRange,
   onStartCreateRange,
@@ -153,6 +154,7 @@ export function YearGrid({
     sourceEventId: string;
     anchorPoint: AnchorPoint;
   }) => void;
+  focusedRenderEventId?: string | null;
   creatingRange: { startIso: string; hoverIso: string; isDragging: boolean } | null;
   guidedSelectionRange?: { startDate: string; endDate: string } | null;
   onStartCreateRange: (startIso: string) => void;
@@ -732,6 +734,7 @@ export function YearGrid({
                     dragState={dragState}
                     hasDragContext={hasDragContext}
                     onEditEvent={onEditEvent}
+                    focusedRenderEventId={focusedRenderEventId}
                     creatingRange={creatingRange}
                     guidedSelectionRange={guidedSelectionRange}
                     onStartCreateRange={onStartCreateRange}

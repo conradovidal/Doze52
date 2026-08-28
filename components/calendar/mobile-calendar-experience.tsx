@@ -30,6 +30,7 @@ type MobileCalendarExperienceProps = {
     sourceEventId: string;
     anchorPoint: AnchorPoint;
   }) => void;
+  focusedRenderEventId?: string | null;
   guidedSelectionMode?: "date" | "period" | null;
   guidedRangeStart?: string | null;
   guidedSelectionRange?: { startDate: string; endDate: string } | null;
@@ -109,10 +110,12 @@ function MobileEventButton({
   event,
   dayIso,
   onEditEvent,
+  isFocused,
 }: {
   event: CalendarRenderEvent;
   dayIso: string;
   onEditEvent: MobileCalendarExperienceProps["onEditEvent"];
+  isFocused: boolean;
 }) {
   const { mode: themeMode } = useTheme();
   const colorToken = React.useMemo(
@@ -124,8 +127,13 @@ function MobileEventButton({
     <button
       type="button"
       data-calendar-event-id={event.sourceEventId}
+      data-calendar-render-event-id={event.id}
+      data-temporal-focus={isFocused ? "true" : undefined}
       aria-label={getEventAriaLabel(event, dayIso)}
-      className="block h-7 w-full overflow-hidden rounded-[8px] border text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.52)] transition-[transform,box-shadow,filter] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 hover:-translate-y-px hover:brightness-[0.99] hover:shadow-[0_10px_18px_-16px_rgba(15,23,42,0.32),inset_0_1px_0_rgba(255,255,255,0.62)]"
+      className={cn(
+        "block h-7 w-full overflow-hidden rounded-[8px] border text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.52)] transition-[transform,box-shadow,filter] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 hover:-translate-y-px hover:brightness-[0.99] hover:shadow-[0_10px_18px_-16px_rgba(15,23,42,0.32),inset_0_1px_0_rgba(255,255,255,0.62)]",
+        isFocused && "doze52-focus-event"
+      )}
       style={{
         backgroundColor: colorToken.eventSoft,
         borderColor: colorToken.eventBorder,
@@ -158,6 +166,7 @@ export function MobileCalendarExperience({
   onActiveDateChange,
   onYearChange,
   onEditEvent,
+  focusedRenderEventId,
   guidedSelectionMode = null,
   guidedRangeStart = null,
   guidedSelectionRange = null,
@@ -627,6 +636,7 @@ export function MobileCalendarExperience({
                       event={event}
                       dayIso={dayIso}
                       onEditEvent={onEditEvent}
+                      isFocused={focusedRenderEventId === event.id}
                     />
                   ))}
                 </div>

@@ -55,7 +55,7 @@ function DialogContent({
   showCloseButton = true,
   anchorPoint: _anchorPoint,
   desktopPlacement: _desktopPlacement = "bottom-start",
-  mobileMode: _mobileMode = "center",
+  mobileMode = "center",
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean;
@@ -65,7 +65,6 @@ function DialogContent({
 }) {
   void _anchorPoint;
   void _desktopPlacement;
-  void _mobileMode;
 
   return (
     <DialogPortal data-slot="dialog-portal">
@@ -73,7 +72,10 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-1.5rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-2xl border border-border/80 bg-background p-5 shadow-[0_28px_70px_-32px_rgba(15,23,42,0.4)] outline-none data-[state=closed]:pointer-events-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:opacity-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:max-w-lg sm:p-6",
+          "fixed z-50 grid w-full gap-4 border border-border/80 bg-background p-5 shadow-[0_28px_70px_-32px_rgba(15,23,42,0.4)] outline-none data-[state=closed]:pointer-events-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:opacity-0 data-[state=open]:fade-in-0",
+          mobileMode === "sheet"
+            ? "inset-x-0 bottom-0 top-auto max-h-[calc(100dvh-0.75rem)] max-w-none translate-x-0 translate-y-0 rounded-t-[1.5rem] rounded-b-none border-x-0 border-b-0 pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))] data-[state=closed]:slide-out-to-bottom-4 data-[state=open]:slide-in-from-bottom-4 md:top-1/2 md:left-1/2 md:bottom-auto md:max-w-lg md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-2xl md:border md:pb-6 md:data-[state=closed]:zoom-out-95 md:data-[state=open]:zoom-in-95"
+            : "top-1/2 left-1/2 max-w-[calc(100%-1.5rem)] -translate-x-1/2 -translate-y-1/2 rounded-2xl data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:max-w-lg sm:p-6",
           DIALOG_MOTION_CLASS,
           className
         )}
