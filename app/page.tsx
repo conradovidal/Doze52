@@ -933,8 +933,7 @@ export default function HomePage() {
       hasDemo &&
       events.some(
         (event) =>
-          event.calendarPackGroupId === ONBOARDING_PERSONAL_DEMO_GROUP_ID &&
-          event.startDate.startsWith(`${year}-`)
+          event.calendarPackGroupId === ONBOARDING_PERSONAL_DEMO_GROUP_ID
       )
     ) {
       return;
@@ -2388,7 +2387,7 @@ export default function HomePage() {
           "z-30 shrink-0 bg-background",
           isMobileCalendarUi
             ? "shrink-0 pb-2"
-            : "pb-2"
+            : "pb-0"
         )}
       >
         <AppHeader

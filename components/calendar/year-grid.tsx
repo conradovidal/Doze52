@@ -796,7 +796,7 @@ export function YearGrid({
             scrollRegion === "habits" ? "true" : undefined
           }
           className={cn(
-            "min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable_both-edges]",
+            "min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:auto] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
             hasFocusZoom
               ? "overflow-x-auto overscroll-x-contain"
               : "overflow-x-hidden"
@@ -804,6 +804,7 @@ export function YearGrid({
           onWheel={handleViewportWheel}
         >
           <div
+            data-year-grid-canvas
             className={canvasWidthClass}
             style={
               hasFocusZoom

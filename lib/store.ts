@@ -169,7 +169,7 @@ export const ONBOARDING_CATEGORY_IDS = {
 
 export const ONBOARDING_DEFAULT_CATEGORY_ID = ONBOARDING_CATEGORY_IDS.events;
 export const ONBOARDING_PERSONAL_DEMO_GROUP_ID =
-  "onboarding-personal-demo-v7";
+  "onboarding-personal-demo-v8";
 const ONBOARDING_PERSONAL_DEMO_GROUP_IDS = new Set([
   "onboarding-personal-demo-v1",
   "onboarding-personal-demo-v2",
@@ -177,6 +177,7 @@ const ONBOARDING_PERSONAL_DEMO_GROUP_IDS = new Set([
   "onboarding-personal-demo-v4",
   "onboarding-personal-demo-v5",
   "onboarding-personal-demo-v6",
+  "onboarding-personal-demo-v7",
   ONBOARDING_PERSONAL_DEMO_GROUP_ID,
 ]);
 
@@ -500,6 +501,33 @@ type PersonalDemoEventInput = {
   recurrenceType?: CalendarEvent["recurrenceType"];
 };
 
+const toPersonalDemoEvent = (
+  originYear: number,
+  event: PersonalDemoEventInput,
+  sequence: number
+): CalendarEvent => {
+  const categoryColorById = new Map(
+    getPersonalDemoCategories().map((category) => [
+      category.id,
+      category.color,
+    ])
+  );
+
+  return {
+    id: `88888888-${originYear}-4888-8${String(sequence).padStart(3, "0")}-888888888888`,
+    title: event.title,
+    categoryId: event.categoryId,
+    color: categoryColorById.get(event.categoryId) ?? defaultCategoryColor,
+    startDate: event.startDate,
+    endDate: event.endDate ?? event.startDate,
+    recurrenceType: event.recurrenceType,
+    createdAt: `${originYear}-01-01T00:00:00.${String(sequence).padStart(3, "0")}Z`,
+    dayOrder: 0,
+    calendarPackGroupId: ONBOARDING_PERSONAL_DEMO_GROUP_ID,
+    calendarPackEventKey: `${originYear}:${event.key}`,
+  };
+};
+
 const getPersonalDemoEvents = (year: number): CalendarEvent[] => {
   const [carnivalStart, carnivalEnd] = getCarnivalRange(year);
   const eventInputs: PersonalDemoEventInput[] = [
@@ -783,7 +811,7 @@ const getPersonalDemoEvents = (year: number): CalendarEvent[] => {
       key: `birthday-${index + 1}`,
       title: String(title),
       categoryId: ONBOARDING_CATEGORY_IDS.birthday,
-      startDate: toDemoIsoDate(year, Number(month), Number(day)),
+      startDate: toDemoIsoDate(2025, Number(month), Number(day)),
       recurrenceType: "yearly" as const,
     })),
     {
@@ -950,27 +978,233 @@ const getPersonalDemoEvents = (year: number): CalendarEvent[] => {
     ...holidayEvents,
     ...formulaEvents,
   ];
-  const categoryColorById = new Map(
-    getPersonalDemoCategories().map((category) => [
-      category.id,
-      category.color,
-    ])
+  return allEventInputs.map((event, index) =>
+    toPersonalDemoEvent(year, event, index)
   );
-
-  return allEventInputs.map((event, index) => ({
-    id: `88888888-8888-4888-8${String(index).padStart(3, "0")}-888888888888`,
-    title: event.title,
-    categoryId: event.categoryId,
-    color: categoryColorById.get(event.categoryId) ?? defaultCategoryColor,
-    startDate: event.startDate,
-    endDate: event.endDate ?? event.startDate,
-    recurrenceType: event.recurrenceType,
-    createdAt: `${year}-01-01T00:00:00.${String(index).padStart(3, "0")}Z`,
-    dayOrder: 0,
-    calendarPackGroupId: ONBOARDING_PERSONAL_DEMO_GROUP_ID,
-    calendarPackEventKey: event.key,
-  }));
 };
+
+const getPersonalDemoEventsFor2025 = () => {
+  const titleOverrides = new Map<string, string>([
+    ["Roadmap do semestre", "Roteiro de pesquisa"],
+    ["Protótipo mobile validado", "Protótipo do ano validado"],
+    ["Beta mobile liberado", "Piloto liberado"],
+    ["Lançamento mobile", "Primeiro calendário publicado"],
+    ["Nova jornada de onboarding", "Aprendizados do piloto"],
+    ["Proposta para PMEs", "Hipóteses para a experiência mobile"],
+    ["Portal para PMEs", "Fluxo mobile priorizado"],
+    ["Relatório para o conselho", "Retrospectiva do produto"],
+    ["Plano do próximo ano", "Plano de evolução para 2026"],
+    ["Campanha de lançamento mobile", "Apresentação do calendário anual"],
+    ["Campanha de conteúdo para PMEs", "Histórias do primeiro piloto"],
+    ["Campanha de retrospectiva do ano", "Retrospectiva do ano visível"],
+    ["Jantar da turma", "Jantar de reencontro"],
+    ["Encontro da faculdade", "Almoço com a turma da faculdade"],
+    ["Reencontro da turma", "Noite com amigos de longa data"],
+  ]);
+  const overrides = new Map<
+    string,
+    Pick<CalendarEvent, "title" | "startDate" | "endDate">
+  >([
+    [
+      "2025:carnival-paraty",
+      {
+        title: "Carnaval em Florianópolis",
+        startDate: "2025-03-01",
+        endDate: "2025-03-05",
+      },
+    ],
+    [
+      "2025:bento-goncalves-weekend",
+      {
+        title: "Fim de semana em Buenos Aires",
+        startDate: "2025-04-18",
+        endDate: "2025-04-21",
+      },
+    ],
+    [
+      "2025:gramado-weekend",
+      {
+        title: "Férias em Torres",
+        startDate: "2025-01-03",
+        endDate: "2025-01-12",
+      },
+    ],
+    [
+      "2025:maceio-family-holidays",
+      {
+        title: "Férias em família — Serra Gaúcha",
+        startDate: "2025-07-19",
+        endDate: "2025-07-27",
+      },
+    ],
+    [
+      "2025:florianopolis-holiday",
+      {
+        title: "Fim de semana em Cambará do Sul",
+        startDate: "2025-09-06",
+        endDate: "2025-09-08",
+      },
+    ],
+    [
+      "2025:new-year-tiradentes",
+      {
+        title: "Réveillon em Torres",
+        startDate: "2025-12-28",
+        endDate: "2025-12-31",
+      },
+    ],
+    [
+      "2025:strategy-planning",
+      {
+        title: "Planejamento do primeiro piloto",
+        startDate: "2025-01-13",
+        endDate: "2025-01-17",
+      },
+    ],
+    [
+      "2025:mobile-experience-discovery",
+      {
+        title: "Pesquisa com pessoas usuárias",
+        startDate: "2025-01-20",
+        endDate: "2025-02-28",
+      },
+    ],
+    [
+      "2025:mobile-experience-beta",
+      {
+        title: "Protótipo do ano visível",
+        startDate: "2025-03-10",
+        endDate: "2025-04-18",
+      },
+    ],
+    [
+      "2025:onboarding-evolution",
+      {
+        title: "Primeiro piloto do calendário anual",
+        startDate: "2025-06-02",
+        endDate: "2025-07-11",
+      },
+    ],
+    [
+      "2025:smb-portal",
+      {
+        title: "Planejamento da experiência mobile",
+        startDate: "2025-09-08",
+        endDate: "2025-11-14",
+      },
+    ],
+    [
+      "2025:performance-alignment-Q4",
+      {
+        title: "Calibração e alinhamento Q4",
+        startDate: "2025-12-28",
+        endDate: "2025-12-31",
+      },
+    ],
+  ]);
+
+  const existingEvents = getPersonalDemoEvents(2025)
+    .filter(
+      (event) =>
+        event.categoryId !== ONBOARDING_CATEGORY_IDS.birthday &&
+        event.categoryId !== DEMO_CATEGORY_IDS.holidays &&
+        event.categoryId !== DEMO_CATEGORY_IDS.formula1
+    )
+    .map((event) => {
+      const override = event.calendarPackEventKey
+        ? overrides.get(event.calendarPackEventKey)
+        : undefined;
+      return {
+        ...event,
+        ...(titleOverrides.has(event.title)
+          ? { title: titleOverrides.get(event.title) }
+          : null),
+        ...override,
+      };
+    });
+  const additionalInputs: PersonalDemoEventInput[] = [
+    {
+      key: "2025-park-run",
+      title: "Corrida de rua no parque",
+      categoryId: ONBOARDING_CATEGORY_IDS.events,
+      startDate: "2025-03-30",
+    },
+    {
+      key: "2025-vinyl-fair",
+      title: "Feira de vinil",
+      categoryId: ONBOARDING_CATEGORY_IDS.events,
+      startDate: "2025-05-04",
+    },
+    {
+      key: "2025-family-outing",
+      title: "Passeio com a família",
+      categoryId: DEMO_CATEGORY_IDS.family,
+      startDate: "2025-06-15",
+    },
+    {
+      key: "2025-former-colleagues",
+      title: "Café com ex-colegas",
+      categoryId: DEMO_CATEGORY_IDS.friends,
+      startDate: "2025-08-09",
+    },
+    {
+      key: "2025-spring-festival",
+      title: "Festival de primavera",
+      categoryId: ONBOARDING_CATEGORY_IDS.events,
+      startDate: "2025-09-21",
+    },
+    {
+      key: "2025-family-dinner",
+      title: "Jantar de aniversário em casa",
+      categoryId: DEMO_CATEGORY_IDS.family,
+      startDate: "2025-10-04",
+    },
+    {
+      key: "2025-calendar-demo",
+      title: "Demo do calendário anual",
+      categoryId: ONBOARDING_CATEGORY_IDS.workDeliveries,
+      startDate: "2025-11-07",
+    },
+    {
+      key: "2025-team-celebration",
+      title: "Confraternização do time",
+      categoryId: DEMO_CATEGORY_IDS.workEvents,
+      startDate: "2025-12-16",
+    },
+  ];
+
+  return [
+    ...existingEvents,
+    ...additionalInputs.map((event, index) =>
+      toPersonalDemoEvent(2025, event, 500 + index)
+    ),
+  ];
+};
+
+const getPersonalDemoEventsFor2027 = () =>
+  [
+    {
+      key: "2027-strategic-planning",
+      title: "Planejamento estratégico 2027",
+      categoryId: DEMO_CATEGORY_IDS.workEvents,
+      startDate: "2027-01-18",
+      endDate: "2027-01-20",
+    },
+    {
+      key: "2027-serra-gaucha-trip",
+      title: "Viagem à Serra Gaúcha",
+      categoryId: ONBOARDING_CATEGORY_IDS.travel,
+      startDate: "2027-07-10",
+      endDate: "2027-07-17",
+    },
+  ].map((event, index) => toPersonalDemoEvent(2027, event, 700 + index));
+
+const getPersonalDemoEventsFor2026 = () =>
+  getPersonalDemoEvents(2026).map((event) =>
+    event.endDate.startsWith("2027-")
+      ? { ...event, endDate: "2026-12-31" }
+      : event
+  );
 
 export type OnboardingPersonalDemoSnapshot = {
   profiles: CalendarProfile[];
@@ -979,12 +1213,17 @@ export type OnboardingPersonalDemoSnapshot = {
 };
 
 export const getOnboardingPersonalDemoSnapshot = (
-  year: number
+  _year: number
 ): OnboardingPersonalDemoSnapshot => {
+  void _year;
   const baseSnapshot: OnboardingPersonalDemoSnapshot = {
     profiles: getPersonalDemoProfiles().map((profile) => ({ ...profile })),
     categories: getPersonalDemoCategories().map((category) => ({ ...category })),
-    events: getPersonalDemoEvents(year).map((event) => ({ ...event })),
+    events: [
+      ...getPersonalDemoEventsFor2025(),
+      ...getPersonalDemoEventsFor2026(),
+      ...getPersonalDemoEventsFor2027(),
+    ].map((event) => ({ ...event })),
   };
   const calendarPackCategoryIds = new Set([
     DEMO_CATEGORY_IDS.holidays,
@@ -999,7 +1238,7 @@ export const getOnboardingPersonalDemoSnapshot = (
   };
 
   const rioGrandeDoSulHolidays = holidays2026Packs.find(
-    (pack) => pack.regionCode === "RS" && pack.year === year
+    (pack) => pack.regionCode === "RS" && pack.year === 2026
   );
   if (rioGrandeDoSulHolidays) {
     snapshot = importCalendarPackVariant(
@@ -1011,7 +1250,7 @@ export const getOnboardingPersonalDemoSnapshot = (
     ).snapshot;
   }
 
-  if (formula12026Pack.year === year) {
+  if (formula12026Pack.year === 2026) {
     snapshot = importCalendarPackVariant(
       snapshot,
       formula12026Pack,

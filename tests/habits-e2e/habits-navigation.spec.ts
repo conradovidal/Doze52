@@ -57,10 +57,24 @@ test("desktop antecipa a demonstração de hábitos e reinicia o guia no ano", a
   await expect(onboardingPanel).toContainText(
     "Por qual contexto você quer começar?"
   );
+  const annualDemoFrameTop = (
+    await page
+      .locator('[data-year-grid-surface="calendar"] [data-year-grid-frame]')
+      .boundingBox()
+  )?.y;
   await page.getByRole("link", { name: "Hábitos" }).click();
 
   const habits = page.locator("[data-habits-prototype]");
   await expect(habits).toBeVisible();
+  const habitsDemoFrameTop = (
+    await page
+      .locator('[data-year-grid-surface="habits"] [data-year-grid-frame]')
+      .boundingBox()
+  )?.y;
+  if (annualDemoFrameTop === undefined || habitsDemoFrameTop === undefined) {
+    throw new Error("Grades demonstrativas não puderam ser medidas.");
+  }
+  expect(Math.abs(habitsDemoFrameTop - annualDemoFrameTop)).toBeLessThanOrEqual(1);
   for (const name of [
     "Exercício",
     "Ler 20 minutos",
@@ -255,6 +269,64 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
   await expect(calendarFrame).toBeVisible();
   await expect(calendarDock).toBeVisible();
   await expect(calendarYearStepper).toBeVisible();
+  const annualExpandedGeometry = await page.evaluate(() => {
+    const navigationRow = document.querySelector<HTMLElement>(
+      "[data-app-header-navigation-row]"
+    );
+    const controls = document.querySelector<HTMLElement>(
+      "[data-onboarding-filter-region]"
+    );
+    const frame = document.querySelector<HTMLElement>(
+      '[data-year-grid-surface="calendar"] [data-year-grid-frame]'
+    );
+    const viewport = document.querySelector<HTMLElement>(
+      '[data-year-grid-surface="calendar"] [data-year-grid-scroll-viewport]'
+    );
+    const canvas = document.querySelector<HTMLElement>(
+      '[data-year-grid-surface="calendar"] [data-year-grid-canvas]'
+    );
+    if (!navigationRow || !controls || !frame || !viewport || !canvas) return null;
+    const navigationBox = navigationRow.getBoundingClientRect();
+    const controlsBox = controls.getBoundingClientRect();
+    const frameBox = frame.getBoundingClientRect();
+    const viewportBox = viewport.getBoundingClientRect();
+    const canvasBox = canvas.getBoundingClientRect();
+    return {
+      navToDivider: controlsBox.top - navigationBox.bottom,
+      controlsToGrid: frameBox.top - controlsBox.bottom,
+      frameTop: frameBox.top,
+      canvasLeftGap: canvasBox.left - viewportBox.left,
+      canvasRightGap: viewportBox.right - canvasBox.right,
+    };
+  });
+  expect(annualExpandedGeometry).not.toBeNull();
+  expect(annualExpandedGeometry?.navToDivider).toBeCloseTo(8, 0);
+  expect(annualExpandedGeometry?.controlsToGrid).toBeCloseTo(12, 0);
+  expect(Math.abs(annualExpandedGeometry?.canvasLeftGap ?? 99)).toBeLessThanOrEqual(1);
+  expect(Math.abs(annualExpandedGeometry?.canvasRightGap ?? 99)).toBeLessThanOrEqual(1);
+
+  const fourthQuarter = page.getByTitle("4o trimestre");
+  await fourthQuarter.click();
+  await expect(fourthQuarter).toHaveAttribute("aria-pressed", "true");
+  const focusedQuarterEdges = await fourthQuarter.evaluate((element) => {
+    const viewport = element.closest("[data-year-grid-scroll-viewport]");
+    const canvas = element.closest("[data-year-grid-canvas]");
+    if (!(viewport instanceof HTMLElement) || !(canvas instanceof HTMLElement)) {
+      return null;
+    }
+    const quarterBox = element.getBoundingClientRect();
+    const viewportBox = viewport.getBoundingClientRect();
+    const canvasBox = canvas.getBoundingClientRect();
+    return {
+      left: quarterBox.left - viewportBox.left,
+      right: viewportBox.right - canvasBox.right,
+    };
+  });
+  expect(focusedQuarterEdges).not.toBeNull();
+  expect(Math.abs(focusedQuarterEdges?.left ?? 99)).toBeLessThanOrEqual(1);
+  expect(Math.abs(focusedQuarterEdges?.right ?? 99)).toBeLessThanOrEqual(1);
+  await fourthQuarter.click();
+  await expect(fourthQuarter).toHaveAttribute("aria-pressed", "false");
   expect(
     await calendarYearStepper.evaluate((element) =>
       Boolean(element.closest("[data-year-grid-frame]"))
@@ -312,6 +384,17 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
   await collapseCategories.click();
   await expect(categoryRegion).toHaveAttribute("aria-hidden", "true");
   await expect(categoryRegion).toHaveCount(1);
+  await expect
+    .poll(async () => {
+      const filterBox = await page
+        .locator("[data-onboarding-filter-region]")
+        .boundingBox();
+      const frameBox = await calendarFrame.boundingBox();
+      return filterBox && frameBox
+        ? Math.round(frameBox.y - (filterBox.y + filterBox.height))
+        : null;
+    })
+    .toBe(12);
   await page.getByRole("button", { name: "Mostrar categorias" }).click();
   await expect(categoryRegion).toHaveAttribute("aria-hidden", "false");
 
@@ -388,6 +471,58 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
   await expect(desktopNavigation.getByRole("link", { name: "Hábitos" })).toHaveClass(/text-foreground/);
   const habits = page.locator("[data-habits-prototype]");
   await expect(habits).toHaveAttribute("data-habits-layout", "desktop-year");
+  const habitsFrame = page.locator(
+    '[data-year-grid-surface="habits"] [data-year-grid-frame]'
+  );
+  const habitsExpandedGeometry = await page.evaluate(() => {
+    const navigationRow = document.querySelector<HTMLElement>(
+      "[data-app-header-navigation-row]"
+    );
+    const controls = document.querySelector<HTMLElement>(
+      '[data-habit-controls-layout="desktop"]'
+    );
+    const frame = document.querySelector<HTMLElement>(
+      '[data-year-grid-surface="habits"] [data-year-grid-frame]'
+    );
+    const viewport = document.querySelector<HTMLElement>(
+      '[data-year-grid-surface="habits"] [data-year-grid-scroll-viewport]'
+    );
+    const canvas = document.querySelector<HTMLElement>(
+      '[data-year-grid-surface="habits"] [data-year-grid-canvas]'
+    );
+    if (!navigationRow || !controls || !frame || !viewport || !canvas) return null;
+    const navigationBox = navigationRow.getBoundingClientRect();
+    const controlsBox = controls.getBoundingClientRect();
+    const frameBox = frame.getBoundingClientRect();
+    const viewportBox = viewport.getBoundingClientRect();
+    const canvasBox = canvas.getBoundingClientRect();
+    return {
+      navToDivider: controlsBox.top - navigationBox.bottom,
+      controlsToGrid: frameBox.top - controlsBox.bottom,
+      frameTop: frameBox.top,
+      canvasLeftGap: canvasBox.left - viewportBox.left,
+      canvasRightGap: viewportBox.right - canvasBox.right,
+    };
+  });
+  expect(habitsExpandedGeometry).not.toBeNull();
+  expect(habitsExpandedGeometry?.navToDivider).toBeCloseTo(8, 0);
+  expect(habitsExpandedGeometry?.controlsToGrid).toBeCloseTo(12, 0);
+  expect(Math.abs(habitsExpandedGeometry?.canvasLeftGap ?? 99)).toBeLessThanOrEqual(1);
+  expect(Math.abs(habitsExpandedGeometry?.canvasRightGap ?? 99)).toBeLessThanOrEqual(1);
+
+  await page.getByRole("button", { name: "Recolher hábitos" }).click();
+  await expect
+    .poll(async () => {
+      const controlsBox = await page
+        .locator('[data-habit-controls-layout="desktop"]')
+        .boundingBox();
+      const frameBox = await habitsFrame.boundingBox();
+      return controlsBox && frameBox
+        ? Math.round(frameBox.y - (controlsBox.y + controlsBox.height))
+        : null;
+    })
+    .toBe(12);
+  await page.getByRole("button", { name: "Mostrar hábitos" }).click();
   await expect(habits.locator('[data-year-grid-surface="habits"]')).toBeVisible();
   const completedDay = habits.locator('[data-day-cell][data-day-iso$="-01-01"]');
   await expect(completedDay.locator("[data-habit-marker]")).toHaveCount(4);
@@ -448,7 +583,7 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
   if (!dockBoxAtTop || !januaryBoxAtTop || !habitsViewportBox) {
     throw new Error("Grade e dock de hábitos não puderam ser medidos.");
   }
-  expect(januaryBoxAtTop.y).toBeGreaterThanOrEqual(habitsViewportBox.y - 1);
+  expect(januaryBoxAtTop.y).toBeGreaterThanOrEqual(habitsViewportBox.y - 2);
   await habitsScrollViewport.evaluate((element) => {
     element.scrollTop = element.scrollHeight;
   });

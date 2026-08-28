@@ -53,6 +53,13 @@ import {
 import { useTheme } from "@/lib/theme";
 import type { Habit } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import {
+  DESKTOP_CONTROL_DIVIDER_CLASS,
+  DESKTOP_CONTROL_GRID_GAP_CLASS,
+  DESKTOP_CONTROL_MAX_WIDTH_CLASS,
+  DESKTOP_CONTROL_REGION_TOP_GAP_CLASS,
+  DESKTOP_CONTROL_ROW_GAP_CLASS,
+} from "@/lib/desktop-control-layout";
 
 type HabitControlsProps = {
   habits: Habit[];
@@ -313,7 +320,7 @@ export function HabitControls({
       className={cn(
         mobile
           ? "grid w-full grid-cols-2 gap-1.5 min-[430px]:grid-cols-3"
-          : "flex min-h-8 w-max min-w-full flex-nowrap items-center justify-start gap-1.5 sm:w-full sm:flex-wrap sm:justify-center sm:gap-2"
+          : "flex min-h-8 w-max min-w-full flex-nowrap items-center justify-center gap-1.5 sm:gap-2"
       )}
     >
       {habits.map((habit) => {
@@ -412,7 +419,7 @@ export function HabitControls({
         <div className={cn(
           mobile
             ? "grid w-full grid-cols-1 gap-1.5 min-[430px]:grid-cols-2"
-            : "flex min-h-8 w-full flex-wrap items-center justify-center gap-2"
+            : "flex min-h-8 w-max min-w-full flex-nowrap items-center justify-center gap-2"
         )}>
           {orderedHabits.map((habit) => (
             <SortableHabitChip
@@ -473,7 +480,14 @@ export function HabitControls({
         "shrink-0",
         mobile
           ? "w-full overflow-hidden rounded-[10px] border border-border bg-card"
-          : "mx-auto mb-2 flex w-full max-w-[50rem] flex-col items-center gap-2 border-t border-border/45 pt-3"
+          : cn(
+              "mx-auto flex w-full flex-col items-center",
+              DESKTOP_CONTROL_MAX_WIDTH_CLASS,
+              DESKTOP_CONTROL_DIVIDER_CLASS,
+              DESKTOP_CONTROL_ROW_GAP_CLASS,
+              DESKTOP_CONTROL_REGION_TOP_GAP_CLASS,
+              DESKTOP_CONTROL_GRID_GAP_CLASS
+            )
       )}
     >
       <h1 className="sr-only">Hábitos</h1>
@@ -519,7 +533,7 @@ export function HabitControls({
           </span>
         </div>
       ) : (
-        <div className="flex items-center justify-center gap-1.5">
+        <div className="flex items-center justify-center gap-1.5 pb-0.5">
           <div className="inline-flex h-8 items-center overflow-hidden rounded-[10px] border border-primary bg-primary text-[0.78rem] font-semibold text-primary-foreground">
             <span className="inline-flex h-8 w-7 items-center justify-center" aria-hidden="true">
               <CircleCheck className="size-3.5" />
@@ -567,7 +581,7 @@ export function HabitControls({
                 "px-2",
                 expanded ? "border-t border-border/55 py-2" : "border-0 py-0"
               )
-            : "-mx-4 overflow-x-auto px-4 pb-0.5 doze52-scrollbar-none sm:mx-0 sm:px-0 md:overflow-visible"
+            : "-mx-4 overflow-x-auto px-4 pb-0.5 doze52-scrollbar-none sm:mx-0 sm:px-0"
         )}
       >
           {isEditing ? editableHabitButtons : habitButtons}

@@ -350,10 +350,10 @@ test("define um hábito Free e quatro Pro com upgrade contextual", () => {
   expect(PRO_UPGRADE_COPY.habits.description).toContain("4 hábitos");
 });
 
-test("mantém o protótipo indisponível em produção", () => {
+test("libera Hábitos em qualquer ambiente somente pela flag explícita", () => {
   expect(
     isHabitsPrototypeAvailable({ flag: "true", deploymentEnv: "production" })
-  ).toBe(false);
+  ).toBe(true);
   expect(
     isHabitsPrototypeAvailable({ flag: "true", deploymentEnv: "preview" })
   ).toBe(true);
@@ -362,6 +362,9 @@ test("mantém o protótipo indisponível em produção", () => {
   ).toBe(true);
   expect(
     isHabitsPrototypeAvailable({ flag: "false", deploymentEnv: "preview" })
+  ).toBe(false);
+  expect(
+    isHabitsPrototypeAvailable({ deploymentEnv: "production" })
   ).toBe(false);
 });
 

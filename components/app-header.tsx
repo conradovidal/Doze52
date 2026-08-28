@@ -42,6 +42,13 @@ import type { OnboardingFocusTarget } from "@/lib/onboarding";
 import type { ProductDestinationId } from "@/lib/product-navigation";
 import type { AnchorPoint } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import {
+  DESKTOP_CONTROL_DIVIDER_CLASS,
+  DESKTOP_CONTROL_GRID_GAP_CLASS,
+  DESKTOP_CONTROL_MAX_WIDTH_CLASS,
+  DESKTOP_CONTROL_NAV_GAP_CLASS,
+  DESKTOP_CONTROL_ROW_GAP_CLASS,
+} from "@/lib/desktop-control-layout";
 
 type AppHeaderProps = {
   year: number;
@@ -382,15 +389,20 @@ export function AppHeader({
       <header
         className={cn(
           "space-y-3 bg-background",
-          useAdaptiveNavigation ? "md:space-y-3" : "md:space-y-3.5",
+          useAdaptiveNavigation
+            ? DESKTOP_CONTROL_NAV_GAP_CLASS
+            : "md:space-y-3.5",
           isMobileMode
             ? "mb-1"
             : useAdaptiveNavigation && !showCalendarControls
               ? "mb-0"
-              : "mb-4 md:mb-5"
+              : useAdaptiveNavigation
+                ? DESKTOP_CONTROL_GRID_GAP_CLASS
+                : "mb-4 md:mb-5"
         )}
       >
         <div
+          data-app-header-navigation-row
           className={cn(
             "relative min-h-9 md:min-h-10",
             useAdaptiveNavigation
@@ -662,8 +674,15 @@ export function AppHeader({
               isMobileMode
                 ? "max-w-[31rem]"
                 : cn(
-                    useAdaptiveNavigation ? "max-w-[50rem]" : "max-w-[62rem]",
-                    "border-t border-border/45 pt-2.5 md:pt-3"
+                    useAdaptiveNavigation
+                      ? DESKTOP_CONTROL_MAX_WIDTH_CLASS
+                      : "max-w-[62rem]",
+                    useAdaptiveNavigation
+                      ? cn(
+                          DESKTOP_CONTROL_DIVIDER_CLASS,
+                          DESKTOP_CONTROL_ROW_GAP_CLASS
+                        )
+                      : "border-t border-border/45 pt-2.5 md:pt-3"
                   ),
               onboardingLayoutReserved &&
                 (isMobileMode ? "min-h-[10.25rem]" : "min-h-[5.6rem]")
@@ -801,9 +820,9 @@ export function AppHeader({
               </div>
             ) : (
               <>
-              <div className="-mx-4 w-[calc(100%+2rem)] overflow-x-auto px-4 pb-0.5 doze52-scrollbar-none sm:mx-0 sm:w-full sm:px-0 md:overflow-visible">
-                <div className="flex w-max min-w-full flex-nowrap items-center justify-start gap-x-1.5 gap-y-1.5 sm:w-full sm:flex-wrap sm:justify-center sm:gap-x-2">
-                  <div className="flex shrink-0 flex-nowrap items-center justify-center gap-1.5 sm:flex-wrap sm:gap-2">
+              <div className="-mx-4 w-[calc(100%+2rem)] overflow-x-auto px-4 pb-0.5 doze52-scrollbar-none sm:mx-0 sm:w-full sm:px-0">
+                <div className="flex w-max min-w-full flex-nowrap items-center justify-center gap-x-1.5 gap-y-1.5 sm:gap-x-2">
+                  <div className="flex shrink-0 flex-nowrap items-center justify-center gap-1.5 sm:gap-2">
                     <ProfileBar
                       compact
                       className="w-max flex-nowrap justify-start sm:w-auto"
@@ -902,10 +921,10 @@ export function AppHeader({
                 id="app-header-categories"
                 expanded={effectiveCategoriesExpanded}
               >
-                  <div className="relative -mx-4 overflow-x-auto px-4 pb-0.5 doze52-scrollbar-none sm:mx-0 sm:px-0 md:overflow-visible">
+                  <div className="relative -mx-4 overflow-x-auto px-4 pb-0.5 doze52-scrollbar-none sm:mx-0 sm:px-0">
                     <CategoryBar
                       compact
-                      className="w-max min-w-full flex-nowrap justify-start sm:w-full sm:flex-wrap sm:justify-center"
+                      className="w-max min-w-full flex-nowrap justify-center"
                       isInlineEditMode={effectiveInlineEditMode}
                       editingProfileId={editingProfileId}
                       onCreateCategory={openCreateCategory}
@@ -933,10 +952,10 @@ export function AppHeader({
                   id="app-header-categories"
                   className="w-full origin-top transition-[opacity,transform] duration-150 ease-out"
                 >
-                  <div className="-mx-4 overflow-x-auto px-4 pb-0.5 doze52-scrollbar-none sm:mx-0 sm:px-0 md:overflow-visible">
+                  <div className="-mx-4 overflow-x-auto px-4 pb-0.5 doze52-scrollbar-none sm:mx-0 sm:px-0">
                     <CategoryBar
                       compact
-                      className="w-max min-w-full flex-nowrap justify-start sm:w-full sm:flex-wrap sm:justify-center"
+                      className="w-max min-w-full flex-nowrap justify-center"
                       isInlineEditMode={effectiveInlineEditMode}
                       editingProfileId={editingProfileId}
                       onCreateCategory={openCreateCategory}
