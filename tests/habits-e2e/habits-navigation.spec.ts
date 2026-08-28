@@ -720,8 +720,13 @@ test("desktop mantém a grade anual disponível antes do primeiro hábito", asyn
   const emptyDay = habits.locator('[data-day-cell][aria-label*="crie um hábito"]:not([aria-disabled="true"])').first();
   await emptyDay.click();
   await expect(page.getByRole("dialog", { name: "Novo hábito" })).toBeVisible();
-  await expect(page.getByText(/Para se inspirar: caminhar, correr/)).toBeVisible();
-  await page.getByLabel("Nome do hábito").fill("Ler");
+  const habitNameInput = page.getByLabel("Nome do hábito");
+  await expect(habitNameInput).toHaveAttribute(
+    "placeholder",
+    "Caminhar, treinar, estudar, meditar, correr, ler…"
+  );
+  await expect(page.getByText(/Para se inspirar:/)).toHaveCount(0);
+  await habitNameInput.fill("Ler");
   await page.getByRole("button", { name: "Criar hábito" }).click();
   await expect(habits.getByRole("button", { name: "Ler", exact: true })).toHaveAttribute(
     "aria-pressed",
@@ -1094,6 +1099,32 @@ test("onboarding mantém a edição aberta até importar o calendário", async (
   await page.goto("/?surface=annual");
 
   const edit = page.locator("[data-onboarding-edit-control]");
+  const editNotice = page.locator(
+    '[data-guided-toolbar-notice][data-guided-toolbar-target="edit"]'
+  );
+  await expect(editNotice).toBeVisible();
+  await expect(editNotice).toHaveCSS("position", "fixed");
+  const editBox = await edit.boundingBox();
+  const editNoticeBox = await editNotice.boundingBox();
+  if (!editBox || !editNoticeBox) {
+    throw new Error("Orientação do modo de edição não pôde ser medida.");
+  }
+  expect(
+    Math.abs(
+      editNoticeBox.x + editNoticeBox.width / 2 -
+        (editBox.x + editBox.width / 2)
+    )
+  ).toBeLessThan(24);
+  expect(
+    await editNotice.evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      const hit = document.elementFromPoint(
+        rect.left + rect.width / 2,
+        rect.top + rect.height / 2
+      );
+      return Boolean(hit && element.contains(hit));
+    })
+  ).toBe(true);
   await edit.click();
   await expect(edit).toHaveAttribute("aria-label", /Finalizar edição/);
   await expect(

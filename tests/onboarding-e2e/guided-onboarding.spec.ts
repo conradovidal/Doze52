@@ -263,17 +263,30 @@ const completePersonalOnboarding = async (
   if (!editNoticeBox || !viewport) {
     throw new Error("Coachmark de edição não renderizado");
   }
+  const adaptiveDesktop =
+    !mobile &&
+    (await page.locator('[data-product-navigation="desktop"]').isVisible());
   expect(editNoticeBox.width).toBeLessThanOrEqual(352.5);
   expect(editNoticeBox.x).toBeGreaterThanOrEqual(-0.5);
   expect(editNoticeBox.x + editNoticeBox.width).toBeLessThanOrEqual(
     viewport.width + 0.5
   );
+  if (adaptiveDesktop) {
+    await expect(toolbarNotice).toHaveCSS("position", "fixed");
+    expect(
+      await toolbarNotice.evaluate((element) => {
+        const rect = element.getBoundingClientRect();
+        const hit = document.elementFromPoint(
+          rect.left + rect.width / 2,
+          rect.top + rect.height / 2
+        );
+        return Boolean(hit && element.contains(hit));
+      })
+    ).toBe(true);
+  }
   await expect(
     toolbarNotice.getByRole("button", { name: "Encerrar guia inicial" })
   ).toHaveCSS("position", "absolute");
-  const adaptiveDesktop =
-    !mobile &&
-    (await page.locator('[data-product-navigation="desktop"]').isVisible());
   await page.locator("[data-onboarding-edit-control]").click();
   const filterRegion = page.locator("[data-onboarding-filter-region]");
   await expect(filterRegion.locator(":scope > div").first()).not.toHaveAttribute(

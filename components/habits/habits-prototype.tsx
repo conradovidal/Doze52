@@ -152,22 +152,9 @@ function HabitEditorDialog({
                 value={name}
                 maxLength={80}
                 autoFocus
-                placeholder="Ex.: Caminhar"
-                aria-describedby={
-                  editing ? undefined : "habit-prototype-name-suggestions"
-                }
+                placeholder="Caminhar, treinar, estudar, meditar, correr, ler…"
                 onChange={(event) => onNameChange(event.target.value)}
               />
-              {!editing ? (
-                <p
-                  id="habit-prototype-name-suggestions"
-                  className="text-xs leading-4 text-muted-foreground"
-                >
-                  Para se inspirar: caminhar, correr, treinar força, estudar,
-                  meditar, praticar um idioma, beber água ou tocar um projeto
-                  paralelo.
-                </p>
-              ) : null}
             </div>
 
             <fieldset>

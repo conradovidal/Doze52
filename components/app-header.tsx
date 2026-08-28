@@ -867,6 +867,10 @@ export function AppHeader({
                             notice={guidedToolbarNotice}
                             onClose={onDismissGuidedSelection}
                             onAction={() => onGuidedToolbarAction?.("edit")}
+                            placement="viewport"
+                            portaled
+                            anchorSelector='[data-onboarding-edit-control][data-onboarding-highlighted="true"]'
+                            anchorPlacement="below-center"
                           />
                         ) : null}
                       </div>
