@@ -144,6 +144,8 @@ export function YearGrid({
   onGuidedPeriodInteraction,
   guidedPeriodInteracted = false,
   showScaleControl = true,
+  scrollViewportRef,
+  scrollRegion,
 }: {
   year: number;
   todayIso: string;
@@ -177,6 +179,8 @@ export function YearGrid({
   onGuidedPeriodInteraction?: () => void;
   guidedPeriodInteracted?: boolean;
   showScaleControl?: boolean;
+  scrollViewportRef?: React.Ref<HTMLDivElement>;
+  scrollRegion?: "calendar" | "habits";
 }) {
   const profiles = useStore((s) => s.profiles as CalendarProfile[]);
   const categories = useStore((s) => s.categories as CategoryItem[]);
@@ -259,6 +263,10 @@ export function YearGrid({
   const didDropRef = React.useRef(false);
   const zoomViewportRef = React.useRef<HTMLDivElement | null>(null);
   const pendingViewportRatioRef = React.useRef<number | null>(null);
+  React.useImperativeHandle(
+    scrollViewportRef,
+    () => zoomViewportRef.current as HTMLDivElement
+  );
 
   const visibleEvents = React.useMemo(
     () =>
@@ -772,47 +780,62 @@ export function YearGrid({
     <div
       data-year-grid
       data-year-grid-surface={habitPresentation ? "habits" : "calendar"}
-      className={cn(
-        "w-full overflow-hidden rounded-[1.35rem] border border-border bg-card shadow-[0_18px_42px_-34px_rgba(15,23,42,0.24)]",
-        canvasWidthClass
-      )}
+      className="flex max-h-full min-h-0 w-full flex-col"
     >
       <div
-        ref={zoomViewportRef}
-        className={cn(
-          "overflow-y-hidden",
-          hasFocusZoom ? "overflow-x-auto overscroll-x-contain" : "overflow-x-hidden"
-        )}
-        onWheel={handleViewportWheel}
+        data-year-grid-frame
+        className="flex min-h-0 shrink flex-col overflow-hidden rounded-[1.35rem] border border-border bg-card shadow-[0_18px_42px_-34px_rgba(15,23,42,0.24)]"
       >
         <div
-          style={
-            hasFocusZoom
-              ? {
-                  width: `${effectiveZoomPercent}%`,
-                  minWidth: `${effectiveZoomPercent}%`,
-                }
-              : undefined
+          ref={zoomViewportRef}
+          data-year-grid-scroll-viewport
+          data-desktop-calendar-scroll-region={
+            scrollRegion === "calendar" ? "true" : undefined
           }
+          data-desktop-habits-scroll-region={
+            scrollRegion === "habits" ? "true" : undefined
+          }
+          className={cn(
+            "min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable_both-edges]",
+            hasFocusZoom
+              ? "overflow-x-auto overscroll-x-contain"
+              : "overflow-x-hidden"
+          )}
+          onWheel={handleViewportWheel}
         >
-          <AnimatePresence initial={false} custom={yearDirection} mode="popLayout">
-            <m.div
-              key={year}
-              custom={yearDirection}
-              initial={{ opacity: 0, x: yearDirection * 10 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: yearDirection * -10 }}
-              transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
-              className={cn(isYearTransitioning && "pointer-events-none")}
-              onAnimationComplete={() => setIsYearTransitioning(false)}
-            >
-              {annualContent}
-            </m.div>
-          </AnimatePresence>
+          <div
+            className={canvasWidthClass}
+            style={
+              hasFocusZoom
+                ? {
+                    width: `${effectiveZoomPercent}%`,
+                    minWidth: `${effectiveZoomPercent}%`,
+                  }
+                : undefined
+            }
+          >
+            <AnimatePresence initial={false} custom={yearDirection} mode="popLayout">
+              <m.div
+                key={year}
+                custom={yearDirection}
+                initial={{ opacity: 0, x: yearDirection * 10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: yearDirection * -10 }}
+                transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                className={cn(isYearTransitioning && "pointer-events-none")}
+                onAnimationComplete={() => setIsYearTransitioning(false)}
+              >
+                {annualContent}
+              </m.div>
+            </AnimatePresence>
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 border-t border-border bg-card px-3 py-2.5 md:px-4 md:py-3">
+      <div
+        data-year-grid-dock
+        className="grid shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 px-1 pt-3"
+      >
         <span aria-hidden="true" />
         <div data-calendar-footer-center className="flex items-center justify-center gap-2 justify-self-center">
           <div
@@ -878,7 +901,7 @@ export function YearGrid({
           ) : null}
         </div>
         {hasFocusZoom ? (
-          <label className="flex w-[10.75rem] items-center justify-end justify-self-end gap-2.5 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground min-[420px]:w-[11.5rem] md:w-[12.25rem] max-[900px]:col-span-3 max-[900px]:row-start-2">
+          <label className="flex w-[10.75rem] items-center justify-end justify-self-end gap-2.5 rounded-[10px] border border-border bg-card px-3 py-2 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground shadow-[0_12px_30px_-26px_rgba(15,23,42,0.34)] min-[420px]:w-[11.5rem] md:w-[12.25rem] max-[900px]:col-span-3 max-[900px]:row-start-2">
             <span className="shrink-0">Zoom</span>
             <input
               type="range"

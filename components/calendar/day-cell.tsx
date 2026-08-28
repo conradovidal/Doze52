@@ -255,6 +255,7 @@ export function DayCell({
         }`}
       >
         <span
+          data-day-number
           className={`grid h-5 min-w-5 place-items-center rounded-full px-1 text-[12px] font-semibold leading-none tabular-nums transition-colors ${
             today
               ? "bg-neutral-900 text-white ring-1 ring-neutral-900 dark:bg-neutral-100 dark:text-neutral-900 dark:ring-neutral-100"
@@ -268,7 +269,7 @@ export function DayCell({
       {habitPresentation && completedHabits.length > 0 ? (
         <div
           data-day-habit-markers
-          className="pointer-events-none absolute inset-x-0 top-6 bottom-0 flex flex-col items-center justify-center overflow-visible"
+          className="pointer-events-none absolute inset-x-0 top-[30px] bottom-1 flex flex-col items-center justify-start gap-0.5 overflow-visible"
           aria-hidden="true"
         >
           {completedHabits.map((habit, completedIndex) => {
@@ -277,7 +278,7 @@ export function DayCell({
                 key={habit.id}
                 data-habit-marker={habit.id}
                 data-habit-slot={`stack-${completedIndex + 1}`}
-                className="size-[clamp(12px,1.1vw,18px)] shrink-0 rounded-[clamp(2px,0.25vw,4px)] border border-black/10"
+                className="size-[clamp(12px,1.1vw,18px)] shrink-0 rounded-full border border-black/10"
                 style={{ backgroundColor: habit.color }}
               />
             );

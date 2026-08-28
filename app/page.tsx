@@ -2536,15 +2536,13 @@ export default function HomePage() {
         />
       ) : (
         <div
-          ref={desktopCalendarScrollRef}
-          data-desktop-calendar-scroll-region
-          className="min-h-0 flex-1 overflow-auto pb-1 [scrollbar-gutter:stable_both-edges]"
+          className="min-h-0 flex-1 overflow-hidden pb-1"
         >
           <div
             data-calendar-focus-root
             data-calendar-ui-mode="desktop"
             className={cn(
-              "relative rounded-xl doze52-calendar-mode-transition",
+              "relative h-full min-h-0 rounded-xl doze52-calendar-mode-transition",
               showGuidedOnboarding &&
                 (guidedOnboarding?.step === "date_instruction" ||
                   guidedOnboarding?.step === "date_details" ||
@@ -2596,6 +2594,8 @@ export default function HomePage() {
                 guidedOnboarding?.periodNavigationInteractedAt
               )}
               showScaleControl={!isHabitsPrototypeEnabled}
+              scrollViewportRef={desktopCalendarScrollRef}
+              scrollRegion="calendar"
             />
           </div>
         </div>

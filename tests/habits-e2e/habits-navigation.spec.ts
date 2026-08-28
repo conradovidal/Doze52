@@ -73,7 +73,7 @@ test("desktop antecipa a demonstração de hábitos e reinicia o guia no ano", a
     habits.getByRole("button", { name: "Dia sem fumar", exact: true })
   ).toHaveAttribute("aria-pressed", "false");
   const habitDay = habits.locator("[data-day-cell]").first();
-  await expect.poll(async () => (await habitDay.boundingBox())?.height).toBe(80);
+  await expect.poll(async () => (await habitDay.boundingBox())?.height).toBe(94);
   await expect(habits.locator("[data-habit-marker]").first()).toBeVisible();
 
   const currentYear = new Date().getFullYear();
@@ -249,6 +249,37 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
   const scaleBox = await page.locator("[data-calendar-footer-center]").boundingBox();
   if (!scaleBox || !desktopViewport) throw new Error("Escala não pôde ser medida.");
   expect(Math.abs(scaleBox.x + scaleBox.width / 2 - desktopViewport.width / 2)).toBeLessThanOrEqual(2);
+  const calendarFrame = page.locator('[data-year-grid-surface="calendar"] [data-year-grid-frame]');
+  const calendarDock = page.locator('[data-year-grid-surface="calendar"] [data-year-grid-dock]');
+  const calendarYearStepper = calendarDock.locator("[data-calendar-year-stepper]");
+  await expect(calendarFrame).toBeVisible();
+  await expect(calendarDock).toBeVisible();
+  await expect(calendarYearStepper).toBeVisible();
+  expect(
+    await calendarYearStepper.evaluate((element) =>
+      Boolean(element.closest("[data-year-grid-frame]"))
+    )
+  ).toBe(false);
+  const frameAndDockGeometry = await page
+    .locator('[data-year-grid-surface="calendar"]')
+    .evaluate((element) => {
+      const frame = element.querySelector<HTMLElement>("[data-year-grid-frame]");
+      const dock = element.querySelector<HTMLElement>("[data-year-grid-dock]");
+      if (!frame || !dock) return null;
+      const frameBox = frame.getBoundingClientRect();
+      const yearStepper = dock.querySelector<HTMLElement>("[data-calendar-year-stepper]");
+      const yearStepperBox = yearStepper?.getBoundingClientRect();
+      const frameStyle = getComputedStyle(frame);
+      return {
+        gap: yearStepperBox ? yearStepperBox.top - frameBox.bottom : null,
+        bottomLeftRadius: Number.parseFloat(frameStyle.borderBottomLeftRadius),
+        bottomRightRadius: Number.parseFloat(frameStyle.borderBottomRightRadius),
+      };
+    });
+  expect(frameAndDockGeometry).not.toBeNull();
+  expect(frameAndDockGeometry?.gap).toBeCloseTo(12, 0);
+  expect(frameAndDockGeometry?.bottomLeftRadius ?? 0).toBeGreaterThanOrEqual(20);
+  expect(frameAndDockGeometry?.bottomRightRadius ?? 0).toBeGreaterThanOrEqual(20);
   await expect(page.getByRole("button", { name: "Adicionar ou gerenciar calendários." })).toHaveCount(0);
 
   await contextualEdit.click();
@@ -367,7 +398,7 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
   }
   const completedDayBox = await completedDay.boundingBox();
   if (!completedDayBox) throw new Error("Célula de hábitos não pôde ser medida.");
-  expect(completedDayBox.height).toBeGreaterThanOrEqual(98);
+  expect(completedDayBox.height).toBeGreaterThanOrEqual(114);
   const markerGeometry = await completedDay.locator("[data-day-habit-markers]").evaluate(
     (element) => {
       const marker = element.querySelector<HTMLElement>("[data-habit-marker]");
@@ -376,7 +407,15 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
         direction: style.flexDirection,
         markerWidth: marker?.getBoundingClientRect().width ?? 0,
         markerGap: style.rowGap,
-        markerRadius: marker ? getComputedStyle(marker).borderRadius : "",
+        markerRadius: marker
+          ? Number.parseFloat(getComputedStyle(marker).borderRadius)
+          : 0,
+        dateBottom:
+          element
+            .closest("[data-day-cell]")
+            ?.querySelector<HTMLElement>("[data-day-number]")
+            ?.getBoundingClientRect().bottom ?? 0,
+        firstMarkerTop: marker?.getBoundingClientRect().top ?? 0,
         markerBoxes: Array.from(
           element.querySelectorAll<HTMLElement>("[data-habit-marker]")
         ).map((entry) => {
@@ -389,13 +428,43 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
   expect(markerGeometry.direction).toBe("column");
   expect(markerGeometry.markerWidth).toBeGreaterThanOrEqual(12);
   expect(markerGeometry.markerWidth).toBeLessThanOrEqual(18);
-  expect(markerGeometry.markerGap).toBe("normal");
-  expect(markerGeometry.markerRadius).not.toBe("9999px");
+  expect(markerGeometry.markerGap).toBe("2px");
+  expect(markerGeometry.markerRadius).toBeGreaterThanOrEqual(
+    markerGeometry.markerWidth / 2
+  );
+  expect(markerGeometry.firstMarkerTop - markerGeometry.dateBottom).toBeGreaterThanOrEqual(4);
   for (let index = 1; index < markerGeometry.markerBoxes.length; index += 1) {
     const previous = markerGeometry.markerBoxes[index - 1];
     const current = markerGeometry.markerBoxes[index];
-    expect(current.y).toBeGreaterThanOrEqual(previous.y + previous.height - 0.5);
+    expect(current.y).toBeGreaterThanOrEqual(previous.y + previous.height + 1.5);
   }
+  const habitsScrollViewport = habits.locator(
+    "[data-desktop-habits-scroll-region]"
+  );
+  const habitsDock = habits.locator("[data-year-grid-dock]");
+  const dockBoxAtTop = await habitsDock.boundingBox();
+  const januaryBoxAtTop = await habits.locator('[data-month-row="0"]').boundingBox();
+  const habitsViewportBox = await habitsScrollViewport.boundingBox();
+  if (!dockBoxAtTop || !januaryBoxAtTop || !habitsViewportBox) {
+    throw new Error("Grade e dock de hábitos não puderam ser medidos.");
+  }
+  expect(januaryBoxAtTop.y).toBeGreaterThanOrEqual(habitsViewportBox.y - 1);
+  await habitsScrollViewport.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+  });
+  await expect
+    .poll(() => habitsScrollViewport.evaluate((element) => element.scrollTop))
+    .toBeGreaterThan(0);
+  const dockBoxAtBottom = await habitsDock.boundingBox();
+  expect(dockBoxAtBottom).not.toBeNull();
+  expect(Math.abs((dockBoxAtBottom?.y ?? 0) - dockBoxAtTop.y)).toBeLessThanOrEqual(1);
+  await habitsScrollViewport.evaluate((element) => {
+    element.scrollTop = 0;
+  });
+  await expect
+    .poll(() => habitsScrollViewport.evaluate((element) => element.scrollTop))
+    .toBe(0);
+  await expect(completedDay).toBeVisible();
   await completedDay.click();
   const dayPicker = page.locator("[data-habit-day-picker]");
   await expect(dayPicker).toBeVisible();
@@ -431,7 +500,7 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
   await hiddenFilter.click();
   await expect(hiddenFilter).toHaveAttribute("aria-pressed", "false");
   await expect(completedDay.locator("[data-habit-marker]")).toHaveCount(3);
-  await expect.poll(async () => (await completedDay.boundingBox())?.height).toBe(80);
+  await expect.poll(async () => (await completedDay.boundingBox())?.height).toBe(94);
   await completedDay.click();
   await expect(
     page.locator("[data-habit-day-picker]").getByRole("button", {
@@ -771,7 +840,7 @@ test("onboarding desktop apresenta o exemplo e termina no hábito real", async (
   });
   await expect(smokeFilter).toHaveAttribute("aria-pressed", "false");
   const showcaseDay = page.locator("[data-day-cell]").first();
-  await expect.poll(async () => (await showcaseDay.boundingBox())?.height).toBe(80);
+  await expect.poll(async () => (await showcaseDay.boundingBox())?.height).toBe(94);
   expect(
     await page.locator("[data-day-habit-markers]").evaluateAll((markers) =>
       markers.some(
@@ -781,7 +850,7 @@ test("onboarding desktop apresenta o exemplo e termina no hábito real", async (
   ).toBe(false);
   await smokeFilter.click();
   await expect(smokeFilter).toHaveAttribute("aria-pressed", "true");
-  await expect.poll(async () => (await showcaseDay.boundingBox())?.height).toBe(98);
+  await expect.poll(async () => (await showcaseDay.boundingBox())?.height).toBe(114);
   expect(
     await page.locator("[data-day-habit-markers]").evaluateAll((markers) =>
       markers.some(
