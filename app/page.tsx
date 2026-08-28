@@ -1218,6 +1218,21 @@ export default function HomePage() {
   ]);
 
   const hasAuthorEvents = hasAuthorCalendarEvents(events);
+  // Existing accounts (created before the guided onboarding tour existed) can
+  // have zero "author" events yet still have real, user-customized setups —
+  // e.g. categories they renamed/created, or more than the single default
+  // profile. Treat those as established users too, so the tour (and the
+  // editing lock that comes with it) never traps someone who already has an
+  // account, not just someone with existing events.
+  const defaultOnboardingCategoryIds = React.useMemo(
+    () => new Set<string>(Object.values(ONBOARDING_CATEGORY_IDS)),
+    []
+  );
+  const hasCustomizedCategories = categories.some(
+    (category) => !defaultOnboardingCategoryIds.has(category.id)
+  );
+  const hasEstablishedSetup =
+    hasAuthorEvents || hasCustomizedCategories || profiles.length > 1;
   const guidedOnboardingEligible = Boolean(
     guidedOnboarding &&
       calendarCreateOnboarding &&
@@ -1225,7 +1240,7 @@ export default function HomePage() {
       shouldShowGuidedOnboarding({
         state: guidedOnboarding,
         legacyState: calendarCreateOnboarding,
-        hasAuthorEvents,
+        hasAuthorEvents: hasEstablishedSetup,
         authLoading,
         isAuthenticated: Boolean(session?.user.id),
         remoteReady,
