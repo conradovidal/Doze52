@@ -9,7 +9,7 @@ import {
   startOfYear,
 } from "date-fns";
 
-const weekdayAbbr = ["dom", "seg", "ter", "qua", "qui", "sex", "sab"] as const;
+export const weekdayAbbr = ["dom", "seg", "ter", "qua", "qui", "sex", "sab"] as const;
 
 export const fmtDayLabel = (date: Date) => {
   const day = format(date, "d");

@@ -102,43 +102,43 @@
 }
 
 .dark {
-  --background: #111827;
-  --foreground: #f9fafb;
-  --card: #1f2937;
-  --card-foreground: #f9fafb;
-  --popover: #1f2937;
-  --popover-foreground: #f9fafb;
-  --primary: #f9fafb;
-  --primary-foreground: #111827;
-  --secondary: #1f2937;
-  --secondary-foreground: #d1d5db;
-  --muted: #374151;
-  --muted-foreground: #9ca3af;
-  --accent: #374151;
-  --accent-foreground: #f9fafb;
+  --background: #171717;
+  --foreground: #fafafa;
+  --card: #262626;
+  --card-foreground: #fafafa;
+  --popover: #262626;
+  --popover-foreground: #fafafa;
+  --primary: #fafafa;
+  --primary-foreground: #171717;
+  --secondary: #262626;
+  --secondary-foreground: #d4d4d4;
+  --muted: #404040;
+  --muted-foreground: #a3a3a3;
+  --accent: #404040;
+  --accent-foreground: #fafafa;
   --destructive: oklch(0.704 0.191 22.216);
-  --border: #4b5563;
-  --input: #4b5563;
-  --ring: #9ca3af;
+  --border: #525252;
+  --input: #525252;
+  --ring: #a3a3a3;
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: #1f2937;
-  --sidebar-foreground: #f9fafb;
-  --sidebar-primary: #f9fafb;
-  --sidebar-primary-foreground: #111827;
-  --sidebar-accent: #374151;
-  --sidebar-accent-foreground: #f9fafb;
-  --sidebar-border: #4b5563;
-  --sidebar-ring: #9ca3af;
-  --cal-cell-weekday: 217 18% 24%;
-  --cal-cell-weekend: 217 17% 21%;
-  --cal-cell-outside: 220 15% 16%;
-  --cal-cell-weekday-past: 220 14% 15%;
-  --cal-cell-weekend-past: 220 14% 13%;
-  --cal-cell-outside-past: 220 14% 11%;
+  --sidebar: #262626;
+  --sidebar-foreground: #fafafa;
+  --sidebar-primary: #fafafa;
+  --sidebar-primary-foreground: #171717;
+  --sidebar-accent: #404040;
+  --sidebar-accent-foreground: #fafafa;
+  --sidebar-border: #525252;
+  --sidebar-ring: #a3a3a3;
+  --cal-cell-weekday: 0 0% 24%;
+  --cal-cell-weekend: 0 0% 21%;
+  --cal-cell-outside: 0 0% 16%;
+  --cal-cell-weekday-past: 0 0% 15%;
+  --cal-cell-weekend-past: 0 0% 13%;
+  --cal-cell-outside-past: 0 0% 11%;
 }
 
 .inverse-product-surface {

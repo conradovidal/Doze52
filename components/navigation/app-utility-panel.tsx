@@ -445,6 +445,7 @@ export function AppUtilityPanel({
                   right: desktopPosition.right,
                   top: desktopPosition.top,
                   transform: "none",
+                  transformOrigin: "top right",
                 }
               : undefined
           }

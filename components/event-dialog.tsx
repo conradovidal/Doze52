@@ -25,6 +25,7 @@ import {
   SelectItem,
   SelectTrigger,
 } from "@/components/ui/select";
+import { DateRangeQuickPicker } from "@/components/date-range-quick-picker";
 import { getCategoryColorToken } from "@/lib/category-palette";
 import {
   ONBOARDING_DEFAULT_CATEGORY_ID,
@@ -39,8 +40,6 @@ import { logDevError, logProdError } from "@/lib/safe-log";
 import { ValidationError, validateEventInput } from "@/lib/validation";
 import { MOTION_SPRING } from "@/lib/motion";
 
-const CHIP_TRIGGER_CLASS =
-  "h-10 w-full rounded-xl border px-3 text-sm shadow-sm transition-colors";
 const FIELD_LABEL_CLASS =
   "text-[12px] font-semibold tracking-[-0.01em] text-foreground/78";
 
@@ -121,6 +120,7 @@ export function EventDialog({
   const [notes, setNotes] = React.useState("");
   const [recurrenceType, setRecurrenceType] = React.useState<RecurrenceDraft>("none");
   const [recurrenceUntil, setRecurrenceUntil] = React.useState("");
+  const [advancedOpen, setAdvancedOpen] = React.useState(false);
   const [isSaving, setIsSaving] = React.useState(false);
   const [activeAction, setActiveAction] = React.useState<"save" | "delete" | null>(null);
   const [submitError, setSubmitError] = React.useState<string | null>(null);
@@ -185,6 +185,9 @@ export function EventDialog({
     () => categories.find((category) => category.id === categoryId) ?? null,
     [categories, categoryId]
   );
+  const currentCategoryToken = currentCategory
+    ? getCategoryColorToken(currentCategory.color, themeMode)
+    : null;
 
   const handleProfileSelect = React.useCallback(
     (nextProfileId: string) => {
@@ -254,6 +257,9 @@ export function EventDialog({
     setNotes(initialEvent?.notes ?? "");
     setRecurrenceType(initialEvent?.recurrenceType ?? "none");
     setRecurrenceUntil(initialEvent?.recurrenceUntil ?? "");
+    setAdvancedOpen(
+      Boolean(initialEvent && (initialEvent.notes || initialEvent.recurrenceType))
+    );
     setIsSaving(false);
     setSubmitError(null);
   }, [
@@ -358,151 +364,110 @@ export function EventDialog({
             />
           </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="space-y-1">
-              <label htmlFor="event-start-date" className={FIELD_LABEL_CLASS}>
-                Data de início
-              </label>
-              <Input
-                id="event-start-date"
-                className="h-10 rounded-xl"
-                type="date"
-                value={startDate}
-                disabled={isManagedEvent}
-                onChange={(event) => {
-                  const nextStartDate = event.target.value;
-                  changedFieldsRef.current.add("startDate");
-                  setStartDate(nextStartDate);
-                  setEndDate((currentEndDate) => {
-                    if (!currentEndDate) {
-                      changedFieldsRef.current.add("endDate");
-                      return nextStartDate;
-                    }
-                    if (currentEndDate < nextStartDate) {
-                      changedFieldsRef.current.add("endDate");
-                      return nextStartDate;
-                    }
-                    return currentEndDate;
-                  });
-                }}
-              />
-            </div>
-            <div className="space-y-1">
-              <label htmlFor="event-end-date" className={FIELD_LABEL_CLASS}>
-                Data final
-              </label>
-              <Input
-                id="event-end-date"
-                className="h-10 rounded-xl"
-                type="date"
-                min={startDate || undefined}
-                value={endDate}
-                disabled={isManagedEvent}
-                onChange={(event) => {
-                  changedFieldsRef.current.add("endDate");
-                  setEndDate(event.target.value);
-                }}
-              />
-            </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Select
+              value={profileId}
+              onValueChange={handleProfileSelect}
+              disabled={isManagedEvent}
+            >
+              <SelectTrigger
+                size="sm"
+                className="h-8 w-auto min-w-0 gap-1.5 rounded-full border-border/80 bg-muted/40 px-3 text-[12.5px] font-semibold text-foreground/85 shadow-none hover:bg-muted/70"
+              >
+                <span className="inline-flex min-w-0 items-center gap-1.5">
+                  {currentProfile ? <ProfileIcon icon={currentProfile.icon} size={12} /> : null}
+                  <span className="truncate">{currentProfile?.name ?? "Contexto"}</span>
+                </span>
+              </SelectTrigger>
+              <SelectContent position="popper" side="bottom" align="start">
+                {profileOptions.map((profile) => (
+                  <SelectItem key={profile.id} value={profile.id}>
+                    <span className="inline-flex items-center gap-2">
+                      <ProfileIcon icon={profile.icon} size={12} />
+                      {profile.name}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={categoryId}
+              onValueChange={(nextCategoryId) => {
+                changedFieldsRef.current.add("categoryId");
+                setCategoryId(nextCategoryId);
+              }}
+              disabled={isManagedEvent}
+            >
+              <SelectTrigger
+                size="sm"
+                className="h-8 w-auto min-w-0 gap-1.5 rounded-full px-3 text-[12.5px] font-semibold shadow-none"
+                style={
+                  currentCategoryToken
+                    ? {
+                        backgroundColor: currentCategoryToken.soft,
+                        borderColor: currentCategoryToken.border,
+                        color: currentCategoryToken.text,
+                      }
+                    : undefined
+                }
+                disabled={categoriesForProfile.length === 0}
+              >
+                <span className="inline-flex min-w-0 items-center gap-1.5">
+                  <span
+                    className="h-2 w-2 rounded-full"
+                    style={{
+                      backgroundColor: currentCategoryToken?.indicator ?? "#9ca3af",
+                    }}
+                  />
+                  <span className="truncate">
+                    {currentCategory?.name ?? "Sem categoria"}
+                  </span>
+                </span>
+              </SelectTrigger>
+              <SelectContent position="popper" side="bottom" align="start">
+                {categoriesForProfile.map((category) => (
+                  <SelectItem key={category.id} value={category.id}>
+                    <span className="inline-flex items-center gap-2">
+                      <span
+                        className="h-2.5 w-2.5 rounded-full"
+                        style={{
+                          backgroundColor: getCategoryColorToken(
+                            category.color,
+                            themeMode
+                          ).indicator,
+                        }}
+                      />
+                      {category.name}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <DateRangeQuickPicker
+              startDate={startDate}
+              endDate={endDate}
+              disabled={isManagedEvent}
+              onChange={({ startDate: nextStart, endDate: nextEnd }) => {
+                changedFieldsRef.current.add("startDate");
+                changedFieldsRef.current.add("endDate");
+                setStartDate(nextStart);
+                setEndDate(nextEnd);
+              }}
+            />
           </div>
 
           <details
-            open={isGuidedCreation ? undefined : true}
-            className={isGuidedCreation ? "group rounded-2xl border border-border/70 bg-muted/20" : "contents"}
+            open={advancedOpen}
+            onToggle={(event) => setAdvancedOpen(event.currentTarget.open)}
+            className="group rounded-2xl border border-border/70 bg-muted/20"
           >
-            <summary
-              className={
-                isGuidedCreation
-                  ? "flex cursor-pointer list-none items-center justify-between px-3.5 py-3 text-sm font-medium text-foreground/78 outline-none focus-visible:ring-2 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden"
-                  : "hidden"
-              }
-            >
-              Organização e detalhes
+            <summary className="flex cursor-pointer list-none items-center justify-between px-3.5 py-3 text-sm font-medium text-foreground/78 outline-none focus-visible:ring-2 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
+              Mais opções
               <ChevronDown className="size-4 text-muted-foreground transition-transform group-open:rotate-180" />
             </summary>
-            <div className={isGuidedCreation ? "space-y-5 border-t border-border/60 p-3.5" : "space-y-5"}>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="space-y-1">
-              <label className={FIELD_LABEL_CLASS}>Contexto</label>
-              <Select
-                value={profileId}
-                onValueChange={handleProfileSelect}
-                disabled={isManagedEvent}
-              >
-                <SelectTrigger
-                  size="sm"
-                  className={`${CHIP_TRIGGER_CLASS} border-border/80 bg-background text-foreground hover:bg-muted/70`}
-                >
-                  <span className="inline-flex min-w-0 items-center gap-1.5 pr-2">
-                    {currentProfile ? <ProfileIcon icon={currentProfile.icon} size={12} /> : null}
-                    <span className="truncate">{currentProfile?.name ?? "Contexto"}</span>
-                  </span>
-                </SelectTrigger>
-                <SelectContent position="popper" side="bottom" align="start">
-                  {profileOptions.map((profile) => (
-                    <SelectItem key={profile.id} value={profile.id}>
-                      <span className="inline-flex items-center gap-2">
-                        <ProfileIcon icon={profile.icon} size={12} />
-                        {profile.name}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1">
-              <label className={FIELD_LABEL_CLASS}>Categoria</label>
-              <Select
-                value={categoryId}
-                onValueChange={(nextCategoryId) => {
-                  changedFieldsRef.current.add("categoryId");
-                  setCategoryId(nextCategoryId);
-                }}
-                disabled={isManagedEvent}
-              >
-                <SelectTrigger
-                  size="sm"
-                  className={`${CHIP_TRIGGER_CLASS} border-border/80 bg-background text-foreground hover:bg-muted/70`}
-                  disabled={categoriesForProfile.length === 0}
-                >
-                  <span className="inline-flex min-w-0 items-center gap-1.5 pr-2">
-                    <span
-                      className="h-2.5 w-2.5 rounded-full"
-                      style={{
-                        backgroundColor: currentCategory
-                          ? getCategoryColorToken(currentCategory.color, themeMode)
-                              .indicator
-                          : "#9ca3af",
-                      }}
-                    />
-                    <span className="truncate">
-                      {currentCategory?.name ?? "Sem categoria"}
-                    </span>
-                  </span>
-                </SelectTrigger>
-                <SelectContent position="popper" side="bottom" align="start">
-                  {categoriesForProfile.map((category) => (
-                    <SelectItem key={category.id} value={category.id}>
-                      <span className="inline-flex items-center gap-2">
-                        <span
-                          className="h-2.5 w-2.5 rounded-full"
-                          style={{
-                            backgroundColor: getCategoryColorToken(
-                              category.color,
-                              themeMode
-                            ).indicator,
-                          }}
-                        />
-                        {category.name}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+            <div className="space-y-5 border-t border-border/60 p-3.5">
 
           <div className="space-y-1">
             <label htmlFor="event-notes" className={FIELD_LABEL_CLASS}>
