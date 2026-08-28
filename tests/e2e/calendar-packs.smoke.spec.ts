@@ -52,7 +52,7 @@ test("contexto, sincronizacao e calendario pronto funcionam de ponta a ponta", a
   ).toContainText("Grêmio");
   const teamCard = calendarsDialog
     .getByRole("article")
-    .filter({ hasText: "Jogos do Grêmio" });
+    .filter({ hasText: "Jogos do seu time favorito" });
   await teamCard.getByRole("button", { name: "Adicionar calendário" }).click();
   const targetProfile = teamCard.getByRole("combobox", {
     name: "Contexto para Jogos do Grêmio",
@@ -116,13 +116,13 @@ test("contexto, sincronizacao e calendario pronto funcionam de ponta a ponta", a
   const removeCard = page
     .getByRole("dialog", { name: "Calendários" })
     .getByRole("article")
-    .filter({ hasText: "Jogos do Grêmio" });
+    .filter({ hasText: "Jogos do seu time favorito" });
   const eventsRemoved = waitForSupabaseWrite(page, "events", ["DELETE"]);
   await removeCard.getByRole("button", { name: "Remover" }).click();
   await eventsRemoved;
   const availableTeamCard = calendarsDialog
     .getByRole("article")
-    .filter({ hasText: "Jogos do Grêmio" });
+    .filter({ hasText: "Jogos do seu time favorito" });
   await expect(
     availableTeamCard.getByRole("combobox", { name: /Time para/ })
   ).toContainText("Grêmio");

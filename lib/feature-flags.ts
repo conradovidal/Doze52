@@ -6,15 +6,7 @@ export const isHabitsPrototypeAvailable = (input: {
   deploymentEnv?: string;
   nodeEnv?: string;
   appEnv?: string;
-}) => {
-  if (input.flag !== "true") return false;
-  if (input.deploymentEnv) return input.deploymentEnv !== "production";
-  return (
-    input.nodeEnv === "development" ||
-    input.appEnv === "local" ||
-    input.appEnv === "dev"
-  );
-};
+}) => input.flag === "true";
 
 export const isHabitsPrototypeEnabled = isHabitsPrototypeAvailable({
   flag: process.env.NEXT_PUBLIC_FEATURE_HABITS_PROTOTYPE,

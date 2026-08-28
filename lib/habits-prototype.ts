@@ -340,6 +340,9 @@ export const getCompletedHabitsForDate = (
     Boolean(checkIns[getHabitCheckInKey(habit.id, dateIso)]?.completed)
   );
 
+export const getDesktopHabitRowMinHeight = (visibleHabitCount: number) =>
+  54 + Math.max(0, Math.min(4, visibleHabitCount) - 1) * 20;
+
 export type HabitDayAction = "blocked" | "create" | "toggle";
 
 export const getHabitDayAction = ({

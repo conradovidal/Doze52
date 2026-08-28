@@ -37,6 +37,79 @@ const expectCenteredLogo = async (
   expect(Math.abs(logoBox.x + logoBox.width / 2 - viewport.width / 2)).toBeLessThanOrEqual(1);
 };
 
+test("desktop antecipa a demonstração de hábitos e reinicia o guia no ano", async ({
+  page,
+}, testInfo) => {
+  test.skip(!testInfo.project.name.startsWith("desktop-"), "Cenário desktop");
+
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      "doze52:onboarding:v2",
+      JSON.stringify({ version: 15, step: "context_selection" })
+    );
+    window.sessionStorage.removeItem("doze52:habits-prototype:v1");
+  });
+  await page.goto("/?surface=annual");
+
+  const onboardingPanel = page.locator(
+    '[data-guided-onboarding-step="context_selection"]'
+  );
+  await expect(onboardingPanel).toContainText(
+    "Por qual contexto você quer começar?"
+  );
+  const annualDemoFrameTop = (
+    await page
+      .locator('[data-year-grid-surface="calendar"] [data-year-grid-frame]')
+      .boundingBox()
+  )?.y;
+  await page.getByRole("link", { name: "Hábitos" }).click();
+
+  const habits = page.locator("[data-habits-prototype]");
+  await expect(habits).toBeVisible();
+  const habitsDemoFrameTop = (
+    await page
+      .locator('[data-year-grid-surface="habits"] [data-year-grid-frame]')
+      .boundingBox()
+  )?.y;
+  if (annualDemoFrameTop === undefined || habitsDemoFrameTop === undefined) {
+    throw new Error("Grades demonstrativas não puderam ser medidas.");
+  }
+  expect(Math.abs(habitsDemoFrameTop - annualDemoFrameTop)).toBeLessThanOrEqual(1);
+  for (const name of [
+    "Exercício",
+    "Ler 20 minutos",
+    "Dormir antes das 23h",
+    "Dia sem fumar",
+  ]) {
+    await expect(habits.getByRole("button", { name, exact: true })).toBeVisible();
+  }
+  await expect(
+    habits.getByRole("button", { name: "Dia sem fumar", exact: true })
+  ).toHaveAttribute("aria-pressed", "false");
+  const habitDay = habits.locator("[data-day-cell]").first();
+  await expect.poll(async () => (await habitDay.boundingBox())?.height).toBe(94);
+  await expect(habits.locator("[data-habit-marker]").first()).toBeVisible();
+
+  const currentYear = new Date().getFullYear();
+  await habits.getByTitle(`Avançar para ${currentYear + 1}`).click();
+  await expect(habits.getByLabel(`Ano ${currentYear + 1}`)).toBeVisible();
+  await habits.locator('button[title="Abrir Janeiro"]:visible').first().click();
+  await expect(habits.locator("[data-month-row]")).toHaveCount(1);
+
+  await page.getByRole("link", { name: "Anual" }).click();
+  await expect(onboardingPanel).toBeVisible();
+  await onboardingPanel
+    .getByRole("button")
+    .filter({ hasText: "Pessoal" })
+    .click();
+
+  await expect(page.locator('[data-product-navigation="desktop"] a[aria-current="page"]')).toHaveAttribute("title", "Anual");
+  await expect(page.locator("[data-calendar-year-stepper]:visible span").first()).toHaveText(
+    String(currentYear)
+  );
+  await expect(page.locator("[data-month-row]")).toHaveCount(12);
+});
+
 test("mobile abre em Hábitos e preserva a sessão entre superfícies", async ({
   page,
 }, testInfo) => {
@@ -123,7 +196,24 @@ test("mobile abre em Hábitos e preserva a sessão entre superfícies", async ({
   await expect(utilityPanel).toBeVisible();
   await utilityPanel.getByRole("button", { name: /^Conta/ }).click();
   await utilityPanel.getByRole("button", { name: "Entrar", exact: true }).click();
-  await expect(page.getByRole("dialog", { name: "Entrar" })).toBeVisible();
+  const authDialog = page.getByRole("dialog", { name: "Entrar" });
+  await expect(authDialog).toBeVisible();
+  const googleButton = authDialog.getByRole("button", {
+    name: "Entrar com Google",
+  });
+  await expect(googleButton).toBeVisible();
+  await expect(googleButton.locator("[data-google-logo]")).toHaveAttribute(
+    "src",
+    /google-g\.svg/
+  );
+  await authDialog.getByRole("button", { name: "Cadastro" }).click();
+  const createAccountDialog = page.getByRole("dialog", {
+    name: "Criar conta",
+  });
+  await expect(createAccountDialog).toBeVisible();
+  await expect(
+    createAccountDialog.getByRole("button", { name: "Entrar com Google" })
+  ).toBeVisible();
 });
 
 test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
@@ -190,6 +280,95 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
   const scaleBox = await page.locator("[data-calendar-footer-center]").boundingBox();
   if (!scaleBox || !desktopViewport) throw new Error("Escala não pôde ser medida.");
   expect(Math.abs(scaleBox.x + scaleBox.width / 2 - desktopViewport.width / 2)).toBeLessThanOrEqual(2);
+  const calendarFrame = page.locator('[data-year-grid-surface="calendar"] [data-year-grid-frame]');
+  const calendarDock = page.locator('[data-year-grid-surface="calendar"] [data-year-grid-dock]');
+  const calendarYearStepper = calendarDock.locator("[data-calendar-year-stepper]");
+  await expect(calendarFrame).toBeVisible();
+  await expect(calendarDock).toBeVisible();
+  await expect(calendarYearStepper).toBeVisible();
+  const annualExpandedGeometry = await page.evaluate(() => {
+    const navigationRow = document.querySelector<HTMLElement>(
+      "[data-app-header-navigation-row]"
+    );
+    const controls = document.querySelector<HTMLElement>(
+      "[data-onboarding-filter-region]"
+    );
+    const frame = document.querySelector<HTMLElement>(
+      '[data-year-grid-surface="calendar"] [data-year-grid-frame]'
+    );
+    const viewport = document.querySelector<HTMLElement>(
+      '[data-year-grid-surface="calendar"] [data-year-grid-scroll-viewport]'
+    );
+    const canvas = document.querySelector<HTMLElement>(
+      '[data-year-grid-surface="calendar"] [data-year-grid-canvas]'
+    );
+    if (!navigationRow || !controls || !frame || !viewport || !canvas) return null;
+    const navigationBox = navigationRow.getBoundingClientRect();
+    const controlsBox = controls.getBoundingClientRect();
+    const frameBox = frame.getBoundingClientRect();
+    const viewportBox = viewport.getBoundingClientRect();
+    const canvasBox = canvas.getBoundingClientRect();
+    return {
+      navToDivider: controlsBox.top - navigationBox.bottom,
+      controlsToGrid: frameBox.top - controlsBox.bottom,
+      frameTop: frameBox.top,
+      canvasLeftGap: canvasBox.left - viewportBox.left,
+      canvasRightGap: viewportBox.right - canvasBox.right,
+    };
+  });
+  expect(annualExpandedGeometry).not.toBeNull();
+  expect(annualExpandedGeometry?.navToDivider).toBeCloseTo(8, 0);
+  expect(annualExpandedGeometry?.controlsToGrid).toBeCloseTo(12, 0);
+  expect(Math.abs(annualExpandedGeometry?.canvasLeftGap ?? 99)).toBeLessThanOrEqual(1);
+  expect(Math.abs(annualExpandedGeometry?.canvasRightGap ?? 99)).toBeLessThanOrEqual(1);
+
+  const fourthQuarter = page.getByTitle("4o trimestre");
+  await fourthQuarter.click();
+  await expect(fourthQuarter).toHaveAttribute("aria-pressed", "true");
+  const focusedQuarterEdges = await fourthQuarter.evaluate((element) => {
+    const viewport = element.closest("[data-year-grid-scroll-viewport]");
+    const canvas = element.closest("[data-year-grid-canvas]");
+    if (!(viewport instanceof HTMLElement) || !(canvas instanceof HTMLElement)) {
+      return null;
+    }
+    const quarterBox = element.getBoundingClientRect();
+    const viewportBox = viewport.getBoundingClientRect();
+    const canvasBox = canvas.getBoundingClientRect();
+    return {
+      left: quarterBox.left - viewportBox.left,
+      right: viewportBox.right - canvasBox.right,
+    };
+  });
+  expect(focusedQuarterEdges).not.toBeNull();
+  expect(Math.abs(focusedQuarterEdges?.left ?? 99)).toBeLessThanOrEqual(1);
+  expect(Math.abs(focusedQuarterEdges?.right ?? 99)).toBeLessThanOrEqual(1);
+  await fourthQuarter.click();
+  await expect(fourthQuarter).toHaveAttribute("aria-pressed", "false");
+  expect(
+    await calendarYearStepper.evaluate((element) =>
+      Boolean(element.closest("[data-year-grid-frame]"))
+    )
+  ).toBe(false);
+  const frameAndDockGeometry = await page
+    .locator('[data-year-grid-surface="calendar"]')
+    .evaluate((element) => {
+      const frame = element.querySelector<HTMLElement>("[data-year-grid-frame]");
+      const dock = element.querySelector<HTMLElement>("[data-year-grid-dock]");
+      if (!frame || !dock) return null;
+      const frameBox = frame.getBoundingClientRect();
+      const yearStepper = dock.querySelector<HTMLElement>("[data-calendar-year-stepper]");
+      const yearStepperBox = yearStepper?.getBoundingClientRect();
+      const frameStyle = getComputedStyle(frame);
+      return {
+        gap: yearStepperBox ? yearStepperBox.top - frameBox.bottom : null,
+        bottomLeftRadius: Number.parseFloat(frameStyle.borderBottomLeftRadius),
+        bottomRightRadius: Number.parseFloat(frameStyle.borderBottomRightRadius),
+      };
+    });
+  expect(frameAndDockGeometry).not.toBeNull();
+  expect(frameAndDockGeometry?.gap).toBeCloseTo(12, 0);
+  expect(frameAndDockGeometry?.bottomLeftRadius ?? 0).toBeGreaterThanOrEqual(20);
+  expect(frameAndDockGeometry?.bottomRightRadius ?? 0).toBeGreaterThanOrEqual(20);
   await expect(page.getByRole("button", { name: "Adicionar ou gerenciar calendários." })).toHaveCount(0);
 
   await contextualEdit.click();
@@ -211,7 +390,7 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
   ).toContainText("Grêmio");
   const defaultTeamCard = calendarGallery
     .getByRole("article")
-    .filter({ hasText: "Jogos do Grêmio" });
+    .filter({ hasText: "Jogos do seu time favorito" });
   await defaultTeamCard.getByRole("button", { name: "Adicionar calendário" }).click();
   await expect(defaultTeamCard.getByText("Meu ano", { exact: true })).toBeVisible();
   await calendarGallery.getByRole("button", { name: "Voltar para as opções de categoria" }).click();
@@ -222,6 +401,17 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
   await collapseCategories.click();
   await expect(categoryRegion).toHaveAttribute("aria-hidden", "true");
   await expect(categoryRegion).toHaveCount(1);
+  await expect
+    .poll(async () => {
+      const filterBox = await page
+        .locator("[data-onboarding-filter-region]")
+        .boundingBox();
+      const frameBox = await calendarFrame.boundingBox();
+      return filterBox && frameBox
+        ? Math.round(frameBox.y - (filterBox.y + filterBox.height))
+        : null;
+    })
+    .toBe(12);
   await page.getByRole("button", { name: "Mostrar categorias" }).click();
   await expect(categoryRegion).toHaveAttribute("aria-hidden", "false");
 
@@ -298,6 +488,58 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
   await expect(desktopNavigation.getByRole("link", { name: "Hábitos" })).toHaveClass(/text-foreground/);
   const habits = page.locator("[data-habits-prototype]");
   await expect(habits).toHaveAttribute("data-habits-layout", "desktop-year");
+  const habitsFrame = page.locator(
+    '[data-year-grid-surface="habits"] [data-year-grid-frame]'
+  );
+  const habitsExpandedGeometry = await page.evaluate(() => {
+    const navigationRow = document.querySelector<HTMLElement>(
+      "[data-app-header-navigation-row]"
+    );
+    const controls = document.querySelector<HTMLElement>(
+      '[data-habit-controls-layout="desktop"]'
+    );
+    const frame = document.querySelector<HTMLElement>(
+      '[data-year-grid-surface="habits"] [data-year-grid-frame]'
+    );
+    const viewport = document.querySelector<HTMLElement>(
+      '[data-year-grid-surface="habits"] [data-year-grid-scroll-viewport]'
+    );
+    const canvas = document.querySelector<HTMLElement>(
+      '[data-year-grid-surface="habits"] [data-year-grid-canvas]'
+    );
+    if (!navigationRow || !controls || !frame || !viewport || !canvas) return null;
+    const navigationBox = navigationRow.getBoundingClientRect();
+    const controlsBox = controls.getBoundingClientRect();
+    const frameBox = frame.getBoundingClientRect();
+    const viewportBox = viewport.getBoundingClientRect();
+    const canvasBox = canvas.getBoundingClientRect();
+    return {
+      navToDivider: controlsBox.top - navigationBox.bottom,
+      controlsToGrid: frameBox.top - controlsBox.bottom,
+      frameTop: frameBox.top,
+      canvasLeftGap: canvasBox.left - viewportBox.left,
+      canvasRightGap: viewportBox.right - canvasBox.right,
+    };
+  });
+  expect(habitsExpandedGeometry).not.toBeNull();
+  expect(habitsExpandedGeometry?.navToDivider).toBeCloseTo(8, 0);
+  expect(habitsExpandedGeometry?.controlsToGrid).toBeCloseTo(12, 0);
+  expect(Math.abs(habitsExpandedGeometry?.canvasLeftGap ?? 99)).toBeLessThanOrEqual(1);
+  expect(Math.abs(habitsExpandedGeometry?.canvasRightGap ?? 99)).toBeLessThanOrEqual(1);
+
+  await page.getByRole("button", { name: "Recolher hábitos" }).click();
+  await expect
+    .poll(async () => {
+      const controlsBox = await page
+        .locator('[data-habit-controls-layout="desktop"]')
+        .boundingBox();
+      const frameBox = await habitsFrame.boundingBox();
+      return controlsBox && frameBox
+        ? Math.round(frameBox.y - (controlsBox.y + controlsBox.height))
+        : null;
+    })
+    .toBe(12);
+  await page.getByRole("button", { name: "Mostrar hábitos" }).click();
   await expect(habits.locator('[data-year-grid-surface="habits"]')).toBeVisible();
   const completedDay = habits.locator('[data-day-cell][data-day-iso$="-01-01"]');
   await expect(completedDay.locator("[data-habit-marker]")).toHaveCount(4);
@@ -308,7 +550,7 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
   }
   const completedDayBox = await completedDay.boundingBox();
   if (!completedDayBox) throw new Error("Célula de hábitos não pôde ser medida.");
-  expect(completedDayBox.height).toBeLessThanOrEqual(48);
+  expect(completedDayBox.height).toBeGreaterThanOrEqual(114);
   const markerGeometry = await completedDay.locator("[data-day-habit-markers]").evaluate(
     (element) => {
       const marker = element.querySelector<HTMLElement>("[data-habit-marker]");
@@ -316,14 +558,65 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
       return {
         direction: style.flexDirection,
         markerWidth: marker?.getBoundingClientRect().width ?? 0,
-        markerRadius: marker ? getComputedStyle(marker).borderRadius : "",
+        markerGap: style.rowGap,
+        markerRadius: marker
+          ? Number.parseFloat(getComputedStyle(marker).borderRadius)
+          : 0,
+        dateBottom:
+          element
+            .closest("[data-day-cell]")
+            ?.querySelector<HTMLElement>("[data-day-number]")
+            ?.getBoundingClientRect().bottom ?? 0,
+        firstMarkerTop: marker?.getBoundingClientRect().top ?? 0,
+        markerBoxes: Array.from(
+          element.querySelectorAll<HTMLElement>("[data-habit-marker]")
+        ).map((entry) => {
+          const box = entry.getBoundingClientRect();
+          return { y: box.y, height: box.height };
+        }),
       };
     }
   );
   expect(markerGeometry.direction).toBe("column");
   expect(markerGeometry.markerWidth).toBeGreaterThanOrEqual(12);
   expect(markerGeometry.markerWidth).toBeLessThanOrEqual(18);
-  expect(markerGeometry.markerRadius).not.toBe("9999px");
+  expect(markerGeometry.markerGap).toBe("2px");
+  expect(markerGeometry.markerRadius).toBeGreaterThanOrEqual(
+    markerGeometry.markerWidth / 2
+  );
+  expect(markerGeometry.firstMarkerTop - markerGeometry.dateBottom).toBeGreaterThanOrEqual(4);
+  for (let index = 1; index < markerGeometry.markerBoxes.length; index += 1) {
+    const previous = markerGeometry.markerBoxes[index - 1];
+    const current = markerGeometry.markerBoxes[index];
+    expect(current.y).toBeGreaterThanOrEqual(previous.y + previous.height + 1.5);
+  }
+  const habitsScrollViewport = habits.locator(
+    "[data-desktop-habits-scroll-region]"
+  );
+  const habitsDock = habits.locator("[data-year-grid-dock]");
+  const dockBoxAtTop = await habitsDock.boundingBox();
+  const januaryBoxAtTop = await habits.locator('[data-month-row="0"]').boundingBox();
+  const habitsViewportBox = await habitsScrollViewport.boundingBox();
+  if (!dockBoxAtTop || !januaryBoxAtTop || !habitsViewportBox) {
+    throw new Error("Grade e dock de hábitos não puderam ser medidos.");
+  }
+  expect(januaryBoxAtTop.y).toBeGreaterThanOrEqual(habitsViewportBox.y - 2);
+  await habitsScrollViewport.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+  });
+  await expect
+    .poll(() => habitsScrollViewport.evaluate((element) => element.scrollTop))
+    .toBeGreaterThan(0);
+  const dockBoxAtBottom = await habitsDock.boundingBox();
+  expect(dockBoxAtBottom).not.toBeNull();
+  expect(Math.abs((dockBoxAtBottom?.y ?? 0) - dockBoxAtTop.y)).toBeLessThanOrEqual(1);
+  await habitsScrollViewport.evaluate((element) => {
+    element.scrollTop = 0;
+  });
+  await expect
+    .poll(() => habitsScrollViewport.evaluate((element) => element.scrollTop))
+    .toBe(0);
+  await expect(completedDay).toBeVisible();
   await completedDay.click();
   const dayPicker = page.locator("[data-habit-day-picker]");
   await expect(dayPicker).toBeVisible();
@@ -359,6 +652,7 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
   await hiddenFilter.click();
   await expect(hiddenFilter).toHaveAttribute("aria-pressed", "false");
   await expect(completedDay.locator("[data-habit-marker]")).toHaveCount(3);
+  await expect.poll(async () => (await completedDay.boundingBox())?.height).toBe(94);
   await completedDay.click();
   await expect(
     page.locator("[data-habit-day-picker]").getByRole("button", {
@@ -443,8 +737,13 @@ test("desktop mantém a grade anual disponível antes do primeiro hábito", asyn
   const emptyDay = habits.locator('[data-day-cell][aria-label*="crie um hábito"]:not([aria-disabled="true"])').first();
   await emptyDay.click();
   await expect(page.getByRole("dialog", { name: "Novo hábito" })).toBeVisible();
-  await expect(page.getByText(/Para se inspirar: caminhar, correr/)).toBeVisible();
-  await page.getByLabel("Nome do hábito").fill("Ler");
+  const habitNameInput = page.getByLabel("Nome do hábito");
+  await expect(habitNameInput).toHaveAttribute(
+    "placeholder",
+    "Caminhar, treinar, estudar, meditar, correr, ler…"
+  );
+  await expect(page.getByText(/Para se inspirar:/)).toHaveCount(0);
+  await habitNameInput.fill("Ler");
   await page.getByRole("button", { name: "Criar hábito" }).click();
   await expect(habits.getByRole("button", { name: "Ler", exact: true })).toHaveAttribute(
     "aria-pressed",
@@ -660,8 +959,17 @@ test("onboarding desktop apresenta o exemplo e termina no hábito real", async (
     "true"
   );
   await expect(page.locator("[data-guided-target-outline]")).toHaveCount(1);
+  const guidedCurrentYear = new Date().getFullYear();
+  await page.getByTitle(`Avançar para ${guidedCurrentYear + 1}`).click();
+  await expect(page.getByLabel(`Ano ${guidedCurrentYear + 1}`)).toBeVisible();
+  await page.locator('button[title="Abrir Janeiro"]:visible').first().click();
+  await expect(page.locator("[data-month-row]")).toHaveCount(1);
   await habitsDestination.click();
   await expect(page.locator('[data-product-navigation="desktop"] a[aria-current="page"]')).toHaveAttribute("title", "Hábitos");
+  await expect(page.locator("[data-calendar-year-stepper]:visible span").first()).toHaveText(
+    String(guidedCurrentYear)
+  );
+  await expect(page.locator("[data-month-row]")).toHaveCount(12);
   const showcaseNotice = page.locator(
     '[data-guided-toolbar-notice][data-guided-toolbar-target="habit-showcase"]'
   );
@@ -688,6 +996,8 @@ test("onboarding desktop apresenta o exemplo e termina no hábito real", async (
     exact: true,
   });
   await expect(smokeFilter).toHaveAttribute("aria-pressed", "false");
+  const showcaseDay = page.locator("[data-day-cell]").first();
+  await expect.poll(async () => (await showcaseDay.boundingBox())?.height).toBe(94);
   expect(
     await page.locator("[data-day-habit-markers]").evaluateAll((markers) =>
       markers.some(
@@ -697,6 +1007,7 @@ test("onboarding desktop apresenta o exemplo e termina no hábito real", async (
   ).toBe(false);
   await smokeFilter.click();
   await expect(smokeFilter).toHaveAttribute("aria-pressed", "true");
+  await expect.poll(async () => (await showcaseDay.boundingBox())?.height).toBe(114);
   expect(
     await page.locator("[data-day-habit-markers]").evaluateAll((markers) =>
       markers.some(
@@ -805,6 +1116,32 @@ test("onboarding mantém a edição aberta até importar o calendário", async (
   await page.goto("/?surface=annual");
 
   const edit = page.locator("[data-onboarding-edit-control]");
+  const editNotice = page.locator(
+    '[data-guided-toolbar-notice][data-guided-toolbar-target="edit"]'
+  );
+  await expect(editNotice).toBeVisible();
+  await expect(editNotice).toHaveCSS("position", "fixed");
+  const editBox = await edit.boundingBox();
+  const editNoticeBox = await editNotice.boundingBox();
+  if (!editBox || !editNoticeBox) {
+    throw new Error("Orientação do modo de edição não pôde ser medida.");
+  }
+  expect(
+    Math.abs(
+      editNoticeBox.x + editNoticeBox.width / 2 -
+        (editBox.x + editBox.width / 2)
+    )
+  ).toBeLessThan(24);
+  expect(
+    await editNotice.evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      const hit = document.elementFromPoint(
+        rect.left + rect.width / 2,
+        rect.top + rect.height / 2
+      );
+      return Boolean(hit && element.contains(hit));
+    })
+  ).toBe(true);
   await edit.click();
   await expect(edit).toHaveAttribute("aria-label", /Finalizar edição/);
   await expect(

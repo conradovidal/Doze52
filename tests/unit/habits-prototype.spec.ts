@@ -6,6 +6,7 @@ import {
   buildOnboardingHabitShowcase,
   applyActiveHabitOrder,
   getCompletedHabitsForDate,
+  getDesktopHabitRowMinHeight,
   getDesktopVisibleHabits,
   getHabitDayAction,
   getHabitCheckInKey,
@@ -292,6 +293,12 @@ test("empilha apenas hábitos concluídos preservando a ordem visível", () => {
   ).toEqual(["segundo", "quarto"]);
 });
 
+test("dimensiona a linha pelo total de hábitos visíveis", () => {
+  expect([0, 1, 2, 3, 4, 5].map(getDesktopHabitRowMinHeight)).toEqual([
+    54, 54, 74, 94, 114, 114,
+  ]);
+});
+
 test("reordena, arquiva e restaura hábitos sem apagar os demais dados", () => {
   const habit = (id: string, position: number): Habit => ({
     id,
@@ -343,10 +350,10 @@ test("define um hábito Free e quatro Pro com upgrade contextual", () => {
   expect(PRO_UPGRADE_COPY.habits.description).toContain("4 hábitos");
 });
 
-test("mantém o protótipo indisponível em produção", () => {
+test("libera Hábitos em qualquer ambiente somente pela flag explícita", () => {
   expect(
     isHabitsPrototypeAvailable({ flag: "true", deploymentEnv: "production" })
-  ).toBe(false);
+  ).toBe(true);
   expect(
     isHabitsPrototypeAvailable({ flag: "true", deploymentEnv: "preview" })
   ).toBe(true);
@@ -355,6 +362,9 @@ test("mantém o protótipo indisponível em produção", () => {
   ).toBe(true);
   expect(
     isHabitsPrototypeAvailable({ flag: "false", deploymentEnv: "preview" })
+  ).toBe(false);
+  expect(
+    isHabitsPrototypeAvailable({ deploymentEnv: "production" })
   ).toBe(false);
 });
 

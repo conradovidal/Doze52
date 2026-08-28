@@ -112,9 +112,7 @@ export function DesktopHabitsPrototype({
       />
 
       <div
-        ref={scrollRegionRef}
-        data-desktop-habits-scroll-region
-        className="min-h-0 flex-1 overflow-auto pb-1 [scrollbar-gutter:stable_both-edges]"
+        className="min-h-0 flex-1 overflow-hidden pb-1"
       >
         <YearGrid
           year={year}
@@ -129,6 +127,8 @@ export function DesktopHabitsPrototype({
           onMoveEventByDelta={noop}
           onApplyDayReorder={noop}
           showScaleControl={false}
+          scrollViewportRef={scrollRegionRef}
+          scrollRegion="habits"
           habitPresentation={{
             habits: visibleHabits,
             allHabits,

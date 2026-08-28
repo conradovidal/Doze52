@@ -6,6 +6,7 @@ import {
   hasAuthorCalendarEvents,
   migrateGuidedOnboardingState,
   reduceGuidedOnboardingState,
+  shouldPresentOnboardingHabitShowcase,
   shouldShowGuidedOnboarding,
   type GuidedOnboardingState,
 } from "../../lib/onboarding";
@@ -722,6 +723,31 @@ test("modo de demonstração libera a interface sem reabrir o painel", () => {
   ).toBe(false);
 });
 
+test("mantém a demonstração de hábitos disponível antes do passo guiado", () => {
+  for (const step of [
+    "context_selection",
+    "date_instruction",
+    "period_instruction",
+    "calendar_instruction",
+    "year_instruction",
+    "period_navigation_instruction",
+    "habit_surface_instruction",
+    "habit_showcase_instruction",
+    "demo_exploration",
+  ] as const) {
+    expect(shouldPresentOnboardingHabitShowcase(step)).toBe(true);
+  }
+
+  for (const step of [
+    "habit_instruction",
+    "habit_created_confirmation",
+    "completed",
+    "dismissed",
+  ] as const) {
+    expect(shouldPresentOnboardingHabitShowcase(step)).toBe(false);
+  }
+});
+
 test("conta autenticada só recebe o fluxo depois da carga remota", () => {
   const input = {
     state: initialState(),
@@ -893,7 +919,11 @@ test("demonstração monta dois contextos e categorias pessoais e profissionais"
       category.name === "Produto"
   );
   const productPeriods = snapshot.events
-    .filter((event) => event.categoryId === productCategory?.id)
+    .filter(
+      (event) =>
+        event.categoryId === productCategory?.id &&
+        event.calendarPackEventKey?.startsWith("2026:")
+    )
     .toSorted((left, right) => left.startDate.localeCompare(right.startDate));
   expect(productPeriods).toHaveLength(4);
   for (const [index, event] of productPeriods.entries()) {
@@ -917,14 +947,20 @@ test("demonstração monta dois contextos e categorias pessoais e profissionais"
   );
   const countCategoryEvents = (name: string) =>
     snapshot.events.filter(
-      (event) => event.categoryId === personalCategoryIds.get(name)
+      (event) =>
+        event.categoryId === personalCategoryIds.get(name) &&
+        event.calendarPackEventKey?.startsWith("2026:")
     ).length;
   expect(countCategoryEvents("Eventos")).toBe(15);
   expect(countCategoryEvents("Família")).toBe(17);
   expect(countCategoryEvents("Amigos")).toBe(19);
   expect(countCategoryEvents("Viagens")).toBe(6);
   expect(countCategoryEvents("Aniversários")).toBe(10);
-  expect(countCategoryEvents("Corridas F1")).toBeGreaterThan(20);
+  expect(
+    snapshot.events.filter(
+      (event) => event.categoryId === personalCategoryIds.get("Corridas F1")
+    ).length
+  ).toBeGreaterThan(20);
 
   const visiblePersonalCategoryIds = new Set(
     personalCategories
@@ -972,14 +1008,103 @@ test("demonstração monta dois contextos e categorias pessoais e profissionais"
       expect.objectContaining({
         title: "Ano Novo em Tiradentes",
         startDate: "2026-12-27",
-        endDate: "2027-01-03",
+        endDate: "2026-12-31",
       }),
       expect.objectContaining({ title: "Revolução Farroupilha" }),
     ])
   );
 });
 
-test("reconhece e remove snapshots demonstrativos v1 a v7", () => {
+test("demonstração conta uma história diferente entre 2025 e 2027", () => {
+  const snapshot = getOnboardingPersonalDemoSnapshot(2026);
+  const eventsByYear = new Map(
+    [2024, 2025, 2026, 2027, 2028].map((year) => [
+      year,
+      expandEventsForYear(snapshot.events, year),
+    ])
+  );
+
+  expect(eventsByYear.get(2024)).toEqual([]);
+  expect(eventsByYear.get(2025)).toHaveLength(123);
+  expect(eventsByYear.get(2026)).toHaveLength(137);
+  expect(eventsByYear.get(2027)).toHaveLength(23);
+  expect(eventsByYear.get(2028)).toHaveLength(21);
+
+  for (const year of [2025, 2026, 2027, 2028]) {
+    expect(
+      new Set(eventsByYear.get(year)?.map((event) => event.startDate.slice(5, 7)))
+        .size
+    ).toBe(12);
+  }
+
+  expect(eventsByYear.get(2025)?.map((event) => event.title)).toEqual(
+    expect.arrayContaining([
+      "Férias em Torres",
+      "Carnaval em Florianópolis",
+      "Fim de semana em Buenos Aires",
+      "Férias em família — Serra Gaúcha",
+      "Pesquisa com pessoas usuárias",
+      "Protótipo do ano visível",
+      "Primeiro piloto do calendário anual",
+      "Planejamento da experiência mobile",
+    ])
+  );
+  expect(eventsByYear.get(2026)?.map((event) => event.title)).toEqual(
+    expect.arrayContaining([
+      "Carnaval em Paraty",
+      "Férias em família — Maceió",
+      "Descoberta da experiência mobile",
+      "Beta da experiência mobile",
+      "Evolução do onboarding",
+      "Portal para PMEs",
+    ])
+  );
+  expect(eventsByYear.get(2026)?.map((event) => event.title)).not.toContain(
+    "Pesquisa com pessoas usuárias"
+  );
+  const categoryNames = new Map(
+    snapshot.categories.map((category) => [category.id, category.name])
+  );
+  expect(eventsByYear.get(2027)?.map((event) => event.title)).toEqual(
+    expect.arrayContaining([
+      "Planejamento estratégico 2027",
+      "Viagem à Serra Gaúcha",
+    ])
+  );
+  expect(
+    new Set(
+      eventsByYear
+        .get(2027)
+        ?.filter(
+          (event) =>
+            event.title !== "Planejamento estratégico 2027" &&
+            event.title !== "Viagem à Serra Gaúcha"
+        )
+        .map((event) => categoryNames.get(event.categoryId))
+    )
+  ).toEqual(new Set(["Aniversários", "Feriados"]));
+
+  expect(
+    new Set(
+      eventsByYear
+        .get(2028)
+        ?.map((event) => categoryNames.get(event.categoryId))
+    )
+  ).toEqual(new Set(["Aniversários", "Feriados"]));
+  expect(new Set(snapshot.events.map((event) => event.id)).size).toBe(
+    snapshot.events.length
+  );
+  expect(
+    new Set(
+      snapshot.events
+        .map((event) => event.calendarPackEventKey)
+        .filter(Boolean)
+    )
+    .size
+  ).toBe(snapshot.events.length);
+});
+
+test("reconhece e remove snapshots demonstrativos v1 a v8", () => {
   for (const groupId of [
     "onboarding-personal-demo-v1",
     "onboarding-personal-demo-v2",
@@ -988,6 +1113,7 @@ test("reconhece e remove snapshots demonstrativos v1 a v7", () => {
     "onboarding-personal-demo-v5",
     "onboarding-personal-demo-v6",
     "onboarding-personal-demo-v7",
+    "onboarding-personal-demo-v8",
   ]) {
     const current = getOnboardingPersonalDemoSnapshot(2026);
     const legacy = {
