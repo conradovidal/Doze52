@@ -126,7 +126,7 @@ export function HabitDayPicker({
             onClick={() => onToggle(habit, dateIso)}
           >
             {completed ? (
-              <Check className="size-4 text-slate-950" strokeWidth={2.8} />
+              <Check className="size-4 text-neutral-950" strokeWidth={2.8} />
             ) : null}
           </button>
         );
