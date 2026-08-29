@@ -6,7 +6,7 @@ export const FAVICON_LIGHT_URL = `/doze52-favicon-light.svg?v=${THEME_ASSET_VERS
 export const FAVICON_DARK_URL = `/doze52-favicon-dark.svg?v=${THEME_ASSET_VERSION}`;
 export const FAVICON_URL = FAVICON_LIGHT_URL;
 export const THEME_CHROME_COLOR_LIGHT = "#ffffff";
-export const THEME_CHROME_COLOR_DARK = "#111827";
+export const THEME_CHROME_COLOR_DARK = "#171717";
 export const THEME_CHROME_COLOR_FALLBACK = THEME_CHROME_COLOR_LIGHT;
 
 export const getThemeFaviconUrl = (mode: ThemeMode) =>
