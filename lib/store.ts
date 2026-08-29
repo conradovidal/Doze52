@@ -14,6 +14,7 @@ import {
   CATEGORY_COLOR_BASE_ORANGE,
   CATEGORY_COLOR_BASE_RED,
   CATEGORY_COLOR_BASE_TEAL,
+  CATEGORY_COLOR_BASE_TERRA,
   CATEGORY_COLOR_BASE_VIOLET,
   CATEGORY_COLOR_BASE_YELLOW,
   DEFAULT_CATEGORY_COLOR,
@@ -1336,7 +1337,7 @@ export const getOnboardingCategoryDefinition = (
       ? {
           id: ONBOARDING_CATEGORY_IDS.customImportantDates,
           name: "Datas importantes",
-          color: CATEGORY_COLOR_BASE_BLUE,
+          color: CATEGORY_COLOR_BASE_TERRA,
         }
       : {
           id: ONBOARDING_CATEGORY_IDS.customPeriods,

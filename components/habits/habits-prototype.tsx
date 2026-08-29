@@ -171,7 +171,7 @@ function HabitEditorDialog({
                     onClick={() => onColorChange(habitColor)}
                   >
                     {color === habitColor ? (
-                      <Check className="size-4 text-slate-950" strokeWidth={2.6} />
+                      <Check className="size-4 text-neutral-950" strokeWidth={2.6} />
                     ) : null}
                   </button>
                 ))}
@@ -726,7 +726,7 @@ export function HabitsPrototype({
                             className={cn(
                               "relative mx-auto grid size-9 place-items-center rounded-full border text-[11px] font-semibold tabular-nums transition-[transform,background-color,border-color,color,box-shadow] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/65 focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:size-10 sm:text-xs",
                               completed
-                                ? "border-black/10 text-slate-950 shadow-sm hover:-translate-y-px"
+                                ? "border-black/10 text-neutral-950 shadow-sm hover:-translate-y-px"
                                 : disabled
                                   ? "cursor-not-allowed border-border/45 bg-muted/28 text-muted-foreground/40"
                                   : "border-border bg-background text-muted-foreground hover:-translate-y-px hover:border-foreground/30 hover:text-foreground",
@@ -778,7 +778,7 @@ export function HabitsPrototype({
                     selectedHabit?.color ?? CATEGORY_COLOR_BASE_BLUE,
                 }}
               >
-                <Check className="size-2 text-slate-950" strokeWidth={3} />
+                <Check className="size-2 text-neutral-950" strokeWidth={3} />
               </span>
               Concluído
             </span>
