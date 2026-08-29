@@ -598,7 +598,7 @@ export function MobileCalendarExperience({
                     className={cn(
                       "flex h-[3.55rem] w-[3.55rem] flex-col items-center justify-center text-center tabular-nums transition-[background-color,color,box-shadow]",
                       today
-                        ? "rounded-[10px] bg-foreground text-background shadow-[0_10px_20px_-16px_rgba(15,23,42,0.72)]"
+                        ? "rounded-[10px] bg-red-600 text-white shadow-[0_10px_20px_-16px_rgba(220,38,38,0.55)]"
                         : active
                           ? "text-foreground"
                           : isPast
@@ -612,7 +612,7 @@ export function MobileCalendarExperience({
                     <span
                       className={cn(
                         "mt-0.5 text-[10px] font-semibold uppercase leading-3 tracking-[0.08em]",
-                        today ? "text-background/72" : "text-muted-foreground"
+                        today ? "text-white/72" : "text-muted-foreground"
                       )}
                     >
                       {weekday}

@@ -7,4 +7,4 @@ export const LATERAL_KEY_REST_CLASS =
   "hover:bg-muted hover:text-foreground hover:ring-1 hover:ring-inset hover:ring-border";
 
 export const LATERAL_KEY_ACTIVE_CLASS =
-  "bg-primary text-primary-foreground ring-1 ring-inset ring-primary hover:bg-primary/90 hover:text-primary-foreground";
+  "bg-foreground/8 text-foreground font-semibold ring-1 ring-inset ring-foreground/15 hover:bg-foreground/12";

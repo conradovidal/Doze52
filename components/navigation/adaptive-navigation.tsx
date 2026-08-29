@@ -69,7 +69,7 @@ function AccountGlyph({
   const sharedClassName = cn(
     sizeClass,
     "rounded-[10px]",
-    showProBorder && "ring-2 ring-amber-400 ring-offset-1 ring-offset-background"
+    showProBorder && "ring-2 ring-premium ring-offset-1 ring-offset-background"
   );
 
   if (avatarUrl && !brokenAvatar) {
