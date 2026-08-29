@@ -38,6 +38,7 @@ import {
   isOnboardingCategoriesSnapshot,
   isOnboardingPersonalDemoSnapshot,
   ONBOARDING_CATEGORY_IDS,
+  ONBOARDING_PROFILE_IDS,
   ONBOARDING_PERSONAL_DEMO_GROUP_ID,
   isOnboardingPersonalDemoGroup,
   stripOnboardingPersonalDemo,
@@ -461,15 +462,31 @@ export default function HomePage() {
   // profile. Treat those as established users too, so the tour (and the
   // editing lock that comes with it) never traps someone who already has an
   // account, not just someone with existing events.
+  //
+  // Anonymous visitors get the personal demo snapshot (2 profiles, demo
+  // categories under DEMO_CATEGORY_IDS) auto-loaded the moment the tour
+  // starts, so counting profiles/categories by raw length or a partial id
+  // set wrongly flags every fresh visitor as "established" too. Compare
+  // against the known onboarding/demo ids instead, so only a profile or
+  // category the user actually created (a fresh, non-onboarding id) counts.
   const defaultOnboardingCategoryIds = React.useMemo(
     () => new Set<string>(Object.values(ONBOARDING_CATEGORY_IDS)),
     []
   );
+  const knownOnboardingProfileIds = React.useMemo(
+    () => new Set<string>(Object.values(ONBOARDING_PROFILE_IDS)),
+    []
+  );
   const hasCustomizedCategories = categories.some(
-    (category) => !defaultOnboardingCategoryIds.has(category.id)
+    (category) =>
+      !defaultOnboardingCategoryIds.has(category.id) &&
+      !isOnboardingPersonalDemoGroup(category.calendarPackGroupId)
+  );
+  const hasCustomProfiles = profiles.some(
+    (profile) => !knownOnboardingProfileIds.has(profile.id)
   );
   const hasEstablishedSetup =
-    hasAuthorEvents || hasCustomizedCategories || profiles.length > 1;
+    hasAuthorEvents || hasCustomizedCategories || hasCustomProfiles;
   const guidedOnboardingEligible = Boolean(
     guidedOnboarding &&
       calendarCreateOnboarding &&
