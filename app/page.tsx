@@ -38,6 +38,7 @@ import {
   isOnboardingCategoriesSnapshot,
   isOnboardingPersonalDemoSnapshot,
   ONBOARDING_CATEGORY_IDS,
+  ONBOARDING_PROFILE_IDS,
   ONBOARDING_PERSONAL_DEMO_GROUP_ID,
   isOnboardingPersonalDemoGroup,
   stripOnboardingPersonalDemo,
@@ -454,8 +455,66 @@ export default function HomePage() {
     () => expandEventsForYear(events, year),
     [events, year]
   );
+  const hasAuthorEvents = hasAuthorCalendarEvents(events);
+  // Existing accounts (created before the guided onboarding tour existed) can
+  // have zero "author" events yet still have real, user-customized setups —
+  // e.g. categories they renamed/created, or more than the single default
+  // profile. Treat those as established users too, so the tour (and the
+  // editing lock that comes with it) never traps someone who already has an
+  // account, not just someone with existing events.
+  //
+  // Anonymous visitors get the personal demo snapshot (2 profiles, demo
+  // categories under DEMO_CATEGORY_IDS, plus imported "ready-made" holiday
+  // and F1 calendar packs) auto-loaded the moment the tour starts, so
+  // counting profiles/categories by raw length or a partial id set wrongly
+  // flags every fresh visitor as "established" too. A category sourced from
+  // any calendar pack (demo or a real ready-made pack — those carry their
+  // own calendarPackGroupId, not the onboarding demo marker) is exactly as
+  // "not authored" as the pack events already excluded above, so the same
+  // signal applies here. Only a profile or category with neither a pack
+  // origin nor a known onboarding id was actually created by the user.
+  const defaultOnboardingCategoryIds = React.useMemo(
+    () => new Set<string>(Object.values(ONBOARDING_CATEGORY_IDS)),
+    []
+  );
+  const knownOnboardingProfileIds = React.useMemo(
+    () => new Set<string>(Object.values(ONBOARDING_PROFILE_IDS)),
+    []
+  );
+  const hasCustomizedCategories = categories.some(
+    (category) =>
+      !category.calendarPackGroupId &&
+      !defaultOnboardingCategoryIds.has(category.id)
+  );
+  const hasCustomProfiles = profiles.some(
+    (profile) => !knownOnboardingProfileIds.has(profile.id)
+  );
+  const hasEstablishedSetup =
+    hasAuthorEvents || hasCustomizedCategories || hasCustomProfiles;
+  const guidedOnboardingEligible = Boolean(
+    guidedOnboarding &&
+      calendarCreateOnboarding &&
+      isMobileCalendarUi !== null &&
+      shouldShowGuidedOnboarding({
+        state: guidedOnboarding,
+        legacyState: calendarCreateOnboarding,
+        hasAuthorEvents: hasEstablishedSetup,
+        authLoading,
+        isAuthenticated: Boolean(session?.user.id),
+        remoteReady,
+      })
+  );
+  const showGuidedOnboarding = Boolean(
+    guidedOnboardingEligible && isMobileCalendarUi === false
+  );
+
   const onboardingHabitShowcase = React.useMemo(
     () =>
+      // Only ever show the demo/example habits while the guided tour is
+      // actually eligible to run — otherwise an established account that
+      // merely has a leftover "context_selection" step in local storage
+      // would have its real Hábitos view replaced by undeletable demo data.
+      showGuidedOnboarding &&
       guidedOnboarding &&
       shouldPresentOnboardingHabitShowcase(guidedOnboarding.step) &&
       activeDestination === "habits" &&
@@ -474,6 +533,7 @@ export default function HomePage() {
       guidedOnboarding,
       isMobileCalendarUi,
       renderEvents,
+      showGuidedOnboarding,
       todayIso,
       year,
     ]
@@ -1217,23 +1277,6 @@ export default function HomePage() {
     windowContext,
   ]);
 
-  const hasAuthorEvents = hasAuthorCalendarEvents(events);
-  const guidedOnboardingEligible = Boolean(
-    guidedOnboarding &&
-      calendarCreateOnboarding &&
-      isMobileCalendarUi !== null &&
-      shouldShowGuidedOnboarding({
-        state: guidedOnboarding,
-        legacyState: calendarCreateOnboarding,
-        hasAuthorEvents,
-        authLoading,
-        isAuthenticated: Boolean(session?.user.id),
-        remoteReady,
-      })
-  );
-  const showGuidedOnboarding = Boolean(
-    guidedOnboardingEligible && isMobileCalendarUi === false
-  );
   const isMobileOnboardingPending = Boolean(
     guidedOnboardingEligible && isMobileCalendarUi === true
   );
@@ -2600,7 +2643,7 @@ export default function HomePage() {
         </div>
       )}
 
-      {isCalendarSurfaceActive && showGuidedOnboarding && guidedOnboarding ? (
+      {showGuidedOnboarding && guidedOnboarding ? (
         <GuidedOnboardingPanel
           state={guidedOnboarding}
           draft={guidedDraft}
