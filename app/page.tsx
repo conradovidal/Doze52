@@ -2643,7 +2643,7 @@ export default function HomePage() {
         </div>
       )}
 
-      {isCalendarSurfaceActive && showGuidedOnboarding && guidedOnboarding ? (
+      {showGuidedOnboarding && guidedOnboarding ? (
         <GuidedOnboardingPanel
           state={guidedOnboarding}
           draft={guidedDraft}
