@@ -47,14 +47,12 @@ function parseIsoLocal(iso: string) {
 function formatRangeLabel(startDate: string, endDate: string) {
   if (!startDate) return "Selecionar data";
   const start = parseIsoLocal(startDate);
-  const dayPart = (date: Date) =>
-    `${weekdayAbbr[date.getDay()]}, ${date.getDate()} ${fmtMonthLabel(date)}`;
+  const dayPart = (date: Date) => `${date.getDate()} ${fmtMonthLabel(date)}`;
   if (!endDate || endDate === startDate) {
     return dayPart(start);
   }
   const end = parseIsoLocal(endDate);
-  const dayCount = Math.round((end.getTime() - start.getTime()) / 86_400_000) + 1;
-  return `${dayPart(start)} → ${dayPart(end)} · ${dayCount} dias`;
+  return `${dayPart(start)} – ${dayPart(end)}`;
 }
 
 export function DateRangeQuickPicker({
@@ -69,6 +67,10 @@ export function DateRangeQuickPicker({
   const [visibleMonth, setVisibleMonth] = React.useState(() =>
     startOfMonth(startDate ? parseIsoLocal(startDate) : new Date())
   );
+  const pointerDownIsoRef = React.useRef<string | null>(null);
+  const hasDraggedRef = React.useRef(false);
+  const onChangeRef = React.useRef(onChange);
+  onChangeRef.current = onChange;
 
   const openPicker = (nextOpen: boolean) => {
     setOpen(nextOpen);
@@ -94,6 +96,39 @@ export function DateRangeQuickPicker({
     setPickingEnd(false);
     setOpen(false);
   };
+
+  const handleDayPointerDown = (dayIso: string) => {
+    pointerDownIsoRef.current = dayIso;
+    hasDraggedRef.current = false;
+  };
+
+  const handleDayPointerEnter = (dayIso: string) => {
+    const anchorIso = pointerDownIsoRef.current;
+    if (!anchorIso || dayIso === anchorIso) return;
+    hasDraggedRef.current = true;
+    const [rangeStart, rangeEnd] =
+      anchorIso <= dayIso ? [anchorIso, dayIso] : [dayIso, anchorIso];
+    onChangeRef.current({ startDate: rangeStart, endDate: rangeEnd });
+  };
+
+  React.useEffect(() => {
+    const handleWindowPointerUp = () => {
+      const anchorIso = pointerDownIsoRef.current;
+      if (!anchorIso) return;
+      const wasDrag = hasDraggedRef.current;
+      pointerDownIsoRef.current = null;
+      hasDraggedRef.current = false;
+      if (wasDrag) {
+        setPickingEnd(false);
+        setOpen(false);
+        return;
+      }
+      handlePickDay(anchorIso);
+    };
+    window.addEventListener("pointerup", handleWindowPointerUp);
+    return () => window.removeEventListener("pointerup", handleWindowPointerUp);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pickingEnd, startDate]);
 
   const monthDays = getMonthDaysWithLeading(
     visibleMonth.getFullYear(),
@@ -153,20 +188,19 @@ export function DateRangeQuickPicker({
               return <div key={`blank-${index}`} />;
             }
             const dayIso = fmtIsoDate(d);
-            const isEdge = dayIso === startDate || dayIso === endDate;
-            const isInRange = dayIso >= startDate && dayIso <= endDate;
+            const isSelected =
+              Boolean(startDate) && dayIso >= startDate && dayIso <= (endDate || startDate);
             return (
               <button
                 key={dayIso}
                 type="button"
-                onClick={() => handlePickDay(dayIso)}
+                onPointerDown={() => handleDayPointerDown(dayIso)}
+                onPointerEnter={() => handleDayPointerEnter(dayIso)}
                 className={cn(
-                  "grid h-7 place-items-center rounded-lg text-[12px] transition-colors",
-                  isEdge
+                  "grid h-7 place-items-center rounded-lg text-[12px] transition-colors select-none touch-none",
+                  isSelected
                     ? "bg-foreground text-background font-semibold"
-                    : isInRange
-                      ? "bg-muted text-foreground"
-                      : "text-foreground/78 hover:bg-muted/70"
+                    : "text-foreground/78 hover:bg-muted/70"
                 )}
               >
                 {d.getDate()}
@@ -175,7 +209,7 @@ export function DateRangeQuickPicker({
           })}
         </div>
         <p className="pt-2 text-center text-[10.5px] text-muted-foreground">
-          clique um dia pra começar, outro pra fechar o intervalo
+          clique um dia, ou arraste até o dia final
         </p>
       </PopoverContent>
     </Popover>

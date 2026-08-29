@@ -310,7 +310,7 @@ export function UserMenu() {
             >
               Importar ou exportar
               {spreadsheetRequiresPro && !isPro && !isBillingLoading ? (
-                <span className="ml-auto rounded-full border border-amber-500/20 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:border-amber-300/20 dark:bg-amber-300/10 dark:text-amber-100">
+                <span className="ml-auto rounded-full border border-premium-border bg-premium-soft px-1.5 py-0.5 text-[10px] font-semibold text-premium-foreground">
                   Pro
                 </span>
               ) : null}

@@ -26,9 +26,11 @@ import {
   SelectTrigger,
 } from "@/components/ui/select";
 import { DateRangeQuickPicker } from "@/components/date-range-quick-picker";
+import { RecurrenceUntilPicker } from "@/components/recurrence-until-picker";
 import { getCategoryColorToken } from "@/lib/category-palette";
 import {
   ONBOARDING_DEFAULT_CATEGORY_ID,
+  isOnboardingPersonalDemoGroup,
   useStore,
   type EventInput,
   type EventUpdatePatch,
@@ -163,6 +165,7 @@ export function EventDialog({
             (category) =>
               category.profileId === profile.id &&
               (!category.calendarPackGroupId ||
+                isOnboardingPersonalDemoGroup(category.calendarPackGroupId) ||
                 (!isManagedEvent &&
                   category.id === initialEvent?.categoryId))
           )
@@ -177,6 +180,7 @@ export function EventDialog({
       (category) =>
         category.profileId === profileId &&
         (!category.calendarPackGroupId ||
+          isOnboardingPersonalDemoGroup(category.calendarPackGroupId) ||
           category.id === initialEvent?.categoryId)
     );
   }, [categories, initialEvent?.categoryId, profileId]);
@@ -326,9 +330,9 @@ export function EventDialog({
             </h2>
           )}
           {dialogSemantics ? (
-            <DialogDescription>{editorDescription}</DialogDescription>
+            <DialogDescription className="sr-only">{editorDescription}</DialogDescription>
           ) : (
-            <p id={descriptionId} className="text-sm leading-6 text-muted-foreground">
+            <p id={descriptionId} className="sr-only">
               {editorDescription}
             </p>
           )}
@@ -364,7 +368,7 @@ export function EventDialog({
             />
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-nowrap items-center gap-2">
             <Select
               value={profileId}
               onValueChange={handleProfileSelect}
@@ -372,7 +376,7 @@ export function EventDialog({
             >
               <SelectTrigger
                 size="sm"
-                className="h-8 w-auto min-w-0 gap-1.5 rounded-full border-border/80 bg-muted/40 px-3 text-[12.5px] font-semibold text-foreground/85 shadow-none hover:bg-muted/70"
+                className="h-8 w-auto min-w-0 shrink-0 gap-1.5 rounded-full border-primary bg-primary px-3 text-[12.5px] font-semibold text-primary-foreground shadow-none hover:bg-primary/90 dark:bg-primary dark:hover:bg-primary/90"
               >
                 <span className="inline-flex min-w-0 items-center gap-1.5">
                   {currentProfile ? <ProfileIcon icon={currentProfile.icon} size={12} /> : null}
@@ -401,7 +405,7 @@ export function EventDialog({
             >
               <SelectTrigger
                 size="sm"
-                className="h-8 w-auto min-w-0 gap-1.5 rounded-full px-3 text-[12.5px] font-semibold shadow-none"
+                className="h-8 w-auto min-w-0 shrink-0 gap-1.5 rounded-full px-3 text-[12.5px] font-semibold shadow-none"
                 style={
                   currentCategoryToken
                     ? {
@@ -449,6 +453,7 @@ export function EventDialog({
               startDate={startDate}
               endDate={endDate}
               disabled={isManagedEvent}
+              className="min-w-0 flex-1 justify-center"
               onChange={({ startDate: nextStart, endDate: nextEnd }) => {
                 changedFieldsRef.current.add("startDate");
                 changedFieldsRef.current.add("endDate");
@@ -461,13 +466,13 @@ export function EventDialog({
           <details
             open={advancedOpen}
             onToggle={(event) => setAdvancedOpen(event.currentTarget.open)}
-            className="group rounded-2xl border border-border/70 bg-muted/20"
+            className="group"
           >
-            <summary className="flex cursor-pointer list-none items-center justify-between px-3.5 py-3 text-sm font-medium text-foreground/78 outline-none focus-visible:ring-2 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
+            <summary className="flex cursor-pointer list-none items-center gap-1.5 py-1 text-[12px] font-semibold text-foreground/78 outline-none focus-visible:ring-2 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
               Mais opções
-              <ChevronDown className="size-4 text-muted-foreground transition-transform group-open:rotate-180" />
+              <ChevronDown className="size-3.5 text-muted-foreground transition-transform group-open:rotate-180" />
             </summary>
-            <div className="space-y-5 border-t border-border/60 p-3.5">
+            <div className="space-y-5 pt-3">
 
           <div className="space-y-1">
             <label htmlFor="event-notes" className={FIELD_LABEL_CLASS}>
@@ -487,67 +492,60 @@ export function EventDialog({
             />
           </div>
 
-          <div className="space-y-2.5 rounded-2xl border border-border/70 bg-muted/25 p-3.5">
-            <div className="space-y-0.5">
-              <p className={FIELD_LABEL_CLASS}>Recorrência</p>
-              <p className="text-xs text-muted-foreground">
-                Use apenas quando esse evento se repetir ao longo do ano.
-              </p>
-            </div>
-            <div className={`grid gap-3 ${isRecurring ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"}`}>
-              <div className="space-y-1">
-                <Select
-                  value={recurrenceType}
-                  onValueChange={(value) => {
-                    changedFieldsRef.current.add("recurrenceType");
-                    changedFieldsRef.current.add("recurrenceUntil");
-                    setRecurrenceType(value as RecurrenceDraft);
-                  }}
-                  disabled={isManagedEvent}
-                >
-                  <SelectTrigger className="h-10 rounded-xl border-border/80 bg-background shadow-sm">
-                    <span>
-                      {recurrenceType === "none"
-                        ? "Sem recorrencia"
-                        : recurrenceType === "weekly"
-                          ? "Semanal"
-                          : recurrenceType === "biweekly"
-                            ? "A cada 2 semanas"
-                            : recurrenceType === "monthly"
-                              ? "Mensal"
-                              : "Anual"}
-                    </span>
-                  </SelectTrigger>
-                  <SelectContent position="popper" side="bottom" align="start">
-                    <SelectItem value="none">Sem recorrencia</SelectItem>
-                    <SelectItem value="weekly">Semanal</SelectItem>
-                    <SelectItem value="biweekly">A cada 2 semanas</SelectItem>
-                    <SelectItem value="monthly">Mensal</SelectItem>
-                    <SelectItem value="yearly">Anual</SelectItem>
-                  </SelectContent>
-                </Select>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="space-y-0.5">
+                <p className={FIELD_LABEL_CLASS}>Recorrência</p>
+                <p className="text-xs text-muted-foreground">
+                  Use apenas quando esse evento se repetir ao longo do ano.
+                </p>
               </div>
-
-              {isRecurring ? (
-                <div className="space-y-1">
-                  <label htmlFor="event-recurrence-until" className={FIELD_LABEL_CLASS}>
-                    Repetir até
-                  </label>
-                  <Input
-                    id="event-recurrence-until"
-                    className="h-10 rounded-xl"
-                    type="date"
-                    min={startDate || undefined}
-                    value={recurrenceUntil}
-                    disabled={isManagedEvent}
-                    onChange={(event) => {
-                      changedFieldsRef.current.add("recurrenceUntil");
-                      setRecurrenceUntil(event.target.value);
-                    }}
-                  />
-                </div>
-              ) : null}
+              <Select
+                value={recurrenceType}
+                onValueChange={(value) => {
+                  changedFieldsRef.current.add("recurrenceType");
+                  changedFieldsRef.current.add("recurrenceUntil");
+                  setRecurrenceType(value as RecurrenceDraft);
+                }}
+                disabled={isManagedEvent}
+              >
+                <SelectTrigger className="h-9 w-auto shrink-0 rounded-xl border-border/80 bg-background shadow-sm">
+                  <span>
+                    {recurrenceType === "none"
+                      ? "Sem recorrencia"
+                      : recurrenceType === "weekly"
+                        ? "Semanal"
+                        : recurrenceType === "biweekly"
+                          ? "A cada 2 semanas"
+                          : recurrenceType === "monthly"
+                            ? "Mensal"
+                            : "Anual"}
+                  </span>
+                </SelectTrigger>
+                <SelectContent position="popper" side="bottom" align="end">
+                  <SelectItem value="none">Sem recorrencia</SelectItem>
+                  <SelectItem value="weekly">Semanal</SelectItem>
+                  <SelectItem value="biweekly">A cada 2 semanas</SelectItem>
+                  <SelectItem value="monthly">Mensal</SelectItem>
+                  <SelectItem value="yearly">Anual</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
+
+            {isRecurring ? (
+              <div className="flex items-center justify-between gap-3 border-t border-border/60 pt-3">
+                <p className={FIELD_LABEL_CLASS}>Repetir até</p>
+                <RecurrenceUntilPicker
+                  value={recurrenceUntil}
+                  minDate={startDate || undefined}
+                  disabled={isManagedEvent}
+                  onChange={(nextIso) => {
+                    changedFieldsRef.current.add("recurrenceUntil");
+                    setRecurrenceUntil(nextIso);
+                  }}
+                />
+              </div>
+            ) : null}
           </div>
             </div>
           </details>
@@ -675,12 +673,6 @@ export function EventDialog({
           )}
         </DialogFooter>
 
-        {!isManagedEvent && profileOptions.length === 0 ? (
-          <p className="rounded-xl border border-border/70 bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
-            Crie uma categoria pessoal para adicionar novos eventos.
-          </p>
-        ) : null}
-
         {categoryUnavailable ? (
           <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
             A categoria original deste evento não está mais disponível. Escolha
@@ -743,7 +735,7 @@ export function EventDialog({
           align="start"
           sideOffset={12}
           collisionPadding={12}
-          className="max-h-[calc(100dvh-1.5rem)] w-[min(520px,calc(100vw-1.5rem))] overflow-y-auto p-0"
+          className="max-h-[calc(100dvh-1.5rem)] w-[min(440px,calc(100vw-1.5rem))] overflow-y-auto p-0"
           onOpenAutoFocus={rememberAnchorFocus}
           onCloseAutoFocus={(event) => {
             event.preventDefault();
@@ -767,7 +759,7 @@ export function EventDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showCloseButton={false}
-        className="max-h-[calc(100dvh-1.5rem)] overflow-y-auto p-5 sm:max-w-[520px] sm:p-6"
+        className="max-h-[calc(100dvh-1.5rem)] overflow-y-auto p-5 sm:max-w-[440px] sm:p-6"
         onOpenAutoFocus={rememberAnchorFocus}
         onCloseAutoFocus={(event) => {
           event.preventDefault();

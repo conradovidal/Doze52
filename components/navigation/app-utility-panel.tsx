@@ -121,7 +121,7 @@ function AccountAvatar({
   const initial = displayName.trim().charAt(0).toUpperCase() || "?";
   const className = cn(
     "size-20 rounded-2xl",
-    isPro && "ring-2 ring-amber-400 ring-offset-2 ring-offset-background"
+    isPro && "ring-2 ring-premium ring-offset-2 ring-offset-background"
   );
 
   if (avatarUrl && !brokenAvatar) {
@@ -191,57 +191,44 @@ export function AppUtilityPanel({
   const [spreadsheetOpen, setSpreadsheetOpen] = React.useState(false);
   const [spreadsheetUpgradeOpen, setSpreadsheetUpgradeOpen] = React.useState(false);
   const [feedbackOpen, setFeedbackOpen] = React.useState(false);
-  const [desktopPosition, setDesktopPosition] = React.useState<{
-    right: number;
-    top: number;
-  } | null>(null);
+  const [viewportTick, setViewportTick] = React.useState(0);
   const spreadsheetRequiresPro = isCalendarSpreadsheetProGateEnabled();
 
-  React.useLayoutEffect(() => {
-    if (!open || isMobile) {
-      setDesktopPosition(null);
-      return;
-    }
+  // Computed synchronously during render (not in an effect) so the very first
+  // paint already has the right anchor — measuring the panel's own DOM node
+  // after mount meant the panel briefly rendered centered, then jumped to its
+  // anchored spot once that measurement effect ran, reading as an errant
+  // "rises from below" motion.
+  const desktopPosition = React.useMemo(() => {
+    if (!open || isMobile) return null;
+    const trigger = returnFocusRef.current;
+    if (!trigger) return null;
 
-    const updatePosition = () => {
-      const trigger = returnFocusRef.current;
-      const panel = document.querySelector<HTMLElement>("[data-app-utility-panel]");
-      if (!trigger || !panel) return;
+    const triggerRect = trigger.getBoundingClientRect();
+    const viewportPadding = 16;
+    const gap = 8;
+    // Mirrors the h-[min(680px,88dvh)] class below exactly, so this estimate
+    // never diverges from the panel's actual rendered height.
+    const panelHeight = Math.min(680, window.innerHeight * 0.88);
+    const right = Math.max(viewportPadding, window.innerWidth - triggerRect.right);
+    const top = Math.max(
+      viewportPadding,
+      Math.min(triggerRect.bottom + gap, window.innerHeight - panelHeight - viewportPadding)
+    );
+    return { right, top };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, isMobile, returnFocusRef, viewportTick]);
 
-      const triggerRect = trigger.getBoundingClientRect();
-      const panelRect = panel.getBoundingClientRect();
-      const viewportPadding = 16;
-      const gap = 8;
-      const right = Math.max(viewportPadding, window.innerWidth - triggerRect.right);
-      const top = Math.max(
-        viewportPadding,
-        Math.min(
-          triggerRect.bottom + gap,
-          window.innerHeight - panelRect.height - viewportPadding
-        )
-      );
-
-      setDesktopPosition((current) =>
-        current && current.right === right && current.top === top
-          ? current
-          : { right, top }
-      );
-    };
-
-    updatePosition();
-    window.addEventListener("resize", updatePosition);
-    window.addEventListener("scroll", updatePosition, true);
-    const observer = new ResizeObserver(updatePosition);
-    if (returnFocusRef.current) observer.observe(returnFocusRef.current);
-    const panel = document.querySelector<HTMLElement>("[data-app-utility-panel]");
-    if (panel) observer.observe(panel);
-
+  React.useEffect(() => {
+    if (!open || isMobile) return;
+    const handleViewportChange = () => setViewportTick((tick) => tick + 1);
+    window.addEventListener("resize", handleViewportChange);
+    window.addEventListener("scroll", handleViewportChange, true);
     return () => {
-      window.removeEventListener("resize", updatePosition);
-      window.removeEventListener("scroll", updatePosition, true);
-      observer.disconnect();
+      window.removeEventListener("resize", handleViewportChange);
+      window.removeEventListener("scroll", handleViewportChange, true);
     };
-  }, [isMobile, open, returnFocusRef]);
+  }, [open, isMobile]);
 
   React.useEffect(() => {
     if (!open) return;
@@ -360,7 +347,7 @@ export function AppUtilityPanel({
             <AccountAvatar avatarUrl={avatarUrl} displayName={displayName} isPro={showProIdentity} />
             <h3 className="mt-5 text-xl font-semibold text-foreground">{displayName}</h3>
             <p className="mt-1 text-sm text-muted-foreground">{email}</p>
-            <span className={cn("mt-3 rounded-full px-2.5 py-1 text-xs font-semibold", showProIdentity ? "bg-amber-400/15 text-amber-700 dark:text-amber-200" : "bg-muted text-muted-foreground")}>{showProIdentity ? "Pro" : "Free"}</span>
+            <span className={cn("mt-3 rounded-full px-2.5 py-1 text-xs font-semibold", showProIdentity ? "bg-premium-soft text-premium-foreground" : "bg-muted text-muted-foreground")}>{showProIdentity ? "Pro" : "Free"}</span>
             <Button type="button" variant="outline" className="mt-8 min-w-48" disabled={isSigningOut} onClick={handleSignOut}><LogOut className="size-4" />{isSigningOut ? "Saindo..." : "Sair"}</Button>
           </div>
         ) : (
@@ -374,7 +361,7 @@ export function AppUtilityPanel({
       case "plan":
         return (
           <div className="max-w-xl rounded-2xl border border-border bg-card p-5">
-            <div className="flex items-start justify-between gap-5"><div><p className="text-lg font-semibold text-foreground">{planLabel}</p><p className="mt-2 text-sm leading-6 text-muted-foreground">{planDescription}</p></div><Sparkles className={cn("mt-1 size-5", isPro ? "text-amber-500" : "text-muted-foreground")} /></div>
+            <div className="flex items-start justify-between gap-5"><div><p className="text-lg font-semibold text-foreground">{planLabel}</p><p className="mt-2 text-sm leading-6 text-muted-foreground">{planDescription}</p></div><Sparkles className={cn("mt-1 size-5", isPro ? "text-premium" : "text-muted-foreground")} /></div>
             <Button type="button" variant={isPro ? "outline" : "premium"} className="mt-6" disabled={isPlanActionLoading || hasBillingError} onClick={handlePlanAction}><CreditCard className="size-4" />{planActionLabel}</Button>
           </div>
         );
@@ -387,7 +374,7 @@ export function AppUtilityPanel({
         );
       case "data":
         return (
-          <div className="max-w-xl rounded-2xl border border-border bg-card p-2"><PanelAction icon={FileSpreadsheet} disabled={spreadsheetRequiresPro && isBillingLoading} onClick={openSpreadsheet}>Importar ou exportar{spreadsheetRequiresPro && !isPro && !isBillingLoading ? <span className="ml-auto rounded-full bg-amber-400/15 px-2 py-0.5 text-[10px] font-semibold text-amber-800 dark:text-amber-100">Pro</span> : null}</PanelAction></div>
+          <div className="max-w-xl rounded-2xl border border-border bg-card p-2"><PanelAction icon={FileSpreadsheet} disabled={spreadsheetRequiresPro && isBillingLoading} onClick={openSpreadsheet}>Importar ou exportar{spreadsheetRequiresPro && !isPro && !isBillingLoading ? <span className="ml-auto rounded-full bg-premium-soft px-2 py-0.5 text-[10px] font-semibold text-premium-foreground">Pro</span> : null}</PanelAction></div>
         );
       case "help":
         return (
@@ -437,7 +424,7 @@ export function AppUtilityPanel({
           data-desktop-anchor-positioned={
             !isMobile && desktopPosition ? "true" : undefined
           }
-          className={cn("overflow-hidden p-0", isMobile ? "inset-0 h-dvh w-screen max-w-none translate-x-0 translate-y-0 rounded-none border-0 sm:max-w-none" : "h-[min(680px,88dvh)] w-[min(880px,calc(100vw-5rem))] max-w-[880px] translate-x-0 translate-y-0 sm:max-w-[880px]")}
+          className={cn("overflow-hidden p-0", isMobile ? "inset-0 h-dvh w-screen max-w-none translate-x-0 translate-y-0 rounded-none border-0 sm:max-w-none" : "h-[min(680px,88dvh)] w-[min(880px,calc(100vw-5rem))] max-w-[880px] translate-x-0 translate-y-0 data-[state=open]:slide-in-from-top-2 data-[state=closed]:slide-out-to-top-2 sm:max-w-[880px]")}
           style={
             !isMobile && desktopPosition
               ? {
