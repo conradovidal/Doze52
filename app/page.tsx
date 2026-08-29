@@ -464,11 +464,15 @@ export default function HomePage() {
   // account, not just someone with existing events.
   //
   // Anonymous visitors get the personal demo snapshot (2 profiles, demo
-  // categories under DEMO_CATEGORY_IDS) auto-loaded the moment the tour
-  // starts, so counting profiles/categories by raw length or a partial id
-  // set wrongly flags every fresh visitor as "established" too. Compare
-  // against the known onboarding/demo ids instead, so only a profile or
-  // category the user actually created (a fresh, non-onboarding id) counts.
+  // categories under DEMO_CATEGORY_IDS, plus imported "ready-made" holiday
+  // and F1 calendar packs) auto-loaded the moment the tour starts, so
+  // counting profiles/categories by raw length or a partial id set wrongly
+  // flags every fresh visitor as "established" too. A category sourced from
+  // any calendar pack (demo or a real ready-made pack — those carry their
+  // own calendarPackGroupId, not the onboarding demo marker) is exactly as
+  // "not authored" as the pack events already excluded above, so the same
+  // signal applies here. Only a profile or category with neither a pack
+  // origin nor a known onboarding id was actually created by the user.
   const defaultOnboardingCategoryIds = React.useMemo(
     () => new Set<string>(Object.values(ONBOARDING_CATEGORY_IDS)),
     []
@@ -479,8 +483,8 @@ export default function HomePage() {
   );
   const hasCustomizedCategories = categories.some(
     (category) =>
-      !defaultOnboardingCategoryIds.has(category.id) &&
-      !isOnboardingPersonalDemoGroup(category.calendarPackGroupId)
+      !category.calendarPackGroupId &&
+      !defaultOnboardingCategoryIds.has(category.id)
   );
   const hasCustomProfiles = profiles.some(
     (profile) => !knownOnboardingProfileIds.has(profile.id)
