@@ -571,12 +571,12 @@ export function AppUtilityPanel({
               <div className="grid grid-cols-[1fr_auto_auto] items-center gap-x-4 gap-y-2.5 px-5 py-4 text-sm">
                 <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">O que muda</span>
                 <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Free</span>
-                <span className="text-xs font-semibold uppercase tracking-wide text-premium">Pro</span>
+                <span className="text-xs font-semibold uppercase tracking-wide text-emerald-600 dark:text-emerald-300">Pro</span>
                 {PLAN_COMPARISON_ROWS.map((row) => (
                   <React.Fragment key={row.label}>
                     <span className="text-foreground">{row.label}</span>
                     <span className="text-muted-foreground">{row.free}</span>
-                    <span className="font-medium text-premium-foreground">{row.pro}</span>
+                    <span className="font-medium text-emerald-600 dark:text-emerald-300">{row.pro}</span>
                   </React.Fragment>
                 ))}
               </div>
