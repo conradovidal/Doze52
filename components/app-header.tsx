@@ -64,6 +64,9 @@ type AppHeaderProps = {
     section: UtilityPanelSection,
     trigger: HTMLElement
   ) => void;
+  onToggleHabitsEditing?: () => void;
+  habitsEditingActive?: boolean;
+  habitsOrganizeDisabled?: boolean;
   onOpenAuthDialog: (anchorPoint?: AnchorPoint) => void;
   onCalendarPackFocusYear: (year: number) => void;
   onboardingFocusTarget?: OnboardingFocusTarget;
@@ -105,6 +108,9 @@ export function AppHeader({
   activeDestination = "annual",
   onDestinationSelect,
   onOpenUtilityPanel,
+  onToggleHabitsEditing,
+  habitsEditingActive = false,
+  habitsOrganizeDisabled = false,
   onOpenAuthDialog,
   onCalendarPackFocusYear,
   onboardingFocusTarget = null,
@@ -341,6 +347,20 @@ export function AppHeader({
     selectedProfileIds,
   ]);
 
+  const organizeActive =
+    activeDestination === "habits" ? habitsEditingActive : effectiveInlineEditMode;
+  const organizeDisabled =
+    activeDestination === "habits" ? habitsOrganizeDisabled : inlineEditDisabled;
+
+  const handleToggleOrganize = React.useCallback(() => {
+    if (organizeDisabled) return;
+    if (activeDestination === "habits") {
+      onToggleHabitsEditing?.();
+      return;
+    }
+    toggleInlineEditMode();
+  }, [activeDestination, organizeDisabled, onToggleHabitsEditing, toggleInlineEditMode]);
+
   const openCreateProfile = React.useCallback(() => {
     pendingProfileCreateRestoreRef.current = {
       knownProfileIds: profiles.map((profile) => profile.id),
@@ -374,7 +394,7 @@ export function AppHeader({
 
   const guidedOutlineSelector =
     guidedToolbarNotice?.target === "edit"
-      ? '[data-onboarding-edit-control][data-onboarding-highlighted="true"]'
+      ? '[data-onboarding-edit-control][data-onboarding-highlighted="true"], [data-product-organize="desktop"][data-onboarding-highlighted="true"]'
       : guidedToolbarNotice?.target === "calendars"
         ? '[data-onboarding-calendar-control][data-onboarding-highlighted="true"]'
         : guidedToolbarNotice?.target === "habit-surface"
@@ -429,6 +449,10 @@ export function AppHeader({
               authLoading={authLoading}
               onDestinationSelect={onDestinationSelect}
               onOpenUtilityPanel={onOpenUtilityPanel}
+              onToggleOrganize={handleToggleOrganize}
+              organizeActive={organizeActive}
+              organizeDisabled={organizeDisabled}
+              organizeHighlighted={guidedToolbarNotice?.target === "edit"}
               highlightProfile={guidedToolbarNotice?.target === "profile"}
               highlightDestination={
                 guidedToolbarNotice?.target === "habit-surface" ? "habits" : undefined
@@ -834,88 +858,52 @@ export function AppHeader({
                       highlightedProfileId={highlightedProfileId}
                     />
 
-                    {useAdaptiveNavigation ? (
-                      <div className="relative shrink-0">
-                        <button
-                          type="button"
-                          data-onboarding-edit-control
-                          data-onboarding-highlighted={
-                            guidedToolbarNotice?.target === "edit"
-                              ? "true"
-                              : undefined
-                          }
-                          aria-pressed={effectiveInlineEditMode}
-                          aria-label={effectiveInlineEditMode ? "Finalizar edição" : "Editar"}
-                          title={effectiveInlineEditMode ? "Finalizar edição" : "Editar"}
-                          disabled={inlineEditDisabled}
-                          className={cn(
-                            categoryToggleClass,
-                            effectiveInlineEditMode &&
-                              "border-foreground bg-foreground text-background hover:bg-foreground/90 hover:text-background"
-                          )}
-                          onClick={toggleInlineEditMode}
-                        >
-                          {effectiveInlineEditMode ? (
-                            <Check className="h-3.5 w-3.5" />
-                          ) : (
-                            <PencilLine className="h-3.5 w-3.5" />
-                          )}
-                        </button>
-                        {guidedToolbarNotice?.target === "edit" &&
-                        onDismissGuidedSelection ? (
-                          <GuidedToolbarNoticeCard
-                            notice={guidedToolbarNotice}
-                            onClose={onDismissGuidedSelection}
-                            onAction={() => onGuidedToolbarAction?.("edit")}
-                            placement="viewport"
-                            portaled
-                            anchorSelector='[data-onboarding-edit-control][data-onboarding-highlighted="true"]'
-                            anchorPlacement="below-center"
-                          />
-                        ) : null}
-                      </div>
+                    {guidedToolbarNotice?.target === "edit" &&
+                    onDismissGuidedSelection ? (
+                      <GuidedToolbarNoticeCard
+                        notice={guidedToolbarNotice}
+                        onClose={onDismissGuidedSelection}
+                        onAction={() => onGuidedToolbarAction?.("edit")}
+                        placement="viewport"
+                        portaled
+                        anchorSelector='[data-product-organize="desktop"][data-onboarding-highlighted="true"]'
+                        anchorPlacement="below-center"
+                      />
                     ) : null}
 
-                    <button
-                      type="button"
-                      className={`${categoryToggleClass} ${
-                        effectiveInlineEditMode
-                          ? "cursor-default opacity-70 hover:border-border hover:bg-card hover:text-foreground/70 active:translate-y-0"
-                          : ""
-                      }`}
-                      disabled={effectiveInlineEditMode}
-                      onClick={() => {
-                        setCategoriesExpanded((current) => !current);
-                        onFilterLayoutChange?.();
-                      }}
-                      aria-label={
-                        effectiveInlineEditMode
-                          ? "Categorias abertas durante a edicao"
-                          : effectiveCategoriesExpanded
+                    {!effectiveInlineEditMode ? (
+                      <button
+                        type="button"
+                        className={categoryToggleClass}
+                        onClick={() => {
+                          setCategoriesExpanded((current) => !current);
+                          onFilterLayoutChange?.();
+                        }}
+                        aria-label={
+                          effectiveCategoriesExpanded
                             ? "Recolher categorias"
                             : "Mostrar categorias"
-                      }
-                      aria-expanded={effectiveCategoriesExpanded}
-                      aria-controls={
-                        effectiveCategoriesExpanded
-                          ? "app-header-categories"
-                          : undefined
-                      }
-                      title={
-                        effectiveInlineEditMode
-                          ? "Categorias abertas durante a edicao"
-                          : effectiveCategoriesExpanded
+                        }
+                        aria-expanded={effectiveCategoriesExpanded}
+                        aria-controls={
+                          effectiveCategoriesExpanded
+                            ? "app-header-categories"
+                            : undefined
+                        }
+                        title={
+                          effectiveCategoriesExpanded
                             ? "Recolher categorias"
                             : "Mostrar categorias"
-                      }
-                    >
-                      <ChevronDown
-                        className={`h-3.5 w-3.5 transition-transform duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-                          effectiveCategoriesExpanded ? "rotate-180" : ""
-                        }`}
-                        aria-hidden="true"
-                      />
-                    </button>
+                        }
+                      >
+                        <ChevronDown
+                          className={`h-3.5 w-3.5 transition-transform duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                            effectiveCategoriesExpanded ? "rotate-180" : ""
+                          }`}
+                          aria-hidden="true"
+                        />
+                      </button>
+                    ) : null}
                   </div>
                 </div>
               </div>

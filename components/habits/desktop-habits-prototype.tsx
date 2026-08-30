@@ -27,10 +27,8 @@ export function DesktopHabitsPrototype({
   onRequestCreate,
   isEditing,
   readOnly = false,
-  archivedHabits,
   onEditHabit,
   onReorderHabits,
-  onReactivateHabit,
   onToggleEditing,
   onYearChange,
   guidedNotice,
@@ -56,10 +54,8 @@ export function DesktopHabitsPrototype({
   onRequestCreate: () => void;
   isEditing: boolean;
   readOnly?: boolean;
-  archivedHabits: Habit[];
   onEditHabit: (habitId: string) => void;
   onReorderHabits: (orderedIds: string[]) => void;
-  onReactivateHabit: (habitId: string) => void;
   onToggleEditing?: () => void;
   onYearChange: (year: number) => void;
   guidedNotice?: GuidedToolbarNotice | null;
@@ -101,10 +97,8 @@ export function DesktopHabitsPrototype({
         onRequestCreate={onRequestCreate}
         isEditing={isEditing}
         readOnly={readOnly}
-        archivedHabits={archivedHabits}
         onEditHabit={onEditHabit}
         onReorderHabits={onReorderHabits}
-        onReactivateHabit={onReactivateHabit}
         onToggleEditing={onToggleEditing}
         guidedNotice={controlsNotice}
         onDismissGuidedNotice={onDismissGuidedNotice}

@@ -250,7 +250,12 @@ const completePersonalOnboarding = async (
   const spotlightToolbar = page.locator(
     '[data-onboarding-toolbar-spotlight="true"]'
   );
-  await expect(page.locator("[data-onboarding-edit-control]")).toBeEnabled();
+  const editControl = mobile
+    ? page.locator("[data-onboarding-edit-control]")
+    : page.locator('[data-product-organize="desktop"]');
+  const editingLabel = mobile ? /Finalizar edição/ : /Finalizar organização/;
+  const notEditingLabel = mobile ? /^Editar$/ : /^Organizar$/;
+  await expect(editControl).toBeEnabled();
   await expect(toolbarNotice).toContainText(
     "Veja como editar contextos e categorias"
   );
@@ -287,7 +292,7 @@ const completePersonalOnboarding = async (
   await expect(
     toolbarNotice.getByRole("button", { name: "Encerrar guia inicial" })
   ).toHaveCSS("position", "absolute");
-  await page.locator("[data-onboarding-edit-control]").click();
+  await editControl.click();
   const filterRegion = page.locator("[data-onboarding-filter-region]");
   await expect(filterRegion.locator(":scope > div").first()).not.toHaveAttribute(
     "inert",
@@ -296,8 +301,8 @@ const completePersonalOnboarding = async (
   const beforeEditPreview = await page.evaluate(() =>
     window.localStorage.getItem("yiv-store")
   );
-  const finishEdit = page.locator("[data-onboarding-edit-control]");
-  await expect(finishEdit).toHaveAttribute("aria-label", /Finalizar edição/);
+  const finishEdit = editControl;
+  await expect(finishEdit).toHaveAttribute("aria-label", editingLabel);
   if (adaptiveDesktop) {
     await expect(toolbarNotice).toHaveAttribute(
       "data-guided-toolbar-target",
@@ -367,10 +372,7 @@ const completePersonalOnboarding = async (
     .click();
   await expect(calendarDialog).toBeHidden();
   if (adaptiveDesktop) {
-    await expect(page.locator("[data-onboarding-edit-control]")).toHaveAttribute(
-      "aria-label",
-      /Editar/
-    );
+    await expect(editControl).toHaveAttribute("aria-label", notEditingLabel);
   }
   const importedHolidayTitles = await page.evaluate(() => {
     const payload = JSON.parse(window.localStorage.getItem("yiv-store") ?? "{}");
@@ -789,10 +791,10 @@ test("seletor de destino integra o card de mover eventos", async ({
     )
     .toBeNull();
   const editWorkspace = page.getByRole("button", {
-    name: "Editar contextos e categorias",
+    name: "Organizar",
   });
   const finishWorkspaceEdit = page.getByRole("button", {
-    name: "Finalizar edição de contextos e categorias",
+    name: "Finalizar organização",
   });
   await expect(async () => {
     await editWorkspace.click();
@@ -1375,7 +1377,7 @@ test("saída após criar contexto preserva o ano e convida após três criaçõe
   });
 
   await page
-    .getByRole("button", { name: "Editar contextos e categorias" })
+    .getByRole("button", { name: "Organizar" })
     .click();
   for (const name of ["Saúde", "Família", "Projetos"]) {
     await page.getByRole("button", { name: "Criar nova categoria" }).click();
@@ -1591,7 +1593,11 @@ test("centraliza cards e mantém a instrução visível no cabeçalho fixo", asy
   const filterControls = filterRegion.locator(":scope > div").first();
   await expect(filterControls).toHaveAttribute("inert", "");
   await expect(filterControls).toHaveAttribute("aria-hidden", "true");
-  await expect(page.locator("[data-onboarding-edit-control]")).toBeEnabled();
+  await expect(
+    mobile
+      ? page.locator("[data-onboarding-edit-control]")
+      : page.locator('[data-product-organize="desktop"]')
+  ).toBeEnabled();
   await expect(page.locator("[data-onboarding-calendar-control]")).toBeEnabled();
   await expect(page.locator("[data-onboarding-year-control]").first()).toBeEnabled();
   await expect(page.locator("[data-onboarding-theme-control]")).toBeEnabled();
