@@ -191,6 +191,25 @@ export const getBillingCustomerId = async (userId: string) => {
   return (data?.stripe_customer_id as string | undefined) ?? null;
 };
 
+export const cancelActiveSubscriptionsForUser = async (userId: string) => {
+  const stripeCustomerId = await getBillingCustomerId(userId);
+  if (!stripeCustomerId) return;
+
+  const stripe = getStripe();
+  const subscriptions = await stripe.subscriptions.list({
+    customer: stripeCustomerId,
+    status: "all",
+  });
+
+  await Promise.all(
+    subscriptions.data
+      .filter((subscription) =>
+        ["active", "trialing", "past_due", "unpaid"].includes(subscription.status)
+      )
+      .map((subscription) => stripe.subscriptions.cancel(subscription.id))
+  );
+};
+
 export const getBillingStatusForUser = async (
   userId: string
 ): Promise<BillingStatusPayload> => {
