@@ -58,10 +58,10 @@ import { saveSnapshot } from "@/lib/sync";
 import { useBilling } from "@/lib/use-billing";
 import { cn } from "@/lib/utils";
 
-const CalendarSpreadsheetDialog = dynamic(
+const CalendarSpreadsheetPanel = dynamic(
   () =>
     import("@/components/calendar-spreadsheet-dialog").then(
-      (module) => module.CalendarSpreadsheetDialog
+      (module) => module.CalendarSpreadsheetPanel
     ),
   { ssr: false }
 );
@@ -259,10 +259,8 @@ export function AppUtilityPanel({
   const [mobileDetailOpen, setMobileDetailOpen] = React.useState(false);
   const [adminCapabilities, setAdminCapabilities] = React.useState<AdminCapabilities>(EMPTY_ADMIN_CAPABILITIES);
   const [isSigningOut, setIsSigningOut] = React.useState(false);
-  const [spreadsheetOpen, setSpreadsheetOpen] = React.useState(false);
   const [spreadsheetUpgradeOpen, setSpreadsheetUpgradeOpen] = React.useState(false);
   const [feedbackOpen, setFeedbackOpen] = React.useState(false);
-  const [viewportTick, setViewportTick] = React.useState(0);
   const [brokenAvatar, setBrokenAvatar] = React.useState(false);
   const [isSendingPasswordReset, setIsSendingPasswordReset] = React.useState(false);
   const [isEditingName, setIsEditingName] = React.useState(false);
@@ -270,42 +268,6 @@ export function AppUtilityPanel({
   const [isSavingName, setIsSavingName] = React.useState(false);
   const [deleteAccountOpen, setDeleteAccountOpen] = React.useState(false);
   const spreadsheetRequiresPro = isCalendarSpreadsheetProGateEnabled();
-
-  // Computed synchronously during render (not in an effect) so the very first
-  // paint already has the right anchor — measuring the panel's own DOM node
-  // after mount meant the panel briefly rendered centered, then jumped to its
-  // anchored spot once that measurement effect ran, reading as an errant
-  // "rises from below" motion.
-  const desktopPosition = React.useMemo(() => {
-    if (!open || isMobile) return null;
-    const trigger = returnFocusRef.current;
-    if (!trigger) return null;
-
-    const triggerRect = trigger.getBoundingClientRect();
-    const viewportPadding = 16;
-    const gap = 8;
-    // Mirrors the h-[min(600px,86dvh)] class below exactly, so this estimate
-    // never diverges from the panel's actual rendered height.
-    const panelHeight = Math.min(600, window.innerHeight * 0.86);
-    const right = Math.max(viewportPadding, window.innerWidth - triggerRect.right);
-    const top = Math.max(
-      viewportPadding,
-      Math.min(triggerRect.bottom + gap, window.innerHeight - panelHeight - viewportPadding)
-    );
-    return { right, top };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, isMobile, returnFocusRef, viewportTick]);
-
-  React.useEffect(() => {
-    if (!open || isMobile) return;
-    const handleViewportChange = () => setViewportTick((tick) => tick + 1);
-    window.addEventListener("resize", handleViewportChange);
-    window.addEventListener("scroll", handleViewportChange, true);
-    return () => {
-      window.removeEventListener("resize", handleViewportChange);
-      window.removeEventListener("scroll", handleViewportChange, true);
-    };
-  }, [open, isMobile]);
 
   React.useEffect(() => {
     if (!open) return;
@@ -463,11 +425,6 @@ export function AppUtilityPanel({
     }
   };
 
-  const openSpreadsheet = () => {
-    onOpenChange(false);
-    if (!spreadsheetRequiresPro || isPro) setSpreadsheetOpen(true);
-    else setSpreadsheetUpgradeOpen(true);
-  };
   const openFeedback = () => { onOpenChange(false); setFeedbackOpen(true); };
   const navigateTo = (href: string) => { onOpenChange(false); router.push(href); };
 
@@ -584,8 +541,19 @@ export function AppUtilityPanel({
           </div>
         );
       case "data":
-        return (
-          <div className="max-w-xl rounded-2xl border border-border bg-card p-2"><PanelAction icon={FileSpreadsheet} disabled={spreadsheetRequiresPro && isBillingLoading} onClick={openSpreadsheet}>Importar ou exportar{spreadsheetRequiresPro && !isPro && !isBillingLoading ? <span className="ml-auto rounded-full bg-premium-soft px-2 py-0.5 text-[10px] font-semibold text-premium-foreground">Pro</span> : null}</PanelAction></div>
+        return spreadsheetRequiresPro && !isPro && !isBillingLoading ? (
+          <div className="max-w-xl rounded-2xl border border-border bg-card p-5">
+            <div className="flex items-start justify-between gap-5">
+              <div>
+                <p className="text-base font-semibold text-foreground">Importação e exportação</p>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">Traga eventos de outra planilha ou baixe seu calendário — disponível no plano Pro.</p>
+              </div>
+              <FileSpreadsheet className="mt-1 size-5 shrink-0 text-muted-foreground" />
+            </div>
+            <Button type="button" variant="premium" className="mt-6" onClick={() => setSpreadsheetUpgradeOpen(true)}><CreditCard className="size-4" />Assinar Pro</Button>
+          </div>
+        ) : (
+          <CalendarSpreadsheetPanel />
         );
       case "help":
         return (
@@ -627,21 +595,7 @@ export function AppUtilityPanel({
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent
           data-app-utility-panel
-          data-desktop-anchor-positioned={
-            !isMobile && desktopPosition ? "true" : undefined
-          }
-          className={cn("overflow-hidden p-0", isMobile ? "inset-0 h-dvh w-screen max-w-none translate-x-0 translate-y-0 rounded-none border-0 sm:max-w-none" : "h-[min(600px,86dvh)] w-[min(720px,calc(100vw-5rem))] max-w-[720px] translate-x-0 translate-y-0 data-[state=open]:slide-in-from-top-2 data-[state=closed]:slide-out-to-top-2 sm:max-w-[720px]")}
-          style={
-            !isMobile && desktopPosition
-              ? {
-                  left: "auto",
-                  right: desktopPosition.right,
-                  top: desktopPosition.top,
-                  transform: "none",
-                  transformOrigin: "top right",
-                }
-              : undefined
-          }
+          className={cn("overflow-hidden p-0", isMobile ? "inset-0 h-dvh w-screen max-w-none translate-x-0 translate-y-0 rounded-none border-0 sm:max-w-none" : "h-[min(600px,86dvh)] w-[min(720px,calc(100vw-5rem))] max-w-[720px] sm:max-w-[720px]")}
           onCloseAutoFocus={(event) => { event.preventDefault(); returnFocusRef.current?.focus(); }}
         >
           <DialogDescription className="sr-only">Gerencie sua conta, plano, dados e canais do Doze 52.</DialogDescription>
@@ -699,7 +653,6 @@ export function AppUtilityPanel({
           ) : null}
         </DialogContent>
       </Dialog>
-      <CalendarSpreadsheetDialog open={spreadsheetOpen} onOpenChange={setSpreadsheetOpen} />
       <ProUpgradeDialog open={spreadsheetUpgradeOpen} onOpenChange={setSpreadsheetUpgradeOpen} reason="calendar-import-export" />
       <FeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />
       <DeleteAccountDialog open={deleteAccountOpen} onOpenChange={setDeleteAccountOpen} />
