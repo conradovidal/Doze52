@@ -30,12 +30,16 @@ export function AuthForm({
     refreshSessionFromClient,
     closeGooglePopupIfOpen,
     isGooglePopupOpen,
+    sendPasswordResetEmail,
   } = useAuth();
   const [mode, setMode] = React.useState<"login" | "signup">(initialMode);
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
+  const [resetRequestState, setResetRequestState] = React.useState<
+    "idle" | "sending" | "sent"
+  >("idle");
   const [pendingGooglePopup, setPendingGooglePopup] = React.useState(false);
   const popupIntervalRef = React.useRef<number | null>(null);
   const popupTimeoutRef = React.useRef<number | null>(null);
@@ -115,6 +119,7 @@ export function AuthForm({
     setError(null);
     setEmail("");
     setPassword("");
+    setResetRequestState("idle");
   }, [clearPopupTimers, open, mode]);
 
   React.useEffect(() => {
@@ -297,6 +302,24 @@ export function AuthForm({
     }
   };
 
+  const handleForgotPassword = async () => {
+    if (!email.trim()) {
+      setError("Informe seu email para receber o link de redefinição.");
+      return;
+    }
+    setResetRequestState("sending");
+    setError(null);
+    try {
+      await sendPasswordResetEmail(email);
+      setResetRequestState("sent");
+    } catch (err) {
+      setResetRequestState("idle");
+      setError(
+        err instanceof Error ? mapAuthError(err.message) : "Não foi possível enviar o link."
+      );
+    }
+  };
+
   const handleGoogle = async () => {
     setLoading(true);
     setError(null);
@@ -377,6 +400,24 @@ export function AuthForm({
           onChange={(e) => setPassword(e.target.value)}
         />
       </div>
+      {mode === "login" ? (
+        <div className="flex justify-end">
+          {resetRequestState === "sent" ? (
+            <p className="text-xs text-muted-foreground">
+              Enviamos um link para {email}, se essa conta existir.
+            </p>
+          ) : (
+            <button
+              type="button"
+              className="text-xs font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline disabled:opacity-60"
+              disabled={resetRequestState === "sending"}
+              onClick={handleForgotPassword}
+            >
+              {resetRequestState === "sending" ? "Enviando..." : "Esqueci minha senha"}
+            </button>
+          )}
+        </div>
+      ) : null}
       <GoogleButton onClick={handleGoogle} disabled={loading} />
       {pendingGooglePopup ? (
         <p className="rounded-xl border border-border/70 bg-muted/40 px-3 py-2 text-xs text-muted-foreground">

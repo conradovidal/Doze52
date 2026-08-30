@@ -16,18 +16,22 @@ import {
   FileSpreadsheet,
   Github,
   HelpCircle,
-  Image as ImageIcon,
   Instagram,
+  KeyRound,
   LogOut,
   Mail,
   MessageCircle,
   MessageSquareText,
+  PencilLine,
   ShieldCheck,
   Sparkles,
+  Trash2,
+  X,
   type LucideIcon,
 } from "lucide-react";
 
 import { AuthForm } from "@/components/auth/auth-form";
+import { DeleteAccountDialog } from "@/components/account/delete-account-dialog";
 import { ProUpgradeDialog } from "@/components/billing/pro-upgrade-dialog";
 import { BrandLogo } from "@/components/brand-logo";
 import { FeedbackDialog } from "@/components/feedback/feedback-dialog";
@@ -45,8 +49,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useFeedback } from "@/components/ui/feedback-provider";
+import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth";
-import { useAvatarPreference } from "@/lib/avatar-preference";
 import { isCalendarSpreadsheetProGateEnabled, PLAN_LIMITS } from "@/lib/entitlements";
 import { logDevError, logProdError } from "@/lib/safe-log";
 import { useStore } from "@/lib/store";
@@ -106,21 +110,49 @@ const SOCIAL_LINKS: ReadonlyArray<{ label: string; href: string; icon: LucideIco
 ];
 
 function SocialLinksRow({ className }: { className?: string }) {
+  const { notify } = useFeedback();
+
+  const handleCopyEmail = async () => {
+    try {
+      await navigator.clipboard.writeText(SUPPORT_EMAIL);
+      notify({ tone: "success", title: "E-mail copiado", description: SUPPORT_EMAIL });
+    } catch {
+      window.location.href = `mailto:${SUPPORT_EMAIL}`;
+    }
+  };
+
   return (
     <div className={cn("flex items-center justify-center gap-2", className)}>
-      {SOCIAL_LINKS.map((link) => (
-        <a
-          key={link.label}
-          href={link.href}
-          target={link.href.startsWith("mailto:") ? undefined : "_blank"}
-          rel={link.href.startsWith("mailto:") ? undefined : "noopener noreferrer"}
-          aria-label={link.label}
-          title={link.label}
-          className="grid size-9 place-items-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-        >
-          <link.icon className="size-4" />
-        </a>
-      ))}
+      {SOCIAL_LINKS.map((link) => {
+        const isEmail = link.href.startsWith("mailto:");
+        if (isEmail) {
+          return (
+            <button
+              key={link.label}
+              type="button"
+              aria-label={`Copiar ${SUPPORT_EMAIL}`}
+              title={`Copiar ${SUPPORT_EMAIL}`}
+              onClick={handleCopyEmail}
+              className="grid size-9 place-items-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              <link.icon className="size-4" />
+            </button>
+          );
+        }
+        return (
+          <a
+            key={link.label}
+            href={link.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={link.label}
+            title={link.label}
+            className="grid size-9 place-items-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <link.icon className="size-4" />
+          </a>
+        );
+      })}
     </div>
   );
 }
@@ -208,7 +240,7 @@ export function AppUtilityPanel({
 }: AppUtilityPanelProps) {
   const router = useRouter();
   const { notify } = useFeedback();
-  const { session, signOut } = useAuth();
+  const { session, signOut, sendPasswordResetEmail, updateProfileName } = useAuth();
   const profiles = useStore((state) => state.profiles);
   const categories = useStore((state) => state.categories);
   const events = useStore((state) => state.events);
@@ -232,7 +264,11 @@ export function AppUtilityPanel({
   const [feedbackOpen, setFeedbackOpen] = React.useState(false);
   const [viewportTick, setViewportTick] = React.useState(0);
   const [brokenAvatar, setBrokenAvatar] = React.useState(false);
-  const { preference: avatarPreference, setPreference: setAvatarPreference } = useAvatarPreference();
+  const [isSendingPasswordReset, setIsSendingPasswordReset] = React.useState(false);
+  const [isEditingName, setIsEditingName] = React.useState(false);
+  const [nameDraft, setNameDraft] = React.useState("");
+  const [isSavingName, setIsSavingName] = React.useState(false);
+  const [deleteAccountOpen, setDeleteAccountOpen] = React.useState(false);
   const spreadsheetRequiresPro = isCalendarSpreadsheetProGateEnabled();
 
   // Computed synchronously during render (not in an effect) so the very first
@@ -319,8 +355,9 @@ export function AppUtilityPanel({
     (typeof metadata.avatar_url === "string" && metadata.avatar_url) ||
     (typeof metadata.picture === "string" && metadata.picture) ||
     null;
-  const showAvatarPhoto = Boolean(avatarUrl) && avatarPreference === "photo" && !brokenAvatar;
+  const showAvatarPhoto = Boolean(avatarUrl) && !brokenAvatar;
   const showProIdentity = Boolean(session && isPro && !isBillingLoading && !billingError);
+  const canChangePassword = session?.user.provider === "password";
   const periodEndDate = billingStatus.currentPeriodEnd ? new Date(billingStatus.currentPeriodEnd) : null;
   const formattedPeriodEnd =
     periodEndDate && !Number.isNaN(periodEndDate.getTime())
@@ -384,6 +421,48 @@ export function AppUtilityPanel({
     }
   };
 
+  const startEditingName = () => {
+    const hasCustomName = Boolean(rawName) && !/^google_[a-z0-9]+$/i.test(rawName.trim());
+    setNameDraft(hasCustomName ? rawName : "");
+    setIsEditingName(true);
+  };
+
+  const handleSaveName = async () => {
+    const trimmed = nameDraft.trim();
+    if (!trimmed) return;
+    setIsSavingName(true);
+    try {
+      await updateProfileName(trimmed);
+      setIsEditingName(false);
+      notify({ tone: "success", title: "Nome atualizado" });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Falha desconhecida.";
+      logDevError("utility-panel.update-name", { message });
+      notify({ tone: "error", title: "Não foi possível salvar o nome", description: "Tente novamente em instantes." });
+    } finally {
+      setIsSavingName(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (!email) return;
+    setIsSendingPasswordReset(true);
+    try {
+      await sendPasswordResetEmail(email);
+      notify({
+        tone: "success",
+        title: "Link enviado",
+        description: `Enviamos um link para redefinir sua senha para ${email}.`,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Falha desconhecida.";
+      logDevError("utility-panel.change-password", { message });
+      notify({ tone: "error", title: "Não foi possível enviar o link", description: "Tente novamente em instantes." });
+    } finally {
+      setIsSendingPasswordReset(false);
+    }
+  };
+
   const openSpreadsheet = () => {
     onOpenChange(false);
     if (!spreadsheetRequiresPro || isPro) setSpreadsheetOpen(true);
@@ -403,31 +482,47 @@ export function AppUtilityPanel({
               isPro={showProIdentity}
               onAvatarBroken={() => setBrokenAvatar(true)}
             />
-            {avatarUrl && !brokenAvatar ? (
-              <div className="mt-3 inline-flex rounded-lg border border-border bg-card p-0.5 text-xs font-medium">
+            {isEditingName ? (
+              <div className="mt-4 flex w-full max-w-xs items-center gap-1.5">
+                <Input
+                  autoFocus
+                  value={nameDraft}
+                  onChange={(event) => setNameDraft(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") handleSaveName();
+                    if (event.key === "Escape") setIsEditingName(false);
+                  }}
+                  placeholder="Seu nome"
+                  className="h-9 text-center"
+                />
+                <Button type="button" size="icon-sm" variant="outline" disabled={isSavingName || !nameDraft.trim()} onClick={handleSaveName} aria-label="Salvar nome">
+                  <Check className="size-4" />
+                </Button>
+                <Button type="button" size="icon-sm" variant="ghost" disabled={isSavingName} onClick={() => setIsEditingName(false)} aria-label="Cancelar">
+                  <X className="size-4" />
+                </Button>
+              </div>
+            ) : (
+              <div className="mt-4 flex items-center gap-1.5">
+                <h3 className="text-xl font-semibold text-foreground">{displayName}</h3>
+                {showProIdentity ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-premium-soft px-2 py-0.5 text-[11px] font-semibold text-premium-foreground">
+                    <Crown className="size-3" />
+                    Pro
+                  </span>
+                ) : null}
                 <button
                   type="button"
-                  aria-pressed={avatarPreference === "photo"}
-                  className={cn("flex items-center gap-1.5 rounded-md px-2.5 py-1 transition-colors", avatarPreference === "photo" ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground")}
-                  onClick={() => setAvatarPreference("photo")}
+                  aria-label="Editar nome"
+                  title="Editar nome"
+                  className="grid size-6 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  onClick={startEditingName}
                 >
-                  {avatarPreference === "photo" ? <Check className="size-3" /> : <ImageIcon className="size-3" />}
-                  Foto
-                </button>
-                <button
-                  type="button"
-                  aria-pressed={avatarPreference === "icon"}
-                  className={cn("flex items-center gap-1.5 rounded-md px-2.5 py-1 transition-colors", avatarPreference === "icon" ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground")}
-                  onClick={() => setAvatarPreference("icon")}
-                >
-                  {avatarPreference === "icon" ? <Check className="size-3" /> : <CircleUserRound className="size-3" />}
-                  Ícone
+                  <PencilLine className="size-3.5" />
                 </button>
               </div>
-            ) : null}
-            <h3 className="mt-4 text-xl font-semibold text-foreground">{displayName}</h3>
+            )}
             <p className="mt-1 text-sm text-muted-foreground">{email}</p>
-            <span className={cn("mt-3 rounded-full px-2.5 py-1 text-xs font-semibold", showProIdentity ? "bg-premium-soft text-premium-foreground" : "bg-muted text-muted-foreground")}>{showProIdentity ? "Pro" : "Free"}</span>
 
             <button
               type="button"
@@ -441,7 +536,24 @@ export function AppUtilityPanel({
               <Sparkles className={cn("size-5 shrink-0", isPro ? "text-premium" : "text-muted-foreground")} />
             </button>
 
-            <Button type="button" variant="outline" className="mt-6 min-w-48" disabled={isSigningOut} onClick={handleSignOut}><LogOut className="size-4" />{isSigningOut ? "Saindo..." : "Sair"}</Button>
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+              {canChangePassword ? (
+                <Button type="button" variant="outline" className="min-w-48" disabled={isSendingPasswordReset} onClick={handleChangePassword}>
+                  <KeyRound className="size-4" />
+                  {isSendingPasswordReset ? "Enviando..." : "Alterar senha"}
+                </Button>
+              ) : null}
+              <Button type="button" variant="outline" className="min-w-48" disabled={isSigningOut} onClick={handleSignOut}><LogOut className="size-4" />{isSigningOut ? "Saindo..." : "Sair"}</Button>
+            </div>
+
+            <button
+              type="button"
+              className="mt-6 inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-rose-600 dark:hover:text-rose-300"
+              onClick={() => setDeleteAccountOpen(true)}
+            >
+              <Trash2 className="size-3.5" />
+              Excluir minha conta
+            </button>
           </div>
         ) : (
           <div className="mx-auto max-w-sm text-left">
@@ -590,6 +702,7 @@ export function AppUtilityPanel({
       <CalendarSpreadsheetDialog open={spreadsheetOpen} onOpenChange={setSpreadsheetOpen} />
       <ProUpgradeDialog open={spreadsheetUpgradeOpen} onOpenChange={setSpreadsheetUpgradeOpen} reason="calendar-import-export" />
       <FeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />
+      <DeleteAccountDialog open={deleteAccountOpen} onOpenChange={setDeleteAccountOpen} />
     </>
   );
 }

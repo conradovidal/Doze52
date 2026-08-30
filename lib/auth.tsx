@@ -28,6 +28,10 @@ type AuthContextValue = {
   closeGooglePopupIfOpen: () => void;
   isGooglePopupOpen: () => boolean;
   signOut: () => Promise<void>;
+  sendPasswordResetEmail: (email: string) => Promise<void>;
+  updatePassword: (newPassword: string) => Promise<void>;
+  updateProfileName: (fullName: string) => Promise<void>;
+  deleteAccount: () => Promise<void>;
 };
 
 const AuthContext = React.createContext<AuthContextValue | null>(null);
@@ -256,6 +260,73 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setSession(null);
   };
 
+  const sendPasswordResetEmail = async (email: string) => {
+    if (!hasSupabaseEnv) {
+      throw new Error(
+        "Supabase nao configurado. Defina NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY."
+      );
+    }
+    const supabase = getSupabaseBrowserClient();
+    const origin = window.location.origin;
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: `${origin}/auth/callback?next=${encodeURIComponent("/auth/reset-password")}`,
+    });
+    if (error) throw error;
+  };
+
+  const updatePassword = async (newPassword: string) => {
+    if (!hasSupabaseEnv) {
+      throw new Error(
+        "Supabase nao configurado. Defina NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY."
+      );
+    }
+    const supabase = getSupabaseBrowserClient();
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) throw error;
+  };
+
+  const updateProfileName = async (fullName: string) => {
+    if (!hasSupabaseEnv) {
+      throw new Error(
+        "Supabase nao configurado. Defina NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY."
+      );
+    }
+    const supabase = getSupabaseBrowserClient();
+    const { data, error } = await supabase.auth.updateUser({
+      data: { full_name: fullName },
+    });
+    if (error) throw error;
+    if (data.user) {
+      setSession((current) =>
+        current
+          ? {
+              ...current,
+              user: {
+                ...current.user,
+                metadata: data.user.user_metadata,
+              },
+            }
+          : current
+      );
+    }
+  };
+
+  const deleteAccount = async () => {
+    const response = await fetch("/api/account/delete", { method: "POST" });
+    if (!response.ok) {
+      const body = await response.json().catch(() => null);
+      throw new Error(body?.error ?? "Não foi possível excluir sua conta agora.");
+    }
+    if (hasSupabaseEnv) {
+      try {
+        await getSupabaseBrowserClient().auth.signOut();
+      } catch {
+        // Account is already deleted server-side; local session is cleared below regardless.
+      }
+    }
+    setSession(null);
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -269,6 +340,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         closeGooglePopupIfOpen,
         isGooglePopupOpen,
         signOut,
+        sendPasswordResetEmail,
+        updatePassword,
+        updateProfileName,
+        deleteAccount,
       }}
     >
       {children}
