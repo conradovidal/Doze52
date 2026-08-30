@@ -28,7 +28,6 @@ import {
   GripVertical,
   PencilLine,
   Plus,
-  RotateCcw,
 } from "lucide-react";
 
 import { CollapsibleControlRegion } from "@/components/ui/collapsible-control-region";
@@ -66,7 +65,6 @@ type HabitControlsProps = {
   totalActiveHabits: number;
   selectedHabit: Habit | null;
   visibleHabitIds?: ReadonlySet<string>;
-  archivedHabits?: Habit[];
   isEditing?: boolean;
   readOnly?: boolean;
   mobile?: boolean;
@@ -77,7 +75,6 @@ type HabitControlsProps = {
   onRequestCreate: () => void;
   onEditHabit?: (habitId: string) => void;
   onReorderHabits?: (orderedIds: string[]) => void;
-  onReactivateHabit?: (habitId: string) => void;
   onToggleEditing?: () => void;
   guidedNotice?: GuidedToolbarNotice | null;
   onDismissGuidedNotice?: () => void;
@@ -232,7 +229,6 @@ export function HabitControls({
   totalActiveHabits,
   selectedHabit,
   visibleHabitIds,
-  archivedHabits = [],
   isEditing = false,
   readOnly = false,
   mobile = false,
@@ -243,7 +239,6 @@ export function HabitControls({
   onRequestCreate,
   onEditHabit,
   onReorderHabits,
-  onReactivateHabit,
   onToggleEditing,
   guidedNotice = null,
   onDismissGuidedNotice,
@@ -540,41 +535,28 @@ export function HabitControls({
             </span>
             <span className="pr-2.5">Hábitos</span>
           </div>
-          <button
-            type="button"
-            data-onboarding-edit-control
-            aria-pressed={isEditing}
-            aria-label={isEditing ? "Finalizar edição" : "Editar"}
-            title={isEditing ? "Finalizar edição" : "Editar"}
-            disabled={readOnly}
-            className={cn(
-              "inline-flex size-8 items-center justify-center rounded-[10px] border border-border bg-card text-foreground/70 disabled:cursor-not-allowed disabled:opacity-45",
-              isEditing && "border-foreground bg-foreground text-background"
-            )}
-            onClick={onToggleEditing}
-          >
-            {isEditing ? <Check className="size-3.5" /> : <PencilLine className="size-3.5" />}
-          </button>
-          <button
-            type="button"
-            className="inline-flex size-8 items-center justify-center rounded-[10px] border border-border bg-card text-foreground/70 transition-colors hover:border-foreground/18 hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45"
-            aria-expanded={expanded}
-            aria-controls={controlsId}
-            aria-label={expanded ? "Recolher hábitos" : "Mostrar hábitos"}
-            title={expanded ? "Recolher hábitos" : "Mostrar hábitos"}
-            onClick={() => setExpanded((current) => !current)}
-          >
-            <ChevronDown
-              className={cn("size-3.5 transition-transform", expanded && "rotate-180")}
-              aria-hidden="true"
-            />
-          </button>
+          {!isEditing ? (
+            <button
+              type="button"
+              className="inline-flex size-8 items-center justify-center rounded-[10px] border border-border bg-card text-foreground/70 transition-colors hover:border-foreground/18 hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45"
+              aria-expanded={expanded}
+              aria-controls={controlsId}
+              aria-label={expanded ? "Recolher hábitos" : "Mostrar hábitos"}
+              title={expanded ? "Recolher hábitos" : "Mostrar hábitos"}
+              onClick={() => setExpanded((current) => !current)}
+            >
+              <ChevronDown
+                className={cn("size-3.5 transition-transform", expanded && "rotate-180")}
+                aria-hidden="true"
+              />
+            </button>
+          ) : null}
         </div>
       )}
 
       <CollapsibleControlRegion
         id={controlsId}
-        expanded={expanded}
+        expanded={expanded || isEditing}
         contentClassName={cn(
           mobile
             ? cn(
@@ -585,24 +567,6 @@ export function HabitControls({
         )}
       >
           {isEditing ? editableHabitButtons : habitButtons}
-          {isEditing && archivedHabits.length > 0 ? (
-            <div className="mt-2 flex flex-wrap items-center justify-center gap-1.5" data-archived-habits>
-              <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                Arquivados
-              </span>
-              {archivedHabits.map((habit) => (
-                <button
-                  key={habit.id}
-                  type="button"
-                  className="inline-flex h-8 items-center gap-1.5 rounded-[10px] border border-dashed border-border px-2.5 text-[0.75rem] font-semibold text-muted-foreground hover:bg-muted hover:text-foreground"
-                  onClick={() => onReactivateHabit?.(habit.id)}
-                >
-                  <RotateCcw className="size-3.5" aria-hidden="true" />
-                  {habit.name}
-                </button>
-              ))}
-            </div>
-          ) : null}
           {totalActiveHabits > habits.length ? (
             <p className="mt-1.5 text-center text-[10px] text-muted-foreground">
               Mostrando os 4 primeiros hábitos nesta grade.

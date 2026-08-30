@@ -9,10 +9,12 @@ import { cn } from "@/lib/utils";
 export function ThemeToggle({
   highlighted = false,
   disabled = false,
+  variant = "button",
   onThemeChange,
 }: {
   highlighted?: boolean;
   disabled?: boolean;
+  variant?: "button" | "bare";
   onThemeChange?: (mode: ThemeMode) => void;
 }) {
   const { mode, setTheme } = useTheme();
@@ -38,8 +40,10 @@ export function ThemeToggle({
       aria-label={isLight ? "Ativar tema escuro" : "Ativar tema claro"}
       title={isLight ? "Tema claro" : "Tema escuro"}
       className={cn(
-        "inline-flex h-8 w-8 items-center justify-center rounded-[10px] border border-border bg-card text-muted-foreground shadow-none transition-colors duration-150 md:h-9 md:w-9",
-        "hover:border-foreground/18 hover:bg-muted hover:text-foreground",
+        "inline-flex items-center justify-center text-muted-foreground shadow-none transition-colors duration-150",
+        variant === "bare"
+          ? "size-9 rounded-full hover:bg-muted hover:text-foreground"
+          : "h-8 w-8 rounded-[10px] border border-border bg-card hover:border-foreground/18 hover:bg-muted hover:text-foreground md:h-9 md:w-9",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
         disabled && "cursor-not-allowed opacity-45",
         highlighted && "product-spotlight-target"

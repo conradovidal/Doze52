@@ -103,10 +103,10 @@
   --cal-cell-weekday-past: 0 0% 91%;
   --cal-cell-weekend-past: 0 0% 88.5%;
   --cal-cell-outside-past: 0 0% 89%;
-  --premium: #b08b3f;
-  --premium-foreground: #7a5a1e;
-  --premium-soft: #b08b3f26;
-  --premium-border: #b08b3f4d;
+  --premium: #c9a13c;
+  --premium-foreground: #8a6318;
+  --premium-soft: #c9a13c26;
+  --premium-border: #c9a13c4d;
 }
 
 .dark {

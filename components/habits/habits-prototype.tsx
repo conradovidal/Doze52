@@ -3,55 +3,29 @@
 import * as React from "react";
 import { Check } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
 import { ProUpgradeDialog } from "@/components/billing/pro-upgrade-dialog";
 import { DesktopHabitsPrototype } from "@/components/habits/desktop-habits-prototype";
 import { HabitControls } from "@/components/habits/habit-controls";
 import { HabitDayPicker } from "@/components/habits/habit-day-picker";
+import { HABIT_COLORS, HabitEditorDialog } from "@/components/habits/habit-editor-dialog";
 import { useFeedback } from "@/components/ui/feedback-provider";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import {
-  CATEGORY_COLOR_BASE_BLUE,
-  CATEGORY_COLOR_BASE_CORAL,
-  CATEGORY_COLOR_BASE_GREEN,
-  CATEGORY_COLOR_BASE_TEAL,
-  CATEGORY_COLOR_BASE_VIOLET,
-  CATEGORY_COLOR_BASE_YELLOW,
-} from "@/lib/category-palette";
+import { CATEGORY_COLOR_BASE_BLUE } from "@/lib/category-palette";
 import {
   buildHabitPrototypeWeeks,
-  applyActiveHabitOrder,
   getDesktopVisibleHabits,
   getHabitDayAction,
   getHabitCheckInKey,
   getHabitRetrospectiveDates,
   orderActiveHabits,
-  setHabitArchived,
   type OnboardingHabitShowcase,
 } from "@/lib/habits-prototype";
-import type { Habit, HabitCheckIn } from "@/lib/types";
+import { useHabitsStore } from "@/lib/habits-store";
+import type { Habit } from "@/lib/types";
 import { useBilling } from "@/lib/use-billing";
 import { cn } from "@/lib/utils";
 
 const WEEKDAY_LABELS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
-const HABITS_PROTOTYPE_SESSION_KEY = "doze52:habits-prototype:v1";
 const HABITS_PROTOTYPE_SCROLL_PREFIX = "doze52:habits-prototype:scroll";
-const HABIT_COLORS = [
-  CATEGORY_COLOR_BASE_BLUE,
-  CATEGORY_COLOR_BASE_TEAL,
-  CATEGORY_COLOR_BASE_GREEN,
-  CATEGORY_COLOR_BASE_YELLOW,
-  CATEGORY_COLOR_BASE_CORAL,
-  CATEGORY_COLOR_BASE_VIOLET,
-] as const;
 const ACCESSIBLE_DATE_FORMATTER = new Intl.DateTimeFormat("pt-BR", {
   dateStyle: "full",
   timeZone: "UTC",
@@ -60,153 +34,8 @@ const ACCESSIBLE_DATE_FORMATTER = new Intl.DateTimeFormat("pt-BR", {
 const formatAccessibleDate = (dateIso: string) =>
   ACCESSIBLE_DATE_FORMATTER.format(new Date(`${dateIso}T12:00:00Z`));
 
-type HabitsPrototypeSession = {
-  habits: Habit[];
-  checkIns: Record<string, HabitCheckIn>;
-  selectedHabitId: string | null;
-  visibleHabitIds: string[];
-};
-
-const EMPTY_HABITS_SESSION: HabitsPrototypeSession = {
-  habits: [],
-  checkIns: {},
-  selectedHabitId: null,
-  visibleHabitIds: [],
-};
-
-const readHabitsPrototypeSession = (): HabitsPrototypeSession => {
-  if (typeof window === "undefined") return EMPTY_HABITS_SESSION;
-  try {
-    const raw = window.sessionStorage.getItem(HABITS_PROTOTYPE_SESSION_KEY);
-    if (!raw) return EMPTY_HABITS_SESSION;
-    const parsed = JSON.parse(raw) as Partial<HabitsPrototypeSession>;
-    if (!Array.isArray(parsed.habits) || typeof parsed.checkIns !== "object") {
-      return EMPTY_HABITS_SESSION;
-    }
-    const activeHabitIds = new Set(
-      parsed.habits.filter((habit) => !habit.archivedAt).map((habit) => habit.id)
-    );
-    return {
-      habits: parsed.habits,
-      checkIns: (parsed.checkIns ?? {}) as Record<string, HabitCheckIn>,
-      selectedHabitId:
-        typeof parsed.selectedHabitId === "string" ? parsed.selectedHabitId : null,
-      visibleHabitIds: Array.isArray(parsed.visibleHabitIds)
-        ? parsed.visibleHabitIds.filter(
-            (id): id is string =>
-              typeof id === "string" && activeHabitIds.has(id)
-          )
-        : parsed.habits
-            .filter((habit) => !habit.archivedAt)
-            .map((habit) => habit.id),
-    };
-  } catch {
-    return EMPTY_HABITS_SESSION;
-  }
-};
-
 const getHabitScrollStorageKey = (year: number, habitId: string) =>
   `${HABITS_PROTOTYPE_SCROLL_PREFIX}:${year}:${habitId}`;
-
-function HabitEditorDialog({
-  open,
-  name,
-  color,
-  onOpenChange,
-  onNameChange,
-  onColorChange,
-  onSubmit,
-  editing,
-  onArchive,
-}: {
-  open: boolean;
-  name: string;
-  color: string;
-  onOpenChange: (open: boolean) => void;
-  onNameChange: (name: string) => void;
-  onColorChange: (color: string) => void;
-  onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
-  editing: boolean;
-  onArchive?: () => void;
-}) {
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[430px]">
-        <form onSubmit={onSubmit}>
-          <DialogHeader>
-            <DialogTitle>{editing ? "Editar hábito" : "Novo hábito"}</DialogTitle>
-            <DialogDescription>
-              {editing
-                ? "Atualize nome ou cor sem perder o histórico já registrado."
-                : "Só o essencial agora. O registro diário será feito direto na grade."}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="mt-5 space-y-4">
-            <div className="space-y-1.5">
-              <label htmlFor="habit-prototype-name" className="text-sm font-medium">
-                Nome do hábito
-              </label>
-              <Input
-                id="habit-prototype-name"
-                value={name}
-                maxLength={80}
-                autoFocus
-                placeholder="Caminhar, treinar, estudar, meditar, correr, ler…"
-                onChange={(event) => onNameChange(event.target.value)}
-              />
-            </div>
-
-            <fieldset>
-              <legend className="text-sm font-medium">Cor</legend>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {HABIT_COLORS.map((habitColor) => (
-                  <button
-                    key={habitColor}
-                    type="button"
-                    aria-label={`Usar cor ${habitColor}`}
-                    aria-pressed={color === habitColor}
-                    className="grid size-9 place-items-center rounded-full border border-black/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 aria-pressed:ring-2 aria-pressed:ring-foreground/65 aria-pressed:ring-offset-2"
-                    style={{ backgroundColor: habitColor }}
-                    onClick={() => onColorChange(habitColor)}
-                  >
-                    {color === habitColor ? (
-                      <Check className="size-4 text-neutral-950" strokeWidth={2.6} />
-                    ) : null}
-                  </button>
-                ))}
-                <label className="relative grid size-9 cursor-pointer place-items-center overflow-hidden rounded-full border border-border bg-background text-[10px] font-semibold text-muted-foreground focus-within:ring-2 focus-within:ring-ring/60 focus-within:ring-offset-2">
-                  <span aria-hidden="true">+</span>
-                  <span className="sr-only">Escolher outra cor</span>
-                  <input
-                    type="color"
-                    value={color}
-                    className="absolute inset-0 cursor-pointer opacity-0"
-                    onChange={(event) => onColorChange(event.target.value)}
-                  />
-                </label>
-              </div>
-            </fieldset>
-          </div>
-
-          <DialogFooter className="mt-6">
-            {editing && onArchive ? (
-              <Button type="button" variant="ghost" className="sm:mr-auto" onClick={onArchive}>
-                Arquivar
-              </Button>
-            ) : null}
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-              Cancelar
-            </Button>
-            <Button type="submit" variant="premium" disabled={!name.trim()}>
-              {editing ? "Salvar alterações" : "Criar hábito"}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-}
 
 export function HabitsPrototype({
   year,
@@ -242,17 +71,17 @@ export function HabitsPrototype({
   const { notify } = useFeedback();
   const { limits, isPro, isLoading: isBillingLoading, error: billingError } =
     useBilling();
-  const [initialSession] = React.useState(readHabitsPrototypeSession);
-  const [habits, setHabits] = React.useState<Habit[]>(initialSession.habits);
-  const [checkIns, setCheckIns] = React.useState<Record<string, HabitCheckIn>>(
-    initialSession.checkIns
-  );
-  const [selectedHabitId, setSelectedHabitId] = React.useState<string | null>(
-    initialSession.selectedHabitId
-  );
-  const [visibleHabitIds, setVisibleHabitIds] = React.useState<string[]>(
-    initialSession.visibleHabitIds
-  );
+  const habits = useHabitsStore((s) => s.habits);
+  const checkIns = useHabitsStore((s) => s.checkIns);
+  const selectedHabitId = useHabitsStore((s) => s.selectedHabitId);
+  const visibleHabitIds = useHabitsStore((s) => s.visibleHabitIds);
+  const setSelectedHabitId = useHabitsStore((s) => s.setSelectedHabitId);
+  const createHabitInStore = useHabitsStore((s) => s.createHabit);
+  const updateHabitInStore = useHabitsStore((s) => s.updateHabit);
+  const reorderHabitsInStore = useHabitsStore((s) => s.reorderHabits);
+  const deleteHabitInStore = useHabitsStore((s) => s.deleteHabit);
+  const toggleHabitCheckInInStore = useHabitsStore((s) => s.toggleHabitCheckIn);
+  const toggleHabitVisibilityInStore = useHabitsStore((s) => s.toggleHabitVisibility);
   const [showcaseVisibleHabitIds, setShowcaseVisibleHabitIds] = React.useState<
     string[]
   >(showcase?.visibleHabitIds ?? []);
@@ -287,10 +116,6 @@ export function HabitsPrototype({
   const presentedVisibleHabitIdSet = React.useMemo(
     () => new Set(presentedVisibleHabitIds),
     [presentedVisibleHabitIds]
-  );
-  const archivedHabits = React.useMemo(
-    () => habits.filter((habit) => Boolean(habit.archivedAt)),
-    [habits]
   );
   const selectedHabit = React.useMemo(
     () =>
@@ -364,17 +189,6 @@ export function HabitsPrototype({
     setShowcaseVisibleHabitIds(showcase?.visibleHabitIds ?? []);
   }, [showcase]);
 
-  React.useEffect(() => {
-    try {
-      window.sessionStorage.setItem(
-        HABITS_PROTOTYPE_SESSION_KEY,
-        JSON.stringify({ habits, checkIns, selectedHabitId, visibleHabitIds })
-      );
-    } catch {
-      // O protótipo continua funcional na memória quando o storage não está disponível.
-    }
-  }, [checkIns, habits, selectedHabitId, visibleHabitIds]);
-
   const requestCreateHabit = () => {
     if (showcaseActive) return;
     if (creationUnavailable) {
@@ -409,31 +223,13 @@ export function HabitsPrototype({
     const name = draftName.trim();
     if (!name) return;
 
-    const timestamp = new Date().toISOString();
     if (editingHabitId) {
-      setHabits((current) =>
-        current.map((habit) =>
-          habit.id === editingHabitId
-            ? { ...habit, name, color: draftColor, updatedAt: timestamp }
-            : habit
-        )
-      );
+      updateHabitInStore(editingHabitId, { name, color: draftColor });
       setCreateDialogOpen(false);
       setEditingHabitId(null);
       return;
     }
-    const habit: Habit = {
-      id: crypto.randomUUID(),
-      name,
-      color: draftColor,
-      icon: "circle-check",
-      position: activeHabits.length,
-      createdAt: timestamp,
-      updatedAt: timestamp,
-    };
-    setHabits((current) => [...current, habit]);
-    setSelectedHabitId(habit.id);
-    setVisibleHabitIds((current) => [...new Set([...current, habit.id])]);
+    createHabitInStore({ name, color: draftColor });
     setCreateDialogOpen(false);
     onHabitCreated?.();
   };
@@ -448,91 +244,33 @@ export function HabitsPrototype({
   };
 
   const reorderHabits = (orderedIds: string[]) => {
-    const timestamp = new Date().toISOString();
-    setHabits((current) => applyActiveHabitOrder(current, orderedIds, timestamp));
+    reorderHabitsInStore(orderedIds);
   };
 
-  const archiveEditingHabit = () => {
+  const deleteEditingHabit = () => {
     if (!editingHabitId) return;
-    const timestamp = new Date().toISOString();
-    const nextActive = activeHabits.filter((habit) => habit.id !== editingHabitId);
-    setHabits((current) =>
-      setHabitArchived(current, editingHabitId, timestamp, timestamp)
-    );
-    if (selectedHabitId === editingHabitId) {
-      setSelectedHabitId(nextActive[0]?.id ?? null);
-    }
-    setVisibleHabitIds((current) => {
-      const retained = current.filter((habitId) => habitId !== editingHabitId);
-      return nextActive.length === 1
-        ? [...new Set([...retained, nextActive[0].id])]
-        : retained;
-    });
+    deleteHabitInStore(editingHabitId);
     setCreateDialogOpen(false);
     setEditingHabitId(null);
   };
 
-  const reactivateHabit = (habitId: string) => {
-    if (creationUnavailable) {
-      notify({
-        tone: "info",
-        title: "Plano ainda não confirmado",
-        description: "Tente restaurar o hábito novamente em instantes.",
-      });
-      return;
-    }
-    if (reachedHabitLimit) {
-      if (!isPro) setUpgradeOpen(true);
-      else
-        notify({
-          tone: "info",
-          title: "Limite de hábitos atingido",
-          description: "Arquive um hábito ativo antes de restaurar este.",
-        });
-      return;
-    }
-    const timestamp = new Date().toISOString();
-    setHabits((current) =>
-      setHabitArchived(
-        current,
-        habitId,
-        undefined,
-        timestamp,
-        activeHabits.length
-      )
-    );
-    setSelectedHabitId(habitId);
-    setVisibleHabitIds((current) => [...new Set([...current, habitId])]);
-  };
-
   const toggleHabitDay = (habit: Habit | null, dateIso: string) => {
     if (!habit || showcaseActive) return;
-    const key = getHabitCheckInKey(habit.id, dateIso);
-    setCheckIns((current) => {
-      const completed = !current[key]?.completed;
-      return {
-        ...current,
-        [key]: {
-          habitId: habit.id,
-          date: dateIso,
-          completed,
-          updatedAt: new Date().toISOString(),
-        },
-      };
-    });
+    toggleHabitCheckInInStore(habit.id, dateIso);
     onHabitCheckIn?.();
   };
 
   const toggleHabitVisibility = (habitId: string) => {
     if (!showcaseActive && activeHabits.length === 1) return;
-    const setter = showcaseActive
-      ? setShowcaseVisibleHabitIds
-      : setVisibleHabitIds;
-    setter((current) =>
-      current.includes(habitId)
-        ? current.filter((id) => id !== habitId)
-        : [...current, habitId]
-    );
+    if (showcaseActive) {
+      setShowcaseVisibleHabitIds((current) =>
+        current.includes(habitId)
+          ? current.filter((id) => id !== habitId)
+          : [...current, habitId]
+      );
+      return;
+    }
+    toggleHabitVisibilityInStore(habitId);
   };
 
   const createDialog = (
@@ -545,7 +283,7 @@ export function HabitsPrototype({
       onColorChange={setDraftColor}
       onSubmit={createHabit}
       editing={Boolean(editingHabitId)}
-      onArchive={editingHabitId ? archiveEditingHabit : undefined}
+      onDelete={editingHabitId ? deleteEditingHabit : undefined}
     />
   );
 
@@ -574,10 +312,8 @@ export function HabitsPrototype({
           onRequestCreate={requestCreateHabit}
           isEditing={showcaseActive ? false : isEditing}
           readOnly={showcaseActive}
-          archivedHabits={showcaseActive ? [] : archivedHabits}
           onEditHabit={requestEditHabit}
           onReorderHabits={reorderHabits}
-          onReactivateHabit={reactivateHabit}
           onToggleEditing={showcaseActive ? undefined : onToggleEditing}
           onYearChange={onYearChange}
           guidedNotice={guidedNotice}
@@ -624,10 +360,8 @@ export function HabitsPrototype({
         onSelectHabit={setSelectedHabitId}
         onRequestCreate={requestCreateHabit}
         isEditing={isEditing}
-        archivedHabits={archivedHabits}
         onEditHabit={requestEditHabit}
         onReorderHabits={reorderHabits}
-        onReactivateHabit={reactivateHabit}
         onToggleEditing={onToggleEditing}
       />
 
