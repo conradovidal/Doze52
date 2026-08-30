@@ -21,9 +21,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
 } from "@/components/ui/dialog";
 import { useFeedback } from "@/components/ui/feedback-provider";
 import { Input } from "@/components/ui/input";
@@ -66,6 +63,10 @@ const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;
 type CalendarSpreadsheetDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+};
+
+type CalendarSpreadsheetPanelProps = {
+  onRequestClose?: () => void;
 };
 
 type AssistantStep =
@@ -281,10 +282,9 @@ const resultItems = (summary: ImportSummary) => [
   ["Linhas ignoradas", summary.ignoredRows],
 ] as const;
 
-export function CalendarSpreadsheetDialog({
-  open,
-  onOpenChange,
-}: CalendarSpreadsheetDialogProps) {
+export function CalendarSpreadsheetPanel({
+  onRequestClose,
+}: CalendarSpreadsheetPanelProps) {
   const { notify } = useFeedback();
   const profiles = useStore((state) => state.profiles);
   const categories = useStore((state) => state.categories);
@@ -365,28 +365,6 @@ export function CalendarSpreadsheetDialog({
     () => (source && mapping ? getImportMappingErrors(source, mapping) : []),
     [mapping, source]
   );
-
-  const reset = React.useCallback(() => {
-    setStep("home");
-    setMode("template");
-    setFileBuffer(null);
-    setFilename("");
-    setSource(null);
-    setMapping(null);
-    setResolution(null);
-    setAcceptedInvalidRows(false);
-    setSelectedExportCategoryIds([]);
-    setResult(null);
-    setActionError("");
-    setIsWorking(false);
-    setWorkingAction(null);
-    setWorkingState("idle");
-    if (fileInputRef.current) fileInputRef.current.value = "";
-  }, []);
-
-  React.useEffect(() => {
-    if (!open) reset();
-  }, [open, reset]);
 
   const runDownload = async (
     action: () => void | Promise<void>,
@@ -1055,57 +1033,75 @@ export function CalendarSpreadsheetDialog({
   );
 
   return (
+    <div className="space-y-4">
+      <div className="flex items-start gap-3">
+        <div className="inline-flex size-9 shrink-0 items-center justify-center rounded-[10px] border border-border/75 bg-muted/34 text-foreground">
+          {isWorking ? <LoaderCircle className="size-4 animate-spin" /> : <FileSpreadsheet className="size-4" />}
+        </div>
+        <div className="min-w-0 pt-1">
+          <p className="text-base font-semibold text-foreground">{titles[step][0]}</p>
+          <p className="text-sm leading-6 text-muted-foreground">{titles[step][1]}</p>
+        </div>
+      </div>
+
+      {step === "home" ? renderHome() : null}
+      {step === "export-scope" ? renderExportScope() : null}
+      {step === "mapping" ? renderMapping() : null}
+      {step === "structures" ? renderStructures() : null}
+      {step === "preview" ? renderPreview() : null}
+      {step === "result" ? renderResult() : null}
+
+      {actionError ? (
+        <div className="flex gap-2 rounded-[12px] border border-rose-200/80 bg-rose-50/70 px-3 py-2.5 text-sm text-rose-800 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-100">
+          <AlertCircle className="mt-0.5 size-4 shrink-0" /><span>{actionError}</span>
+        </div>
+      ) : null}
+
+      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
+        {step === "home" && onRequestClose ? <Button variant="ghost" onClick={onRequestClose}>Fechar</Button> : null}
+        {step !== "home" && step !== "result" ? <Button variant="ghost" onClick={back}><ArrowLeft className="size-4" />Voltar</Button> : null}
+        {step === "export-scope" ? (
+          <AsyncStateButton
+            variant="premium"
+            disabled={selectedExportEventCount === 0 || isWorking}
+            state={workingAction === "export" ? workingState : "idle"}
+            pendingLabel="Gerando exportação…"
+            successLabel="Calendário exportado"
+            errorLabel="Tentar exportar"
+            onClick={() =>
+              void runDownload(
+                () => exportCalendarSpreadsheet(snapshot, exportSelection),
+                "Calendario exportado",
+                "calendar-spreadsheet.export",
+                "export"
+              )
+            }
+          >
+            Exportar {selectedExportEventCount} evento{selectedExportEventCount === 1 ? "" : "s"}
+          </AsyncStateButton>
+        ) : null}
+        {step === "mapping" ? <Button variant="premium" disabled={mappingErrors.length > 0} onClick={continueFromMapping}>Revisar estruturas</Button> : null}
+        {step === "structures" ? <Button variant="premium" disabled={!canAdvanceStructures} onClick={() => setStep("preview")}>Ver pre-visualizacao</Button> : null}
+        {step === "preview" ? <Button variant="premium" disabled={!canConfirm} onClick={confirmImport}>Importar {plan?.summary.importedEvents ?? 0} evento(s)</Button> : null}
+        {step === "result" ? <Button variant="premium" onClick={() => (onRequestClose ? onRequestClose() : setStep("home"))}>Concluir</Button> : null}
+      </div>
+    </div>
+  );
+}
+
+export function CalendarSpreadsheetDialog({
+  open,
+  onOpenChange,
+}: CalendarSpreadsheetDialogProps) {
+  return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[min(92dvh,860px)] overflow-y-auto sm:max-w-[820px]">
-        <DialogHeader className="pr-8">
-          <div className="mb-1 inline-flex h-9 w-9 items-center justify-center rounded-[10px] border border-border/75 bg-muted/34 text-foreground">
-            {isWorking ? <LoaderCircle className="size-4 animate-spin" /> : <FileSpreadsheet className="size-4" />}
-          </div>
-          <DialogTitle>{titles[step][0]}</DialogTitle>
-          <DialogDescription>{titles[step][1]}</DialogDescription>
-        </DialogHeader>
-
-        {step === "home" ? renderHome() : null}
-        {step === "export-scope" ? renderExportScope() : null}
-        {step === "mapping" ? renderMapping() : null}
-        {step === "structures" ? renderStructures() : null}
-        {step === "preview" ? renderPreview() : null}
-        {step === "result" ? renderResult() : null}
-
-        {actionError ? (
-          <div className="flex gap-2 rounded-[12px] border border-rose-200/80 bg-rose-50/70 px-3 py-2.5 text-sm text-rose-800 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-100">
-            <AlertCircle className="mt-0.5 size-4 shrink-0" /><span>{actionError}</span>
-          </div>
+        <DialogDescription className="sr-only">
+          Importe ou exporte os dados do seu calendario.
+        </DialogDescription>
+        {open ? (
+          <CalendarSpreadsheetPanel onRequestClose={() => onOpenChange(false)} />
         ) : null}
-
-        <DialogFooter>
-          {step === "home" ? <Button variant="ghost" onClick={() => onOpenChange(false)}>Fechar</Button> : null}
-          {step !== "home" && step !== "result" ? <Button variant="ghost" onClick={back}><ArrowLeft className="size-4" />Voltar</Button> : null}
-          {step === "export-scope" ? (
-            <AsyncStateButton
-              variant="premium"
-              disabled={selectedExportEventCount === 0 || isWorking}
-              state={workingAction === "export" ? workingState : "idle"}
-              pendingLabel="Gerando exportação…"
-              successLabel="Calendário exportado"
-              errorLabel="Tentar exportar"
-              onClick={() =>
-                void runDownload(
-                  () => exportCalendarSpreadsheet(snapshot, exportSelection),
-                  "Calendario exportado",
-                  "calendar-spreadsheet.export",
-                  "export"
-                )
-              }
-            >
-              Exportar {selectedExportEventCount} evento{selectedExportEventCount === 1 ? "" : "s"}
-            </AsyncStateButton>
-          ) : null}
-          {step === "mapping" ? <Button variant="premium" disabled={mappingErrors.length > 0} onClick={continueFromMapping}>Revisar estruturas</Button> : null}
-          {step === "structures" ? <Button variant="premium" disabled={!canAdvanceStructures} onClick={() => setStep("preview")}>Ver pre-visualizacao</Button> : null}
-          {step === "preview" ? <Button variant="premium" disabled={!canConfirm} onClick={confirmImport}>Importar {plan?.summary.importedEvents ?? 0} evento(s)</Button> : null}
-          {step === "result" ? <Button variant="premium" onClick={() => onOpenChange(false)}>Concluir</Button> : null}
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
