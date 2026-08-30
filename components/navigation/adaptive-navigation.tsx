@@ -4,10 +4,13 @@ import * as React from "react";
 import {
   CalendarDays,
   CircleCheck,
+  CircleUserRound,
+  LayoutGrid,
   UserRound,
   type LucideIcon,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { useAvatarPreference } from "@/lib/avatar-preference";
 import { useBilling } from "@/lib/use-billing";
 import {
   PRODUCT_DESTINATIONS,
@@ -18,10 +21,8 @@ import { cn } from "@/lib/utils";
 export type UtilityPanelSection =
   | "account"
   | "plan"
-  | "appearance"
   | "data"
   | "help"
-  | "about"
   | "admin";
 
 type ProductNavigationProps = {
@@ -32,6 +33,10 @@ type ProductNavigationProps = {
     section: UtilityPanelSection,
     trigger: HTMLElement
   ) => void;
+  onToggleOrganize?: () => void;
+  organizeActive?: boolean;
+  organizeDisabled?: boolean;
+  organizeHighlighted?: boolean;
   highlightProfile?: boolean;
   highlightDestination?: ProductDestinationId;
 };
@@ -53,26 +58,22 @@ function AccountGlyph({
 }) {
   const { session } = useAuth();
   const { isPro, isLoading, error } = useBilling();
+  const { preference } = useAvatarPreference();
   const [brokenAvatar, setBrokenAvatar] = React.useState(false);
   const metadata = session?.user.metadata ?? {};
-  const displayName =
-    (typeof metadata.full_name === "string" && metadata.full_name) ||
-    (typeof metadata.name === "string" && metadata.name) ||
-    session?.user.email ||
-    "";
   const avatarUrl =
     (typeof metadata.avatar_url === "string" && metadata.avatar_url) ||
     (typeof metadata.picture === "string" && metadata.picture) ||
     null;
   const showProBorder = Boolean(session && isPro && !isLoading && !error);
-  const sizeClass = compact ? "size-6" : "size-9";
+  const sizeClass = compact ? "size-5" : "size-8";
   const sharedClassName = cn(
     sizeClass,
     "rounded-[10px]",
-    showProBorder && "ring-2 ring-premium ring-offset-1 ring-offset-background"
+    showProBorder && "ring-[3px] ring-premium"
   );
 
-  if (avatarUrl && !brokenAvatar) {
+  if (avatarUrl && preference === "photo" && !brokenAvatar) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
@@ -98,18 +99,16 @@ function AccountGlyph({
     );
   }
 
-  const initial = displayName.trim().charAt(0).toUpperCase() || "?";
-
   if (session) {
     return (
       <span
         className={cn(
           sharedClassName,
-          "grid place-items-center bg-foreground text-[10px] font-semibold text-background"
+          "grid place-items-center bg-foreground text-background"
         )}
         aria-hidden="true"
       >
-        {initial}
+        <CircleUserRound className={compact ? "size-4" : "size-5"} strokeWidth={1.8} />
       </span>
     );
   }
@@ -181,6 +180,10 @@ export function DesktopProductNavigation({
   authLoading,
   onDestinationSelect,
   onOpenUtilityPanel,
+  onToggleOrganize,
+  organizeActive = false,
+  organizeDisabled = false,
+  organizeHighlighted = false,
   highlightProfile = false,
   highlightDestination,
 }: ProductNavigationProps) {
@@ -207,21 +210,41 @@ export function DesktopProductNavigation({
         ))}
       </nav>
 
-      <button
-        type="button"
-        data-product-account="desktop"
-        data-onboarding-auth-entry
-        aria-label="Abrir perfil"
-        title="Perfil"
-        disabled={authLoading}
-        className={cn(
-          "col-start-3 hidden size-10 place-items-center justify-self-end rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 disabled:opacity-45 md:grid",
-          highlightProfile && "text-foreground"
-        )}
-        onClick={handleAccount}
-      >
-        {authLoading ? null : <AccountGlyph desktopHeader />}
-      </button>
+      <div className="col-start-3 hidden items-center gap-1 justify-self-end md:flex">
+        {onToggleOrganize ? (
+          <button
+            type="button"
+            data-product-organize="desktop"
+            data-onboarding-highlighted={organizeHighlighted ? "true" : undefined}
+            aria-pressed={organizeActive}
+            aria-label={organizeActive ? "Finalizar organização" : "Organizar"}
+            title={organizeActive ? "Finalizar organização" : "Organizar"}
+            disabled={organizeDisabled}
+            className={cn(
+              "grid size-10 place-items-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-transparent disabled:hover:text-muted-foreground",
+              organizeActive && "bg-foreground text-background hover:bg-foreground/90 hover:text-background"
+            )}
+            onClick={onToggleOrganize}
+          >
+            <LayoutGrid className="size-[18px]" />
+          </button>
+        ) : null}
+        <button
+          type="button"
+          data-product-account="desktop"
+          data-onboarding-auth-entry
+          aria-label="Abrir perfil"
+          title="Perfil"
+          disabled={authLoading}
+          className={cn(
+            "grid size-10 place-items-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 disabled:opacity-45",
+            highlightProfile && "text-foreground"
+          )}
+          onClick={handleAccount}
+        >
+          {authLoading ? null : <AccountGlyph desktopHeader />}
+        </button>
+      </div>
     </>
   );
 }

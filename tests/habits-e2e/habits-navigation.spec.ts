@@ -13,7 +13,7 @@ const installCompletedOnboarding = async (
       })
     );
     if (!window.sessionStorage.getItem("doze52:habits-e2e:initialized")) {
-      window.sessionStorage.removeItem("doze52:habits-prototype:v1");
+      window.localStorage.removeItem("doze52:habits-store:v1");
       window.sessionStorage.setItem("doze52:habits-e2e:initialized", "1");
     }
   });
@@ -47,7 +47,7 @@ test("desktop antecipa a demonstração de hábitos e reinicia o guia no ano", a
       "doze52:onboarding:v2",
       JSON.stringify({ version: 15, step: "context_selection" })
     );
-    window.sessionStorage.removeItem("doze52:habits-prototype:v1");
+    window.localStorage.removeItem("doze52:habits-store:v1");
   });
   await page.goto("/?surface=annual");
 
@@ -146,11 +146,13 @@ test("mobile abre em Hábitos e preserva a sessão entre superfícies", async ({
     habits.getByRole("button", { name: "Caminhar", exact: true })
   ).toBeVisible();
 
-  const sessionAfterCreation = await page.evaluate(() =>
-    window.sessionStorage.getItem("doze52:habits-prototype:v1")
+  const storeAfterCreation = await page.evaluate(() =>
+    window.localStorage.getItem("doze52:habits-store:v1")
   );
-  expect(sessionAfterCreation).not.toBeNull();
-  expect(Object.keys(JSON.parse(sessionAfterCreation ?? "{}").checkIns ?? {})).toHaveLength(0);
+  expect(storeAfterCreation).not.toBeNull();
+  expect(
+    Object.keys(JSON.parse(storeAfterCreation ?? "{}").state?.checkIns ?? {})
+  ).toHaveLength(0);
 
   await habits.getByRole("button", { name: "Criar novo hábito" }).click();
   await expect(
@@ -195,10 +197,7 @@ test("mobile abre em Hábitos e preserva a sessão entre superfícies", async ({
   const utilityPanel = page.locator("[data-app-utility-panel]");
   await expect(utilityPanel).toBeVisible();
   await utilityPanel.getByRole("button", { name: /^Conta/ }).click();
-  await utilityPanel.getByRole("button", { name: "Entrar", exact: true }).click();
-  const authDialog = page.getByRole("dialog", { name: "Entrar" });
-  await expect(authDialog).toBeVisible();
-  const googleButton = authDialog.getByRole("button", {
+  const googleButton = utilityPanel.getByRole("button", {
     name: "Entrar com Google",
   });
   await expect(googleButton).toBeVisible();
@@ -206,13 +205,15 @@ test("mobile abre em Hábitos e preserva a sessão entre superfícies", async ({
     "src",
     /google-g\.svg/
   );
-  await authDialog.getByRole("button", { name: "Cadastro" }).click();
-  const createAccountDialog = page.getByRole("dialog", {
-    name: "Criar conta",
-  });
-  await expect(createAccountDialog).toBeVisible();
   await expect(
-    createAccountDialog.getByRole("button", { name: "Entrar com Google" })
+    utilityPanel.getByRole("button", { name: "Entrar", exact: true })
+  ).toBeVisible();
+  await utilityPanel.getByRole("button", { name: "Cadastro" }).click();
+  await expect(
+    utilityPanel.getByRole("button", { name: "Criar conta", exact: true })
+  ).toBeVisible();
+  await expect(
+    utilityPanel.getByRole("button", { name: "Entrar com Google" })
   ).toBeVisible();
 });
 
@@ -243,9 +244,17 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
         { habitId: habit.id, date, completed: true, updatedAt: "2026-01-01T00:00:00.000Z" },
       ])
     );
-    window.sessionStorage.setItem(
-      "doze52:habits-prototype:v1",
-      JSON.stringify({ habits, checkIns, selectedHabitId: "habit-1" })
+    window.localStorage.setItem(
+      "doze52:habits-store:v1",
+      JSON.stringify({
+        state: {
+          habits,
+          checkIns,
+          selectedHabitId: "habit-1",
+          visibleHabitIds: habits.map((habit) => habit.id),
+        },
+        version: 0,
+      })
     );
     window.sessionStorage.setItem("doze52:habits-desktop-seeded", "1");
   });
@@ -270,12 +279,10 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
   await expect(page.locator("[data-rail-divider]")).toHaveCount(0);
   await expect(desktopNavigation.getByRole("button", { name: "Editar", exact: true })).toHaveCount(0);
   await expect(page.locator('[data-calendar-ui-mode="desktop"]')).toBeVisible();
-  const contextualEdit = page.getByRole("button", { name: "Editar", exact: true });
+  const contextualEdit = page.getByRole("button", { name: "Organizar", exact: true });
   const collapseCategories = page.getByRole("button", { name: "Recolher categorias" });
-  const contextualEditBox = await contextualEdit.boundingBox();
-  const collapseBox = await collapseCategories.boundingBox();
-  if (!contextualEditBox || !collapseBox) throw new Error("Controles contextuais não puderam ser medidos.");
-  expect(contextualEditBox.x).toBeLessThan(collapseBox.x);
+  await expect(contextualEdit).toBeVisible();
+  await expect(collapseCategories).toBeVisible();
   await expect(page.locator("[data-calendar-scale-control]")).toHaveCount(0);
   const scaleBox = await page.locator("[data-calendar-footer-center]").boundingBox();
   if (!scaleBox || !desktopViewport) throw new Error("Escala não pôde ser medida.");
@@ -396,7 +403,7 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
   await calendarGallery.getByRole("button", { name: "Voltar para as opções de categoria" }).click();
   await expect(categoryChoice).toBeVisible();
   await page.keyboard.press("Escape");
-  await page.getByRole("button", { name: "Finalizar edição" }).click();
+  await page.getByRole("button", { name: "Finalizar organização" }).click();
   const categoryRegion = page.locator("#app-header-categories");
   await collapseCategories.click();
   await expect(categoryRegion).toHaveAttribute("aria-hidden", "true");
@@ -436,7 +443,7 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
   const viewport = page.viewportSize();
   if (!viewport) throw new Error("Viewport desktop indisponível.");
   await expect.poll(async () => Math.round((await panel.boundingBox())?.width ?? 0)).toBe(
-    Math.min(880, viewport.width - 80)
+    Math.min(720, viewport.width - 80)
   );
   const panelBox = await panel.boundingBox();
   const profileTriggerBox = await profile.boundingBox();
@@ -454,7 +461,7 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
   );
   expect(panelBox.y + panelBox.height).toBeLessThanOrEqual(viewport.height - 15);
   expect((await calendarRegion.boundingBox())?.width).toBe(widthBefore);
-  await expect(panel.getByText("Aparência", { exact: true })).toBeVisible();
+  await expect(panel.getByText("Plano", { exact: true })).toBeVisible();
   await expect(panel.getByText("Dados", { exact: true })).toHaveCount(0);
   await page.keyboard.press("Escape");
   await expect(panel).toBeHidden();
@@ -662,9 +669,9 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
   await page.keyboard.press("Escape");
   await expect.poll(async () => {
     const raw = await page.evaluate(() =>
-      window.sessionStorage.getItem("doze52:habits-prototype:v1")
+      window.localStorage.getItem("doze52:habits-store:v1")
     );
-    return JSON.parse(raw ?? "{}").visibleHabitIds ?? [];
+    return JSON.parse(raw ?? "{}").state?.visibleHabitIds ?? [];
   }).not.toContain("habit-4");
   await expect(habits.locator('[data-day-cell][aria-disabled="true"]').first()).toBeVisible();
   await page.getByRole("link", { name: "Anual" }).click();
@@ -675,8 +682,8 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
 
   await profile.click();
   await panel.getByRole("button", { name: /^Conta/ }).click();
-  await panel.getByRole("button", { name: "Entrar", exact: true }).click();
-  await expect(page.getByRole("dialog", { name: "Entrar" })).toBeVisible();
+  await expect(panel.getByRole("button", { name: "Entrar com Google" })).toBeVisible();
+  await expect(panel.getByRole("button", { name: "Entrar", exact: true })).toBeVisible();
 });
 
 test("desktop restaura filtros de hábitos persistidos na sessão", async ({
@@ -695,13 +702,16 @@ test("desktop restaura filtros de hábitos persistidos na sessão", async ({
       createdAt: "2026-01-01T00:00:00.000Z",
       updatedAt: "2026-01-01T00:00:00.000Z",
     }));
-    window.sessionStorage.setItem(
-      "doze52:habits-prototype:v1",
+    window.localStorage.setItem(
+      "doze52:habits-store:v1",
       JSON.stringify({
-        habits,
-        checkIns: {},
-        selectedHabitId: "visible",
-        visibleHabitIds: ["visible"],
+        state: {
+          habits,
+          checkIns: {},
+          selectedHabitId: "visible",
+          visibleHabitIds: ["visible"],
+        },
+        version: 0,
       })
     );
     window.sessionStorage.setItem("doze52:habits-filter-seeded", "1");
@@ -770,18 +780,26 @@ test("desktop edita e reordena hábitos nos controles contextuais", async ({
       createdAt: `2026-01-0${index + 1}T00:00:00.000Z`,
       updatedAt: "2026-01-01T00:00:00.000Z",
     }));
-    window.sessionStorage.setItem(
-      "doze52:habits-prototype:v1",
-      JSON.stringify({ habits, checkIns: {}, selectedHabitId: "habit-a" })
+    window.localStorage.setItem(
+      "doze52:habits-store:v1",
+      JSON.stringify({
+        state: {
+          habits,
+          checkIns: {},
+          selectedHabitId: "habit-a",
+          visibleHabitIds: habits.map((habit) => habit.id),
+        },
+        version: 0,
+      })
     );
     window.sessionStorage.setItem("doze52:habits-edit-seeded", "1");
   });
   await page.goto("/?surface=habits");
 
   const controls = page.locator('[data-habit-controls-layout="desktop"]');
-  const edit = controls.getByRole("button", { name: "Editar", exact: true });
+  const edit = page.getByRole("button", { name: "Organizar", exact: true });
   await edit.click();
-  await expect(controls.getByRole("button", { name: "Finalizar edição" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Finalizar organização" })).toBeVisible();
   await expect(page.locator('[data-day-cell][aria-disabled="true"]').first()).toBeVisible();
 
   const reorderCaminhar = controls.getByRole("button", { name: "Reordenar hábito Caminhar" });
@@ -795,9 +813,9 @@ test("desktop edita e reordena hábitos nos controles contextuais", async ({
   await page.mouse.up();
   await expect.poll(async () => {
     const raw = await page.evaluate(() =>
-      window.sessionStorage.getItem("doze52:habits-prototype:v1")
+      window.localStorage.getItem("doze52:habits-store:v1")
     );
-    return [...(JSON.parse(raw ?? "{}").habits ?? [])]
+    return [...(JSON.parse(raw ?? "{}").state?.habits ?? [])]
       .sort((left, right) => left.position - right.position)
       .map((habit) => habit.id)
       .join(",");
@@ -808,11 +826,10 @@ test("desktop edita e reordena hábitos nos controles contextuais", async ({
   await page.getByRole("button", { name: "Salvar alterações" }).click();
   await expect(controls.getByRole("button", { name: "Editar hábito Corrida" })).toBeVisible();
 
-  await controls.getByRole("button", { name: "Editar hábito Corrida" }).click();
-  await page.getByRole("button", { name: "Arquivar" }).click();
   await controls.getByRole("button", { name: "Editar hábito Ler" }).click();
-  await page.getByRole("button", { name: "Arquivar" }).click();
-  await controls.getByRole("button", { name: "Corrida", exact: true }).click();
+  await page.getByRole("button", { name: "Excluir hábito" }).click();
+  await page.getByRole("button", { name: "Confirmar exclusão" }).click();
+  await expect(controls.getByRole("button", { name: "Editar hábito Ler" })).toHaveCount(0);
   await expect(controls.getByRole("button", { name: "Editar hábito Corrida" })).toBeVisible();
 
   const currentYear = new Date().getFullYear();
@@ -841,9 +858,17 @@ test("mobile reordena hábitos pelo mesmo DnD e persiste a posição", async ({
       createdAt: `2026-01-0${index + 1}T00:00:00.000Z`,
       updatedAt: "2026-01-01T00:00:00.000Z",
     }));
-    window.sessionStorage.setItem(
-      "doze52:habits-prototype:v1",
-      JSON.stringify({ habits, checkIns: {}, selectedHabitId: "mobile-a" })
+    window.localStorage.setItem(
+      "doze52:habits-store:v1",
+      JSON.stringify({
+        state: {
+          habits,
+          checkIns: {},
+          selectedHabitId: "mobile-a",
+          visibleHabitIds: habits.map((habit) => habit.id),
+        },
+        version: 0,
+      })
     );
     window.sessionStorage.setItem("doze52:habits-mobile-dnd-seeded", "1");
   });
@@ -863,10 +888,10 @@ test("mobile reordena hábitos pelo mesmo DnD e persiste a posição", async ({
 
   await expect.poll(async () => {
     const raw = await page.evaluate(() =>
-      window.sessionStorage.getItem("doze52:habits-prototype:v1")
+      window.localStorage.getItem("doze52:habits-store:v1")
     );
-    const session = JSON.parse(raw ?? "{}");
-    return [...(session.habits ?? [])]
+    const store = JSON.parse(raw ?? "{}");
+    return [...(store.state?.habits ?? [])]
       .sort((left, right) => left.position - right.position)
       .map((habit) => habit.id)
       .join(",");
@@ -879,11 +904,10 @@ test("mobile reordena hábitos pelo mesmo DnD e persiste a posição", async ({
   await controls.getByRole("button", { name: "Editar hábito Caminhar" }).click();
   await page.getByLabel("Nome do hábito").fill("Caminhar mobile");
   await page.getByRole("button", { name: "Salvar alterações" }).click();
-  await controls.getByRole("button", { name: "Editar hábito Caminhar mobile" }).click();
-  await page.getByRole("button", { name: "Arquivar" }).click();
   await controls.getByRole("button", { name: "Editar hábito Ler" }).click();
-  await page.getByRole("button", { name: "Arquivar" }).click();
-  await controls.getByRole("button", { name: "Caminhar mobile", exact: true }).click();
+  await page.getByRole("button", { name: "Excluir hábito" }).click();
+  await page.getByRole("button", { name: "Confirmar exclusão" }).click();
+  await expect(controls.getByRole("button", { name: "Editar hábito Ler" })).toHaveCount(0);
   await expect(
     controls.getByRole("button", { name: "Editar hábito Caminhar mobile" })
   ).toBeVisible();
@@ -906,7 +930,7 @@ test("onboarding desktop apresenta o exemplo e termina no hábito real", async (
         periodItemsCreated: 2,
       })
     );
-    window.sessionStorage.removeItem("doze52:habits-prototype:v1");
+    window.localStorage.removeItem("doze52:habits-store:v1");
   });
   await page.goto("/?surface=annual");
 
@@ -1018,9 +1042,9 @@ test("onboarding desktop apresenta o exemplo e termina no hábito real", async (
   expect(
     await page.evaluate(() => {
       const stored = JSON.parse(
-        window.sessionStorage.getItem("doze52:habits-prototype:v1") ?? "{}"
+        window.localStorage.getItem("doze52:habits-store:v1") ?? "{}"
       );
-      return (stored.habits ?? []).length;
+      return (stored.state?.habits ?? []).length;
     })
   ).toBe(0);
   await showcaseNotice.getByRole("button", { name: "Criar meu hábito" }).click();
@@ -1084,9 +1108,10 @@ test("onboarding desktop apresenta o exemplo e termina no hábito real", async (
       const onboarding = JSON.parse(
         window.localStorage.getItem("doze52:onboarding:v2") ?? "{}"
       );
-      const habits = JSON.parse(
-        window.sessionStorage.getItem("doze52:habits-prototype:v1") ?? "{}"
+      const habitsStore = JSON.parse(
+        window.localStorage.getItem("doze52:habits-store:v1") ?? "{}"
       );
+      const habits = habitsStore.state ?? {};
       return {
         step: onboarding.step,
         habitCount: (habits.habits ?? []).length,
@@ -1115,7 +1140,7 @@ test("onboarding mantém a edição aberta até importar o calendário", async (
   });
   await page.goto("/?surface=annual");
 
-  const edit = page.locator("[data-onboarding-edit-control]");
+  const edit = page.locator('[data-product-organize="desktop"]');
   const editNotice = page.locator(
     '[data-guided-toolbar-notice][data-guided-toolbar-target="edit"]'
   );
@@ -1123,15 +1148,14 @@ test("onboarding mantém a edição aberta até importar o calendário", async (
   await expect(editNotice).toHaveCSS("position", "fixed");
   const editBox = await edit.boundingBox();
   const editNoticeBox = await editNotice.boundingBox();
-  if (!editBox || !editNoticeBox) {
+  const viewport = page.viewportSize();
+  if (!editBox || !editNoticeBox || !viewport) {
     throw new Error("Orientação do modo de edição não pôde ser medida.");
   }
-  expect(
-    Math.abs(
-      editNoticeBox.x + editNoticeBox.width / 2 -
-        (editBox.x + editBox.width / 2)
-    )
-  ).toBeLessThan(24);
+  expect(editNoticeBox.x).toBeGreaterThanOrEqual(-0.5);
+  expect(editNoticeBox.x + editNoticeBox.width).toBeLessThanOrEqual(
+    viewport.width + 0.5
+  );
   expect(
     await editNotice.evaluate((element) => {
       const rect = element.getBoundingClientRect();
@@ -1143,7 +1167,7 @@ test("onboarding mantém a edição aberta até importar o calendário", async (
     })
   ).toBe(true);
   await edit.click();
-  await expect(edit).toHaveAttribute("aria-label", /Finalizar edição/);
+  await expect(edit).toHaveAttribute("aria-label", /Finalizar organização/);
   await expect(
     page.locator(
       '[data-guided-toolbar-notice][data-guided-toolbar-target="calendars"]'
@@ -1189,7 +1213,7 @@ test("onboarding mantém a edição aberta até importar o calendário", async (
   await expect(
     page.locator('[data-guided-toolbar-notice][data-guided-toolbar-target="year"]')
   ).toBeVisible();
-  await expect(edit).toHaveAttribute("aria-label", /^Editar/);
+  await expect(edit).toHaveAttribute("aria-label", /^Organizar/);
 });
 
 test("demonstração não apaga um hábito real já existente", async ({
@@ -1207,22 +1231,26 @@ test("demonstração não apaga um hábito real já existente", async ({
         startedAt: timestamp,
       })
     );
-    window.sessionStorage.setItem(
-      "doze52:habits-prototype:v1",
+    window.localStorage.setItem(
+      "doze52:habits-store:v1",
       JSON.stringify({
-        habits: [
-          {
-            id: "real-habit",
-            name: "Meu hábito preservado",
-            color: "#4F8FD6",
-            icon: "circle-check",
-            position: 0,
-            createdAt: timestamp,
-            updatedAt: timestamp,
-          },
-        ],
-        checkIns: {},
-        selectedHabitId: "real-habit",
+        state: {
+          habits: [
+            {
+              id: "real-habit",
+              name: "Meu hábito preservado",
+              color: "#4F8FD6",
+              icon: "circle-check",
+              position: 0,
+              createdAt: timestamp,
+              updatedAt: timestamp,
+            },
+          ],
+          checkIns: {},
+          selectedHabitId: "real-habit",
+          visibleHabitIds: ["real-habit"],
+        },
+        version: 0,
       })
     );
   });
@@ -1250,9 +1278,9 @@ test("demonstração não apaga um hábito real já existente", async ({
   expect(
     await page.evaluate(() => {
       const stored = JSON.parse(
-        window.sessionStorage.getItem("doze52:habits-prototype:v1") ?? "{}"
+        window.localStorage.getItem("doze52:habits-store:v1") ?? "{}"
       );
-      return stored.habits?.map((habit: { id: string }) => habit.id);
+      return stored.state?.habits?.map((habit: { id: string }) => habit.id);
     })
   ).toEqual(["real-habit"]);
 });

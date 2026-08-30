@@ -2049,7 +2049,7 @@ export default function HomePage() {
         instruction:
           isMobileCalendarUi === true
             ? "Toque no lápis para abrir o modo de edição."
-            : "Clique no lápis para abrir o modo de edição.",
+            : "Clique em Organizar para abrir o modo de edição.",
         stepLabel: `Passo 4 de ${totalSteps}`,
       };
     }
@@ -2314,6 +2314,10 @@ export default function HomePage() {
     [updateGuidedOnboarding]
   );
 
+  const handleToggleHabitsEditing = React.useCallback(() => {
+    setWorkspaceEditMode((current) => (current === "habits" ? null : "habits"));
+  }, []);
+
   React.useLayoutEffect(() => {
     if (
       !isHabitsPrototypeEnabled ||
@@ -2444,6 +2448,9 @@ export default function HomePage() {
           activeDestination={activeDestination}
           onDestinationSelect={handleDestinationSelect}
           onOpenUtilityPanel={handleOpenUtilityPanel}
+          onToggleHabitsEditing={handleToggleHabitsEditing}
+          habitsEditingActive={workspaceEditMode === "habits"}
+          habitsOrganizeDisabled={Boolean(onboardingHabitShowcase)}
           onCalendarPackFocusYear={handleYearChange}
           onboardingFocusTarget={
             isCalendarSurfaceActive ? onboardingFocusTarget : null
@@ -2501,11 +2508,7 @@ export default function HomePage() {
           isMobile={isMobileCalendarUi}
           isEditing={workspaceEditMode === "habits"}
           onYearChange={handleYearChange}
-          onToggleEditing={() =>
-            setWorkspaceEditMode((current) =>
-              current === "habits" ? null : "habits"
-            )
-          }
+          onToggleEditing={handleToggleHabitsEditing}
           onRequireAuth={() => {
             setAuthDialogInitialMode("login");
             setAuthDialogAnchorPoint(undefined);
