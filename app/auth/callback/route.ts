@@ -11,8 +11,10 @@ export async function GET(request: Request) {
     ? `${forwardedProto ?? "https"}://${forwardedHost}`
     : requestUrl.origin;
   const code = requestUrl.searchParams.get("code");
+  const nextPath = requestUrl.searchParams.get("next");
+  const safeNextPath = nextPath && nextPath.startsWith("/") ? nextPath : "/";
   const buildResponse = () => {
-    const redirectUrl = new URL("/", origin);
+    const redirectUrl = new URL(safeNextPath, origin);
     return NextResponse.redirect(redirectUrl);
   };
 
