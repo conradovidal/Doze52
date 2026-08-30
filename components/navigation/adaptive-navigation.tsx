@@ -8,8 +8,6 @@ import {
   UserRound,
   type LucideIcon,
 } from "lucide-react";
-import { useAuth } from "@/lib/auth";
-import { useBilling } from "@/lib/use-billing";
 import {
   PRODUCT_DESTINATIONS,
   type ProductDestinationId,
@@ -48,17 +46,13 @@ const ICON_BY_NAME: Record<
 };
 
 function AccountGlyph({ compact = false }: { compact?: boolean }) {
-  const { session } = useAuth();
-  const { isPro, isLoading, error } = useBilling();
-  const showProBorder = Boolean(session && isPro && !isLoading && !error);
   const sizeClass = compact ? "size-5" : "size-8";
 
   return (
     <span
       className={cn(
         sizeClass,
-        "rounded-[10px] grid place-items-center text-muted-foreground",
-        showProBorder && "ring-[3px] ring-premium"
+        "rounded-[10px] grid place-items-center text-muted-foreground"
       )}
       aria-hidden="true"
     >
