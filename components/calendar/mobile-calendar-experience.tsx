@@ -598,7 +598,7 @@ export function MobileCalendarExperience({
                     className={cn(
                       "flex h-[3.55rem] w-[3.55rem] flex-col items-center justify-center text-center tabular-nums transition-[background-color,color,box-shadow]",
                       today
-                        ? "rounded-[10px] bg-red-600 text-white shadow-[0_10px_20px_-16px_rgba(220,38,38,0.55)]"
+                        ? "rounded-[10px] bg-[#b2554c] text-white shadow-[0_10px_20px_-16px_rgba(178,85,76,0.55)]"
                         : active
                           ? "text-foreground"
                           : isPast
