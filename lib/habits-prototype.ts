@@ -371,6 +371,7 @@ export const buildHabitPrototypeWeeks = (
     ? Number.POSITIVE_INFINITY
     : safeToday.getTime();
   const weeks: HabitPrototypeWeek[] = [];
+  const monthLabelStartIndices: number[] = [];
 
   for (
     let weekStart = gridStart;
@@ -392,6 +393,8 @@ export const buildHabitPrototypeWeeks = (
       (day) => day.inYear && day.dayOfMonth === 1
     );
 
+    if (firstOfMonth) monthLabelStartIndices.push(weeks.length);
+
     weeks.push({
       id: format(weekStart, "yyyy-MM-dd"),
       monthLabel: firstOfMonth
@@ -399,6 +402,21 @@ export const buildHabitPrototypeWeeks = (
         : null,
       days,
     });
+  }
+
+  // Move each month's label from its first week to the row at the center of
+  // however many weeks it actually spans in this grid (a month's span runs
+  // from its own first-of-month week up to, but not including, the next
+  // month's first-of-month week — or the end of the grid for December), so
+  // the vertical text reads as sitting in the middle of the month's own
+  // block rather than pinned to the boundary with the previous month.
+  for (let i = 0; i < monthLabelStartIndices.length; i += 1) {
+    const startIndex = monthLabelStartIndices[i];
+    const nextStartIndex = monthLabelStartIndices[i + 1] ?? weeks.length;
+    const span = nextStartIndex - startIndex;
+    const targetIndex = startIndex + Math.floor((span - 1) / 2);
+    weeks[targetIndex].monthLabel = weeks[startIndex].monthLabel;
+    if (targetIndex !== startIndex) weeks[startIndex].monthLabel = null;
   }
 
   return weeks;

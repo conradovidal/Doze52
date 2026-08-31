@@ -439,9 +439,12 @@ export function ProfileBar({
   }
 
   if (!isInlineEditMode) {
+    const visibleProfiles = mobileDense
+      ? profiles.filter((profile) => !selectedSet.has(profile.id))
+      : profiles;
     return (
       <div className={barClass}>
-        {profiles.map((profile) => {
+        {visibleProfiles.map((profile) => {
           const selected = selectedSet.has(profile.id);
           return (
             <button

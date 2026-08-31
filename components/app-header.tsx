@@ -1,7 +1,14 @@
 "use client";
 
 import * as React from "react";
-import { Check, ChevronDown, PencilLine } from "lucide-react";
+import {
+  Check,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  LayoutGrid,
+  PencilLine,
+} from "lucide-react";
 import { BrandLogo } from "@/components/brand-logo";
 import {
   GuidedCalendarNotice,
@@ -50,6 +57,8 @@ import {
   DESKTOP_CONTROL_ROW_GAP_CLASS,
 } from "@/lib/desktop-control-layout";
 
+const MOBILE_FILTERS_COLLAPSED_STORAGE_KEY = "doze52:mobile-filters:collapsed";
+
 type AppHeaderProps = {
   year: number;
   onYearChange: (year: number) => void;
@@ -90,6 +99,8 @@ type AppHeaderProps = {
   controlledInlineEditMode?: boolean;
   onFilterLayoutChange?: () => void;
   exitInlineEditRequestKey?: number;
+  onYearLabelClick?: () => void;
+  onGuidedThemeChange?: () => void;
 };
 
 const getPreferredEditingProfileId = (
@@ -134,6 +145,8 @@ export function AppHeader({
   controlledInlineEditMode,
   onFilterLayoutChange,
   exitInlineEditRequestKey = 0,
+  onYearLabelClick,
+  onGuidedThemeChange,
 }: AppHeaderProps) {
   const profiles = useStore((s) => s.profiles);
   const categories = useStore((s) => s.categories);
@@ -151,8 +164,35 @@ export function AppHeader({
   const [categoryEditOpen, setCategoryEditOpen] = React.useState(false);
   const [editingCategoryId, setEditingCategoryId] = React.useState<string | null>(null);
   const [categoriesExpanded, setCategoriesExpanded] = React.useState(true);
-  const [areMobileFiltersCollapsed, setAreMobileFiltersCollapsed] =
-    React.useState(false);
+  const [areMobileFiltersCollapsed, setAreMobileFiltersCollapsedState] =
+    React.useState(() => {
+      if (typeof window === "undefined") return false;
+      try {
+        return (
+          window.localStorage.getItem(MOBILE_FILTERS_COLLAPSED_STORAGE_KEY) ===
+          "true"
+        );
+      } catch {
+        return false;
+      }
+    });
+  const setAreMobileFiltersCollapsed = React.useCallback(
+    (updater: boolean | ((current: boolean) => boolean)) => {
+      setAreMobileFiltersCollapsedState((current) => {
+        const next = typeof updater === "function" ? updater(current) : updater;
+        try {
+          window.localStorage.setItem(
+            MOBILE_FILTERS_COLLAPSED_STORAGE_KEY,
+            String(next)
+          );
+        } catch {
+          // Sem persistência entre navegações se o storage falhar; sem impacto na sessão atual.
+        }
+        return next;
+      });
+    },
+    []
+  );
   const previousOnboardingLayoutLockedRef = React.useRef(false);
   const effectiveInlineEditMode = onboardingLayoutLocked
     ? guidedEditPreviewActive
@@ -260,7 +300,7 @@ export function AppHeader({
     if (effectiveInlineEditMode) {
       setAreMobileFiltersCollapsed(false);
     }
-  }, [effectiveInlineEditMode]);
+  }, [effectiveInlineEditMode, setAreMobileFiltersCollapsed]);
 
   React.useEffect(() => {
     const wasLocked = previousOnboardingLayoutLockedRef.current;
@@ -408,12 +448,15 @@ export function AppHeader({
       ) : null}
       <header
         className={cn(
-          "space-y-3 bg-background",
+          "bg-background",
+          isMobileMode
+            ? "space-y-0"
+            : "space-y-3",
           useAdaptiveNavigation
             ? DESKTOP_CONTROL_NAV_GAP_CLASS
             : "md:space-y-3.5",
           isMobileMode
-            ? "mb-1"
+            ? "mb-0"
             : useAdaptiveNavigation && !showCalendarControls
               ? "mb-0"
               : useAdaptiveNavigation
@@ -425,20 +468,18 @@ export function AppHeader({
           data-app-header-navigation-row
           className={cn(
             "relative min-h-9 md:min-h-10",
-            useAdaptiveNavigation
-              ? "flex items-start justify-end md:grid md:grid-cols-[1fr_auto_1fr] md:items-center"
-              : "grid grid-cols-[auto_minmax(0,1fr)] items-start gap-2.5 md:grid-cols-[minmax(0,1fr)_auto] md:items-center md:gap-4"
+            useAdaptiveNavigation && isMobileMode
+              ? "fixed inset-x-0 top-0 z-40 flex h-12 items-center justify-between bg-background/92 px-3 pt-[env(safe-area-inset-top,0px)] backdrop-blur"
+              : useAdaptiveNavigation
+                ? "flex items-center justify-between md:grid md:grid-cols-[1fr_auto_1fr]"
+                : "grid grid-cols-[auto_minmax(0,1fr)] items-start gap-2.5 md:grid-cols-[minmax(0,1fr)_auto] md:items-center md:gap-4"
           )}
         >
           <div
             data-brand-logo-position={
               useAdaptiveNavigation ? "header-adaptive" : undefined
             }
-            className={cn(
-              useAdaptiveNavigation
-                ? "absolute top-0 left-1/2 -translate-x-1/2 md:static md:translate-x-0 md:justify-self-start"
-                : "justify-self-start"
-            )}
+            className={cn(useAdaptiveNavigation && "md:justify-self-start")}
           >
             <BrandLogo />
           </div>
@@ -457,6 +498,25 @@ export function AppHeader({
               highlightDestination={
                 guidedToolbarNotice?.target === "habit-surface" ? "habits" : undefined
               }
+              themeHighlighted={guidedToolbarNotice?.target === "theme"}
+              themeDisabled={themeToggleDisabled}
+              onGuidedThemeChange={onGuidedThemeChange}
+            />
+          ) : null}
+          {guidedToolbarNotice?.target === "theme" &&
+          onDismissGuidedSelection ? (
+            <GuidedToolbarNoticeCard
+              notice={guidedToolbarNotice}
+              onClose={onDismissGuidedSelection}
+              onAction={
+                guidedToolbarNotice.actionLabel
+                  ? () => onGuidedToolbarAction?.("theme")
+                  : undefined
+              }
+              placement="viewport"
+              portaled
+              anchorSelector="[data-product-theme='desktop']"
+              anchorPlacement="below-end"
             />
           ) : null}
           {guidedToolbarNotice?.target === "profile" &&
@@ -484,8 +544,8 @@ export function AppHeader({
 
           <div
             className={cn(
-              "w-full min-w-0 justify-self-end",
-              useAdaptiveNavigation && "md:hidden"
+              "min-w-0",
+              useAdaptiveNavigation ? "md:hidden" : "w-full justify-self-end"
             )}
           >
             <div
@@ -494,6 +554,52 @@ export function AppHeader({
               }
               className="flex min-w-0 flex-wrap items-center justify-end gap-1 sm:gap-2"
             >
+              {useAdaptiveNavigation ? (
+                <button
+                  type="button"
+                  data-product-organize="mobile"
+                  aria-pressed={organizeActive}
+                  aria-label={organizeActive ? "Finalizar organização" : "Organizar"}
+                  title={organizeActive ? "Finalizar organização" : "Organizar"}
+                  disabled={organizeDisabled}
+                  className={cn(
+                    "grid size-9 shrink-0 place-items-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-transparent disabled:hover:text-muted-foreground",
+                    organizeActive &&
+                      "bg-foreground text-background hover:bg-foreground/90 hover:text-background"
+                  )}
+                  onClick={handleToggleOrganize}
+                >
+                  <LayoutGrid className="size-[18px]" />
+                </button>
+              ) : null}
+              {useAdaptiveNavigation ? (
+                <span
+                  data-onboarding-spotlight-target={
+                    guidedToolbarNotice?.target === "theme" ? "true" : undefined
+                  }
+                  className="relative"
+                >
+                  <ThemeToggle
+                    variant="bare"
+                    highlighted={guidedToolbarNotice?.target === "theme"}
+                    disabled={themeToggleDisabled}
+                    onThemeChange={onGuidedThemeChange}
+                  />
+                  {guidedToolbarNotice?.target === "theme" &&
+                  onDismissGuidedSelection ? (
+                    <GuidedToolbarNoticeCard
+                      notice={guidedToolbarNotice}
+                      onClose={onDismissGuidedSelection}
+                      onAction={
+                        guidedToolbarNotice.actionLabel
+                          ? () => onGuidedToolbarAction?.("theme")
+                          : undefined
+                      }
+                      align="end"
+                    />
+                  ) : null}
+                </span>
+              ) : null}
               {showCalendarControls && !useAdaptiveNavigation ? (
                 <div
                   data-onboarding-spotlight-target={
@@ -600,32 +706,87 @@ export function AppHeader({
                   useAdaptiveNavigation && "md:hidden"
                 )}
               >
-                <Select
-                  value={String(year)}
-                  disabled={yearSelectDisabled}
-                  open={yearSelectOpen}
-                  onOpenChange={setYearSelectOpen}
-                  onValueChange={(v) => onYearChange(Number(v))}
-                >
-                  <SelectTrigger
+                {useAdaptiveNavigation ? (
+                  <div
                     data-onboarding-year-control
                     data-onboarding-highlighted={
                       guidedToolbarNotice?.target === "year" ? "true" : undefined
                     }
                     className={cn(
-                      yearSelectClass,
+                      "inline-flex h-9 items-center rounded-xl border border-border bg-card",
                       guidedToolbarNotice?.target === "year" &&
                         "product-spotlight-target"
                     )}
                   >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={String(year - 1)}>{year - 1}</SelectItem>
-                    <SelectItem value={String(year)}>{year}</SelectItem>
-                    <SelectItem value={String(year + 1)}>{year + 1}</SelectItem>
-                  </SelectContent>
-                </Select>
+                    <button
+                      type="button"
+                      aria-label={`Voltar para ${year - 1}`}
+                      title={`Voltar para ${year - 1}`}
+                      disabled={yearSelectDisabled}
+                      className="grid size-9 place-items-center rounded-l-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-45"
+                      onClick={() => onYearChange(year - 1)}
+                    >
+                      <ChevronLeft className="size-4" />
+                    </button>
+                    {onYearLabelClick ? (
+                      <button
+                        type="button"
+                        aria-label={`Ano ${year}. Ir para hoje`}
+                        aria-live="polite"
+                        title="Ir para hoje"
+                        className="min-w-9 text-center text-[0.9rem] font-semibold tabular-nums text-foreground transition-colors hover:text-foreground/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:rounded-md"
+                        onClick={onYearLabelClick}
+                      >
+                        {year}
+                      </button>
+                    ) : (
+                      <span
+                        aria-label={`Ano ${year}`}
+                        aria-live="polite"
+                        className="min-w-9 text-center text-[0.9rem] font-semibold tabular-nums text-foreground"
+                      >
+                        {year}
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      aria-label={`Avançar para ${year + 1}`}
+                      title={`Avançar para ${year + 1}`}
+                      disabled={yearSelectDisabled}
+                      className="grid size-9 place-items-center rounded-r-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-45"
+                      onClick={() => onYearChange(year + 1)}
+                    >
+                      <ChevronRight className="size-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <Select
+                    value={String(year)}
+                    disabled={yearSelectDisabled}
+                    open={yearSelectOpen}
+                    onOpenChange={setYearSelectOpen}
+                    onValueChange={(v) => onYearChange(Number(v))}
+                  >
+                    <SelectTrigger
+                      data-onboarding-year-control
+                      data-onboarding-highlighted={
+                        guidedToolbarNotice?.target === "year" ? "true" : undefined
+                      }
+                      className={cn(
+                        yearSelectClass,
+                        guidedToolbarNotice?.target === "year" &&
+                          "product-spotlight-target"
+                      )}
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={String(year - 1)}>{year - 1}</SelectItem>
+                      <SelectItem value={String(year)}>{year}</SelectItem>
+                      <SelectItem value={String(year + 1)}>{year + 1}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
                 {guidedToolbarNotice?.target === "year" &&
                 !yearSelectOpen &&
                 onDismissGuidedSelection ? (
@@ -689,6 +850,9 @@ export function AppHeader({
             </div>
           </div>
         </div>
+        {useAdaptiveNavigation && isMobileMode && showCalendarControls ? (
+          <div aria-hidden="true" className="h-12" />
+        ) : null}
 
         {showCalendarControls ? (
           <div
@@ -723,7 +887,7 @@ export function AppHeader({
               <div className="w-full overflow-hidden rounded-[10px] border border-border bg-card">
               <div className="m-[3px] flex h-10 w-[calc(100%-6px)] items-center gap-1 rounded-[8px] px-2.5">
                 <span className="flex min-w-0 items-center gap-2.5">
-                  {selectedProfile ? (
+                  {!effectiveInlineEditMode && selectedProfile ? (
                     <span className="grid h-7 w-7 shrink-0 place-items-center text-foreground/72">
                       <ProfileIcon
                         icon={selectedProfile.icon}
@@ -733,65 +897,71 @@ export function AppHeader({
                     </span>
                   ) : null}
                   <span className="block min-w-0 truncate text-[13px] font-semibold leading-4 text-foreground">
-                    {selectedProfile?.name ?? "Contextos"}
+                    {effectiveInlineEditMode
+                      ? "Contextos"
+                      : (selectedProfile?.name ?? "Contextos")}
                   </span>
                 </span>
                 <span className="relative ml-auto flex shrink-0 items-center gap-1">
-                  {useAdaptiveNavigation ? (
+                  {!useAdaptiveNavigation ? (
+                    <>
+                      <button
+                        type="button"
+                        data-onboarding-edit-control
+                        data-onboarding-highlighted={
+                          guidedToolbarNotice?.target === "edit" ? "true" : undefined
+                        }
+                        aria-pressed={effectiveInlineEditMode}
+                        aria-label={effectiveInlineEditMode ? "Finalizar edição" : "Editar"}
+                        title={effectiveInlineEditMode ? "Finalizar edição" : "Editar"}
+                        disabled={inlineEditDisabled}
+                        className={cn(
+                          categoryToggleClass,
+                          effectiveInlineEditMode &&
+                            "border-foreground bg-foreground text-background hover:bg-foreground/90 hover:text-background"
+                        )}
+                        onClick={toggleInlineEditMode}
+                      >
+                        {effectiveInlineEditMode ? (
+                          <Check className="h-3.5 w-3.5" />
+                        ) : (
+                          <PencilLine className="h-3.5 w-3.5" />
+                        )}
+                      </button>
+                      {guidedToolbarNotice?.target === "edit" &&
+                      onDismissGuidedSelection ? (
+                        <GuidedToolbarNoticeCard
+                          notice={guidedToolbarNotice}
+                          onClose={onDismissGuidedSelection}
+                          onAction={() => onGuidedToolbarAction?.("edit")}
+                        />
+                      ) : null}
+                    </>
+                  ) : null}
+                  {!effectiveInlineEditMode ? (
                     <button
                       type="button"
-                      data-onboarding-edit-control
-                      data-onboarding-highlighted={
-                        guidedToolbarNotice?.target === "edit" ? "true" : undefined
+                      className={categoryToggleClass}
+                      aria-expanded={showMobileFilterPanel}
+                      aria-controls={filterPanelId}
+                      aria-label={
+                        showMobileFilterPanel
+                          ? "Recolher contextos e categorias"
+                          : "Mostrar contextos e categorias"
                       }
-                      aria-pressed={effectiveInlineEditMode}
-                      aria-label={effectiveInlineEditMode ? "Finalizar edição" : "Editar"}
-                      title={effectiveInlineEditMode ? "Finalizar edição" : "Editar"}
-                      disabled={inlineEditDisabled}
-                      className={cn(
-                        categoryToggleClass,
-                        effectiveInlineEditMode &&
-                          "border-foreground bg-foreground text-background hover:bg-foreground/90 hover:text-background"
-                      )}
-                      onClick={toggleInlineEditMode}
+                      onClick={() =>
+                        setAreMobileFiltersCollapsed((current) => !current)
+                      }
                     >
-                      {effectiveInlineEditMode ? (
-                        <Check className="h-3.5 w-3.5" />
-                      ) : (
-                        <PencilLine className="h-3.5 w-3.5" />
-                      )}
+                      <ChevronDown
+                        className={cn(
+                          "h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
+                          showMobileFilterPanel ? "rotate-180" : "rotate-0"
+                        )}
+                        aria-hidden="true"
+                      />
                     </button>
                   ) : null}
-                  {guidedToolbarNotice?.target === "edit" &&
-                  onDismissGuidedSelection ? (
-                    <GuidedToolbarNoticeCard
-                      notice={guidedToolbarNotice}
-                      onClose={onDismissGuidedSelection}
-                      onAction={() => onGuidedToolbarAction?.("edit")}
-                    />
-                  ) : null}
-                  <button
-                    type="button"
-                    className={categoryToggleClass}
-                    aria-expanded={showMobileFilterPanel}
-                    aria-controls={filterPanelId}
-                    aria-label={
-                      showMobileFilterPanel
-                        ? "Recolher contextos e categorias"
-                        : "Mostrar contextos e categorias"
-                    }
-                    onClick={() =>
-                      setAreMobileFiltersCollapsed((current) => !current)
-                    }
-                  >
-                    <ChevronDown
-                      className={cn(
-                        "h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
-                        showMobileFilterPanel ? "rotate-180" : "rotate-0"
-                      )}
-                      aria-hidden="true"
-                    />
-                  </button>
                 </span>
               </div>
 

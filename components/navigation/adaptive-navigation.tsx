@@ -12,6 +12,7 @@ import {
 import { useAuth } from "@/lib/auth";
 import { useAvatarPreference } from "@/lib/avatar-preference";
 import { useBilling } from "@/lib/use-billing";
+import { ThemeToggle } from "@/components/theme-toggle";
 import {
   PRODUCT_DESTINATIONS,
   type ProductDestinationId,
@@ -39,6 +40,9 @@ type ProductNavigationProps = {
   organizeHighlighted?: boolean;
   highlightProfile?: boolean;
   highlightDestination?: ProductDestinationId;
+  themeHighlighted?: boolean;
+  themeDisabled?: boolean;
+  onGuidedThemeChange?: () => void;
 };
 
 const ICON_BY_NAME: Record<
@@ -94,7 +98,7 @@ function AccountGlyph({
         )}
         aria-hidden="true"
       >
-        <UserRound className="size-5" strokeWidth={1.8} />
+        <UserRound className={compact ? "size-4" : "size-5"} strokeWidth={1.8} />
       </span>
     );
   }
@@ -144,7 +148,7 @@ function DestinationButton({
       data-onboarding-highlighted={highlighted ? "true" : undefined}
       className={cn(
         "group relative inline-flex items-center justify-center rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
-        mobile ? "min-h-12 min-w-16 flex-1 flex-col gap-0.5 px-2" : "size-10",
+        mobile ? "min-h-12 min-w-16 flex-1" : "size-10",
         active
           ? "text-foreground"
           : "text-muted-foreground/55 hover:bg-muted/45 hover:text-foreground/80"
@@ -164,13 +168,7 @@ function DestinationButton({
       }}
     >
       <Icon className="size-5" aria-hidden="true" />
-      {mobile ? (
-        <span className="text-[10px] font-semibold leading-none">
-          {destination.label}
-        </span>
-      ) : (
-        <span className="sr-only">{destination.label}</span>
-      )}
+      <span className="sr-only">{destination.label}</span>
     </a>
   );
 }
@@ -186,6 +184,9 @@ export function DesktopProductNavigation({
   organizeHighlighted = false,
   highlightProfile = false,
   highlightDestination,
+  themeHighlighted = false,
+  themeDisabled = false,
+  onGuidedThemeChange,
 }: ProductNavigationProps) {
   const handleAccount = (event: React.MouseEvent<HTMLButtonElement>) => {
     if (authLoading) return;
@@ -229,6 +230,14 @@ export function DesktopProductNavigation({
             <LayoutGrid className="size-[18px]" />
           </button>
         ) : null}
+        <span data-product-theme="desktop" className="relative">
+          <ThemeToggle
+            variant="bare"
+            highlighted={themeHighlighted}
+            disabled={themeDisabled}
+            onThemeChange={onGuidedThemeChange}
+          />
+        </span>
         <button
           type="button"
           data-product-account="desktop"
@@ -280,11 +289,10 @@ export function AdaptiveNavigation({
         data-onboarding-auth-entry
         aria-label="Abrir perfil"
         disabled={authLoading}
-        className="inline-flex min-h-12 min-w-16 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-2 text-muted-foreground/55 transition-colors hover:bg-muted/45 hover:text-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 disabled:opacity-45"
+        className="inline-flex min-h-12 min-w-16 flex-1 items-center justify-center rounded-xl text-muted-foreground/55 transition-colors hover:bg-muted/45 hover:text-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 disabled:opacity-45"
         onClick={handleAccount}
       >
-        {authLoading ? null : <AccountGlyph compact />}
-        <span className="text-[10px] font-semibold leading-none">Perfil</span>
+        {authLoading ? null : <AccountGlyph compact desktopHeader />}
       </button>
     </nav>
   );

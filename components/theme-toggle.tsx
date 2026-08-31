@@ -52,7 +52,7 @@ export function ThemeToggle({
       <span className="sr-only">
         {isLight ? "Mudar para tema escuro" : "Mudar para tema claro"}
       </span>
-      {isLight ? <MoonStar className="h-4 w-4" /> : <SunMedium className="h-4 w-4" />}
+      {isLight ? <SunMedium className="h-4 w-4" /> : <MoonStar className="h-4 w-4" />}
     </button>
   );
 }

@@ -16,12 +16,14 @@ type MobileDesktopFirstGateProps = {
   allowExample: boolean;
   onExploreExample: () => void;
   onOpenLogin: () => void;
+  onBackToHabits?: () => void;
 };
 
 export function MobileDesktopFirstGate({
   allowExample,
   onExploreExample,
   onOpenLogin,
+  onBackToHabits,
 }: MobileDesktopFirstGateProps) {
   return (
     <Dialog open>
@@ -67,6 +69,16 @@ export function MobileDesktopFirstGate({
           >
             Entrar na minha conta
           </Button>
+          {onBackToHabits ? (
+            <Button
+              type="button"
+              variant="ghost"
+              className="w-full text-muted-foreground"
+              onClick={onBackToHabits}
+            >
+              Continuar em Hábitos
+            </Button>
+          ) : null}
         </DialogFooter>
       </DialogContent>
     </Dialog>

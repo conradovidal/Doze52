@@ -34,12 +34,13 @@ type MobileCalendarExperienceProps = {
   guidedRangeStart?: string | null;
   guidedSelectionRange?: { startDate: string; endDate: string } | null;
   onGuidedDaySelect?: (dateIso: string) => void;
+  scrollToTodayRequestKey?: number;
 };
 
 const MONTH_LABELS = [
   "Janeiro",
   "Fevereiro",
-  "Marco",
+  "Março",
   "Abril",
   "Maio",
   "Junho",
@@ -51,24 +52,9 @@ const MONTH_LABELS = [
   "Dezembro",
 ] as const;
 
-const MONTH_SHORT_LABELS = [
-  "jan",
-  "fev",
-  "mar",
-  "abr",
-  "mai",
-  "jun",
-  "jul",
-  "ago",
-  "set",
-  "out",
-  "nov",
-  "dez",
-] as const;
-
 const WEEKDAY_SHORT_LABELS = ["dom", "seg", "ter", "qua", "qui", "sex", "sab"] as const;
 const DAY_ACTIVE_TOP_THRESHOLD = 12;
-const MONTH_REVEAL_MARGIN = 8;
+const TODAY_SCROLL_LEAD_DAYS = 3;
 
 const toIsoDate = (date: Date) => format(date, "yyyy-MM-dd");
 
@@ -162,6 +148,7 @@ export function MobileCalendarExperience({
   guidedRangeStart = null,
   guidedSelectionRange = null,
   onGuidedDaySelect,
+  scrollToTodayRequestKey = 0,
 }: MobileCalendarExperienceProps) {
   const categories = useStore((s) => s.categories as CategoryItem[]);
   const selectedProfileIds = useStore((s) => s.selectedProfileIds);
@@ -191,21 +178,21 @@ export function MobileCalendarExperience({
     [events, visibleCategoryIds]
   );
   const yearDays = React.useMemo(() => getYearDays(year), [year]);
-  const activeDate = React.useMemo(() => {
-    if (getIsoYear(activeDateIso) === year) {
-      return getSafeDate(activeDateIso, year);
+  const monthGroups = React.useMemo(() => {
+    const groups: { monthIndex: number; days: Date[] }[] = [];
+    for (const day of yearDays) {
+      const monthIndex = day.getMonth();
+      const lastGroup = groups[groups.length - 1];
+      if (lastGroup && lastGroup.monthIndex === monthIndex) {
+        lastGroup.days.push(day);
+      } else {
+        groups.push({ monthIndex, days: [day] });
+      }
     }
-
-    return new Date(year, 0, 1);
-  }, [activeDateIso, year]);
-  const [activeMonthIndex, setActiveMonthIndex] = React.useState(
-    activeDate.getMonth()
-  );
+    return groups;
+  }, [yearDays]);
   const listRef = React.useRef<HTMLDivElement | null>(null);
-  const monthScrollerRef = React.useRef<HTMLElement | null>(null);
-  const monthButtonRefs = React.useRef<Array<HTMLButtonElement | null>>([]);
   const activeDateRef = React.useRef(activeDateIso);
-  const activeMonthRef = React.useRef(activeMonthIndex);
   const scrollAnimationFrameRef = React.useRef<number | null>(null);
   const programmaticScrollRef = React.useRef(false);
 
@@ -213,23 +200,13 @@ export function MobileCalendarExperience({
     activeDateRef.current = activeDateIso;
   }, [activeDateIso]);
 
-  React.useEffect(() => {
-    activeMonthRef.current = activeMonthIndex;
-  }, [activeMonthIndex]);
-
   const setActiveFromDate = React.useCallback(
     (date: Date) => {
       const nextIso = toIsoDate(date);
-      const nextMonth = date.getMonth();
 
       if (activeDateRef.current !== nextIso) {
         activeDateRef.current = nextIso;
         onActiveDateChange(nextIso);
-      }
-
-      if (activeMonthRef.current !== nextMonth) {
-        activeMonthRef.current = nextMonth;
-        setActiveMonthIndex(nextMonth);
       }
 
       const nextYear = date.getFullYear();
@@ -295,56 +272,34 @@ export function MobileCalendarExperience({
   React.useEffect(() => cancelScrollAnimation, [cancelScrollAnimation]);
 
   const scrollToDate = React.useCallback(
-    (date: Date, behavior: ScrollBehavior = "smooth") => {
+    (date: Date, behavior: ScrollBehavior = "smooth", leadDays = 0) => {
       const list = listRef.current;
       if (!list) return;
 
-      const iso = toIsoDate(date);
-      const target = list.querySelector<HTMLElement>(
-        `[data-mobile-day][data-date-iso="${iso}"]`
+      const preferredIso = toIsoDate(
+        leadDays > 0 ? addDays(date, -leadDays) : date
       );
+      const fallbackIso = toIsoDate(date);
+      const target =
+        list.querySelector<HTMLElement>(
+          `[data-mobile-day][data-date-iso="${preferredIso}"]`
+        ) ??
+        list.querySelector<HTMLElement>(
+          `[data-mobile-day][data-date-iso="${fallbackIso}"]`
+        );
       if (!target) return;
 
       setActiveFromDate(date);
       programmaticScrollRef.current = behavior !== "auto";
+      const listRect = list.getBoundingClientRect();
+      const targetRect = target.getBoundingClientRect();
       scrollListTo(
         list,
-        Math.max(0, target.offsetTop - list.offsetTop),
+        Math.max(0, list.scrollTop + (targetRect.top - listRect.top)),
         behavior
       );
     },
     [scrollListTo, setActiveFromDate]
-  );
-
-  const revealMonthButton = React.useCallback(
-    (monthIndex: number, behavior: ScrollBehavior = "smooth") => {
-      const scroller = monthScrollerRef.current;
-      const button = monthButtonRefs.current[monthIndex];
-      if (!scroller || !button) return;
-
-      const scrollerRect = scroller.getBoundingClientRect();
-      const buttonRect = button.getBoundingClientRect();
-      let targetLeft = scroller.scrollLeft;
-      const leftOverflow = buttonRect.left - scrollerRect.left - MONTH_REVEAL_MARGIN;
-      const rightOverflow =
-        buttonRect.right - scrollerRect.right + MONTH_REVEAL_MARGIN;
-
-      if (leftOverflow < 0) {
-        targetLeft += leftOverflow;
-      } else if (rightOverflow > 0) {
-        targetLeft += rightOverflow;
-      } else {
-        return;
-      }
-
-      const maxScrollLeft = scroller.scrollWidth - scroller.clientWidth;
-
-      scroller.scrollTo({
-        left: Math.max(0, Math.min(targetLeft, maxScrollLeft)),
-        behavior,
-      });
-    },
-    []
   );
 
   const handleTodayClick = React.useCallback(() => {
@@ -358,20 +313,20 @@ export function MobileCalendarExperience({
     }
 
     const today = getSafeDate(todayIso, year);
-    revealMonthButton(today.getMonth(), "smooth");
-    scrollToDate(today, "smooth");
-  }, [
-    onActiveDateChange,
-    onYearChange,
-    revealMonthButton,
-    scrollToDate,
-    todayIso,
-    year,
-  ]);
+    scrollToDate(today, "smooth", TODAY_SCROLL_LEAD_DAYS);
+  }, [onActiveDateChange, onYearChange, scrollToDate, todayIso, year]);
 
+  const handledScrollToTodayRequestRef = React.useRef(0);
   React.useEffect(() => {
-    revealMonthButton(activeMonthIndex, "smooth");
-  }, [activeMonthIndex, revealMonthButton]);
+    if (
+      scrollToTodayRequestKey <= 0 ||
+      scrollToTodayRequestKey === handledScrollToTodayRequestRef.current
+    ) {
+      return;
+    }
+    handledScrollToTodayRequestRef.current = scrollToTodayRequestKey;
+    handleTodayClick();
+  }, [scrollToTodayRequestKey, handleTodayClick]);
 
   const syncActiveFromScroll = React.useCallback(() => {
     if (programmaticScrollRef.current) return;
@@ -380,14 +335,19 @@ export function MobileCalendarExperience({
     if (!list) return;
 
     const anchorTop = list.scrollTop + DAY_ACTIVE_TOP_THRESHOLD;
+    const listRect = list.getBoundingClientRect();
     const dayNodes = Array.from(
       list.querySelectorAll<HTMLElement>("[data-mobile-day]")
     );
     let activeNode: HTMLElement | null = null;
 
     for (const node of dayNodes) {
-      const nodeTop = Math.max(0, node.offsetTop - list.offsetTop);
-      const nodeBottom = nodeTop + node.offsetHeight;
+      const nodeRect = node.getBoundingClientRect();
+      const nodeTop = Math.max(
+        0,
+        list.scrollTop + (nodeRect.top - listRect.top)
+      );
+      const nodeBottom = nodeTop + nodeRect.height;
 
       if (nodeTop <= anchorTop && nodeBottom > anchorTop) {
         activeNode = node;
@@ -455,184 +415,186 @@ export function MobileCalendarExperience({
         ? getSafeDate(currentIso, year)
         : new Date(year, 0, 1);
 
-    scrollToDate(initialDate, "auto");
-    revealMonthButton(initialDate.getMonth(), "auto");
+    scrollToDate(initialDate, "auto", TODAY_SCROLL_LEAD_DAYS);
     const frameId = window.requestAnimationFrame(() => {
-      scrollToDate(initialDate, "auto");
-      revealMonthButton(initialDate.getMonth(), "auto");
+      scrollToDate(initialDate, "auto", TODAY_SCROLL_LEAD_DAYS);
     });
     const timeoutId = window.setTimeout(() => {
-      scrollToDate(initialDate, "auto");
-      revealMonthButton(initialDate.getMonth(), "auto");
+      scrollToDate(initialDate, "auto", TODAY_SCROLL_LEAD_DAYS);
     }, 120);
 
     return () => {
       window.cancelAnimationFrame(frameId);
       window.clearTimeout(timeoutId);
     };
-  }, [revealMonthButton, scrollToDate, year]);
+  }, [scrollToDate, year]);
 
   return (
     <section
       data-mobile-calendar-experience
       className="flex min-h-0 w-full flex-1 flex-col"
     >
-      <div className="mx-auto flex w-full max-w-[31rem] shrink-0 items-center gap-1.5 rounded-[10px] border border-border/65 bg-muted/28 p-[3px]">
-        <button
-          type="button"
-          className="inline-flex h-10 shrink-0 items-center rounded-[9px] border border-border bg-card px-3 text-[12px] font-semibold text-foreground shadow-none transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45"
-          onClick={handleTodayClick}
-        >
-          <span className="mr-1.5 size-1.5 rounded-full bg-current" aria-hidden="true" />
-          Hoje
-        </button>
-
-        <div className="relative min-w-0 flex-1 overflow-hidden rounded-[9px]">
-          <nav
-            ref={monthScrollerRef}
-            className="min-w-0 overflow-x-auto overscroll-x-contain px-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-            aria-label={`Meses de ${year}`}
-          >
-            <div className="flex min-w-max items-center gap-1">
-              {MONTH_LABELS.map((monthLabel, monthIndex) => {
-                const active = monthIndex === activeMonthIndex;
-
-                return (
-                  <button
-                    key={monthLabel}
-                    ref={(node) => {
-                      monthButtonRefs.current[monthIndex] = node;
-                    }}
-                    type="button"
-                    aria-pressed={active}
-                    aria-label={monthLabel}
-                    className={cn(
-                      "h-10 min-w-10 shrink-0 rounded-[8px] border px-3 text-[12px] font-semibold transition-[background-color,border-color,color,box-shadow,transform] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45",
-                      active
-                        ? "border-primary bg-primary text-primary-foreground shadow-[0_10px_22px_-18px_rgba(15,23,42,0.55)]"
-                        : "border-transparent bg-transparent text-foreground/62 hover:bg-background hover:text-foreground"
-                    )}
-                    onClick={() => {
-                      revealMonthButton(monthIndex, "smooth");
-                      scrollToDate(new Date(year, monthIndex, 1), "smooth");
-                    }}
-                  >
-                    {MONTH_SHORT_LABELS[monthIndex]}
-                  </button>
-                );
-              })}
-            </div>
-          </nav>
-        </div>
-      </div>
-
-      <div
-        data-mobile-calendar-divider
-        aria-hidden="true"
-        className="mt-2 mb-1 h-px w-full shrink-0 bg-border/45"
-      />
-
       <div
         ref={listRef}
         onScroll={syncActiveFromScroll}
         onTouchMove={syncActiveFromScroll}
         onWheel={syncActiveFromScroll}
-        className="mx-auto min-h-0 w-full max-w-[31rem] flex-1 overflow-y-auto overscroll-contain pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="min-h-0 w-full flex-1 overflow-y-auto overscroll-contain px-3 pb-[calc(4.25rem+env(safe-area-inset-bottom,0px))] [scrollbar-width:none] sm:px-6 [&::-webkit-scrollbar]:hidden"
       >
-        <div className="space-y-1">
-          {yearDays.map((day) => {
-            const dayIso = toIsoDate(day);
-            const dayEvents = getEventsForDay(visibleEvents, dayIso);
-            const active = dayIso === activeDateIso;
-            const today = Boolean(todayIso) && dayIso === todayIso;
-            const isPast = Boolean(todayIso) && dayIso < todayIso;
-            const isWeekend = day.getDay() === 0 || day.getDay() === 6;
-            const weekday = WEEKDAY_SHORT_LABELS[day.getDay()];
-            const guidedSelectable = Boolean(guidedSelectionMode && onGuidedDaySelect);
-            const guidedStart = guidedRangeStart === dayIso;
-            const guidedSelected = Boolean(
-              guidedSelectionRange &&
-                dayIso >= guidedSelectionRange.startDate &&
-                dayIso <= guidedSelectionRange.endDate
-            );
-
-            return (
-              <article
-                key={dayIso}
-                data-mobile-day
-                data-date-iso={dayIso}
-                data-month-index={day.getMonth()}
-                data-day-state={today ? "today" : isPast ? "past" : "future"}
-                data-guided-selected={guidedSelected ? "true" : undefined}
-                className={cn(
-                  "grid min-h-[4.75rem] grid-cols-[3.75rem_minmax(0,1fr)] gap-2 rounded-[8px] border p-2 transition-[background-color,border-color,box-shadow]",
-                  isPast
-                    ? isWeekend
-                      ? "bg-[hsl(var(--cal-cell-weekend-past))]"
-                      : "bg-[hsl(var(--cal-cell-weekday-past))]"
-                    : isWeekend
-                      ? "bg-muted/38"
-                      : "bg-card",
-                  active
-                    ? "border-foreground/70 shadow-[0_12px_24px_-22px_rgba(15,23,42,0.55)]"
-                    : "border-border",
-                  guidedSelectable && "ring-1 ring-primary/15",
-                  (guidedStart || guidedSelected) &&
-                    "border-primary bg-primary/8 ring-2 ring-primary/30"
-                )}
-              >
-                <button
-                  type="button"
-                  className="grid h-full place-items-center rounded-[9px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45"
-                  aria-label={
-                    guidedSelectable
-                      ? `Selecionar ${dayIso} no guia inicial`
-                      : undefined
-                  }
-                  onClick={() => {
-                    setActiveFromDate(day);
-                    if (guidedSelectable) onGuidedDaySelect?.(dayIso);
-                  }}
-                >
+        <div className="mx-auto flex max-w-[31rem] flex-col gap-3">
+          {monthGroups.map((group) => (
+            <div key={group.monthIndex} className="flex items-stretch">
+              <div className="w-5 shrink-0 sm:w-6">
+                <div className="sticky top-2">
                   <span
-                    className={cn(
-                      "flex h-[3.55rem] w-[3.55rem] flex-col items-center justify-center text-center tabular-nums transition-[background-color,color,box-shadow]",
-                      today
-                        ? "rounded-[10px] bg-red-600 text-white shadow-[0_10px_20px_-16px_rgba(220,38,38,0.55)]"
-                        : active
-                          ? "text-foreground"
-                          : isPast
-                            ? "text-foreground/72"
-                            : "text-foreground"
-                    )}
+                    aria-hidden="true"
+                    className="block whitespace-nowrap [writing-mode:vertical-rl] rotate-180 text-[13px] font-semibold uppercase leading-none tracking-[0.08em] text-muted-foreground/40 sm:text-sm"
                   >
-                    <span className="text-[21px] font-semibold leading-6">
-                      {day.getDate()}
-                    </span>
-                    <span
+                    {MONTH_LABELS[group.monthIndex]}
+                  </span>
+                </div>
+              </div>
+
+              <div className="min-w-0 flex-1 overflow-hidden rounded-2xl border border-border/60">
+                {group.days.map((day, dayIndex) => {
+                  const dayIso = toIsoDate(day);
+                  const dayEvents = getEventsForDay(visibleEvents, dayIso);
+                  const hasEvents = dayEvents.length > 0;
+                  const active = dayIso === activeDateIso;
+                  const today = Boolean(todayIso) && dayIso === todayIso;
+                  const isPast = Boolean(todayIso) && dayIso < todayIso;
+                  const isWeekend = day.getDay() === 0 || day.getDay() === 6;
+                  const weekday = WEEKDAY_SHORT_LABELS[day.getDay()];
+                  const isFirstInMonth = dayIndex === 0;
+                  const isLastInMonth = dayIndex === group.days.length - 1;
+                  const guidedSelectable = Boolean(
+                    guidedSelectionMode && onGuidedDaySelect
+                  );
+                  const guidedStart = guidedRangeStart === dayIso;
+                  const guidedSelected = Boolean(
+                    guidedSelectionRange &&
+                      dayIso >= guidedSelectionRange.startDate &&
+                      dayIso <= guidedSelectionRange.endDate
+                  );
+
+                  return (
+                    <article
+                      key={dayIso}
+                      data-mobile-day
+                      data-date-iso={dayIso}
+                      data-month-index={day.getMonth()}
+                      data-day-state={today ? "today" : isPast ? "past" : "future"}
+                      data-guided-selected={guidedSelected ? "true" : undefined}
                       className={cn(
-                        "mt-0.5 text-[10px] font-semibold uppercase leading-3 tracking-[0.08em]",
-                        today ? "text-white/72" : "text-muted-foreground"
+                        "relative transition-[background-color,box-shadow]",
+                        isFirstInMonth && "rounded-t-2xl",
+                        isLastInMonth && "rounded-b-2xl",
+                        !isLastInMonth && "border-b border-border/40",
+                        hasEvents
+                          ? "grid min-h-[4.75rem] grid-cols-[3.75rem_minmax(0,1fr)] gap-2 p-2"
+                          : "flex min-h-[2.25rem] items-center px-1.5",
+                        isPast
+                          ? isWeekend
+                            ? "bg-[hsl(var(--cal-cell-weekend-past))]"
+                            : "bg-[hsl(var(--cal-cell-weekday-past))]"
+                          : isWeekend
+                            ? "bg-[hsl(var(--cal-cell-weekend))]"
+                            : "bg-card",
+                        active && "ring-1 ring-inset ring-foreground/25",
+                        guidedSelectable && "ring-1 ring-inset ring-primary/15",
+                        (guidedStart || guidedSelected) &&
+                          "bg-primary/8 ring-2 ring-inset ring-primary/40",
+                        today && "z-10 ring-2 ring-inset ring-destructive"
                       )}
                     >
-                      {weekday}
-                    </span>
-                  </span>
-                </button>
+                      {hasEvents ? (
+                        <>
+                          <button
+                            type="button"
+                            className="grid h-full place-items-center rounded-[9px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45"
+                            aria-label={
+                              guidedSelectable
+                                ? `Selecionar ${dayIso} no guia inicial`
+                                : undefined
+                            }
+                            onClick={() => {
+                              setActiveFromDate(day);
+                              if (guidedSelectable) onGuidedDaySelect?.(dayIso);
+                            }}
+                          >
+                            <span
+                              className={cn(
+                                "flex h-[3.55rem] w-[3.55rem] flex-col items-center justify-center text-center tabular-nums transition-[background-color,color,box-shadow]",
+                                today
+                                  ? "text-foreground"
+                                  : active
+                                    ? "text-foreground"
+                                    : isPast
+                                      ? "text-foreground/72"
+                                      : "text-foreground"
+                              )}
+                            >
+                              <span className="text-[21px] font-semibold leading-6">
+                                {day.getDate()}
+                              </span>
+                              <span
+                                className="mt-0.5 text-[10px] font-semibold uppercase leading-3 tracking-[0.08em] text-muted-foreground"
+                              >
+                                {weekday}
+                              </span>
+                            </span>
+                          </button>
 
-                <div className="flex min-w-0 flex-col justify-start gap-1">
-                  {dayEvents.map((event) => (
-                    <MobileEventButton
-                      key={`${event.id}-${dayIso}`}
-                      event={event}
-                      dayIso={dayIso}
-                      onEditEvent={onEditEvent}
-                    />
-                  ))}
-                </div>
-              </article>
-            );
-          })}
+                          <div className="flex min-w-0 flex-col justify-start gap-1">
+                            {dayEvents.map((event) => (
+                              <MobileEventButton
+                                key={`${event.id}-${dayIso}`}
+                                event={event}
+                                dayIso={dayIso}
+                                onEditEvent={onEditEvent}
+                              />
+                            ))}
+                          </div>
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          className="flex h-full w-full items-center gap-2 rounded-[7px] py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45"
+                          aria-label={
+                            guidedSelectable
+                              ? `Selecionar ${dayIso} no guia inicial`
+                              : undefined
+                          }
+                          onClick={() => {
+                            setActiveFromDate(day);
+                            if (guidedSelectable) onGuidedDaySelect?.(dayIso);
+                          }}
+                        >
+                          <span
+                            className={cn(
+                              "flex h-6 min-w-6 items-center justify-center rounded-[6px] px-1 text-[13px] font-semibold tabular-nums transition-[background-color,color,box-shadow]",
+                              today
+                                ? "text-foreground"
+                                : active
+                                  ? "text-foreground"
+                                  : isPast
+                                    ? "text-foreground/72"
+                                    : "text-foreground"
+                            )}
+                          >
+                            {day.getDate()}
+                          </span>
+                          <span className="text-[10px] font-semibold uppercase leading-3 tracking-[0.08em] text-muted-foreground">
+                            {weekday}
+                          </span>
+                        </button>
+                      )}
+                    </article>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </section>

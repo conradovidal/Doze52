@@ -4,7 +4,6 @@ import * as React from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft,
   Bug,
   CalendarCog,
   Check,
@@ -36,7 +35,6 @@ import {
   GuidedToolbarNoticeCard,
   type GuidedToolbarNotice,
 } from "@/components/onboarding/guided-toolbar-notice";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -182,13 +180,10 @@ type AppUtilityPanelProps = {
   section: UtilityPanelSection;
   isMobile: boolean;
   returnFocusRef: React.RefObject<HTMLElement | null>;
-  guidedThemeNotice?: GuidedToolbarNotice | null;
   guidedAppearanceNotice?: GuidedToolbarNotice | null;
   onOpenChange: (open: boolean) => void;
   onOpenAuthDialog: () => void;
   onDismissGuidedNotice?: () => void;
-  onGuidedThemeAction?: () => void;
-  onGuidedThemeChange?: () => void;
   onGuidedAppearanceOpen?: () => void;
 };
 
@@ -197,13 +192,10 @@ export function AppUtilityPanel({
   section,
   isMobile,
   returnFocusRef,
-  guidedThemeNotice = null,
   guidedAppearanceNotice = null,
   onOpenChange,
   onOpenAuthDialog,
   onDismissGuidedNotice,
-  onGuidedThemeAction,
-  onGuidedThemeChange,
   onGuidedAppearanceOpen,
 }: AppUtilityPanelProps) {
   const router = useRouter();
@@ -224,7 +216,6 @@ export function AppUtilityPanel({
     openPortal,
   } = useBilling();
   const [activeSection, setActiveSection] = React.useState<UtilityPanelSection>(section);
-  const [mobileDetailOpen, setMobileDetailOpen] = React.useState(false);
   const [adminCapabilities, setAdminCapabilities] = React.useState<AdminCapabilities>(EMPTY_ADMIN_CAPABILITIES);
   const [isSigningOut, setIsSigningOut] = React.useState(false);
   const [spreadsheetOpen, setSpreadsheetOpen] = React.useState(false);
@@ -274,7 +265,6 @@ export function AppUtilityPanel({
   React.useEffect(() => {
     if (!open) return;
     setActiveSection(section);
-    setMobileDetailOpen(section !== "account");
   }, [open, section]);
 
   React.useEffect(() => {
@@ -392,8 +382,12 @@ export function AppUtilityPanel({
   const openFeedback = () => { onOpenChange(false); setFeedbackOpen(true); };
   const navigateTo = (href: string) => { onOpenChange(false); router.push(href); };
 
-  const renderSection = () => {
-    switch (activeSection) {
+  const renderSection = (
+    sectionId: UtilityPanelSection,
+    options?: { standalone?: boolean }
+  ) => {
+    const standalone = options?.standalone ?? true;
+    switch (sectionId) {
       case "account":
         return session ? (
           <div className="mx-auto flex max-w-xl flex-col items-center py-4 text-center">
@@ -429,17 +423,19 @@ export function AppUtilityPanel({
             <p className="mt-1 text-sm text-muted-foreground">{email}</p>
             <span className={cn("mt-3 rounded-full px-2.5 py-1 text-xs font-semibold", showProIdentity ? "bg-premium-soft text-premium-foreground" : "bg-muted text-muted-foreground")}>{showProIdentity ? "Pro" : "Free"}</span>
 
-            <button
-              type="button"
-              className="mt-6 flex w-full items-center justify-between gap-4 rounded-2xl border border-border bg-card p-4 text-left transition-colors hover:bg-muted/60"
-              onClick={() => setActiveSection("plan")}
-            >
-              <div>
-                <p className="text-sm font-semibold text-foreground">{planLabel}</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">{isPro ? "Ver detalhes da assinatura" : "Veja o que o Pro libera"}</p>
-              </div>
-              <Sparkles className={cn("size-5 shrink-0", isPro ? "text-premium" : "text-muted-foreground")} />
-            </button>
+            {standalone ? (
+              <button
+                type="button"
+                className="mt-6 flex w-full items-center justify-between gap-4 rounded-2xl border border-border bg-card p-4 text-left transition-colors hover:bg-muted/60"
+                onClick={() => setActiveSection("plan")}
+              >
+                <div>
+                  <p className="text-sm font-semibold text-foreground">{planLabel}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{isPro ? "Ver detalhes da assinatura" : "Veja o que o Pro libera"}</p>
+                </div>
+                <Sparkles className={cn("size-5 shrink-0", isPro ? "text-premium" : "text-muted-foreground")} />
+              </button>
+            ) : null}
 
             <Button type="button" variant="outline" className="mt-6 min-w-48" disabled={isSigningOut} onClick={handleSignOut}><LogOut className="size-4" />{isSigningOut ? "Saindo..." : "Sair"}</Button>
           </div>
@@ -502,7 +498,7 @@ export function AppUtilityPanel({
         const Icon = topic.icon;
         const selected = activeSection === topic.id;
         return (
-          <button key={topic.id} type="button" aria-current={selected ? "page" : undefined} data-onboarding-appearance-topic={topic.id === "account" ? "true" : undefined} className={cn("flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60", selected ? "bg-foreground text-background" : "text-muted-foreground hover:bg-muted hover:text-foreground", guidedAppearanceNotice && topic.id === "account" && "guided-control-target")} onClick={() => { setActiveSection(topic.id); if (topic.id === "account") onGuidedAppearanceOpen?.(); if (isMobile) setMobileDetailOpen(true); }}>
+          <button key={topic.id} type="button" aria-current={selected ? "page" : undefined} data-onboarding-appearance-topic={topic.id === "account" ? "true" : undefined} className={cn("flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60", selected ? "bg-foreground text-background" : "text-muted-foreground hover:bg-muted hover:text-foreground", guidedAppearanceNotice && topic.id === "account" && "guided-control-target")} onClick={() => { setActiveSection(topic.id); if (topic.id === "account") onGuidedAppearanceOpen?.(); }}>
             <Icon className="size-4 shrink-0" /><span className="min-w-0 truncate text-sm font-semibold">{topic.label}</span>
           </button>
         );
@@ -518,7 +514,7 @@ export function AppUtilityPanel({
           data-desktop-anchor-positioned={
             !isMobile && desktopPosition ? "true" : undefined
           }
-          className={cn("overflow-hidden p-0", isMobile ? "inset-0 h-dvh w-screen max-w-none translate-x-0 translate-y-0 rounded-none border-0 sm:max-w-none" : "h-[min(600px,86dvh)] w-[min(720px,calc(100vw-5rem))] max-w-[720px] translate-x-0 translate-y-0 data-[state=open]:slide-in-from-top-2 data-[state=closed]:slide-out-to-top-2 sm:max-w-[720px]")}
+          className={cn("overflow-hidden p-0", isMobile ? "inset-x-0 top-auto bottom-0 h-[min(34rem,58dvh)] w-screen max-w-none translate-x-0 translate-y-0 rounded-none rounded-t-[1.75rem] border-0 border-t border-border/70 data-[state=open]:slide-in-from-bottom-2 data-[state=closed]:slide-out-to-bottom-2 sm:max-w-none" : "h-[min(600px,86dvh)] w-[min(720px,calc(100vw-5rem))] max-w-[720px] translate-x-0 translate-y-0 data-[state=open]:slide-in-from-top-2 data-[state=closed]:slide-out-to-top-2 sm:max-w-[720px]")}
           style={
             !isMobile && desktopPosition
               ? {
@@ -535,8 +531,32 @@ export function AppUtilityPanel({
           <DialogDescription className="sr-only">Gerencie sua conta, plano, dados e canais do Doze 52.</DialogDescription>
           {isMobile ? (
             <div className="flex h-full min-h-0 flex-col">
-              <header className="flex h-16 shrink-0 items-center gap-3 border-b border-border px-4 pr-12">{mobileDetailOpen ? <button type="button" aria-label="Voltar aos tópicos" className="grid size-10 place-items-center rounded-xl hover:bg-muted" onClick={() => setMobileDetailOpen(false)}><ArrowLeft className="size-5" /></button> : null}<div className="min-w-0 flex-1"><DialogTitle>{mobileDetailOpen ? activeTopic?.label : "Conta e configurações"}</DialogTitle><p className="text-xs text-muted-foreground">{mobileDetailOpen ? activeTopic?.description : "Escolha o que deseja gerenciar."}</p></div><span data-onboarding-spotlight-target={guidedThemeNotice ? "true" : undefined} className="relative"><ThemeToggle highlighted={Boolean(guidedThemeNotice)} onThemeChange={onGuidedThemeChange} /></span></header>
-              <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))]">{mobileDetailOpen ? renderSection() : topicButtons}</div>
+              <header className="flex h-16 shrink-0 items-center gap-3 border-b border-border px-4 pr-12">
+                <div className="min-w-0 flex-1">
+                  <DialogTitle>Conta e configurações</DialogTitle>
+                  {session ? (
+                    <p className="text-xs text-muted-foreground">
+                      Sua conta, plano e canais de contato.
+                    </p>
+                  ) : null}
+                </div>
+              </header>
+              <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))]">
+                {session ? (
+                  <div className="space-y-7">
+                    {visibleTopics.map((topic) => (
+                        <section key={topic.id}>
+                          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                            {topic.label}
+                          </h3>
+                          {renderSection(topic.id, { standalone: false })}
+                        </section>
+                      ))}
+                  </div>
+                ) : (
+                  renderSection("account")
+                )}
+              </div>
             </div>
           ) : (
             <div className="grid h-full min-h-0 grid-cols-[180px_minmax(0,1fr)]">
@@ -545,13 +565,10 @@ export function AppUtilityPanel({
                 <header className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-6 py-4">
                   <div className="flex items-center gap-2">
                     <BrandLogo className="h-6 w-[68px]" />
-                    <span data-onboarding-spotlight-target={guidedThemeNotice ? "true" : undefined} className="relative">
-                      <ThemeToggle variant="bare" highlighted={Boolean(guidedThemeNotice)} onThemeChange={onGuidedThemeChange} />
-                    </span>
                   </div>
                   <SocialLinksRow />
                 </header>
-                <div className="min-h-0 flex-1 overflow-y-auto py-6 pr-12 pl-6">{renderSection()}</div>
+                <div className="min-h-0 flex-1 overflow-y-auto py-6 pr-12 pl-6">{renderSection(activeSection)}</div>
               </section>
             </div>
           )}
@@ -564,25 +581,6 @@ export function AppUtilityPanel({
               portalTargetSelector="[data-app-utility-panel]"
               anchorSelector="[data-onboarding-appearance-topic='true']"
               anchorPlacement="right-center"
-            />
-          ) : null}
-          {guidedThemeNotice && onDismissGuidedNotice ? (
-            <GuidedToolbarNoticeCard
-              notice={guidedThemeNotice}
-              onClose={onDismissGuidedNotice}
-              onAction={
-                guidedThemeNotice.actionLabel
-                  ? () => {
-                      onGuidedThemeAction?.();
-                      onOpenChange(false);
-                    }
-                  : undefined
-              }
-              placement="panel"
-              portaled
-              portalTargetSelector="[data-app-utility-panel]"
-              anchorSelector="[data-onboarding-spotlight-target='true']"
-              anchorPlacement="below-center"
             />
           ) : null}
         </DialogContent>
