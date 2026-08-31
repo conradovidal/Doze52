@@ -88,6 +88,7 @@ import { cn } from "@/lib/utils";
 import type { AnchorPoint } from "@/lib/types";
 import { trackOnboardingRegion } from "@/lib/onboarding-region";
 import { isHabitsPrototypeEnabled } from "@/lib/feature-flags";
+import { useHabitsStore } from "@/lib/habits-store";
 import {
   buildProductDestinationUrl,
   resolveInitialProductDestination,
@@ -133,6 +134,27 @@ type RawSyncState =
     };
 
 const PENDING_SYNC_STORAGE_PREFIX = "pending-sync:";
+
+const DESKTOP_VISIT_CONFIRMED_STORAGE_KEY = "doze52:desktop-visit-confirmed";
+
+const readDesktopVisitConfirmed = () => {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(DESKTOP_VISIT_CONFIRMED_STORAGE_KEY) === "true";
+  } catch {
+    return false;
+  }
+};
+
+const writeDesktopVisitConfirmed = () => {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(DESKTOP_VISIT_CONFIRMED_STORAGE_KEY, "true");
+  } catch {
+    // Sem persistência entre navegações se o storage falhar; a Anual mobile
+    // pode voltar a pedir o onboarding no desktop na próxima visita.
+  }
+};
 
 const isDetailedSyncDiagnosticsEnabled =
   process.env.NODE_ENV !== "production" ||
@@ -394,6 +416,8 @@ export default function HomePage() {
   const inlineEditModeActive = workspaceEditMode === "calendar";
   const [exitInlineEditRequestKey, setExitInlineEditRequestKey] =
     React.useState(0);
+  const [scrollToTodayRequestKey, setScrollToTodayRequestKey] =
+    React.useState(0);
   const [demoInviteSuppressed, setDemoInviteSuppressed] = React.useState(false);
   const [guidedDraft, setGuidedDraft] =
     React.useState<GuidedCalendarDraft | null>(null);
@@ -406,6 +430,13 @@ export default function HomePage() {
   const [isMobileCalendarUi, setIsMobileCalendarUi] = React.useState<
     boolean | null
   >(null);
+  const [hasConfirmedDesktopVisit, setHasConfirmedDesktopVisit] =
+    React.useState(readDesktopVisitConfirmed);
+  React.useEffect(() => {
+    if (isMobileCalendarUi !== false || hasConfirmedDesktopVisit) return;
+    writeDesktopVisitConfirmed();
+    setHasConfirmedDesktopVisit(true);
+  }, [isMobileCalendarUi, hasConfirmedDesktopVisit]);
   const [activeDestination, setActiveDestination] =
     React.useState<ProductDestinationId>("annual");
   const [utilityPanelOpen, setUtilityPanelOpen] = React.useState(false);
@@ -489,8 +520,12 @@ export default function HomePage() {
   const hasCustomProfiles = profiles.some(
     (profile) => !knownOnboardingProfileIds.has(profile.id)
   );
+  const hasExistingHabits = useHabitsStore((s) => s.habits.length > 0);
   const hasEstablishedSetup =
-    hasAuthorEvents || hasCustomizedCategories || hasCustomProfiles;
+    hasAuthorEvents ||
+    hasCustomizedCategories ||
+    hasCustomProfiles ||
+    hasExistingHabits;
   const guidedOnboardingEligible = Boolean(
     guidedOnboarding &&
       calendarCreateOnboarding &&
@@ -1287,9 +1322,19 @@ export default function HomePage() {
       isInitialMobileOnboarding &&
       mobileExamplePreviewDismissed
   );
+  // Anual mobile is a read/consult surface, not a place to build the year —
+  // that lives on desktop. Established mobile users (e.g. someone who signed
+  // up and started habits from their phone) fall outside guidedOnboarding
+  // once they have real content, so gate them here too until this browser
+  // has confirmed at least one non-mobile visit. This is a local, per-browser
+  // heuristic (no server-side "completed desktop onboarding" flag exists
+  // yet), so it can re-trigger on a new device/browser even for someone who
+  // already did this on desktop elsewhere — acceptable for now, revisit if
+  // that turns out to be common.
   const showMobileDesktopFirstGate = Boolean(
-    isMobileOnboardingPending &&
-      (!isInitialMobileOnboarding || !mobileExamplePreviewDismissed)
+    (isMobileOnboardingPending &&
+      (!isInitialMobileOnboarding || !mobileExamplePreviewDismissed)) ||
+      (isMobileCalendarUi === true && !hasConfirmedDesktopVisit && !authLoading)
   );
   const isDemoExploration =
     guidedOnboarding?.step === "demo_exploration" && !session?.user.id;
@@ -2371,9 +2416,7 @@ export default function HomePage() {
         isMobileCalendarUi
           ? cn(
               "flex h-[100dvh] min-h-0 flex-col overflow-hidden px-3 pt-2",
-              isHabitsPrototypeEnabled
-                ? "pb-[calc(4.25rem+env(safe-area-inset-bottom,0px))]"
-                : "pb-1"
+              isHabitsPrototypeEnabled ? "pb-0" : "pb-1"
             )
           : cn(
               "flex h-full min-h-0 flex-col overflow-hidden pt-3 pb-2 md:pb-4",
@@ -2394,11 +2437,6 @@ export default function HomePage() {
             section={utilityPanelSection}
             isMobile={isMobileCalendarUi}
             returnFocusRef={utilityPanelTriggerRef}
-            guidedThemeNotice={
-              guidedToolbarNotice?.target === "theme"
-                ? guidedToolbarNotice
-                : null
-            }
             guidedAppearanceNotice={
               guidedToolbarNotice?.target === "appearance"
                 ? guidedToolbarNotice
@@ -2411,10 +2449,6 @@ export default function HomePage() {
               setAuthDialogOpen(true);
             }}
             onDismissGuidedNotice={dismissGuidedOnboarding}
-            onGuidedThemeAction={() => handleGuidedToolbarAction("theme")}
-            onGuidedThemeChange={() =>
-              updateGuidedOnboarding({ type: "confirm_theme" })
-            }
             onGuidedAppearanceOpen={() =>
               updateGuidedOnboarding({ type: "open_appearance" })
             }
@@ -2429,14 +2463,7 @@ export default function HomePage() {
         onErrorPopoverOpenChange={handleSyncOverlayErrorOpenChange}
       />
 
-      <div
-        className={cn(
-          "z-30 shrink-0 bg-background",
-          isMobileCalendarUi
-            ? "shrink-0 pb-2"
-            : "pb-0"
-        )}
-      >
+      <div className="z-30 shrink-0 bg-background pb-0">
         <AppHeader
           year={year}
           onYearChange={handleYearChange}
@@ -2483,6 +2510,14 @@ export default function HomePage() {
           controlledInlineEditMode={inlineEditModeActive}
           onFilterLayoutChange={requestDesktopTodayCenter}
           exitInlineEditRequestKey={exitInlineEditRequestKey}
+          onYearLabelClick={
+            isMobileCalendarUi === true
+              ? () => setScrollToTodayRequestKey((key) => key + 1)
+              : undefined
+          }
+          onGuidedThemeChange={() =>
+            updateGuidedOnboarding({ type: "confirm_theme" })
+          }
           mobileExamplePreviewActive={isMobileExamplePreview}
           demoExplorationActive={isDemoExploration}
           onCategoryCreated={(categoryId) => {
@@ -2508,12 +2543,15 @@ export default function HomePage() {
           isMobile={isMobileCalendarUi}
           isEditing={workspaceEditMode === "habits"}
           onYearChange={handleYearChange}
-          onToggleEditing={handleToggleHabitsEditing}
           onRequireAuth={() => {
             setAuthDialogInitialMode("login");
             setAuthDialogAnchorPoint(undefined);
             setAuthDialogOpen(true);
           }}
+          onRequestSignup={(trigger) => {
+            handleOpenUtilityPanel("account", trigger);
+          }}
+          isAuthenticated={Boolean(session)}
           guidedNotice={
             guidedToolbarNotice?.target === "habit-showcase" ||
             guidedToolbarNotice?.target === "habit" ||
@@ -2529,6 +2567,7 @@ export default function HomePage() {
           retrospectiveInteracted={Boolean(
             guidedOnboarding?.habitRetrospectiveInteractedAt
           )}
+          scrollToTodayRequestKey={scrollToTodayRequestKey}
           onHabitCheckIn={() => {
             if (
               readGuidedOnboardingState().step ===
@@ -2578,6 +2617,7 @@ export default function HomePage() {
           guidedRangeStart={mobileGuidedRangeStart}
           guidedSelectionRange={guidedDraft}
           onGuidedDaySelect={handleMobileGuidedDaySelect}
+          scrollToTodayRequestKey={scrollToTodayRequestKey}
         />
       ) : (
         <div
@@ -2671,7 +2711,7 @@ export default function HomePage() {
 
       {isCalendarSurfaceActive && showMobileDesktopFirstGate ? (
         <MobileDesktopFirstGate
-          allowExample={isInitialMobileOnboarding}
+          allowExample={isInitialMobileOnboarding && !hasEstablishedSetup}
           onExploreExample={() => {
             writeMobileExamplePreviewSession();
             setMobileExamplePreviewDismissed(true);
@@ -2681,6 +2721,11 @@ export default function HomePage() {
             setAuthDialogAnchorPoint(undefined);
             setAuthDialogOpen(true);
           }}
+          onBackToHabits={
+            isHabitsPrototypeEnabled
+              ? () => handleDestinationSelect("habits")
+              : undefined
+          }
         />
       ) : null}
 

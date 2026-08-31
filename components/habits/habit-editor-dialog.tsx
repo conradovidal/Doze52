@@ -65,11 +65,11 @@ export function HabitEditorDialog({
         <form onSubmit={onSubmit}>
           <DialogHeader>
             <DialogTitle>{editing ? "Editar hábito" : "Novo hábito"}</DialogTitle>
-            <DialogDescription>
-              {editing
-                ? "Atualize nome ou cor sem perder o histórico já registrado."
-                : "Só o essencial agora. O registro diário será feito direto na grade."}
-            </DialogDescription>
+            {editing ? (
+              <DialogDescription>
+                Atualize nome ou cor sem perder o histórico já registrado.
+              </DialogDescription>
+            ) : null}
           </DialogHeader>
 
           <div className="mt-5 space-y-4">
