@@ -22,7 +22,6 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
-  Check,
   ChevronDown,
   CircleCheck,
   GripVertical,
@@ -60,22 +59,20 @@ import {
   DESKTOP_CONTROL_ROW_GAP_CLASS,
 } from "@/lib/desktop-control-layout";
 
+const HABIT_CONTROLS_EXPANDED_STORAGE_KEY = "doze52:habit-controls:expanded";
+
 type HabitControlsProps = {
   habits: Habit[];
-  totalActiveHabits: number;
   selectedHabit: Habit | null;
   visibleHabitIds?: ReadonlySet<string>;
   isEditing?: boolean;
-  readOnly?: boolean;
   mobile?: boolean;
   creationDisabled: boolean;
-  creationDisabledLabel: string | null;
   onSelectHabit: (habitId: string) => void;
   onToggleHabitVisibility?: (habitId: string) => void;
   onRequestCreate: () => void;
   onEditHabit?: (habitId: string) => void;
   onReorderHabits?: (orderedIds: string[]) => void;
-  onToggleEditing?: () => void;
   guidedNotice?: GuidedToolbarNotice | null;
   onDismissGuidedNotice?: () => void;
   onGuidedNoticeAction?: () => void;
@@ -226,26 +223,47 @@ function SortableHabitChip({
 
 export function HabitControls({
   habits,
-  totalActiveHabits,
   selectedHabit,
   visibleHabitIds,
   isEditing = false,
-  readOnly = false,
   mobile = false,
   creationDisabled,
-  creationDisabledLabel,
   onSelectHabit,
   onToggleHabitVisibility,
   onRequestCreate,
   onEditHabit,
   onReorderHabits,
-  onToggleEditing,
   guidedNotice = null,
   onDismissGuidedNotice,
   onGuidedNoticeAction,
 }: HabitControlsProps) {
   const { mode: themeMode } = useTheme();
-  const [expanded, setExpanded] = React.useState(true);
+  const [expanded, setExpanded] = React.useState(() => {
+    if (typeof window === "undefined") return true;
+    try {
+      const stored = window.localStorage.getItem(HABIT_CONTROLS_EXPANDED_STORAGE_KEY);
+      return stored === null ? true : stored === "true";
+    } catch {
+      return true;
+    }
+  });
+  const setExpandedPersisted = React.useCallback(
+    (updater: boolean | ((current: boolean) => boolean)) => {
+      setExpanded((current) => {
+        const next = typeof updater === "function" ? updater(current) : updater;
+        try {
+          window.localStorage.setItem(
+            HABIT_CONTROLS_EXPANDED_STORAGE_KEY,
+            String(next)
+          );
+        } catch {
+          // Sem persistência entre navegações se o storage falhar; sem impacto na sessão atual.
+        }
+        return next;
+      });
+    },
+    []
+  );
   const controlsId = React.useId();
   const [activeDrag, setActiveDrag] = React.useState<DragState | null>(null);
   const [draftOrderIds, setDraftOrderIds] = React.useState<string[] | null>(null);
@@ -382,20 +400,21 @@ export function HabitControls({
         );
       })}
 
-      <button
-        type="button"
-        data-onboarding-habit-create={guidedNotice?.target === "habit" ? "true" : undefined}
-        aria-label="Criar novo hábito"
-        title={creationDisabledLabel ?? "Criar novo hábito"}
-        disabled={creationDisabled}
-        className={cn(
-          "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-border bg-card text-foreground shadow-none transition-all duration-[160ms] ease-[cubic-bezier(0.22,1,0.36,1)] hover:border-foreground/20 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45 disabled:cursor-not-allowed disabled:text-muted-foreground/55 disabled:hover:border-border disabled:hover:bg-card",
-          mobile && "h-10 w-full rounded-[8px]",
-        )}
-        onClick={onRequestCreate}
-      >
-        <Plus className="size-3.5" aria-hidden="true" />
-      </button>
+      {!creationDisabled ? (
+        <button
+          type="button"
+          data-onboarding-habit-create={guidedNotice?.target === "habit" ? "true" : undefined}
+          aria-label="Criar novo hábito"
+          title="Criar novo hábito"
+          className={cn(
+            "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-border bg-card text-foreground shadow-none transition-all duration-[160ms] ease-[cubic-bezier(0.22,1,0.36,1)] hover:border-foreground/20 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45",
+            mobile && "h-10 w-full rounded-[8px]",
+          )}
+          onClick={onRequestCreate}
+        >
+          <Plus className="size-3.5" aria-hidden="true" />
+        </button>
+      ) : null}
     </div>
   );
 
@@ -413,8 +432,8 @@ export function HabitControls({
       <SortableContext items={orderedHabits.map((habit) => habit.id)} strategy={rectSortingStrategy}>
         <div className={cn(
           mobile
-            ? "grid w-full grid-cols-1 gap-1.5 min-[430px]:grid-cols-2"
-            : "flex min-h-8 w-max min-w-full flex-nowrap items-center justify-center gap-2"
+            ? "grid w-full grid-cols-2 gap-1.5 min-[430px]:grid-cols-3"
+            : "flex min-h-8 w-max min-w-full flex-nowrap items-center justify-center gap-1.5 sm:gap-2"
         )}>
           {orderedHabits.map((habit) => (
             <SortableHabitChip
@@ -427,19 +446,20 @@ export function HabitControls({
               onEdit={() => onEditHabit?.(habit.id)}
             />
           ))}
-          <button
-            type="button"
-            aria-label="Criar novo hábito"
-            title={creationDisabledLabel ?? "Criar novo hábito"}
-            disabled={creationDisabled}
-            className={cn(
-              "inline-flex h-8 w-8 items-center justify-center rounded-[10px] border border-border bg-card disabled:opacity-45",
-              mobile && "h-10 w-full rounded-[8px]"
-            )}
-            onClick={onRequestCreate}
-          >
-            <Plus className="size-3.5" />
-          </button>
+          {!creationDisabled ? (
+            <button
+              type="button"
+              aria-label="Criar novo hábito"
+              title="Criar novo hábito"
+              className={cn(
+                "inline-flex h-8 w-8 items-center justify-center rounded-[10px] border border-border bg-card",
+                mobile && "h-10 w-full rounded-[8px]"
+              )}
+              onClick={onRequestCreate}
+            >
+              <Plus className="size-3.5" />
+            </button>
+          ) : null}
         </div>
       </SortableContext>
       {overlayPortalTarget && activeHabit
@@ -500,26 +520,11 @@ export function HabitControls({
           <span className="ml-auto flex items-center gap-1">
             <button
               type="button"
-              data-onboarding-edit-control
-              aria-pressed={isEditing}
-              aria-label={isEditing ? "Finalizar edição" : "Editar"}
-              title={isEditing ? "Finalizar edição" : "Editar"}
-              disabled={readOnly}
-              className={cn(
-                "grid size-8 place-items-center rounded-[10px] border border-border text-foreground/70 disabled:cursor-not-allowed disabled:opacity-45",
-                isEditing && "border-foreground bg-foreground text-background"
-              )}
-              onClick={onToggleEditing}
-            >
-              {isEditing ? <Check className="size-3.5" /> : <PencilLine className="size-3.5" />}
-            </button>
-            <button
-              type="button"
-              className="grid size-8 place-items-center rounded-[10px] border border-border text-foreground/70"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-[10px] border border-border bg-card text-foreground/70 shadow-none transition-[background-color,border-color,color,box-shadow,transform] duration-150 ease-out hover:border-foreground/18 hover:bg-muted hover:text-foreground active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45"
               aria-expanded={expanded}
               aria-controls={controlsId}
               aria-label={expanded ? "Recolher hábitos" : "Mostrar hábitos"}
-              onClick={() => setExpanded((current) => !current)}
+              onClick={() => setExpandedPersisted((current) => !current)}
             >
               <ChevronDown
                 className={cn("size-4 transition-transform duration-300", expanded && "rotate-180")}
@@ -543,7 +548,7 @@ export function HabitControls({
               aria-controls={controlsId}
               aria-label={expanded ? "Recolher hábitos" : "Mostrar hábitos"}
               title={expanded ? "Recolher hábitos" : "Mostrar hábitos"}
-              onClick={() => setExpanded((current) => !current)}
+              onClick={() => setExpandedPersisted((current) => !current)}
             >
               <ChevronDown
                 className={cn("size-3.5 transition-transform", expanded && "rotate-180")}
@@ -567,16 +572,6 @@ export function HabitControls({
         )}
       >
           {isEditing ? editableHabitButtons : habitButtons}
-          {totalActiveHabits > habits.length ? (
-            <p className="mt-1.5 text-center text-[10px] text-muted-foreground">
-              Mostrando os 4 primeiros hábitos nesta grade.
-            </p>
-          ) : null}
-          {creationDisabledLabel ? (
-            <p role="status" className="mt-1.5 text-center text-[10px] text-muted-foreground">
-              {creationDisabledLabel}
-            </p>
-          ) : null}
       </CollapsibleControlRegion>
       {guidedNotice && onDismissGuidedNotice ? (
         <>

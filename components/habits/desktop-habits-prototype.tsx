@@ -15,12 +15,10 @@ export function DesktopHabitsPrototype({
   habits,
   visibleHabits,
   allHabits,
-  totalActiveHabits,
   checkIns,
   selectedHabit,
   visibleHabitIds,
   creationDisabled,
-  creationDisabledLabel,
   onSelectHabit,
   onToggleDay,
   onOpenDayPicker,
@@ -29,7 +27,6 @@ export function DesktopHabitsPrototype({
   readOnly = false,
   onEditHabit,
   onReorderHabits,
-  onToggleEditing,
   onYearChange,
   guidedNotice,
   retrospectiveDates,
@@ -42,12 +39,10 @@ export function DesktopHabitsPrototype({
   habits: Habit[];
   visibleHabits: Habit[];
   allHabits: Habit[];
-  totalActiveHabits: number;
   checkIns: Record<string, HabitCheckIn>;
   selectedHabit: Habit | null;
   visibleHabitIds: ReadonlySet<string>;
   creationDisabled: boolean;
-  creationDisabledLabel: string | null;
   onSelectHabit: (habitId: string) => void;
   onToggleDay: (dateIso: string) => void;
   onOpenDayPicker: (dateIso: string, anchor: HTMLElement) => void;
@@ -56,7 +51,6 @@ export function DesktopHabitsPrototype({
   readOnly?: boolean;
   onEditHabit: (habitId: string) => void;
   onReorderHabits: (orderedIds: string[]) => void;
-  onToggleEditing?: () => void;
   onYearChange: (year: number) => void;
   guidedNotice?: GuidedToolbarNotice | null;
   retrospectiveDates?: ReadonlySet<string>;
@@ -87,19 +81,15 @@ export function DesktopHabitsPrototype({
     >
       <HabitControls
         habits={habits}
-        totalActiveHabits={totalActiveHabits}
         selectedHabit={selectedHabit}
         visibleHabitIds={visibleHabitIds}
         creationDisabled={creationDisabled}
-        creationDisabledLabel={creationDisabledLabel}
         onSelectHabit={onSelectHabit}
         onToggleHabitVisibility={onSelectHabit}
         onRequestCreate={onRequestCreate}
         isEditing={isEditing}
-        readOnly={readOnly}
         onEditHabit={onEditHabit}
         onReorderHabits={onReorderHabits}
-        onToggleEditing={onToggleEditing}
         guidedNotice={controlsNotice}
         onDismissGuidedNotice={onDismissGuidedNotice}
         onGuidedNoticeAction={onGuidedNoticeAction}

@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { Check } from "lucide-react";
+import { createPortal } from "react-dom";
+import { X } from "lucide-react";
 
 import { ProUpgradeDialog } from "@/components/billing/pro-upgrade-dialog";
 import { DesktopHabitsPrototype } from "@/components/habits/desktop-habits-prototype";
@@ -24,8 +25,8 @@ import type { Habit } from "@/lib/types";
 import { useBilling } from "@/lib/use-billing";
 import { cn } from "@/lib/utils";
 
-const WEEKDAY_LABELS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 const HABITS_PROTOTYPE_SCROLL_PREFIX = "doze52:habits-prototype:scroll";
+const MOBILE_DESKTOP_HINT_STORAGE_KEY = "doze52:mobile-onboarding:desktop-hint-dismissed";
 const ACCESSIBLE_DATE_FORMATTER = new Intl.DateTimeFormat("pt-BR", {
   dateStyle: "full",
   timeZone: "UTC",
@@ -42,8 +43,9 @@ export function HabitsPrototype({
   todayIso,
   isMobile,
   onRequireAuth,
+  onRequestSignup,
+  isAuthenticated = false,
   isEditing = false,
-  onToggleEditing,
   onYearChange,
   guidedNotice = null,
   showcase = null,
@@ -52,13 +54,15 @@ export function HabitsPrototype({
   onHabitCreated,
   onHabitCheckIn,
   retrospectiveInteracted = false,
+  scrollToTodayRequestKey = 0,
 }: {
   year: number;
   todayIso: string;
   isMobile: boolean;
   onRequireAuth?: () => void;
+  onRequestSignup?: (trigger: HTMLElement) => void;
+  isAuthenticated?: boolean;
   isEditing?: boolean;
-  onToggleEditing?: () => void;
   onYearChange: (year: number) => void;
   guidedNotice?: import("@/components/onboarding/guided-toolbar-notice").GuidedToolbarNotice | null;
   showcase?: OnboardingHabitShowcase | null;
@@ -67,6 +71,7 @@ export function HabitsPrototype({
   onHabitCreated?: () => void;
   onHabitCheckIn?: () => void;
   retrospectiveInteracted?: boolean;
+  scrollToTodayRequestKey?: number;
 }) {
   const { notify } = useFeedback();
   const { limits, isPro, isLoading: isBillingLoading, error: billingError } =
@@ -92,10 +97,13 @@ export function HabitsPrototype({
   const [createDialogOpen, setCreateDialogOpen] = React.useState(false);
   const [editingHabitId, setEditingHabitId] = React.useState<string | null>(null);
   const [upgradeOpen, setUpgradeOpen] = React.useState(false);
+  const [createHintDismissed, setCreateHintDismissed] = React.useState(false);
+  const [markHintDismissed, setMarkHintDismissed] = React.useState(false);
+  const [desktopHintDismissed, setDesktopHintDismissed] = React.useState(true);
   const [draftName, setDraftName] = React.useState("");
   const [draftColor, setDraftColor] = React.useState<string>(HABIT_COLORS[0]);
   const scrollRegionRef = React.useRef<HTMLDivElement | null>(null);
-  const currentWeekRef = React.useRef<HTMLDivElement | null>(null);
+  const currentWeekRef = React.useRef<HTMLButtonElement | null>(null);
   const closeDayPicker = React.useCallback(() => {
     setDayPicker((current) => {
       current?.anchor.focus();
@@ -154,13 +162,6 @@ export function HabitsPrototype({
   const reachedHabitLimit = activeHabits.length >= limits.maxHabits;
   const creationDisabled = showcaseActive ||
     creationUnavailable || (isPro && reachedHabitLimit);
-  const creationDisabledLabel = showcaseActive
-    ? null
-    : creationUnavailable
-    ? "Aguarde a confirmação do seu plano para criar outro hábito."
-    : isPro && reachedHabitLimit
-      ? "O plano Pro permite até 4 hábitos neste protótipo."
-      : null;
 
   React.useLayoutEffect(() => {
     const region = scrollRegionRef.current;
@@ -179,15 +180,72 @@ export function HabitsPrototype({
       }
     }
 
+    const regionRect = region.getBoundingClientRect();
+    const targetRect = currentWeek.getBoundingClientRect();
     region.scrollTop = Math.max(
       0,
-      currentWeek.offsetTop - region.offsetTop - region.clientHeight / 3
+      region.scrollTop +
+        (targetRect.top - regionRect.top) -
+        region.clientHeight / 3
     );
   }, [selectedHabit, showcaseActive, year]);
+
+  const scrollToToday = React.useCallback(() => {
+    if (!todayIso) return;
+    const todayYear = Number(todayIso.slice(0, 4));
+    if (todayYear !== year) {
+      onYearChange(todayYear);
+      return;
+    }
+
+    const region = scrollRegionRef.current;
+    const currentWeek = currentWeekRef.current;
+    if (!region || !currentWeek) return;
+
+    const regionRect = region.getBoundingClientRect();
+    const targetRect = currentWeek.getBoundingClientRect();
+    const targetTop = Math.max(
+      0,
+      region.scrollTop + (targetRect.top - regionRect.top) - region.clientHeight / 3
+    );
+    region.scrollTo({ top: targetTop, behavior: "smooth" });
+  }, [todayIso, year, onYearChange]);
+
+  const handledScrollToTodayRequestRef = React.useRef(0);
+  React.useEffect(() => {
+    if (
+      scrollToTodayRequestKey <= 0 ||
+      scrollToTodayRequestKey === handledScrollToTodayRequestRef.current
+    ) {
+      return;
+    }
+    handledScrollToTodayRequestRef.current = scrollToTodayRequestKey;
+    scrollToToday();
+  }, [scrollToTodayRequestKey, scrollToToday]);
 
   React.useEffect(() => {
     setShowcaseVisibleHabitIds(showcase?.visibleHabitIds ?? []);
   }, [showcase]);
+
+  React.useEffect(() => {
+    if (!isMobile || showcaseActive) return;
+    try {
+      setDesktopHintDismissed(
+        window.localStorage.getItem(MOBILE_DESKTOP_HINT_STORAGE_KEY) === "true"
+      );
+    } catch {
+      setDesktopHintDismissed(false);
+    }
+  }, [isMobile, showcaseActive]);
+
+  const dismissDesktopHint = React.useCallback(() => {
+    setDesktopHintDismissed(true);
+    try {
+      window.localStorage.setItem(MOBILE_DESKTOP_HINT_STORAGE_KEY, "true");
+    } catch {
+      // Reaparece na próxima visita se o storage falhar; sem impacto funcional.
+    }
+  }, []);
 
   const requestCreateHabit = () => {
     if (showcaseActive) return;
@@ -296,12 +354,10 @@ export function HabitsPrototype({
           habits={desktopAllHabits}
           visibleHabits={desktopHabits}
           allHabits={desktopAllHabits}
-          totalActiveHabits={presentedHabits.length}
           checkIns={presentedCheckIns}
           selectedHabit={desktopSelectedHabit}
           visibleHabitIds={presentedVisibleHabitIdSet}
           creationDisabled={creationDisabled}
-          creationDisabledLabel={creationDisabledLabel}
           onSelectHabit={toggleHabitVisibility}
           onToggleDay={(dateIso) =>
             toggleHabitDay(desktopSelectedHabit, dateIso)
@@ -314,7 +370,6 @@ export function HabitsPrototype({
           readOnly={showcaseActive}
           onEditHabit={requestEditHabit}
           onReorderHabits={reorderHabits}
-          onToggleEditing={showcaseActive ? undefined : onToggleEditing}
           onYearChange={onYearChange}
           guidedNotice={guidedNotice}
           retrospectiveDates={retrospectiveDates}
@@ -345,41 +400,122 @@ export function HabitsPrototype({
     );
   }
 
+  const hasCompletedAnyCheckIn = Object.values(checkIns).some(
+    (checkIn) => checkIn?.completed
+  );
+  const onboardingBanner = showcaseActive
+    ? null
+    : activeHabits.length === 0 && !createHintDismissed
+      ? {
+          message: "Toque em + para criar seu primeiro hábito.",
+          onDismiss: () => setCreateHintDismissed(true),
+        }
+      : activeHabits.length > 0 && !hasCompletedAnyCheckIn && !markHintDismissed
+        ? {
+            message: "Toque num dia pra marcar.",
+            onDismiss: () => setMarkHintDismissed(true),
+          }
+        : hasCompletedAnyCheckIn && !desktopHintDismissed
+          ? {
+              message:
+                "Isso é só o começo. O ano inteiro mora no computador — aqui, você continua o dia a dia.",
+              onDismiss: dismissDesktopHint,
+              anchoredToNav: true,
+              action:
+                !isAuthenticated && onRequestSignup
+                  ? {
+                      label: "Criar conta",
+                      onClick: () => {
+                        const trigger = document.querySelector<HTMLElement>(
+                          "[data-onboarding-auth-entry]"
+                        );
+                        if (trigger) onRequestSignup(trigger);
+                      },
+                    }
+                  : undefined,
+            }
+          : null;
+
   return (
     <section
       data-habits-prototype
-      className="mx-auto flex min-h-0 w-full max-w-[62rem] flex-1 flex-col overflow-hidden"
+      className="mx-auto flex min-h-0 w-full max-w-[31rem] flex-1 flex-col overflow-hidden pt-12"
     >
       <HabitControls
         habits={activeHabits}
-        totalActiveHabits={activeHabits.length}
         selectedHabit={selectedHabit}
         mobile
         creationDisabled={creationDisabled}
-        creationDisabledLabel={creationDisabledLabel}
         onSelectHabit={setSelectedHabitId}
         onRequestCreate={requestCreateHabit}
         isEditing={isEditing}
         onEditHabit={requestEditHabit}
         onReorderHabits={reorderHabits}
-        onToggleEditing={onToggleEditing}
       />
+
+      {onboardingBanner && !onboardingBanner.anchoredToNav ? (
+        <div
+          data-mobile-habits-onboarding-hint
+          className="inverse-product-surface mt-2 flex items-start gap-2 rounded-[10px] border border-border bg-card px-3 py-2.5 shadow-[0_18px_36px_-24px_rgba(15,23,42,0.45)]"
+        >
+          <div className="min-w-0 flex-1">
+            <p className="text-[13px] leading-5 text-card-foreground">
+              {onboardingBanner.message}
+            </p>
+          </div>
+          <button
+            type="button"
+            aria-label="Dispensar"
+            title="Dispensar"
+            className="grid size-6 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-card-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45"
+            onClick={onboardingBanner.onDismiss}
+          >
+            <X className="size-3.5" />
+          </button>
+        </div>
+      ) : null}
+
+      {onboardingBanner && onboardingBanner.anchoredToNav && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              data-mobile-habits-onboarding-hint
+              className="inverse-product-surface fixed inset-x-3 z-40 flex items-start gap-2 rounded-[10px] border border-border bg-card px-3 py-2.5 shadow-[0_18px_36px_-24px_rgba(15,23,42,0.45)]"
+              style={{
+                bottom: "calc(4.4rem + env(safe-area-inset-bottom, 0px))",
+              }}
+            >
+              <div className="min-w-0 flex-1">
+                <p className="text-[13px] leading-5 text-card-foreground">
+                  {onboardingBanner.message}
+                </p>
+                {onboardingBanner.action ? (
+                  <button
+                    type="button"
+                    className="mt-1.5 text-[13px] font-semibold text-primary underline underline-offset-2"
+                    onClick={onboardingBanner.action.onClick}
+                  >
+                    {onboardingBanner.action.label}
+                  </button>
+                ) : null}
+              </div>
+              <button
+                type="button"
+                aria-label="Dispensar"
+                title="Dispensar"
+                className="grid size-6 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-card-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45"
+                onClick={onboardingBanner.onDismiss}
+              >
+                <X className="size-3.5" />
+              </button>
+            </div>,
+            document.body
+          )
+        : null}
 
       <div
         data-mobile-habits-grid
-        className="mt-2 flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border/70 bg-card/42 shadow-[0_24px_70px_-52px_rgba(15,23,42,0.5)]"
+        className="flex min-h-0 flex-1 flex-col overflow-hidden"
       >
-          <div className="grid shrink-0 grid-cols-7 gap-1 border-b border-border/55 bg-background/78 px-3 py-2 sm:gap-2 sm:px-6">
-            {WEEKDAY_LABELS.map((label) => (
-              <span
-                key={label}
-                className="text-center text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground sm:text-xs"
-              >
-                {label}
-              </span>
-            ))}
-          </div>
-
           <div
             ref={scrollRegionRef}
             onScroll={(event) => {
@@ -393,45 +529,75 @@ export function HabitsPrototype({
                 // A posição volta para a semana atual se o storage falhar.
               }
             }}
-            className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3 [scrollbar-width:thin] sm:px-6 sm:py-5"
+            className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-[calc(4.25rem+env(safe-area-inset-bottom,0px))] pt-2 [scrollbar-width:thin] sm:px-6"
           >
-            <div className="mx-auto max-w-[34rem] space-y-1.5 sm:space-y-2">
-              {weeks.map((week) => {
-                const hasToday = week.days.some((day) => day.isToday);
-                return (
-                  <div
-                    key={week.id}
-                    ref={hasToday ? currentWeekRef : undefined}
-                    data-habit-week={week.id}
-                  >
+            <div className="mx-auto flex max-w-[20.2rem] items-stretch">
+              <div className="flex w-5 shrink-0 flex-col sm:w-6">
+                {weeks.map((week) => (
+                  <div key={week.id} className="relative h-10 sm:h-11">
                     {week.monthLabel ? (
-                      <p className="mb-1 mt-2 text-[10px] font-semibold uppercase tracking-[0.11em] text-muted-foreground first:mt-0 sm:text-xs">
+                      <span
+                        aria-hidden="true"
+                        className="absolute left-0 top-0 [writing-mode:vertical-rl] rotate-180 whitespace-nowrap text-[13px] font-semibold uppercase leading-none tracking-[0.08em] text-muted-foreground/40 sm:text-sm"
+                      >
                         {week.monthLabel}
-                      </p>
+                      </span>
                     ) : null}
-                    <div
-                      className={cn(
-                        "grid grid-cols-7 gap-1 rounded-xl px-1 py-1 sm:gap-2 sm:px-2",
-                        hasToday && "bg-muted/55 ring-1 ring-border/75"
-                      )}
-                    >
-                      {week.days.map((day) => {
+                  </div>
+                ))}
+              </div>
+
+              <div className="relative grid min-w-0 flex-1 grid-cols-7 overflow-hidden rounded-2xl border border-border/60 bg-card">
+                {weeks.map((week, weekIndex) => {
+                  const completedFlags = week.days.map((day) => {
+                    if (!day.inYear || !selectedHabit) return false;
+                    const key = getHabitCheckInKey(selectedHabit.id, day.dateIso);
+                    return Boolean(checkIns[key]?.completed);
+                  });
+                  const isFirstWeek = weekIndex === 0;
+                  const isLastWeek = weekIndex === weeks.length - 1;
+
+                  return (
+                    <React.Fragment key={week.id}>
+                      {week.days.map((day, dayIndex) => {
+                        const isWeekend = dayIndex === 5 || dayIndex === 6;
+                        const isPast = !day.isToday && !day.isFuture;
+                        const completed = completedFlags[dayIndex];
+                        const joinLeft = completed && completedFlags[dayIndex - 1];
+                        const joinRight = completed && completedFlags[dayIndex + 1];
+                        const dividerClass = "border-r-border/40";
+                        const cornerClass =
+                          isFirstWeek && dayIndex === 0
+                            ? "rounded-tl-2xl"
+                            : isFirstWeek && dayIndex === 6
+                              ? "rounded-tr-2xl"
+                              : isLastWeek && dayIndex === 0
+                                ? "rounded-bl-2xl"
+                                : isLastWeek && dayIndex === 6
+                                  ? "rounded-br-2xl"
+                                  : undefined;
+
                         if (!day.inYear) {
                           return (
                             <span
                               key={day.dateIso}
                               aria-hidden="true"
-                              className="mx-auto size-9 rounded-full border border-dashed border-border/45 bg-muted/18 sm:size-10"
+                              className={cn(
+                                "h-10 border-b-[1.5px] border-r-[1.5px] sm:h-11",
+                                dividerClass,
+                                cornerClass
+                              )}
+                              style={{
+                                backgroundColor: `hsl(var(${
+                                  isPast
+                                    ? "--cal-cell-outside-past"
+                                    : "--cal-cell-outside"
+                                }))`,
+                              }}
                             />
                           );
                         }
 
-                        const key = selectedHabit
-                          ? getHabitCheckInKey(selectedHabit.id, day.dateIso)
-                          : null;
-                        const completed = key
-                          ? Boolean(checkIns[key]?.completed)
-                          : false;
                         const dayAction = getHabitDayAction({
                           inYear: day.inYear,
                           isFuture: day.isFuture,
@@ -440,10 +606,16 @@ export function HabitsPrototype({
                         const disabled = dayAction === "blocked" || isEditing;
                         const dateLabel = formatAccessibleDate(day.dateIso);
                         const actionLabel = completed ? "Desmarcar" : "Marcar";
+                        const markerColor =
+                          selectedHabit?.color ?? CATEGORY_COLOR_BASE_BLUE;
+                        const cellToneVar = isPast
+                          ? "--cal-cell-weekday-past"
+                          : "--cal-cell-weekday";
 
                         return (
                           <button
                             key={day.dateIso}
+                            ref={day.isToday ? currentWeekRef : undefined}
                             type="button"
                             aria-pressed={completed}
                             aria-label={
@@ -458,20 +630,14 @@ export function HabitsPrototype({
                             title={dateLabel}
                             disabled={disabled}
                             className={cn(
-                              "relative mx-auto grid size-9 place-items-center rounded-full border text-[11px] font-semibold tabular-nums transition-[transform,background-color,border-color,color,box-shadow] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/65 focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:size-10 sm:text-xs",
-                              completed
-                                ? "border-black/10 text-neutral-950 shadow-sm hover:-translate-y-px"
-                                : disabled
-                                  ? "cursor-not-allowed border-border/45 bg-muted/28 text-muted-foreground/40"
-                                  : "border-border bg-background text-muted-foreground hover:-translate-y-px hover:border-foreground/30 hover:text-foreground",
-                              day.isToday &&
-                                "ring-2 ring-foreground/65 ring-offset-2 ring-offset-background"
+                              "relative grid h-10 place-items-center border-b-[1.5px] border-r-[1.5px] text-[11px] font-medium tabular-nums transition-colors focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/65 focus-visible:ring-inset sm:h-11 sm:text-xs",
+                              dividerClass,
+                              cornerClass,
+                              disabled ? "cursor-not-allowed" : "hover:brightness-110",
+                              "text-foreground/85",
+                              day.isToday && "z-10 ring-2 ring-inset ring-destructive"
                             )}
-                            style={
-                              completed && selectedHabit
-                                ? { backgroundColor: selectedHabit.color }
-                                : undefined
-                            }
+                            style={{ backgroundColor: `hsl(var(${cellToneVar}))` }}
                             onClick={() => {
                               if (isEditing) return;
                               if (dayAction === "toggle" && selectedHabit) {
@@ -481,45 +647,55 @@ export function HabitsPrototype({
                               }
                             }}
                           >
+                            {isWeekend ? (
+                              <span
+                                aria-hidden="true"
+                                className="absolute inset-0 bg-foreground/[0.08]"
+                              />
+                            ) : null}
+                            {joinLeft ? (
+                              <span
+                                aria-hidden="true"
+                                className="absolute -left-px top-1/2 h-[11px] w-[calc(28%+1px)] -translate-y-1/2"
+                                style={{ backgroundColor: markerColor }}
+                              />
+                            ) : null}
+                            {joinRight ? (
+                              <span
+                                aria-hidden="true"
+                                className="absolute -right-px top-1/2 h-[11px] w-[calc(28%+1px)] -translate-y-1/2"
+                                style={{ backgroundColor: markerColor }}
+                              />
+                            ) : null}
                             {completed ? (
-                              <Check className="size-4" strokeWidth={2.6} aria-hidden="true" />
-                            ) : (
-                              day.dayOfMonth
-                            )}
+                              <span
+                                aria-hidden="true"
+                                className="absolute inset-[15%] rounded-full"
+                                style={{ backgroundColor: markerColor }}
+                              />
+                            ) : null}
+                            <span
+                              className={cn(
+                                "relative",
+                                completed && "text-neutral-950"
+                              )}
+                            >
+                              {day.dayOfMonth}
+                            </span>
                             {day.isToday ? (
                               <span className="sr-only">Hoje</span>
+                            ) : null}
+                            {completed ? (
+                              <span className="sr-only">, concluído</span>
                             ) : null}
                           </button>
                         );
                       })}
-                    </div>
-                  </div>
-                );
-              })}
+                    </React.Fragment>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-
-          <div className="flex shrink-0 flex-wrap items-center justify-center gap-x-4 gap-y-1 border-t border-border/55 bg-background/78 px-3 py-2 text-[10px] text-muted-foreground sm:text-xs">
-            <span className="inline-flex items-center gap-1.5">
-              <span className="size-3 rounded-full border border-border bg-background" />
-              Disponível
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <span
-                className="grid size-3 place-items-center rounded-full border border-black/10"
-                style={{
-                  backgroundColor:
-                    selectedHabit?.color ?? CATEGORY_COLOR_BASE_BLUE,
-                }}
-              >
-                <Check className="size-2 text-neutral-950" strokeWidth={3} />
-              </span>
-              Concluído
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <span className="size-3 rounded-full border border-border/45 bg-muted/35" />
-              Futuro
-            </span>
           </div>
       </div>
 
