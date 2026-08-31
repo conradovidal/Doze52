@@ -4,14 +4,10 @@ import * as React from "react";
 import {
   CalendarDays,
   CircleCheck,
-  CircleUserRound,
   LayoutGrid,
   UserRound,
   type LucideIcon,
 } from "lucide-react";
-import { useAuth } from "@/lib/auth";
-import { useAvatarPreference } from "@/lib/avatar-preference";
-import { useBilling } from "@/lib/use-billing";
 import { ThemeToggle } from "@/components/theme-toggle";
 import {
   PRODUCT_DESTINATIONS,
@@ -53,73 +49,18 @@ const ICON_BY_NAME: Record<
   "circle-check": CircleCheck,
 };
 
-function AccountGlyph({
-  compact = false,
-  desktopHeader = false,
-}: {
-  compact?: boolean;
-  desktopHeader?: boolean;
-}) {
-  const { session } = useAuth();
-  const { isPro, isLoading, error } = useBilling();
-  const { preference } = useAvatarPreference();
-  const [brokenAvatar, setBrokenAvatar] = React.useState(false);
-  const metadata = session?.user.metadata ?? {};
-  const avatarUrl =
-    (typeof metadata.avatar_url === "string" && metadata.avatar_url) ||
-    (typeof metadata.picture === "string" && metadata.picture) ||
-    null;
-  const showProBorder = Boolean(session && isPro && !isLoading && !error);
+function AccountGlyph({ compact = false }: { compact?: boolean }) {
   const sizeClass = compact ? "size-5" : "size-8";
-  const sharedClassName = cn(
-    sizeClass,
-    "rounded-[10px]",
-    showProBorder && "ring-[3px] ring-premium"
-  );
-
-  if (avatarUrl && preference === "photo" && !brokenAvatar) {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={avatarUrl}
-        alt=""
-        className={cn(sharedClassName, "object-cover")}
-        onError={() => setBrokenAvatar(true)}
-      />
-    );
-  }
-
-  if (desktopHeader && !session) {
-    return (
-      <span
-        className={cn(
-          sharedClassName,
-          "grid place-items-center text-muted-foreground"
-        )}
-        aria-hidden="true"
-      >
-        <UserRound className={compact ? "size-4" : "size-5"} strokeWidth={1.8} />
-      </span>
-    );
-  }
-
-  if (session) {
-    return (
-      <span
-        className={cn(
-          sharedClassName,
-          "grid place-items-center bg-foreground text-background"
-        )}
-        aria-hidden="true"
-      >
-        <CircleUserRound className={compact ? "size-4" : "size-5"} strokeWidth={1.8} />
-      </span>
-    );
-  }
 
   return (
-    <span className={cn(sharedClassName, "grid place-items-center bg-foreground text-background")}>
-      <UserRound className="size-4" aria-hidden="true" />
+    <span
+      className={cn(
+        sizeClass,
+        "rounded-[10px] grid place-items-center text-muted-foreground"
+      )}
+      aria-hidden="true"
+    >
+      <UserRound className={compact ? "size-4" : "size-5"} strokeWidth={1.8} />
     </span>
   );
 }
@@ -251,7 +192,7 @@ export function DesktopProductNavigation({
           )}
           onClick={handleAccount}
         >
-          {authLoading ? null : <AccountGlyph desktopHeader />}
+          {authLoading ? null : <AccountGlyph />}
         </button>
       </div>
     </>
@@ -292,7 +233,7 @@ export function AdaptiveNavigation({
         className="inline-flex min-h-12 min-w-16 flex-1 items-center justify-center rounded-xl text-muted-foreground/55 transition-colors hover:bg-muted/45 hover:text-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 disabled:opacity-45"
         onClick={handleAccount}
       >
-        {authLoading ? null : <AccountGlyph compact desktopHeader />}
+        {authLoading ? null : <AccountGlyph compact />}
       </button>
     </nav>
   );

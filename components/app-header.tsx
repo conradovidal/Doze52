@@ -45,6 +45,7 @@ import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { CollapsibleControlRegion } from "@/components/ui/collapsible-control-region";
 import { useStore } from "@/lib/store";
+import { useScrollEdgeFade } from "@/lib/use-scroll-edge-fade";
 import type { OnboardingFocusTarget } from "@/lib/onboarding";
 import type { ProductDestinationId } from "@/lib/product-navigation";
 import type { AnchorPoint } from "@/lib/types";
@@ -193,6 +194,8 @@ export function AppHeader({
     },
     []
   );
+  const { ref: categoryScrollRef, style: categoryScrollFadeStyle } =
+    useScrollEdgeFade<HTMLDivElement>();
   const previousOnboardingLayoutLockedRef = React.useRef(false);
   const effectiveInlineEditMode = onboardingLayoutLocked
     ? guidedEditPreviewActive
@@ -1083,7 +1086,11 @@ export function AppHeader({
                 id="app-header-categories"
                 expanded={effectiveCategoriesExpanded}
               >
-                  <div className="relative -mx-4 overflow-x-auto px-4 pb-0.5 doze52-scrollbar-none sm:mx-0 sm:px-0">
+                  <div
+                    ref={categoryScrollRef}
+                    style={categoryScrollFadeStyle}
+                    className="relative -mx-4 overflow-x-auto px-4 pb-0.5 doze52-scrollbar-none sm:mx-0 sm:px-0"
+                  >
                     <CategoryBar
                       compact
                       className="w-max min-w-full flex-nowrap justify-center"
@@ -1114,7 +1121,11 @@ export function AppHeader({
                   id="app-header-categories"
                   className="w-full origin-top transition-[opacity,transform] duration-150 ease-out"
                 >
-                  <div className="-mx-4 overflow-x-auto px-4 pb-0.5 doze52-scrollbar-none sm:mx-0 sm:px-0">
+                  <div
+                    ref={categoryScrollRef}
+                    style={categoryScrollFadeStyle}
+                    className="-mx-4 overflow-x-auto px-4 pb-0.5 doze52-scrollbar-none sm:mx-0 sm:px-0"
+                  >
                     <CategoryBar
                       compact
                       className="w-max min-w-full flex-nowrap justify-center"

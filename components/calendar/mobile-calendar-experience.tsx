@@ -504,7 +504,7 @@ export function MobileCalendarExperience({
                         guidedSelectable && "ring-1 ring-inset ring-primary/15",
                         (guidedStart || guidedSelected) &&
                           "bg-primary/8 ring-2 ring-inset ring-primary/40",
-                        today && "z-10 ring-2 ring-inset ring-destructive"
+                        today && "z-10 ring-2 ring-inset ring-[#b2554c]"
                       )}
                     >
                       {hasEvents ? (
@@ -526,7 +526,7 @@ export function MobileCalendarExperience({
                               className={cn(
                                 "flex h-[3.55rem] w-[3.55rem] flex-col items-center justify-center text-center tabular-nums transition-[background-color,color,box-shadow]",
                                 today
-                                  ? "text-foreground"
+                                  ? "rounded-[10px] bg-[#b2554c] text-white shadow-[0_10px_20px_-16px_rgba(178,85,76,0.55)]"
                                   : active
                                     ? "text-foreground"
                                     : isPast

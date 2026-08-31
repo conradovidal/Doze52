@@ -180,7 +180,7 @@ export function DayCell({
           : "cursor-pointer"
       } ${
         today
-          ? "ring-2 ring-destructive"
+          ? "ring-[#b2554c] shadow-[inset_0_0_0_1px_rgba(178,85,76,0.2)]"
           : showCreateCue
             ? "ring-transparent hover:ring-neutral-400/85 hover:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.5),0_12px_24px_-20px_rgba(15,23,42,0.3)] dark:hover:bg-white/7 dark:hover:ring-neutral-400/70"
             : "ring-transparent hover:ring-neutral-300/80 hover:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.46),0_10px_18px_-18px_rgba(15,23,42,0.26)] dark:hover:bg-white/6 dark:hover:ring-neutral-500/60"
@@ -258,7 +258,7 @@ export function DayCell({
           data-day-number
           className={`grid h-5 min-w-5 place-items-center rounded-full px-1 text-[12px] font-semibold leading-none tabular-nums transition-colors ${
             today
-              ? "bg-muted text-foreground"
+              ? "bg-[#b2554c] text-white ring-1 ring-[#b2554c]"
               : "group-hover:text-foreground dark:group-hover:text-white"
           }`}
         >

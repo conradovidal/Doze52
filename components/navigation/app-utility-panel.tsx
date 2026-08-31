@@ -15,18 +15,22 @@ import {
   FileSpreadsheet,
   Github,
   HelpCircle,
-  Image as ImageIcon,
   Instagram,
+  KeyRound,
   LogOut,
   Mail,
   MessageCircle,
   MessageSquareText,
+  PencilLine,
   ShieldCheck,
   Sparkles,
+  Trash2,
+  X,
   type LucideIcon,
 } from "lucide-react";
 
 import { AuthForm } from "@/components/auth/auth-form";
+import { DeleteAccountDialog } from "@/components/account/delete-account-dialog";
 import { ProUpgradeDialog } from "@/components/billing/pro-upgrade-dialog";
 import { BrandLogo } from "@/components/brand-logo";
 import { FeedbackDialog } from "@/components/feedback/feedback-dialog";
@@ -43,8 +47,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useFeedback } from "@/components/ui/feedback-provider";
+import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth";
-import { useAvatarPreference } from "@/lib/avatar-preference";
 import { isCalendarSpreadsheetProGateEnabled, PLAN_LIMITS } from "@/lib/entitlements";
 import { logDevError, logProdError } from "@/lib/safe-log";
 import { useStore } from "@/lib/store";
@@ -52,10 +56,10 @@ import { saveSnapshot } from "@/lib/sync";
 import { useBilling } from "@/lib/use-billing";
 import { cn } from "@/lib/utils";
 
-const CalendarSpreadsheetDialog = dynamic(
+const CalendarSpreadsheetPanel = dynamic(
   () =>
     import("@/components/calendar-spreadsheet-dialog").then(
-      (module) => module.CalendarSpreadsheetDialog
+      (module) => module.CalendarSpreadsheetPanel
     ),
   { ssr: false }
 );
@@ -104,21 +108,49 @@ const SOCIAL_LINKS: ReadonlyArray<{ label: string; href: string; icon: LucideIco
 ];
 
 function SocialLinksRow({ className }: { className?: string }) {
+  const { notify } = useFeedback();
+
+  const handleCopyEmail = async () => {
+    try {
+      await navigator.clipboard.writeText(SUPPORT_EMAIL);
+      notify({ tone: "success", title: "E-mail copiado", description: SUPPORT_EMAIL });
+    } catch {
+      window.location.href = `mailto:${SUPPORT_EMAIL}`;
+    }
+  };
+
   return (
     <div className={cn("flex items-center justify-center gap-2", className)}>
-      {SOCIAL_LINKS.map((link) => (
-        <a
-          key={link.label}
-          href={link.href}
-          target={link.href.startsWith("mailto:") ? undefined : "_blank"}
-          rel={link.href.startsWith("mailto:") ? undefined : "noopener noreferrer"}
-          aria-label={link.label}
-          title={link.label}
-          className="grid size-9 place-items-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-        >
-          <link.icon className="size-4" />
-        </a>
-      ))}
+      {SOCIAL_LINKS.map((link) => {
+        const isEmail = link.href.startsWith("mailto:");
+        if (isEmail) {
+          return (
+            <button
+              key={link.label}
+              type="button"
+              aria-label={`Copiar ${SUPPORT_EMAIL}`}
+              title={`Copiar ${SUPPORT_EMAIL}`}
+              onClick={handleCopyEmail}
+              className="grid size-9 place-items-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              <link.icon className="size-4" />
+            </button>
+          );
+        }
+        return (
+          <a
+            key={link.label}
+            href={link.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={link.label}
+            title={link.label}
+            className="grid size-9 place-items-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <link.icon className="size-4" />
+          </a>
+        );
+      })}
     </div>
   );
 }
@@ -200,7 +232,7 @@ export function AppUtilityPanel({
 }: AppUtilityPanelProps) {
   const router = useRouter();
   const { notify } = useFeedback();
-  const { session, signOut } = useAuth();
+  const { session, signOut, sendPasswordResetEmail, updateProfileName } = useAuth();
   const profiles = useStore((state) => state.profiles);
   const categories = useStore((state) => state.categories);
   const events = useStore((state) => state.events);
@@ -218,49 +250,15 @@ export function AppUtilityPanel({
   const [activeSection, setActiveSection] = React.useState<UtilityPanelSection>(section);
   const [adminCapabilities, setAdminCapabilities] = React.useState<AdminCapabilities>(EMPTY_ADMIN_CAPABILITIES);
   const [isSigningOut, setIsSigningOut] = React.useState(false);
-  const [spreadsheetOpen, setSpreadsheetOpen] = React.useState(false);
   const [spreadsheetUpgradeOpen, setSpreadsheetUpgradeOpen] = React.useState(false);
   const [feedbackOpen, setFeedbackOpen] = React.useState(false);
-  const [viewportTick, setViewportTick] = React.useState(0);
   const [brokenAvatar, setBrokenAvatar] = React.useState(false);
-  const { preference: avatarPreference, setPreference: setAvatarPreference } = useAvatarPreference();
+  const [isSendingPasswordReset, setIsSendingPasswordReset] = React.useState(false);
+  const [isEditingName, setIsEditingName] = React.useState(false);
+  const [nameDraft, setNameDraft] = React.useState("");
+  const [isSavingName, setIsSavingName] = React.useState(false);
+  const [deleteAccountOpen, setDeleteAccountOpen] = React.useState(false);
   const spreadsheetRequiresPro = isCalendarSpreadsheetProGateEnabled();
-
-  // Computed synchronously during render (not in an effect) so the very first
-  // paint already has the right anchor — measuring the panel's own DOM node
-  // after mount meant the panel briefly rendered centered, then jumped to its
-  // anchored spot once that measurement effect ran, reading as an errant
-  // "rises from below" motion.
-  const desktopPosition = React.useMemo(() => {
-    if (!open || isMobile) return null;
-    const trigger = returnFocusRef.current;
-    if (!trigger) return null;
-
-    const triggerRect = trigger.getBoundingClientRect();
-    const viewportPadding = 16;
-    const gap = 8;
-    // Mirrors the h-[min(600px,86dvh)] class below exactly, so this estimate
-    // never diverges from the panel's actual rendered height.
-    const panelHeight = Math.min(600, window.innerHeight * 0.86);
-    const right = Math.max(viewportPadding, window.innerWidth - triggerRect.right);
-    const top = Math.max(
-      viewportPadding,
-      Math.min(triggerRect.bottom + gap, window.innerHeight - panelHeight - viewportPadding)
-    );
-    return { right, top };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, isMobile, returnFocusRef, viewportTick]);
-
-  React.useEffect(() => {
-    if (!open || isMobile) return;
-    const handleViewportChange = () => setViewportTick((tick) => tick + 1);
-    window.addEventListener("resize", handleViewportChange);
-    window.addEventListener("scroll", handleViewportChange, true);
-    return () => {
-      window.removeEventListener("resize", handleViewportChange);
-      window.removeEventListener("scroll", handleViewportChange, true);
-    };
-  }, [open, isMobile]);
 
   React.useEffect(() => {
     if (!open) return;
@@ -309,8 +307,9 @@ export function AppUtilityPanel({
     (typeof metadata.avatar_url === "string" && metadata.avatar_url) ||
     (typeof metadata.picture === "string" && metadata.picture) ||
     null;
-  const showAvatarPhoto = Boolean(avatarUrl) && avatarPreference === "photo" && !brokenAvatar;
+  const showAvatarPhoto = Boolean(avatarUrl) && !brokenAvatar;
   const showProIdentity = Boolean(session && isPro && !isBillingLoading && !billingError);
+  const canChangePassword = session?.user.provider === "password";
   const periodEndDate = billingStatus.currentPeriodEnd ? new Date(billingStatus.currentPeriodEnd) : null;
   const formattedPeriodEnd =
     periodEndDate && !Number.isNaN(periodEndDate.getTime())
@@ -374,11 +373,48 @@ export function AppUtilityPanel({
     }
   };
 
-  const openSpreadsheet = () => {
-    onOpenChange(false);
-    if (!spreadsheetRequiresPro || isPro) setSpreadsheetOpen(true);
-    else setSpreadsheetUpgradeOpen(true);
+  const startEditingName = () => {
+    const hasCustomName = Boolean(rawName) && !/^google_[a-z0-9]+$/i.test(rawName.trim());
+    setNameDraft(hasCustomName ? rawName : "");
+    setIsEditingName(true);
   };
+
+  const handleSaveName = async () => {
+    const trimmed = nameDraft.trim();
+    if (!trimmed) return;
+    setIsSavingName(true);
+    try {
+      await updateProfileName(trimmed);
+      setIsEditingName(false);
+      notify({ tone: "success", title: "Nome atualizado" });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Falha desconhecida.";
+      logDevError("utility-panel.update-name", { message });
+      notify({ tone: "error", title: "Não foi possível salvar o nome", description: "Tente novamente em instantes." });
+    } finally {
+      setIsSavingName(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (!email) return;
+    setIsSendingPasswordReset(true);
+    try {
+      await sendPasswordResetEmail(email);
+      notify({
+        tone: "success",
+        title: "Link enviado",
+        description: `Enviamos um link para redefinir sua senha para ${email}.`,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Falha desconhecida.";
+      logDevError("utility-panel.change-password", { message });
+      notify({ tone: "error", title: "Não foi possível enviar o link", description: "Tente novamente em instantes." });
+    } finally {
+      setIsSendingPasswordReset(false);
+    }
+  };
+
   const openFeedback = () => { onOpenChange(false); setFeedbackOpen(true); };
   const navigateTo = (href: string) => { onOpenChange(false); router.push(href); };
 
@@ -397,31 +433,47 @@ export function AppUtilityPanel({
               isPro={showProIdentity}
               onAvatarBroken={() => setBrokenAvatar(true)}
             />
-            {avatarUrl && !brokenAvatar ? (
-              <div className="mt-3 inline-flex rounded-lg border border-border bg-card p-0.5 text-xs font-medium">
+            {isEditingName ? (
+              <div className="mt-4 flex w-full max-w-xs items-center gap-1.5">
+                <Input
+                  autoFocus
+                  value={nameDraft}
+                  onChange={(event) => setNameDraft(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") handleSaveName();
+                    if (event.key === "Escape") setIsEditingName(false);
+                  }}
+                  placeholder="Seu nome"
+                  className="h-9 text-center"
+                />
+                <Button type="button" size="icon-sm" variant="outline" disabled={isSavingName || !nameDraft.trim()} onClick={handleSaveName} aria-label="Salvar nome">
+                  <Check className="size-4" />
+                </Button>
+                <Button type="button" size="icon-sm" variant="ghost" disabled={isSavingName} onClick={() => setIsEditingName(false)} aria-label="Cancelar">
+                  <X className="size-4" />
+                </Button>
+              </div>
+            ) : (
+              <div className="mt-4 flex items-center gap-1.5">
+                <h3 className="text-xl font-semibold text-foreground">{displayName}</h3>
+                {showProIdentity ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-premium-soft px-2 py-0.5 text-[11px] font-semibold text-premium-foreground">
+                    <Crown className="size-3" />
+                    Pro
+                  </span>
+                ) : null}
                 <button
                   type="button"
-                  aria-pressed={avatarPreference === "photo"}
-                  className={cn("flex items-center gap-1.5 rounded-md px-2.5 py-1 transition-colors", avatarPreference === "photo" ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground")}
-                  onClick={() => setAvatarPreference("photo")}
+                  aria-label="Editar nome"
+                  title="Editar nome"
+                  className="grid size-6 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  onClick={startEditingName}
                 >
-                  {avatarPreference === "photo" ? <Check className="size-3" /> : <ImageIcon className="size-3" />}
-                  Foto
-                </button>
-                <button
-                  type="button"
-                  aria-pressed={avatarPreference === "icon"}
-                  className={cn("flex items-center gap-1.5 rounded-md px-2.5 py-1 transition-colors", avatarPreference === "icon" ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground")}
-                  onClick={() => setAvatarPreference("icon")}
-                >
-                  {avatarPreference === "icon" ? <Check className="size-3" /> : <CircleUserRound className="size-3" />}
-                  Ícone
+                  <PencilLine className="size-3.5" />
                 </button>
               </div>
-            ) : null}
-            <h3 className="mt-4 text-xl font-semibold text-foreground">{displayName}</h3>
+            )}
             <p className="mt-1 text-sm text-muted-foreground">{email}</p>
-            <span className={cn("mt-3 rounded-full px-2.5 py-1 text-xs font-semibold", showProIdentity ? "bg-premium-soft text-premium-foreground" : "bg-muted text-muted-foreground")}>{showProIdentity ? "Pro" : "Free"}</span>
 
             {standalone ? (
               <button
@@ -437,7 +489,24 @@ export function AppUtilityPanel({
               </button>
             ) : null}
 
-            <Button type="button" variant="outline" className="mt-6 min-w-48" disabled={isSigningOut} onClick={handleSignOut}><LogOut className="size-4" />{isSigningOut ? "Saindo..." : "Sair"}</Button>
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+              {canChangePassword ? (
+                <Button type="button" variant="outline" className="min-w-48" disabled={isSendingPasswordReset} onClick={handleChangePassword}>
+                  <KeyRound className="size-4" />
+                  {isSendingPasswordReset ? "Enviando..." : "Alterar senha"}
+                </Button>
+              ) : null}
+              <Button type="button" variant="outline" className="min-w-48" disabled={isSigningOut} onClick={handleSignOut}><LogOut className="size-4" />{isSigningOut ? "Saindo..." : "Sair"}</Button>
+            </div>
+
+            <button
+              type="button"
+              className="mt-6 inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-rose-600 dark:hover:text-rose-300"
+              onClick={() => setDeleteAccountOpen(true)}
+            >
+              <Trash2 className="size-3.5" />
+              Excluir minha conta
+            </button>
           </div>
         ) : (
           <div className="mx-auto max-w-sm text-left">
@@ -455,12 +524,12 @@ export function AppUtilityPanel({
               <div className="grid grid-cols-[1fr_auto_auto] items-center gap-x-4 gap-y-2.5 px-5 py-4 text-sm">
                 <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">O que muda</span>
                 <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Free</span>
-                <span className="text-xs font-semibold uppercase tracking-wide text-premium">Pro</span>
+                <span className="text-xs font-semibold uppercase tracking-wide text-emerald-600 dark:text-emerald-300">Pro</span>
                 {PLAN_COMPARISON_ROWS.map((row) => (
                   <React.Fragment key={row.label}>
                     <span className="text-foreground">{row.label}</span>
                     <span className="text-muted-foreground">{row.free}</span>
-                    <span className="font-medium text-premium-foreground">{row.pro}</span>
+                    <span className="font-medium text-emerald-600 dark:text-emerald-300">{row.pro}</span>
                   </React.Fragment>
                 ))}
               </div>
@@ -468,8 +537,19 @@ export function AppUtilityPanel({
           </div>
         );
       case "data":
-        return (
-          <div className="max-w-xl rounded-2xl border border-border bg-card p-2"><PanelAction icon={FileSpreadsheet} disabled={spreadsheetRequiresPro && isBillingLoading} onClick={openSpreadsheet}>Importar ou exportar{spreadsheetRequiresPro && !isPro && !isBillingLoading ? <span className="ml-auto rounded-full bg-premium-soft px-2 py-0.5 text-[10px] font-semibold text-premium-foreground">Pro</span> : null}</PanelAction></div>
+        return spreadsheetRequiresPro && !isPro && !isBillingLoading ? (
+          <div className="max-w-xl rounded-2xl border border-border bg-card p-5">
+            <div className="flex items-start justify-between gap-5">
+              <div>
+                <p className="text-base font-semibold text-foreground">Importação e exportação</p>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">Traga eventos de outra planilha ou baixe seu calendário — disponível no plano Pro.</p>
+              </div>
+              <FileSpreadsheet className="mt-1 size-5 shrink-0 text-muted-foreground" />
+            </div>
+            <Button type="button" variant="premium" className="mt-6" onClick={() => setSpreadsheetUpgradeOpen(true)}><CreditCard className="size-4" />Assinar Pro</Button>
+          </div>
+        ) : (
+          <CalendarSpreadsheetPanel />
         );
       case "help":
         return (
@@ -511,21 +591,7 @@ export function AppUtilityPanel({
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent
           data-app-utility-panel
-          data-desktop-anchor-positioned={
-            !isMobile && desktopPosition ? "true" : undefined
-          }
-          className={cn("overflow-hidden p-0", isMobile ? "inset-x-0 top-auto bottom-0 h-[min(34rem,58dvh)] w-screen max-w-none translate-x-0 translate-y-0 rounded-none rounded-t-[1.75rem] border-0 border-t border-border/70 data-[state=open]:slide-in-from-bottom-2 data-[state=closed]:slide-out-to-bottom-2 sm:max-w-none" : "h-[min(600px,86dvh)] w-[min(720px,calc(100vw-5rem))] max-w-[720px] translate-x-0 translate-y-0 data-[state=open]:slide-in-from-top-2 data-[state=closed]:slide-out-to-top-2 sm:max-w-[720px]")}
-          style={
-            !isMobile && desktopPosition
-              ? {
-                  left: "auto",
-                  right: desktopPosition.right,
-                  top: desktopPosition.top,
-                  transform: "none",
-                  transformOrigin: "top right",
-                }
-              : undefined
-          }
+          className={cn("overflow-hidden p-0", isMobile ? "inset-x-0 top-auto bottom-0 h-[min(34rem,58dvh)] w-screen max-w-none translate-x-0 translate-y-0 rounded-none rounded-t-[1.75rem] border-0 border-t border-border/70 data-[state=open]:slide-in-from-bottom-2 data-[state=closed]:slide-out-to-bottom-2 sm:max-w-none" : "h-[min(600px,86dvh)] w-[min(720px,calc(100vw-5rem))] max-w-[720px] sm:max-w-[720px]")}
           onCloseAutoFocus={(event) => { event.preventDefault(); returnFocusRef.current?.focus(); }}
         >
           <DialogDescription className="sr-only">Gerencie sua conta, plano, dados e canais do Doze 52.</DialogDescription>
@@ -585,9 +651,9 @@ export function AppUtilityPanel({
           ) : null}
         </DialogContent>
       </Dialog>
-      <CalendarSpreadsheetDialog open={spreadsheetOpen} onOpenChange={setSpreadsheetOpen} />
       <ProUpgradeDialog open={spreadsheetUpgradeOpen} onOpenChange={setSpreadsheetUpgradeOpen} reason="calendar-import-export" />
       <FeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />
+      <DeleteAccountDialog open={deleteAccountOpen} onOpenChange={setDeleteAccountOpen} />
     </>
   );
 }
