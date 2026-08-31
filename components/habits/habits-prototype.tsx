@@ -55,6 +55,7 @@ export function HabitsPrototype({
   onHabitCheckIn,
   retrospectiveInteracted = false,
   scrollToTodayRequestKey = 0,
+  headerMinimized = false,
 }: {
   year: number;
   todayIso: string;
@@ -64,6 +65,7 @@ export function HabitsPrototype({
   isAuthenticated?: boolean;
   isEditing?: boolean;
   onYearChange: (year: number) => void;
+  headerMinimized?: boolean;
   guidedNotice?: import("@/components/onboarding/guided-toolbar-notice").GuidedToolbarNotice | null;
   showcase?: OnboardingHabitShowcase | null;
   onDismissGuidedNotice?: () => void;
@@ -367,6 +369,7 @@ export function HabitsPrototype({
           }}
           onRequestCreate={requestCreateHabit}
           isEditing={showcaseActive ? false : isEditing}
+          headerMinimized={headerMinimized}
           readOnly={showcaseActive}
           onEditHabit={requestEditHabit}
           onReorderHabits={reorderHabits}

@@ -439,6 +439,30 @@ export default function HomePage() {
   }, [isMobileCalendarUi, hasConfirmedDesktopVisit]);
   const [activeDestination, setActiveDestination] =
     React.useState<ProductDestinationId>("annual");
+  // Desktop-only "minimize chrome" toggle, shared by the Anual and Hábitos
+  // surfaces via the same header button. Initial value matches SSR (never
+  // minimized) to avoid a hydration mismatch; the real viewport-based
+  // default is applied client-side right after mount, before paint.
+  const [headerMinimized, setHeaderMinimizedState] = React.useState(false);
+  const headerMinimizedManuallySetRef = React.useRef(false);
+  const canMinimizeHeader = isHabitsPrototypeEnabled && isMobileCalendarUi === false;
+  const setHeaderMinimized = React.useCallback((next: boolean) => {
+    headerMinimizedManuallySetRef.current = true;
+    setHeaderMinimizedState(next);
+  }, []);
+  React.useLayoutEffect(() => {
+    if (!canMinimizeHeader) return;
+    setHeaderMinimizedState(window.innerHeight < 860);
+  }, [canMinimizeHeader]);
+  React.useEffect(() => {
+    if (!canMinimizeHeader) return;
+    const handleResize = () => {
+      if (headerMinimizedManuallySetRef.current) return;
+      setHeaderMinimizedState(window.innerHeight < 860);
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [canMinimizeHeader]);
   const [utilityPanelOpen, setUtilityPanelOpen] = React.useState(false);
   const [utilityPanelSection, setUtilityPanelSection] =
     React.useState<UtilityPanelSection>("account");
@@ -2518,6 +2542,8 @@ export default function HomePage() {
           onGuidedThemeChange={() =>
             updateGuidedOnboarding({ type: "confirm_theme" })
           }
+          headerMinimized={headerMinimized}
+          onToggleHeaderMinimized={() => setHeaderMinimized(!headerMinimized)}
           mobileExamplePreviewActive={isMobileExamplePreview}
           demoExplorationActive={isDemoExploration}
           onCategoryCreated={(categoryId) => {
@@ -2542,6 +2568,7 @@ export default function HomePage() {
           todayIso={todayIso}
           isMobile={isMobileCalendarUi}
           isEditing={workspaceEditMode === "habits"}
+          headerMinimized={headerMinimized}
           onYearChange={handleYearChange}
           onRequireAuth={() => {
             setAuthDialogInitialMode("login");

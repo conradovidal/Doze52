@@ -114,6 +114,7 @@ export function MonthRow({
   monthIndex,
   density = "year",
   verticalScale = 1,
+  compactBottomPaddingPx,
   events,
   visibleCategoryIds,
   profileIconByCategoryId,
@@ -145,6 +146,7 @@ export function MonthRow({
   monthIndex: number;
   density?: MonthRowDensity;
   verticalScale?: number;
+  compactBottomPaddingPx?: number;
   events: CalendarRenderEvent[];
   visibleCategoryIds: string[];
   profileIconByCategoryId: Map<string, ProfileIconId>;
@@ -335,10 +337,14 @@ export function MonthRow({
   const eventBandHeightPx =
     rowsForHeightTotal * EVENT_ITEM_HEIGHT_PX +
     Math.max(0, rowsForHeightTotal - 1) * EVENT_ITEM_GAP_PX;
+  const resolvedBottomPaddingPx =
+    typeof compactBottomPaddingPx === "number"
+      ? compactBottomPaddingPx
+      : layoutDensity.monthRowBottomPaddingPx;
   const baseContentHeight =
     baseEventsTopOffset +
     eventBandHeightPx +
-    layoutDensity.monthRowBottomPaddingPx;
+    resolvedBottomPaddingPx;
   const minHeightPx = isHabitMode
     ? scaleVerticalSpacing(
         getDesktopHabitRowMinHeight(habitPresentation?.habits.length ?? 0)
