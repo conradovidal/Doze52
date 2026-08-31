@@ -77,6 +77,11 @@ const CALENDAR_ZOOM_MIN_PERCENT = 100;
 const CALENDAR_ZOOM_MAX_PERCENT = 180;
 const CALENDAR_VERTICAL_ZOOM_MAX_PERCENT = 140;
 
+const YEAR_ROW_BOTTOM_PADDING_ROOMY_PX = 12;
+const YEAR_ROW_BOTTOM_PADDING_FLOOR_PX = 4;
+const YEAR_ROW_BOTTOM_PADDING_MAX_SAVINGS_PX =
+  12 * (YEAR_ROW_BOTTOM_PADDING_ROOMY_PX - YEAR_ROW_BOTTOM_PADDING_FLOOR_PX);
+
 const CALENDAR_VIEW_OPTIONS = [
   { value: "year", label: "Ano" },
   { value: "quarter", label: "Trimestre" },
@@ -267,6 +272,47 @@ export function YearGrid({
     scrollViewportRef,
     () => zoomViewportRef.current as HTMLDivElement
   );
+
+  const [yearRowBottomPaddingPx, setYearRowBottomPaddingPx] = React.useState(
+    YEAR_ROW_BOTTOM_PADDING_ROOMY_PX
+  );
+  const canCompactYearDensity = !habitPresentation && viewMode === "year";
+  React.useLayoutEffect(() => {
+    if (!canCompactYearDensity) {
+      setYearRowBottomPaddingPx(YEAR_ROW_BOTTOM_PADDING_ROOMY_PX);
+      return;
+    }
+    const viewport = zoomViewportRef.current;
+    if (!viewport) return;
+
+    const measure = () => {
+      const clientHeight = viewport.clientHeight;
+      if (clientHeight <= 0) return;
+      const scrollHeight = viewport.scrollHeight;
+      const monthCount = 12;
+      setYearRowBottomPaddingPx((currentPaddingPx) => {
+        const currentSavingsPerRow =
+          YEAR_ROW_BOTTOM_PADDING_ROOMY_PX - currentPaddingPx;
+        const naturalScrollHeight =
+          scrollHeight + currentSavingsPerRow * monthCount;
+        const deficit = naturalScrollHeight - clientHeight;
+        const neededTotalSavings = Math.min(
+          YEAR_ROW_BOTTOM_PADDING_MAX_SAVINGS_PX,
+          Math.max(0, deficit)
+        );
+        const nextPaddingPx =
+          YEAR_ROW_BOTTOM_PADDING_ROOMY_PX - neededTotalSavings / monthCount;
+        return Math.abs(nextPaddingPx - currentPaddingPx) > 0.5
+          ? nextPaddingPx
+          : currentPaddingPx;
+      });
+    };
+
+    measure();
+    const resizeObserver = new ResizeObserver(measure);
+    resizeObserver.observe(viewport);
+    return () => resizeObserver.disconnect();
+  }, [canCompactYearDensity, yearRowBottomPaddingPx, year, events, habitPresentation]);
 
   const visibleEvents = React.useMemo(
     () =>
@@ -733,6 +779,9 @@ export function YearGrid({
                     monthIndex={monthIndex}
                     density={density}
                     verticalScale={verticalZoomScale}
+                    compactBottomPaddingPx={
+                      canCompactYearDensity ? yearRowBottomPaddingPx : undefined
+                    }
                     events={habitPresentation ? [] : events}
                     visibleCategoryIds={visibleCategoryIds}
                     profileIconByCategoryId={profileIconByCategoryId}

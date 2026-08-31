@@ -3,6 +3,8 @@
 import * as React from "react";
 import {
   CalendarDays,
+  ChevronsDownUp,
+  ChevronsUpDown,
   CircleCheck,
   LayoutGrid,
   UserRound,
@@ -39,6 +41,9 @@ type ProductNavigationProps = {
   themeHighlighted?: boolean;
   themeDisabled?: boolean;
   onGuidedThemeChange?: () => void;
+  showHeaderMinimizeToggle?: boolean;
+  headerMinimized?: boolean;
+  onToggleHeaderMinimized?: () => void;
 };
 
 const ICON_BY_NAME: Record<
@@ -128,6 +133,9 @@ export function DesktopProductNavigation({
   themeHighlighted = false,
   themeDisabled = false,
   onGuidedThemeChange,
+  showHeaderMinimizeToggle = false,
+  headerMinimized = false,
+  onToggleHeaderMinimized,
 }: ProductNavigationProps) {
   const handleAccount = (event: React.MouseEvent<HTMLButtonElement>) => {
     if (authLoading) return;
@@ -150,6 +158,31 @@ export function DesktopProductNavigation({
             highlighted={highlightDestination === destination.id}
           />
         ))}
+        {showHeaderMinimizeToggle && onToggleHeaderMinimized ? (
+          <button
+            type="button"
+            data-product-header-minimize="desktop"
+            aria-pressed={headerMinimized}
+            aria-label={
+              headerMinimized
+                ? "Mostrar contextos e categorias"
+                : "Minimizar contextos e categorias"
+            }
+            title={
+              headerMinimized
+                ? "Mostrar contextos e categorias"
+                : "Minimizar contextos e categorias"
+            }
+            className="ml-1 grid size-10 place-items-center rounded-xl text-muted-foreground/55 transition-colors hover:bg-muted/45 hover:text-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+            onClick={onToggleHeaderMinimized}
+          >
+            {headerMinimized ? (
+              <ChevronsUpDown className="size-[18px]" />
+            ) : (
+              <ChevronsDownUp className="size-[18px]" />
+            )}
+          </button>
+        ) : null}
       </nav>
 
       <div className="col-start-3 hidden items-center gap-1 justify-self-end md:flex">

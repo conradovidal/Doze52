@@ -42,7 +42,7 @@ export function ThemeToggle({
       className={cn(
         "inline-flex items-center justify-center text-muted-foreground shadow-none transition-colors duration-150",
         variant === "bare"
-          ? "size-9 rounded-full hover:bg-muted hover:text-foreground"
+          ? "size-10 rounded-xl hover:bg-muted hover:text-foreground"
           : "h-8 w-8 rounded-[10px] border border-border bg-card hover:border-foreground/18 hover:bg-muted hover:text-foreground md:h-9 md:w-9",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
         disabled && "cursor-not-allowed opacity-45",
@@ -53,9 +53,9 @@ export function ThemeToggle({
         {isLight ? "Mudar para tema escuro" : "Mudar para tema claro"}
       </span>
       {isLight ? (
-        <SunMedium className="h-4 w-4 text-amber-500" />
+        <SunMedium className="h-4 w-4" />
       ) : (
-        <MoonStar className="h-4 w-4 text-slate-300" />
+        <MoonStar className="h-4 w-4" />
       )}
     </button>
   );
