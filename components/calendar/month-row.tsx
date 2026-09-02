@@ -36,7 +36,10 @@ import {
   compareEventsByVisualPriority,
   isRenderableEventDateRange,
 } from "@/lib/event-order";
-import { getDesktopHabitRowMinHeight } from "@/lib/habits-prototype";
+import {
+  getCompletedHabitsForDate,
+  getDesktopHabitRowMinHeight,
+} from "@/lib/habits-prototype";
 import { cn } from "@/lib/utils";
 import { isOnboardingPersonalDemoGroup } from "@/lib/store";
 import {
@@ -345,10 +348,25 @@ export function MonthRow({
     baseEventsTopOffset +
     eventBandHeightPx +
     resolvedBottomPaddingPx;
-  const minHeightPx = isHabitMode
-    ? scaleVerticalSpacing(
-        getDesktopHabitRowMinHeight(habitPresentation?.habits.length ?? 0)
+  // Cada mês tem sua própria altura em modo hábito: parte de 1 hábito e só
+  // cresce até o pico real de hábitos marcados no mesmo dia dentro do mês
+  // (não do total de hábitos visíveis no seletor, que é global).
+  const maxHabitsMarkedInMonth = habitPresentation
+    ? inMonthDays.reduce(
+        (max, day) =>
+          Math.max(
+            max,
+            getCompletedHabitsForDate(
+              habitPresentation.habits,
+              habitPresentation.checkIns,
+              day.iso
+            ).length
+          ),
+        1
       )
+    : 0;
+  const minHeightPx = isHabitMode
+    ? scaleVerticalSpacing(getDesktopHabitRowMinHeight(maxHabitsMarkedInMonth))
     : scaleVerticalSpacing(
         Math.max(layoutDensity.monthRowBaseMinHeightPx, baseContentHeight)
       );

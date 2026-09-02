@@ -189,7 +189,10 @@ export function GuidedToolbarNoticeCard({
       style={anchorSelector && portaled ? (anchorPosition ?? undefined) : undefined}
     >
       <div className="pr-7">
-        <div className="min-w-0">
+        <div
+          key={`${notice.target}:${notice.title}`}
+          className="min-w-0 animate-in fade-in slide-in-from-bottom-1 duration-300 motion-reduce:animate-none"
+        >
           {notice.stepLabel ? (
             <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-primary">
               {notice.stepLabel}

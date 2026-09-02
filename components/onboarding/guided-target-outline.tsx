@@ -41,6 +41,13 @@ export function GuidedTargetOutline({
 
     const update = () => setRect(getTargetRect(selector, multiple));
     const frame = requestAnimationFrame(update);
+    // O alvo às vezes mora dentro de um modal/painel que ainda está em
+    // transição de entrada quando a primeira medição roda (o rAF pega uma
+    // posição intermediária da animação) — remede em alguns instantes depois
+    // pra assentar na posição final, sem depender só de Resize/Mutation.
+    const settleTimeouts = [80, 200, 400].map((delay) =>
+      window.setTimeout(update, delay)
+    );
     const observer = new ResizeObserver(update);
     const targets = multiple
       ? document.querySelectorAll<HTMLElement>(selector)
@@ -54,6 +61,7 @@ export function GuidedTargetOutline({
     window.addEventListener("scroll", update, { capture: true, passive: true });
     return () => {
       cancelAnimationFrame(frame);
+      settleTimeouts.forEach((timeout) => window.clearTimeout(timeout));
       observer.disconnect();
       mutationObserver.disconnect();
       window.removeEventListener("resize", update);

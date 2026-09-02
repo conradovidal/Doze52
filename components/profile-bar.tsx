@@ -358,7 +358,7 @@ export function ProfileBar({
       ? "contents"
       : compact
         ? "w-full min-h-8 justify-center"
-        : "mb-2 min-h-8 justify-center",
+        : "mb-2 min-h-8 justify-start",
     mobileDense ? "" : "flex flex-wrap items-center gap-1.5 sm:gap-2.5",
     className
   );

@@ -8,6 +8,7 @@ import {
   ChevronRight,
   LayoutGrid,
   PencilLine,
+  Plus,
 } from "lucide-react";
 import { BrandLogo } from "@/components/brand-logo";
 import {
@@ -48,6 +49,7 @@ import { CollapsibleControlRegion } from "@/components/ui/collapsible-control-re
 import { useStore } from "@/lib/store";
 import { useScrollEdgeFade } from "@/lib/use-scroll-edge-fade";
 import type { OnboardingFocusTarget } from "@/lib/onboarding";
+import type { CalendarPack } from "@/lib/calendar-packs/types";
 import type { ProductDestinationId } from "@/lib/product-navigation";
 import type { AnchorPoint } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -87,7 +89,7 @@ type AppHeaderProps = {
   onGuidedToolbarAction?: (target: GuidedToolbarNotice["target"]) => void;
   onGuidedCalendarOpen?: () => void;
   onGuidedCalendarClose?: () => void;
-  onGuidedCalendarImported?: (uf?: string) => void;
+  onGuidedCalendarImported?: (pack?: CalendarPack) => void;
   guidedCalendarSelectionActive?: boolean;
   guidedEditPreviewActive?: boolean;
   onboardingLayoutLocked?: boolean;
@@ -101,6 +103,7 @@ type AppHeaderProps = {
   controlledInlineEditMode?: boolean;
   onFilterLayoutChange?: () => void;
   exitInlineEditRequestKey?: number;
+  expandCategoriesRequestKey?: number;
   onYearLabelClick?: () => void;
   onGuidedThemeChange?: () => void;
   headerMinimized?: boolean;
@@ -149,6 +152,7 @@ export function AppHeader({
   controlledInlineEditMode,
   onFilterLayoutChange,
   exitInlineEditRequestKey = 0,
+  expandCategoriesRequestKey = 0,
   onYearLabelClick,
   onGuidedThemeChange,
   headerMinimized = false,
@@ -213,6 +217,7 @@ export function AppHeader({
   const previousProfileManagerOpenRef = React.useRef(false);
   const handledCategoryCreateRequestRef = React.useRef(0);
   const handledExitInlineEditRequestRef = React.useRef(0);
+  const handledExpandCategoriesRequestRef = React.useRef(0);
 
   const utilityIconClass =
     "h-8 w-8 rounded-[10px] border-border bg-card text-muted-foreground shadow-none transition-colors hover:border-foreground/18 hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 md:h-9 md:w-9";
@@ -345,6 +350,17 @@ export function AppHeader({
 
   React.useEffect(() => {
     if (
+      expandCategoriesRequestKey <= 0 ||
+      expandCategoriesRequestKey === handledExpandCategoriesRequestRef.current
+    ) {
+      return;
+    }
+    handledExpandCategoriesRequestRef.current = expandCategoriesRequestKey;
+    setCategoriesRowExpanded(true);
+  }, [expandCategoriesRequestKey]);
+
+  React.useEffect(() => {
+    if (
       categoryCreateRequestKey <= 0 ||
       categoryCreateRequestKey === handledCategoryCreateRequestRef.current
     ) {
@@ -468,7 +484,7 @@ export function AppHeader({
   const guidedOutlineSelector =
     guidedToolbarNotice?.target === "edit"
       ? '[data-onboarding-edit-control][data-onboarding-highlighted="true"], [data-product-organize="desktop"][data-onboarding-highlighted="true"]'
-      : guidedToolbarNotice?.target === "calendars"
+      : guidedToolbarNotice?.target === "calendars" && !categoryCreateOpen
         ? '[data-onboarding-calendar-control][data-onboarding-highlighted="true"]'
         : guidedToolbarNotice?.target === "habit-surface"
           ? '[data-product-navigation="desktop"] [data-product-destination="habits"]'
@@ -724,9 +740,7 @@ export function AppHeader({
                   requireExplicitVariant={guidedCalendarSelectionActive}
                   onOpen={onGuidedCalendarOpen}
                   onClose={onGuidedCalendarClose}
-                  onImported={(pack) =>
-                    onGuidedCalendarImported?.(pack.regionCode)
-                  }
+                  onImported={(pack) => onGuidedCalendarImported?.(pack)}
                 />
                 {guidedToolbarNotice?.target === "calendars" &&
                 onDismissGuidedSelection ? (
@@ -895,8 +909,7 @@ export function AppHeader({
           <div aria-hidden="true" className="h-12" />
         ) : null}
 
-        {showCalendarControls &&
-        !(headerMinimized && canMinimizeHeader && !onboardingLayoutLocked) ? (
+        {showCalendarControls ? (
           <div
             data-onboarding-filter-region
             className={cn(
@@ -915,8 +928,14 @@ export function AppHeader({
                       : "border-t border-border/45 pt-2.5 md:pt-3"
                   ),
               onboardingLayoutReserved &&
-                (isMobileMode ? "min-h-[10.25rem]" : "min-h-[5.6rem]")
+                (isMobileMode ? "min-h-[10.25rem]" : undefined)
             )}
+          >
+          <CollapsibleControlRegion
+            id="app-header-filter-region"
+            expanded={
+              !(headerMinimized && canMinimizeHeader && !onboardingLayoutLocked)
+            }
           >
           <div
             className={cn(
@@ -1103,18 +1122,35 @@ export function AppHeader({
                     }
                     className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] text-foreground/70 shadow-none transition-colors duration-150 ease-out hover:bg-muted hover:text-foreground active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45"
                   >
-                    {categoriesRowExpanded ? (
-                      <ChevronLeft className="h-3.5 w-3.5" aria-hidden="true" />
-                    ) : (
-                      <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
-                    )}
+                    <ChevronRight
+                      className={cn(
+                        "h-3.5 w-3.5 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
+                        categoriesRowExpanded && "rotate-180"
+                      )}
+                      aria-hidden="true"
+                    />
                   </button>
 
-                  {categoriesRowExpanded ? (
-                    <div
-                      id="app-header-categories-inline"
-                      className="flex shrink-0 flex-nowrap items-center justify-center gap-1.5 sm:gap-2"
-                    >
+                  <div
+                    id="app-header-categories-inline"
+                    className={cn(
+                      "grid transition-[grid-template-columns,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
+                      categoriesRowExpanded
+                        ? "grid-cols-[1fr] opacity-100"
+                        : "pointer-events-none grid-cols-[0fr] opacity-0"
+                    )}
+                  >
+                    <div className="flex min-w-0 shrink-0 flex-nowrap items-center gap-1.5 overflow-hidden sm:gap-2">
+                      <button
+                        type="button"
+                        onClick={openCreateCategory}
+                        disabled={!editingProfileId}
+                        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-border bg-card text-foreground shadow-none transition-all hover:border-foreground/20 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45 disabled:cursor-not-allowed disabled:opacity-45"
+                        aria-label="Criar nova categoria"
+                        title="Criar nova categoria"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                      </button>
                       <CategoryBar
                         compact
                         className="w-max flex-nowrap justify-start sm:w-auto"
@@ -1122,7 +1158,7 @@ export function AppHeader({
                         highlightedCategoryEffect={highlightedCategoryEffect}
                       />
                     </div>
-                  ) : null}
+                  </div>
                 </div>
               </div>
             ) : (
@@ -1217,13 +1253,14 @@ export function AppHeader({
               </>
             )}
           </div>
+          </CollapsibleControlRegion>
 
           {guidedSelectionNotice && onDismissGuidedSelection ? (
             <div
               data-guided-selection-overlay
               className={cn(
                 "pointer-events-auto absolute inset-x-0 z-[50] flex w-full items-center justify-center overflow-hidden bg-background",
-                isMobileMode ? "inset-y-0" : "top-px -bottom-3"
+                isMobileMode ? "inset-y-0" : "-top-12 bottom-0"
               )}
             >
               <div
@@ -1264,6 +1301,7 @@ export function AppHeader({
           onEditProfile={openEditProfile}
           onCreateCategory={openCreateCategory}
           onEditCategory={openEditCategory}
+          categoryCreateOpen={categoryCreateOpen}
           highlightedProfileId={highlightedProfileId}
           highlightedCategoryId={highlightedCategoryId}
           highlightedCategoryEffect={highlightedCategoryEffect}
@@ -1294,9 +1332,7 @@ export function AppHeader({
           guidedCalendarSelection={guidedCalendarSelectionActive}
           onCalendarOpen={onGuidedCalendarOpen}
           onCalendarClose={onGuidedCalendarClose}
-          onCalendarImported={(pack) =>
-            onGuidedCalendarImported?.(pack.regionCode)
-          }
+          onCalendarImported={(pack) => onGuidedCalendarImported?.(pack)}
         />
       ) : (
         <CategoryManager

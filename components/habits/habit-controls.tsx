@@ -3,7 +3,6 @@
 import * as React from "react";
 import {
   ChevronDown,
-  ChevronLeft,
   ChevronRight,
   CircleCheck,
   Plus,
@@ -92,14 +91,24 @@ export function HabitControls({
   );
   const controlsId = React.useId();
 
-  const habitButtons = (
-    <div
+  const createButton = !creationDisabled ? (
+    <button
+      type="button"
+      data-onboarding-habit-create={guidedNotice?.target === "habit" ? "true" : undefined}
+      aria-label="Criar novo hábito"
+      title="Criar novo hábito"
       className={cn(
-        mobile
-          ? "grid w-full grid-cols-2 gap-1.5 min-[430px]:grid-cols-3"
-          : "flex min-h-8 w-max shrink-0 flex-nowrap items-center gap-1.5 sm:gap-2"
+        "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-border bg-card text-foreground shadow-none transition-all duration-[160ms] ease-[cubic-bezier(0.22,1,0.36,1)] hover:border-foreground/20 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45",
+        mobile && "h-10 w-full rounded-[8px]",
       )}
+      onClick={onRequestCreate}
     >
+      <Plus className="size-3.5" aria-hidden="true" />
+    </button>
+  ) : null;
+
+  const habitChipButtons = (
+    <>
       {habits.map((habit) => {
         const selected = mobile
           ? selectedHabit?.id === habit.id
@@ -163,22 +172,19 @@ export function HabitControls({
           </button>
         );
       })}
+    </>
+  );
 
-      {!creationDisabled ? (
-        <button
-          type="button"
-          data-onboarding-habit-create={guidedNotice?.target === "habit" ? "true" : undefined}
-          aria-label="Criar novo hábito"
-          title="Criar novo hábito"
-          className={cn(
-            "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-border bg-card text-foreground shadow-none transition-all duration-[160ms] ease-[cubic-bezier(0.22,1,0.36,1)] hover:border-foreground/20 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45",
-            mobile && "h-10 w-full rounded-[8px]",
-          )}
-          onClick={onRequestCreate}
-        >
-          <Plus className="size-3.5" aria-hidden="true" />
-        </button>
-      ) : null}
+  const habitButtons = (
+    <div
+      className={cn(
+        mobile
+          ? "grid w-full grid-cols-2 gap-1.5 min-[430px]:grid-cols-3"
+          : "flex min-h-8 w-max shrink-0 flex-nowrap items-center gap-1.5 sm:gap-2"
+      )}
+    >
+      {habitChipButtons}
+      {createButton}
     </div>
   );
 
@@ -249,14 +255,28 @@ export function HabitControls({
               title={expanded ? "Recolher hábitos" : "Mostrar hábitos"}
               onClick={() => setExpandedPersisted((current) => !current)}
             >
-              {expanded ? (
-                <ChevronLeft className="h-3.5 w-3.5" aria-hidden="true" />
-              ) : (
-                <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
-              )}
+              <ChevronRight
+                className={cn(
+                  "h-3.5 w-3.5 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
+                  expanded && "rotate-180"
+                )}
+                aria-hidden="true"
+              />
             </button>
 
-            {expanded ? habitButtons : null}
+            <div
+              className={cn(
+                "grid transition-[grid-template-columns,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
+                expanded
+                  ? "grid-cols-[1fr] opacity-100"
+                  : "pointer-events-none grid-cols-[0fr] opacity-0"
+              )}
+            >
+              <div className="flex min-h-8 min-w-0 shrink-0 flex-nowrap items-center gap-1.5 overflow-hidden sm:gap-2">
+                {createButton}
+                {habitChipButtons}
+              </div>
+            </div>
           </div>
         </div>
       )}

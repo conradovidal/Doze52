@@ -94,6 +94,8 @@ export function EventDialog({
   seedRange,
   anchorPoint,
   guidedIntent,
+  initialCategoryId,
+  initialRecurrenceType,
   onSubmit,
   onDelete,
   allowManagedMutation = false,
@@ -105,6 +107,8 @@ export function EventDialog({
   seedRange?: { startDate: string; endDate: string } | null;
   anchorPoint?: AnchorPoint;
   guidedIntent?: GuidedCreationIntent | null;
+  initialCategoryId?: string;
+  initialRecurrenceType?: RecurrenceType;
   onSubmit: (submission: EventDialogSubmission) => Promise<void> | void;
   onDelete?: () => Promise<void> | void;
   allowManagedMutation?: boolean;
@@ -250,7 +254,13 @@ export function EventDialog({
     )?.id;
     const nextCategoryId = initialEvent
       ? initialEvent.categoryId
-      : guidedDefaultCategoryId ?? availableCategories[0]?.id ?? "";
+      : (initialCategoryId &&
+          availableCategories.some((category) => category.id === initialCategoryId)
+          ? initialCategoryId
+          : undefined) ??
+        guidedDefaultCategoryId ??
+        availableCategories[0]?.id ??
+        "";
 
     setCategoryId(nextCategoryId);
 
@@ -259,7 +269,9 @@ export function EventDialog({
     setStartDate(nextStartDate);
     setEndDate(nextEndDate);
     setNotes(initialEvent?.notes ?? "");
-    setRecurrenceType(initialEvent?.recurrenceType ?? "none");
+    const nextRecurrenceType =
+      initialEvent?.recurrenceType ?? (!initialEvent ? initialRecurrenceType : undefined) ?? "none";
+    setRecurrenceType(nextRecurrenceType);
     setRecurrenceUntil(initialEvent?.recurrenceUntil ?? "");
     setAdvancedOpen(
       Boolean(initialEvent && (initialEvent.notes || initialEvent.recurrenceType))
@@ -271,6 +283,8 @@ export function EventDialog({
     categories,
     initializationSession,
     initialEvent,
+    initialCategoryId,
+    initialRecurrenceType,
     initialProfileFromEvent,
     guidedIntent,
     profileOptions,
