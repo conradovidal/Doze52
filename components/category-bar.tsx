@@ -53,7 +53,7 @@ const CHIP_PLACEHOLDER_CLASS =
   "pointer-events-none absolute inset-[3px] rounded-[8px] border border-dashed border-border bg-muted";
 const CHIP_OVERLAY_CLASS =
   "border-border bg-card shadow-[0_18px_34px_-24px_rgba(15,23,42,0.36)]";
-const CREATE_ACTION_CLASS = `inline-flex h-8 w-8 items-center justify-center rounded-[10px] border border-border bg-card text-foreground shadow-none transition-all ${MOTION_CLASS} hover:border-foreground/20 hover:bg-muted`;
+const CREATE_ACTION_CLASS = `inline-flex h-8 w-8 items-center justify-center rounded-[10px] border border-border bg-card text-foreground shadow-none transition-all ${MOTION_CLASS} hover:border-foreground/20 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45`;
 const MOBILE_CHIP_LABEL_STYLE = {
   display: "-webkit-box",
   WebkitBoxOrient: "vertical",
@@ -403,7 +403,7 @@ export function CategoryBar({
       ? "grid w-full grid-cols-2 gap-1.5 min-[430px]:grid-cols-3"
       : compact
         ? "w-full min-h-8 justify-center"
-        : "mb-2 min-h-8 justify-center",
+        : "mb-2 min-h-8 justify-start",
     mobileDense ? "" : "flex flex-wrap items-center gap-1.5 sm:gap-2",
     className
   );

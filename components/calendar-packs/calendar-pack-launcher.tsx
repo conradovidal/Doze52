@@ -491,19 +491,11 @@ export function CalendarPackLauncher({
                   <ArrowLeft className="size-4" />
                 </Button>
               ) : null}
-              <DialogTitle>
-                {guidedVariantGroupId
-                  ? "Adicione os feriados do seu estado"
-                  : "Calendários"}
-              </DialogTitle>
+              <DialogTitle>Calendários</DialogTitle>
             </div>
             <DialogDescription>
               {guidedVariantGroupId
-                ? `Escolha sua UF para incluir este calendário no contexto ${
-                    activeProfileId
-                      ? profileNameById.get(activeProfileId) ?? "criado"
-                      : "criado"
-                  }.`
+                ? "Feriados do seu estado é uma boa sugestão para começar, mas qualquer calendário serve."
                 : "Adicione calendários prontos ao seu ano."}
             </DialogDescription>
           </DialogHeader>

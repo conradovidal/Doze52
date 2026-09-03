@@ -112,7 +112,10 @@ export function DayCell({
   const completedNames = completedHabits.map((habit) => habit.name).join(", ");
   const registeredHabitCount =
     habitPresentation?.allHabits?.length ?? habitPresentation?.habits.length ?? 0;
-  const usesHabitPicker = registeredHabitCount > 1 && Boolean(habitPresentation?.onOpenPicker);
+  const usesHabitPicker =
+    !habitPresentation?.selectedHabit &&
+    registeredHabitCount > 1 &&
+    Boolean(habitPresentation?.onOpenPicker);
   const isRetrospectiveDate = Boolean(
     habitPresentation?.retrospectiveDates?.has(dateIso)
   );

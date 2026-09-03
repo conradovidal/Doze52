@@ -49,6 +49,7 @@ export function HabitsPrototype({
   onYearChange,
   guidedNotice = null,
   showcase = null,
+  showcaseDisplay = null,
   onDismissGuidedNotice,
   onGuidedNoticeAction,
   onHabitCreated,
@@ -68,6 +69,7 @@ export function HabitsPrototype({
   headerMinimized?: boolean;
   guidedNotice?: import("@/components/onboarding/guided-toolbar-notice").GuidedToolbarNotice | null;
   showcase?: OnboardingHabitShowcase | null;
+  showcaseDisplay?: OnboardingHabitShowcase | null;
   onDismissGuidedNotice?: () => void;
   onGuidedNoticeAction?: (input?: { hasExistingHabit: boolean }) => void;
   onHabitCreated?: () => void;
@@ -118,11 +120,41 @@ export function HabitsPrototype({
     [habits]
   );
   const showcaseActive = Boolean(showcase);
-  const presentedHabits = showcase?.habits ?? activeHabits;
-  const presentedCheckIns = showcase?.checkIns ?? checkIns;
-  const presentedVisibleHabitIds = showcaseActive
-    ? showcaseVisibleHabitIds
-    : visibleHabitIds;
+  // A partir de habit_instruction a vitrine (showcaseDisplay) some do controle
+  // de trava, mas continua na tela ao lado do hábito real que a pessoa cria —
+  // mesma lógica de "compor, não substituir" usada no Anual com o exemplo.
+  const displayShowcase = showcase ?? showcaseDisplay;
+  const showcaseHabitIds = React.useMemo(
+    () => new Set((displayShowcase?.habits ?? []).map((habit) => habit.id)),
+    [displayShowcase]
+  );
+  const presentedHabits = React.useMemo(
+    () =>
+      showcaseActive
+        ? (showcase?.habits ?? activeHabits)
+        : displayShowcase
+          ? [...displayShowcase.habits, ...activeHabits]
+          : activeHabits,
+    [activeHabits, displayShowcase, showcase, showcaseActive]
+  );
+  const presentedCheckIns = React.useMemo(
+    () =>
+      showcaseActive
+        ? (showcase?.checkIns ?? checkIns)
+        : displayShowcase
+          ? { ...displayShowcase.checkIns, ...checkIns }
+          : checkIns,
+    [checkIns, displayShowcase, showcase, showcaseActive]
+  );
+  const presentedVisibleHabitIds = React.useMemo(
+    () =>
+      showcaseActive
+        ? showcaseVisibleHabitIds
+        : displayShowcase
+          ? [...displayShowcase.visibleHabitIds, ...visibleHabitIds]
+          : visibleHabitIds,
+    [displayShowcase, showcaseActive, showcaseVisibleHabitIds, visibleHabitIds]
+  );
   const presentedVisibleHabitIdSet = React.useMemo(
     () => new Set(presentedVisibleHabitIds),
     [presentedVisibleHabitIds]
@@ -149,10 +181,15 @@ export function HabitsPrototype({
     () => getDesktopVisibleHabits(presentedHabits),
     [presentedHabits]
   );
-  const desktopSelectedHabit = React.useMemo(
-    () => (presentedHabits.length === 1 ? presentedHabits[0] ?? null : null),
-    [presentedHabits]
-  );
+  const desktopSelectedHabit = React.useMemo(() => {
+    // Durante o tour, a vitrine soma hábitos decorativos aos reais na tela —
+    // mas só o hábito real pode ser marcado, e no plano Free só existe um.
+    // Marcar direto nele evita pedir pra "selecionar" entre os que aparecem.
+    if (!showcaseActive && displayShowcase && activeHabits.length === 1) {
+      return activeHabits[0];
+    }
+    return presentedHabits.length === 1 ? presentedHabits[0] ?? null : null;
+  }, [activeHabits, displayShowcase, presentedHabits, showcaseActive]);
   const retrospectiveDates = React.useMemo(
     () =>
       guidedNotice?.target === "habit-created"
@@ -164,6 +201,10 @@ export function HabitsPrototype({
   const reachedHabitLimit = activeHabits.length >= limits.maxHabits;
   const creationDisabled = showcaseActive ||
     creationUnavailable || (isPro && reachedHabitLimit);
+  // Enquanto só a vitrine está visível (nenhum hábito real ainda), os dias
+  // ficam bloqueados: não há hábito nenhum pra marcar, só o "+" cria um.
+  const dayInteractionBlocked =
+    showcaseActive || (Boolean(displayShowcase) && activeHabits.length === 0);
 
   React.useLayoutEffect(() => {
     const region = scrollRegionRef.current;
@@ -315,13 +356,12 @@ export function HabitsPrototype({
   };
 
   const toggleHabitDay = (habit: Habit | null, dateIso: string) => {
-    if (!habit || showcaseActive) return;
+    if (!habit || showcaseActive || showcaseHabitIds.has(habit.id)) return;
     toggleHabitCheckInInStore(habit.id, dateIso);
     onHabitCheckIn?.();
   };
 
   const toggleHabitVisibility = (habitId: string) => {
-    if (!showcaseActive && activeHabits.length === 1) return;
     if (showcaseActive) {
       setShowcaseVisibleHabitIds((current) =>
         current.includes(habitId)
@@ -330,6 +370,8 @@ export function HabitsPrototype({
       );
       return;
     }
+    if (showcaseHabitIds.has(habitId)) return;
+    if (activeHabits.length === 1) return;
     toggleHabitVisibilityInStore(habitId);
   };
 
@@ -365,12 +407,12 @@ export function HabitsPrototype({
             toggleHabitDay(desktopSelectedHabit, dateIso)
           }
           onOpenDayPicker={(dateIso, anchor) => {
-            if (!showcaseActive) setDayPicker({ dateIso, anchor });
+            if (!dayInteractionBlocked) setDayPicker({ dateIso, anchor });
           }}
           onRequestCreate={requestCreateHabit}
           isEditing={showcaseActive ? false : isEditing}
           headerMinimized={headerMinimized}
-          readOnly={showcaseActive}
+          readOnly={dayInteractionBlocked}
           onEditHabit={requestEditHabit}
           onReorderHabits={reorderHabits}
           onYearChange={onYearChange}

@@ -27,7 +27,10 @@ export function GuidedCalendarNotice({
       <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/12 text-primary">
         <CalendarDays className="size-5" aria-hidden="true" />
       </div>
-      <div className="min-w-0 flex-1">
+      <div
+        key={`${notice.title}:${notice.instruction}`}
+        className="min-w-0 flex-1 animate-in fade-in slide-in-from-bottom-1 duration-300 motion-reduce:animate-none"
+      >
         <p className="max-w-[30rem] text-balance text-base font-semibold leading-5.5 sm:text-lg">
           {notice.title}
         </p>

@@ -37,6 +37,7 @@ import {
   isOnboardingProfilesSnapshot,
   isOnboardingCategoriesSnapshot,
   isOnboardingPersonalDemoSnapshot,
+  getOnboardingClosingVisibleCategoryIds,
   ONBOARDING_CATEGORY_IDS,
   ONBOARDING_PROFILE_IDS,
   ONBOARDING_PERSONAL_DEMO_GROUP_ID,
@@ -46,7 +47,12 @@ import {
 } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { useCalendarCatalog } from "@/lib/calendar-catalog/runtime";
-import { reconcileInstalledCalendarPacks } from "@/lib/calendar-packs/import";
+import {
+  getCalendarPackGroupId,
+  reconcileInstalledCalendarPacks,
+  removeCalendarPackByCategory,
+} from "@/lib/calendar-packs/import";
+import type { CalendarPack } from "@/lib/calendar-packs/types";
 import {
   loadRemoteData,
   saveSnapshot,
@@ -58,10 +64,12 @@ import {
   GUIDED_ONBOARDING_CHANGE_EVENT,
   PRODUCT_ONBOARDING_RESET_EVENT,
   dispatchGuidedOnboarding,
+  getGuidedOnboardingProgress,
   hasAuthorCalendarEvents,
   getGuidedCategoryRevealRemainingMs,
   readGuidedOnboardingState,
   readProductOnboardingState,
+  resetAllProductOnboarding,
   shouldPresentOnboardingHabitShowcase,
   shouldShowGuidedOnboarding,
   type GuidedOnboardingAction,
@@ -351,6 +359,9 @@ export default function HomePage() {
   const loadOnboardingPersonalDemo = useStore(
     (s) => s.loadOnboardingPersonalDemo
   );
+  const unlockOnboardingPersonalDemo = useStore(
+    (s) => s.unlockOnboardingPersonalDemo
+  );
   const configureOnboardingContext = useStore(
     (s) => s.configureOnboardingContext
   );
@@ -370,6 +381,11 @@ export default function HomePage() {
   );
 
   const { session, loading: authLoading } = useAuth();
+
+  React.useEffect(() => {
+    if (!isHabitsPrototypeEnabled) return;
+    void import("@/components/habits/habits-prototype");
+  }, []);
 
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [authDialogOpen, setAuthDialogOpen] = React.useState(false);
@@ -418,6 +434,11 @@ export default function HomePage() {
     React.useState(0);
   const [scrollToTodayRequestKey, setScrollToTodayRequestKey] =
     React.useState(0);
+  const [expandCategoriesRequestKey, setExpandCategoriesRequestKey] =
+    React.useState(0);
+  const requestCategoriesRowExpanded = React.useCallback(() => {
+    setExpandCategoriesRequestKey((key) => key + 1);
+  }, []);
   const [demoInviteSuppressed, setDemoInviteSuppressed] = React.useState(false);
   const [guidedDraft, setGuidedDraft] =
     React.useState<GuidedCalendarDraft | null>(null);
@@ -567,18 +588,20 @@ export default function HomePage() {
     guidedOnboardingEligible && isMobileCalendarUi === false
   );
 
-  const onboardingHabitShowcase = React.useMemo(
-    () =>
-      // Only ever show the demo/example habits while the guided tour is
-      // actually eligible to run — otherwise an established account that
-      // merely has a leftover "context_selection" step in local storage
-      // would have its real Hábitos view replaced by undeletable demo data.
-      showGuidedOnboarding &&
+  const habitShowcaseDataEligible = Boolean(
+    // Only ever show the demo/example habits while the guided tour is
+    // actually eligible to run — otherwise an established account that
+    // merely has a leftover "context_selection" step in local storage
+    // would have its real Hábitos view replaced by undeletable demo data.
+    showGuidedOnboarding &&
       guidedOnboarding &&
-      shouldPresentOnboardingHabitShowcase(guidedOnboarding.step) &&
       activeDestination === "habits" &&
       isMobileCalendarUi === false &&
       todayIso
+  );
+  const guidedHabitShowcaseSource = React.useMemo(
+    () =>
+      habitShowcaseDataEligible && todayIso
         ? buildOnboardingHabitShowcase({
             year,
             todayIso,
@@ -586,17 +609,25 @@ export default function HomePage() {
             categories,
           })
         : null,
-    [
-      categories,
-      activeDestination,
-      guidedOnboarding,
-      isMobileCalendarUi,
-      renderEvents,
-      showGuidedOnboarding,
-      todayIso,
-      year,
-    ]
+    [categories, habitShowcaseDataEligible, renderEvents, todayIso, year]
   );
+  // Passo em que a vitrine ainda é só demonstrativa (nada é criado de verdade
+  // ainda) — trava toda a interação, como hoje.
+  const onboardingHabitShowcase =
+    guidedHabitShowcaseSource &&
+    guidedOnboarding &&
+    shouldPresentOnboardingHabitShowcase(guidedOnboarding.step)
+      ? guidedHabitShowcaseSource
+      : null;
+  // A partir do passo de criar o primeiro hábito, a vitrine continua visível
+  // (o hábito real nasce ao lado dela), mas deixa de travar a interação.
+  const onboardingHabitShowcaseDisplay =
+    guidedHabitShowcaseSource &&
+    guidedOnboarding &&
+    (guidedOnboarding.step === "habit_instruction" ||
+      guidedOnboarding.step === "habit_created_confirmation")
+      ? guidedHabitShowcaseSource
+      : null;
 
   const centerTodayInDesktopCalendar = React.useCallback(() => {
     if (isMobileCalendarUi !== false || !todayIso) return;
@@ -1418,6 +1449,22 @@ export default function HomePage() {
     if (!inlineEditModeActive) setWorkspaceEditMode("calendar");
   }, [guidedOnboarding?.step, inlineEditModeActive]);
 
+  React.useEffect(() => {
+    // No mobile o guia começa em Hábitos de propósito (ver
+    // resolveInitialProductDestination) — só o desktop precisa ser
+    // redirecionado para o Anual, já que é lá que os primeiros passos
+    // (escolher contexto, criar categoria) acontecem.
+    if (isMobileCalendarUi !== false) return;
+    if (guidedOnboarding?.step !== "context_selection") return;
+    if (activeDestination === "annual") return;
+    setActiveDestination("annual");
+    window.history.replaceState(
+      window.history.state,
+      "",
+      buildProductDestinationUrl(window.location.href, "annual")
+    );
+  }, [activeDestination, guidedOnboarding?.step, isMobileCalendarUi]);
+
   const recordDemoInteraction = React.useCallback(
     (key: string) => {
       if (readGuidedOnboardingState().step !== "demo_exploration") return;
@@ -1493,7 +1540,10 @@ export default function HomePage() {
 
   const handleConfigureGuidedContext = React.useCallback(
     (context: OnboardingContext) => {
-      const configured = configureOnboardingContext({ context });
+      const configured = configureOnboardingContext({
+        context,
+        year: initialYear,
+      });
       if (!configured) {
         notify({
           tone: "error",
@@ -1564,6 +1614,93 @@ export default function HomePage() {
       durationMs: 3200,
     });
   }, [notify]);
+
+  const finalizeGuidedOnboarding = React.useCallback(
+    (next: GuidedOnboardingState) => {
+      if (next.step !== "completed") return;
+      const context = next.context ?? "personal";
+      const keepCategoryIds = new Set(
+        getOnboardingClosingVisibleCategoryIds(context)
+      );
+      const current = useStore.getState();
+      const categoriesToRemove = current.categories.filter(
+        (category) => !keepCategoryIds.has(category.id)
+      );
+      const packCategoriesToRemove = categoriesToRemove.filter(
+        (category) =>
+          category.calendarPackGroupId &&
+          !isOnboardingPersonalDemoGroup(category.calendarPackGroupId)
+      );
+      const ordinaryCategoryIdsToRemove = new Set(
+        categoriesToRemove
+          .filter(
+            (category) =>
+              !category.calendarPackGroupId ||
+              isOnboardingPersonalDemoGroup(category.calendarPackGroupId)
+          )
+          .map((category) => category.id)
+      );
+      // Dentro das categorias mantidas, só o que a pessoa criou com a própria
+      // mão sobrevive: os eventos que já vinham prontos no ano de exemplo
+      // (ex.: Eventos) somem, deixando a categoria pronta para ela começar do
+      // zero. Os dois aniversários que ela criou não carregam essa marca,
+      // então não são afetados.
+      const categories = current.categories.filter(
+        (category) => !ordinaryCategoryIdsToRemove.has(category.id)
+      );
+      const events = current.events.filter((event) => {
+        if (ordinaryCategoryIdsToRemove.has(event.categoryId)) return false;
+        if (
+          keepCategoryIds.has(event.categoryId) &&
+          isOnboardingPersonalDemoGroup(event.calendarPackGroupId)
+        ) {
+          return false;
+        }
+        return true;
+      });
+      let snapshot = { profiles: current.profiles, categories, events };
+      for (const category of packCategoriesToRemove) {
+        snapshot = removeCalendarPackByCategory(
+          snapshot,
+          calendarPacks,
+          category.id
+        ).snapshot;
+      }
+      replaceAllData(snapshot);
+      unlockOnboardingPersonalDemo();
+      announceGuidedCompletion();
+      setActiveDestination("annual");
+      resetCalendarFocusOnYearChange();
+      setHeaderMinimized(false);
+      requestCategoriesRowExpanded();
+      window.history.replaceState(
+        window.history.state,
+        "",
+        buildProductDestinationUrl(window.location.href, "annual")
+      );
+    },
+    [
+      announceGuidedCompletion,
+      calendarPacks,
+      replaceAllData,
+      requestCategoriesRowExpanded,
+      resetCalendarFocusOnYearChange,
+      setHeaderMinimized,
+      unlockOnboardingPersonalDemo,
+    ]
+  );
+
+  const handleRestartOnboardingForTesting = React.useCallback(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.removeItem("yiv-store");
+      window.localStorage.removeItem("doze52:habits-store:v1");
+    } catch {
+      // Recarrega mesmo assim; sem storage disponível não há o que limpar.
+    }
+    resetAllProductOnboarding();
+    window.location.reload();
+  }, []);
 
   const dismissGuidedOnboarding = React.useCallback(() => {
     setOnboardingExitOpen(true);
@@ -1671,6 +1808,14 @@ export default function HomePage() {
       trackPostExitCreation(`event:${eventId}`);
     }
 
+    const guidedStep = readGuidedOnboardingState().step;
+    if (guidedStep === "date_details" || guidedStep === "period_details") {
+      updateGuidedOnboarding({
+        type: guidedStep === "period_details" ? "period_saved" : "date_saved",
+      });
+      setGuidedDraft(null);
+    }
+
     notify({
       tone: "success",
       title: "Evento criado",
@@ -1750,6 +1895,13 @@ export default function HomePage() {
           if (currentStep === "date_instruction") {
             updateGuidedOnboarding({ type: "select_date" });
           }
+          setSeedRange({
+            startDate: nextDraft.startDate,
+            endDate: nextDraft.startDate,
+          });
+          setEditingId(null);
+          setDialogAnchorPoint(anchorPoint);
+          setDialogOpen(true);
           return null;
         }
         if (
@@ -1769,6 +1921,10 @@ export default function HomePage() {
           if (currentStep === "period_instruction") {
             updateGuidedOnboarding({ type: "select_period" });
           }
+          setSeedRange(nextDraft);
+          setEditingId(null);
+          setDialogAnchorPoint(anchorPoint);
+          setDialogOpen(true);
           return null;
         }
         setSeedRange(nextDraft);
@@ -2097,9 +2253,11 @@ export default function HomePage() {
             state: guidedOnboarding,
             isMobile: isMobileCalendarUi === true,
             mobileRangeStart: mobileGuidedRangeStart,
+            draft: guidedDraft,
           })
         : null,
     [
+      guidedDraft,
       guidedOnboarding,
       isMobileCalendarUi,
       mobileGuidedRangeStart,
@@ -2109,17 +2267,21 @@ export default function HomePage() {
 
   const guidedToolbarNotice = React.useMemo<GuidedToolbarNotice | null>(() => {
     if (!showGuidedOnboarding || !guidedOnboarding) return null;
-    const totalSteps =
-      isHabitsPrototypeEnabled && isMobileCalendarUi !== true ? 8 : 7;
+    const showHabitSteps = isHabitsPrototypeEnabled && isMobileCalendarUi !== true;
+    const { current, total } = getGuidedOnboardingProgress(
+      guidedOnboarding.step,
+      { showHabitSteps }
+    );
+    const stepLabel = `Passo ${current} de ${total}`;
     if (guidedOnboarding.step === "edit_instruction") {
       return {
         target: "edit",
-        title: "Veja como editar contextos e categorias.",
+        title: "Organize contextos e categorias.",
         instruction:
           isMobileCalendarUi === true
             ? "Toque no lápis para abrir o modo de edição."
             : "Clique em Organizar para abrir o modo de edição.",
-        stepLabel: `Passo 4 de ${totalSteps}`,
+        stepLabel,
       };
     }
     if (guidedOnboarding.step === "edit_preview") {
@@ -2130,16 +2292,15 @@ export default function HomePage() {
           isMobileCalendarUi === true
             ? "Aqui você poderá ajustar nomes, cores e organização. Toque em Finalizar para continuar."
             : "Aqui você poderá ajustar nomes, cores e organização. Clique em Finalizar para continuar.",
-        stepLabel: `Passo 4 de ${totalSteps}`,
+        stepLabel,
       };
     }
     if (guidedOnboarding.step === "calendar_instruction") {
       return {
         target: "calendars",
         title: "Complemente seu ano com calendários prontos.",
-        instruction:
-          "Use o + para abrir as opções e adicione os feriados do seu estado.",
-        stepLabel: `Passo 5 de ${totalSteps}`,
+        instruction: "Use o + para abrir as opções e escolher um calendário.",
+        stepLabel,
       };
     }
     if (guidedOnboarding.step === "year_instruction") {
@@ -2149,7 +2310,7 @@ export default function HomePage() {
         instruction:
           "Depois do guia, use estas setas para consultar o ano anterior ou o próximo.",
         actionLabel: "Continuar",
-        stepLabel: `Passo 6 de ${totalSteps}`,
+        stepLabel,
       };
     }
     if (
@@ -2160,9 +2321,9 @@ export default function HomePage() {
         target: "period-navigation",
         title: "Navegue pelo seu ano.",
         instruction:
-          "Teste navegar pelos trimestres e pelos meses clicando nos rótulos Q1–Q4 e JAN–DEZ.",
+          "Clique nos rótulos Q1–Q4 e JAN–DEZ para ir direto a trimestres e meses.",
         actionLabel: "Continuar",
-        stepLabel: "Passo 7 de 8",
+        stepLabel,
       };
     }
     if (
@@ -2173,20 +2334,7 @@ export default function HomePage() {
         target: "habit-surface",
         title: "Conheça seus hábitos.",
         instruction: "Clique em Hábitos no topo para mudar de tela.",
-        stepLabel: "Passo 8 de 8",
-      };
-    }
-    if (
-      guidedOnboarding.step === "habit_showcase_instruction" &&
-      isMobileCalendarUi !== true
-    ) {
-      return {
-        target: "habit-showcase",
-        title: "Hábitos também contam a história do seu ano.",
-        instruction:
-          "Veja como viagens, férias e noites especiais mudam o ritmo de quatro hábitos ao longo do tempo.",
-        actionLabel: "Criar meu hábito",
-        stepLabel: "Passo 8 de 8",
+        stepLabel,
       };
     }
     if (
@@ -2197,8 +2345,8 @@ export default function HomePage() {
         target: "habit",
         title: "Crie seu primeiro hábito.",
         instruction:
-          "Abra o +, dê um nome ao hábito e escolha uma cor para começar a acompanhar.",
-        stepLabel: "Passo 8 de 8",
+          "Viagens, férias e noites especiais já mudam o ritmo de Exercício e Ler 20 minutos. Abra o + e crie o seu.",
+        stepLabel,
       };
     }
     if (
@@ -2209,9 +2357,9 @@ export default function HomePage() {
         target: "habit-created",
         title: "Seu primeiro hábito está pronto.",
         instruction:
-          "Lembre como foram as duas últimas semanas e marque os dias que conseguir. Você pode continuar por aqui depois do guia.",
+          "Antes de finalizar, registre como foram as duas últimas semanas — marque os dias que conseguir. Não precisa ser exato.",
         actionLabel: "Finalizar guia",
-        stepLabel: "Passo 8 de 8",
+        stepLabel,
       };
     }
     if (guidedOnboarding.step === "theme_instruction") {
@@ -2226,7 +2374,7 @@ export default function HomePage() {
           guidedOnboarding.themeConfirmedAt
             ? "Finalizar guia"
             : undefined,
-        stepLabel: `Passo ${totalSteps} de ${totalSteps}`,
+        stepLabel,
       };
     }
     return null;
@@ -2254,7 +2402,7 @@ export default function HomePage() {
         showPeriodNavigation:
           isHabitsPrototypeEnabled && isMobileCalendarUi !== true,
       });
-      if (next.step === "completed") announceGuidedCompletion();
+      finalizeGuidedOnboarding(next);
       return;
     }
     if (
@@ -2262,11 +2410,10 @@ export default function HomePage() {
       current.step === "period_navigation_instruction"
     ) {
       resetCalendarFocusOnYearChange();
-      const next = updateGuidedOnboarding({
+      updateGuidedOnboarding({
         type: "continue_from_period_navigation",
         showHabit: true,
       });
-      if (next.step === "completed") announceGuidedCompletion();
       return;
     }
     if (target === "theme" && current.step === "theme_instruction") {
@@ -2274,10 +2421,10 @@ export default function HomePage() {
         type: "confirm_theme",
         complete: true,
       });
-      if (next.step === "completed") announceGuidedCompletion();
+      finalizeGuidedOnboarding(next);
     }
   }, [
-    announceGuidedCompletion,
+    finalizeGuidedOnboarding,
     isMobileCalendarUi,
     resetCalendarFocusOnYearChange,
     updateGuidedOnboarding,
@@ -2295,14 +2442,23 @@ export default function HomePage() {
     }
   }, [updateGuidedOnboarding]);
 
-  const handleGuidedCalendarImported = React.useCallback((uf?: string) => {
-    if (!uf) return;
-    const next = updateGuidedOnboarding({ type: "calendar_added", uf });
-    if (next.step === "year_instruction" && uf) {
-      setWorkspaceEditMode(null);
-      void trackOnboardingRegion(uf);
-    }
-  }, [updateGuidedOnboarding]);
+  const handleGuidedCalendarImported = React.useCallback(
+    (pack?: CalendarPack) => {
+      if (!pack) return;
+      const uf = pack.regionCode;
+      const packGroupId = getCalendarPackGroupId(pack);
+      const next = updateGuidedOnboarding({
+        type: "calendar_added",
+        uf,
+        packGroupId,
+      });
+      if (next.step === "year_instruction") {
+        setWorkspaceEditMode(null);
+        if (uf) void trackOnboardingRegion(uf);
+      }
+    },
+    [updateGuidedOnboarding]
+  );
 
   React.useEffect(() => {
     if (
@@ -2318,7 +2474,7 @@ export default function HomePage() {
     const pack = calendarPacks.find(
       (candidate) => candidate.id === holidayCategory.calendarPackVariantId
     );
-    handleGuidedCalendarImported(pack?.regionCode);
+    handleGuidedCalendarImported(pack);
   }, [calendarPacks, categories, guidedOnboarding?.step, handleGuidedCalendarImported]);
 
   const handleYearChange = React.useCallback(
@@ -2348,7 +2504,10 @@ export default function HomePage() {
       ) {
         setYear(initialYear);
         resetCalendarFocusOnYearChange();
-        updateGuidedOnboarding({ type: "open_habits_surface" });
+        updateGuidedOnboarding({
+          type: "open_habits_surface",
+          hasExistingHabit: hasExistingHabits,
+        });
       }
       if (activeDestination === "annual" && isMobileCalendarUi === false) {
         desktopCalendarScrollTopRef.current =
@@ -2364,6 +2523,7 @@ export default function HomePage() {
     },
     [
       activeDestination,
+      hasExistingHabits,
       initialYear,
       isMobileCalendarUi,
       resetCalendarFocusOnYearChange,
@@ -2534,6 +2694,7 @@ export default function HomePage() {
           controlledInlineEditMode={inlineEditModeActive}
           onFilterLayoutChange={requestDesktopTodayCenter}
           exitInlineEditRequestKey={exitInlineEditRequestKey}
+          expandCategoriesRequestKey={expandCategoriesRequestKey}
           onYearLabelClick={
             isMobileCalendarUi === true
               ? () => setScrollToTodayRequestKey((key) => key + 1)
@@ -2587,6 +2748,7 @@ export default function HomePage() {
               : null
           }
           showcase={onboardingHabitShowcase}
+          showcaseDisplay={onboardingHabitShowcaseDisplay}
           onDismissGuidedNotice={dismissGuidedOnboarding}
           onHabitCreated={() =>
             updateGuidedOnboarding({ type: "habit_saved" })
@@ -2618,7 +2780,7 @@ export default function HomePage() {
             const next = updateGuidedOnboarding({
               type: "finish_habit_onboarding",
             });
-            if (next.step === "completed") announceGuidedCompletion();
+            finalizeGuidedOnboarding(next);
           }}
         />
       ) : isMobileCalendarUi === true ? (
@@ -2717,6 +2879,8 @@ export default function HomePage() {
         <GuidedOnboardingPanel
           state={guidedOnboarding}
           draft={guidedDraft}
+          showHabitSteps={isHabitsPrototypeEnabled && isMobileCalendarUi !== true}
+          isMobile={isMobileCalendarUi === true}
           onClose={dismissGuidedOnboarding}
           onConfigureContext={handleConfigureGuidedContext}
           onChooseCategory={handleChooseGuidedCategory}
@@ -2834,6 +2998,19 @@ export default function HomePage() {
         seedRange={seedRange}
         anchorPoint={dialogAnchorPoint}
         guidedIntent={null}
+        initialCategoryId={
+          guidedOnboarding?.step === "date_details"
+            ? guidedOnboarding.dateCategoryId
+            : guidedOnboarding?.step === "period_details"
+              ? guidedOnboarding.periodCategoryId
+              : undefined
+        }
+        initialRecurrenceType={
+          guidedOnboarding?.step === "date_details" &&
+          guidedOnboarding.dateCategoryId === ONBOARDING_CATEGORY_IDS.birthday
+            ? "yearly"
+            : undefined
+        }
         onSubmit={handleSubmit}
         onDelete={
           editingId &&
@@ -2860,6 +3037,16 @@ export default function HomePage() {
         }}
         anchorPoint={authDialogAnchorPoint}
       />
+
+      {isDetailedSyncDiagnosticsEnabled ? (
+        <button
+          type="button"
+          onClick={handleRestartOnboardingForTesting}
+          className="fixed bottom-3 left-3 z-[60] rounded-full border border-border/70 bg-background/90 px-3 py-1.5 text-[11px] font-medium text-muted-foreground shadow-sm backdrop-blur-sm transition-colors hover:text-foreground"
+        >
+          Reiniciar onboarding
+        </button>
+      ) : null}
     </main>
   );
 }

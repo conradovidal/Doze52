@@ -64,6 +64,7 @@ export type GuidedOnboardingState = {
   appearanceOpenedAt?: string;
   holidayUf?: string;
   holidayCalendarAddedAt?: string;
+  addedCalendarPackGroupId?: string;
   postOnboardingEventsCreated?: number;
   postOnboardingCategoriesCreated?: number;
   accountNudgeShownAt?: string;
@@ -90,11 +91,15 @@ export type GuidedOnboardingAction =
   | { type: "finish_edit_preview" }
   | { type: "open_calendar" }
   | { type: "close_calendar" }
-  | { type: "calendar_added"; uf?: string; at?: string }
+  | { type: "calendar_added"; uf?: string; packGroupId?: string; at?: string }
   | { type: "continue_from_year"; showPeriodNavigation?: boolean; at?: string }
   | { type: "continue_from_period_navigation"; showHabit?: boolean; at?: string }
   | { type: "interact_with_period_navigation"; at?: string }
-  | { type: "open_habits_surface"; at?: string }
+  | {
+      type: "open_habits_surface";
+      hasExistingHabit?: boolean;
+      at?: string;
+    }
   | { type: "continue_from_habit_showcase"; hasExistingHabit?: boolean; at?: string }
   | { type: "habit_saved"; at?: string }
   | { type: "interact_with_habit_retrospective"; at?: string }
@@ -502,6 +507,19 @@ export const migrateGuidedOnboardingState = (
   return initialGuidedState();
 };
 
+const buildCompletedState = (
+  state: GuidedOnboardingState,
+  at?: string
+): GuidedOnboardingState => ({
+  ...state,
+  step: "completed",
+  postOnboardingEventsCreated: 0,
+  postOnboardingCategoriesCreated: 0,
+  accountNudgeShownAt: undefined,
+  completedAt: at ?? nowIso(),
+  dismissedAt: undefined,
+});
+
 export const reduceGuidedOnboardingState = (
   state: GuidedOnboardingState,
   action: GuidedOnboardingAction
@@ -553,10 +571,7 @@ export const reduceGuidedOnboardingState = (
       const nextDateCount = (state.dateItemsCreated ?? 0) + 1;
       return {
         ...state,
-        step:
-          nextDateCount >= 2
-            ? "period_category_selection"
-            : "date_instruction",
+        step: nextDateCount >= 2 ? "edit_instruction" : "date_instruction",
         dateItemsCreated: nextDateCount,
         firstDateCreatedAt: state.firstDateCreatedAt ?? action.at ?? nowIso(),
       };
@@ -614,6 +629,8 @@ export const reduceGuidedOnboardingState = (
             ...state,
             step: "year_instruction",
             holidayUf: action.uf ?? state.holidayUf,
+            addedCalendarPackGroupId:
+              action.packGroupId ?? state.addedCalendarPackGroupId,
             holidayCalendarAddedAt:
               state.holidayCalendarAddedAt ?? action.at ?? nowIso(),
           }
@@ -626,15 +643,7 @@ export const reduceGuidedOnboardingState = (
       if (!state.themeConfirmedAt) {
         return { ...state, step: "theme_instruction" };
       }
-      return {
-        ...state,
-        step: "completed",
-        postOnboardingEventsCreated: 0,
-        postOnboardingCategoriesCreated: 0,
-        accountNudgeShownAt: undefined,
-        completedAt: action.at ?? nowIso(),
-        dismissedAt: undefined,
-      };
+      return buildCompletedState(state, action.at);
     case "continue_from_period_navigation":
       if (state.step !== "period_navigation_instruction") return state;
       return {
@@ -646,8 +655,21 @@ export const reduceGuidedOnboardingState = (
         ? { ...state, periodNavigationInteractedAt: action.at ?? nowIso() }
         : state;
     case "open_habits_surface":
+      // Pula direto para a criação: a vitrine de hábitos fica visível junto
+      // com o "+", sem um passo intermediário só de olhar antes de poder agir
+      // (mesma composição usada no Anual). Se a pessoa já tem um hábito real
+      // (voltou pra essa tela depois de já ter criado), vai direto pra
+      // confirmação em vez de pedir outro.
       return state.step === "habit_surface_instruction"
-        ? { ...state, step: "habit_showcase_instruction" }
+        ? {
+            ...state,
+            step: action.hasExistingHabit
+              ? "habit_created_confirmation"
+              : "habit_instruction",
+            firstHabitCreatedAt: action.hasExistingHabit
+              ? (state.firstHabitCreatedAt ?? action.at ?? nowIso())
+              : state.firstHabitCreatedAt,
+          }
         : state;
     case "continue_from_habit_showcase":
       return state.step === "habit_showcase_instruction"
@@ -678,15 +700,7 @@ export const reduceGuidedOnboardingState = (
         : state;
     case "finish_habit_onboarding":
       return state.step === "habit_created_confirmation"
-        ? {
-            ...state,
-            step: "completed",
-            postOnboardingEventsCreated: 0,
-            postOnboardingCategoriesCreated: 0,
-            accountNudgeShownAt: undefined,
-            completedAt: action.at ?? nowIso(),
-            dismissedAt: undefined,
-          }
+        ? buildCompletedState(state, action.at)
         : state;
     case "return_to_year":
       return state.step === "habit_created_confirmation"
@@ -708,21 +722,16 @@ export const reduceGuidedOnboardingState = (
             appearanceOpenedAt: action.at ?? nowIso(),
           }
         : state;
-    case "confirm_theme":
+    case "confirm_theme": {
       if (state.step !== "theme_instruction") return state;
       if (!action.complete) {
         return { ...state, themeConfirmedAt: action.at ?? nowIso() };
       }
-      return {
-        ...state,
-        step: "completed",
-        themeConfirmedAt: state.themeConfirmedAt ?? action.at ?? nowIso(),
-        postOnboardingEventsCreated: 0,
-        postOnboardingCategoriesCreated: 0,
-        accountNudgeShownAt: undefined,
-        completedAt: action.at ?? nowIso(),
-        dismissedAt: undefined,
-      };
+      return buildCompletedState(
+        { ...state, themeConfirmedAt: state.themeConfirmedAt ?? action.at ?? nowIso() },
+        action.at
+      );
+    }
     case "complete":
       if (
         state.step !== "year_instruction" &&
@@ -730,15 +739,7 @@ export const reduceGuidedOnboardingState = (
       ) {
         return state;
       }
-      return {
-        ...state,
-        step: "completed",
-        postOnboardingEventsCreated: 0,
-        postOnboardingCategoriesCreated: 0,
-        accountNudgeShownAt: undefined,
-        completedAt: action.at ?? nowIso(),
-        dismissedAt: undefined,
-      };
+      return buildCompletedState(state, action.at);
     case "record_post_onboarding_event": {
       if (state.step !== "completed" || state.accountNudgeShownAt) return state;
       const postOnboardingEventsCreated =
@@ -848,6 +849,35 @@ export const dispatchGuidedOnboarding = (
     );
   }
   return next;
+};
+
+const GUIDED_ONBOARDING_STEP_POSITION: Partial<
+  Record<GuidedOnboardingStep, number>
+> = {
+  context_selection: 1,
+  date_category_selection: 2,
+  date_category_reveal: 2,
+  date_instruction: 2,
+  date_details: 2,
+  edit_instruction: 3,
+  edit_preview: 3,
+  calendar_instruction: 4,
+  calendar_selection: 4,
+  year_instruction: 5,
+  period_navigation_instruction: 6,
+};
+
+export const getGuidedOnboardingTotalSteps = (options: {
+  showHabitSteps: boolean;
+}) => (options.showHabitSteps ? 7 : 6);
+
+export const getGuidedOnboardingProgress = (
+  step: GuidedOnboardingStep,
+  options: { showHabitSteps: boolean }
+): { current: number; total: number } => {
+  const total = getGuidedOnboardingTotalSteps(options);
+  const current = GUIDED_ONBOARDING_STEP_POSITION[step] ?? total;
+  return { current, total };
 };
 
 export const isGuidedOnboardingInProgress = (state: GuidedOnboardingState) =>

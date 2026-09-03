@@ -128,7 +128,7 @@ test("normaliza a antiga cor escura para uma opção oficial", () => {
   expect(getNearestCategoryColor("#1F2937")).toBe("#9CA6B4");
 });
 
-test("cria contexto, categorias incrementais e quatro eventos", () => {
+test("cria contexto, categoria incremental de datas e pula direto para edição", () => {
   const configured = reduceGuidedOnboardingState(initialState(), {
     type: "configure_profile",
     context: "work",
@@ -170,40 +170,8 @@ test("cria contexto, categorias incrementais e quatro eventos", () => {
     at: "2026-07-20T10:02:00.000Z",
   });
   expect(state).toMatchObject({
-    step: "period_category_selection",
-    dateItemsCreated: 2,
-  });
-
-  state = reduceGuidedOnboardingState(state, {
-    type: "choose_period_category",
-    categoryId: ONBOARDING_CATEGORY_IDS.workTrips,
-    at: "2026-07-20T10:02:30.000Z",
-  });
-  expect(state).toMatchObject({
-    step: "period_category_reveal",
-    categoryRevealStartedAt: "2026-07-20T10:02:30.000Z",
-  });
-  state = reduceGuidedOnboardingState(state, {
-    type: "finish_category_reveal",
-  });
-  state = reduceGuidedOnboardingState(state, { type: "select_period" });
-  state = reduceGuidedOnboardingState(state, {
-    type: "period_saved",
-    at: "2026-07-20T10:03:00.000Z",
-  });
-  expect(state).toMatchObject({
-    step: "period_instruction",
-    periodItemsCreated: 1,
-  });
-
-  state = reduceGuidedOnboardingState(state, { type: "select_period" });
-  state = reduceGuidedOnboardingState(state, {
-    type: "period_saved",
-    at: "2026-07-20T10:04:00.000Z",
-  });
-  expect(state).toMatchObject({
     step: "edit_instruction",
-    periodItemsCreated: 2,
+    dateItemsCreated: 2,
   });
 
   state = reduceGuidedOnboardingState(state, {
@@ -271,13 +239,8 @@ test("onboarding desktop termina em Hábitos sem retornar ao ano", () => {
   });
   expect(habitSurface.step).toBe("habit_surface_instruction");
 
-  const showcase = reduceGuidedOnboardingState(habitSurface, {
+  const habit = reduceGuidedOnboardingState(habitSurface, {
     type: "open_habits_surface",
-  });
-  expect(showcase.step).toBe("habit_showcase_instruction");
-
-  const habit = reduceGuidedOnboardingState(showcase, {
-    type: "continue_from_habit_showcase",
   });
   expect(habit.step).toBe("habit_instruction");
 
@@ -314,8 +277,8 @@ test("onboarding desktop termina em Hábitos sem retornar ao ano", () => {
   });
 
   expect(
-    reduceGuidedOnboardingState(showcase, {
-      type: "continue_from_habit_showcase",
+    reduceGuidedOnboardingState(habitSurface, {
+      type: "open_habits_surface",
       hasExistingHabit: true,
       at: "2026-08-26T12:00:30.000Z",
     })
@@ -818,38 +781,25 @@ test("demonstração monta dois contextos e categorias pessoais e profissionais"
     "Família",
     "Amigos",
     "Viagens",
-    "Aniversários",
-    "Feriados",
-    "Corridas F1",
     "Eventos",
     "Rituais",
-    "Produto",
+    "Projetos",
     "Marketing",
-    "Performance Review",
-    "Entregas",
   ]);
   expect(snapshot.categories.map((category) => category.color)).toEqual([
     "#9CA6B4",
     "#EF8F8F",
     "#4F8FD6",
     "#58B76F",
-    "#E1D15D",
-    "#B79AEF",
-    "#EBA16D",
-    "#9CA6B4",
+    "#58B76F",
     "#4F8FD6",
-    "#B79AEF",
+    "#E7B957",
     "#EE9275",
-    "#55B5A8",
-    "#EBA16D",
   ]);
   expect(snapshot.events.length).toBeGreaterThan(150);
   expect(new Set(snapshot.events.map((event) => event.startDate.slice(5, 7))).size).toBe(12);
   expect(snapshot.events.map((event) => event.title)).toEqual(
     expect.arrayContaining([
-      "Planejamento estratégico",
-      "Encontro com clientes",
-      "Conferência de produto",
       "All Hands",
       "QBR",
       "Descoberta da experiência mobile",
@@ -859,45 +809,20 @@ test("demonstração monta dois contextos e categorias pessoais e profissionais"
       "Campanha de lançamento mobile",
       "Campanha de conteúdo para PMEs",
       "Campanha de retrospectiva do ano",
-      "Fechamento de performance Q1",
-      "Calibração e alinhamento Q4",
-      "Roadmap do semestre",
-      "Protótipo mobile validado",
-      "Lançamento mobile",
-      "Relatório para o conselho",
-      "Plano do próximo ano",
     ])
   );
   expect(isOnboardingPersonalDemoSnapshot(snapshot)).toBe(true);
-  const holidayPack = holidays2026Packs.find(
-    (pack) => pack.regionCode === "RS"
-  );
-  if (!holidayPack) throw new Error("Pacote de feriados do RS ausente");
-  const holidayCategory = snapshot.categories.find(
-    (category) => category.name === "Feriados"
-  );
-  const formulaCategory = snapshot.categories.find(
-    (category) => category.name === "Corridas F1"
-  );
-  expect(holidayCategory).toMatchObject({
-    calendarPackGroupId: "holidays-by-state",
-    calendarPackVariantId: holidayPack.id,
-  });
-  expect(formulaCategory).toMatchObject({
-    calendarPackGroupId: formula12026Pack.id,
-    calendarPackVariantId: formula12026Pack.id,
-  });
+  // Feriados e Corridas F1 não fazem mais parte do ano de exemplo: só
+  // categorias criadas manualmente (sem calendário pronto por trás) sobram.
   expect(
-    snapshot.events
-      .filter(
-        (event) =>
-          event.categoryId !== holidayCategory?.id &&
-          event.categoryId !== formulaCategory?.id
-      )
-      .every(
-        (event) =>
-          event.calendarPackGroupId === ONBOARDING_PERSONAL_DEMO_GROUP_ID
-      )
+    snapshot.categories.some(
+      (category) => category.name === "Feriados" || category.name === "Corridas F1"
+    )
+  ).toBe(false);
+  expect(
+    snapshot.events.every(
+      (event) => event.calendarPackGroupId === ONBOARDING_PERSONAL_DEMO_GROUP_ID
+    )
   ).toBe(true);
   expect(snapshot.categories.filter((category) => !category.visible)).toEqual([]);
   expect(
@@ -907,16 +832,14 @@ test("demonstração monta dois contextos e categorias pessoais e profissionais"
   ).toEqual([
     "Eventos",
     "Rituais",
-    "Produto",
+    "Projetos",
     "Marketing",
-    "Performance Review",
-    "Entregas",
   ]);
 
   const productCategory = snapshot.categories.find(
     (category) =>
       category.profileId === ONBOARDING_PROFILE_IDS.professional &&
-      category.name === "Produto"
+      category.name === "Projetos"
   );
   const productPeriods = snapshot.events
     .filter(
@@ -935,10 +858,6 @@ test("demonstração monta dois contextos e categorias pessoais e profissionais"
       expect(productPeriods[index - 1].endDate < event.startDate).toBe(true);
     }
   }
-  expect(
-    snapshot.events.filter((event) => event.recurrenceType === "yearly").length
-  ).toBeGreaterThanOrEqual(10);
-
   const personalCategories = snapshot.categories.filter(
     (category) => category.profileId === ONBOARDING_PROFILE_IDS.personal
   );
@@ -955,12 +874,6 @@ test("demonstração monta dois contextos e categorias pessoais e profissionais"
   expect(countCategoryEvents("Família")).toBe(17);
   expect(countCategoryEvents("Amigos")).toBe(19);
   expect(countCategoryEvents("Viagens")).toBe(6);
-  expect(countCategoryEvents("Aniversários")).toBe(10);
-  expect(
-    snapshot.events.filter(
-      (event) => event.categoryId === personalCategoryIds.get("Corridas F1")
-    ).length
-  ).toBeGreaterThan(20);
 
   const visiblePersonalCategoryIds = new Set(
     personalCategories
@@ -970,8 +883,8 @@ test("demonstração monta dois contextos e categorias pessoais e profissionais"
   const visiblePersonalEvents = expandEventsForYear(snapshot.events, 2026).filter(
     (event) => visiblePersonalCategoryIds.has(event.categoryId)
   );
-  expect(visiblePersonalEvents.length).toBeGreaterThanOrEqual(95);
-  expect(visiblePersonalEvents.length).toBeLessThanOrEqual(105);
+  expect(visiblePersonalEvents.length).toBeGreaterThanOrEqual(50);
+  expect(visiblePersonalEvents.length).toBeLessThanOrEqual(65);
 
   const authorCategoryIds = new Set(
     personalCategories
@@ -1010,7 +923,6 @@ test("demonstração monta dois contextos e categorias pessoais e profissionais"
         startDate: "2026-12-27",
         endDate: "2026-12-31",
       }),
-      expect.objectContaining({ title: "Revolução Farroupilha" }),
     ])
   );
 });
@@ -1025,17 +937,28 @@ test("demonstração conta uma história diferente entre 2025 e 2027", () => {
   );
 
   expect(eventsByYear.get(2024)).toEqual([]);
-  expect(eventsByYear.get(2025)).toHaveLength(123);
-  expect(eventsByYear.get(2026)).toHaveLength(137);
-  expect(eventsByYear.get(2027)).toHaveLength(23);
-  expect(eventsByYear.get(2028)).toHaveLength(21);
+  expect(eventsByYear.get(2025)).toHaveLength(84);
+  expect(eventsByYear.get(2026)).toHaveLength(77);
+  expect(eventsByYear.get(2027)).toHaveLength(2);
+  expect(eventsByYear.get(2028)).toHaveLength(0);
 
-  for (const year of [2025, 2026, 2027, 2028]) {
+  for (const year of [2025, 2026]) {
     expect(
       new Set(eventsByYear.get(year)?.map((event) => event.startDate.slice(5, 7)))
         .size
     ).toBe(12);
   }
+  // 2027/2028 são anos de projeção mais enxutos (sem os marcos de "Entregas"
+  // e sem os calendários prontos de demonstração) e quase não têm eventos —
+  // isso é esperado.
+  expect(
+    new Set(eventsByYear.get(2027)?.map((event) => event.startDate.slice(5, 7)))
+      .size
+  ).toBe(2);
+  expect(
+    new Set(eventsByYear.get(2028)?.map((event) => event.startDate.slice(5, 7)))
+      .size
+  ).toBe(0);
 
   expect(eventsByYear.get(2025)?.map((event) => event.title)).toEqual(
     expect.arrayContaining([
@@ -1066,10 +989,7 @@ test("demonstração conta uma história diferente entre 2025 e 2027", () => {
     snapshot.categories.map((category) => [category.id, category.name])
   );
   expect(eventsByYear.get(2027)?.map((event) => event.title)).toEqual(
-    expect.arrayContaining([
-      "Planejamento estratégico 2027",
-      "Viagem à Serra Gaúcha",
-    ])
+    expect.arrayContaining(["Viagem à Serra Gaúcha"])
   );
   expect(
     new Set(
@@ -1082,7 +1002,7 @@ test("demonstração conta uma história diferente entre 2025 e 2027", () => {
         )
         .map((event) => categoryNames.get(event.categoryId))
     )
-  ).toEqual(new Set(["Aniversários", "Feriados"]));
+  ).toEqual(new Set());
 
   expect(
     new Set(
@@ -1090,7 +1010,7 @@ test("demonstração conta uma história diferente entre 2025 e 2027", () => {
         .get(2028)
         ?.map((event) => categoryNames.get(event.categoryId))
     )
-  ).toEqual(new Set(["Aniversários", "Feriados"]));
+  ).toEqual(new Set());
   expect(new Set(snapshot.events.map((event) => event.id)).size).toBe(
     snapshot.events.length
   );
@@ -1210,7 +1130,14 @@ test("troca e remove os feriados gerenciados do exemplo sem duplicar", () => {
     throw new Error("Variantes de feriados ausentes");
   }
 
-  const snapshot = getOnboardingPersonalDemoSnapshot(2026);
+  const baseSnapshot = getOnboardingPersonalDemoSnapshot(2026);
+  const snapshot = importCalendarPackVariant(
+    baseSnapshot,
+    rioGrandeDoSul,
+    holidays2026Packs,
+    "all",
+    ONBOARDING_PROFILE_IDS.personal
+  ).snapshot;
   expect(getCalendarPackAvailability(snapshot, rioGrandeDoSul)).toMatchObject({
     hasAnyCategory: true,
     hasImportedEvents: true,
@@ -1254,6 +1181,27 @@ test("troca e remove os feriados gerenciados do exemplo sem duplicar", () => {
 test("sandbox libera criação, edição e exclusão sem preservar a origem demonstrativa", () => {
   const store = useStore.getState();
   store.loadOnboardingPersonalDemo(2026);
+
+  const rioGrandeDoSul = holidays2026Packs.find(
+    (pack) => pack.regionCode === "RS"
+  );
+  if (!rioGrandeDoSul) {
+    throw new Error("Variante de feriados ausente");
+  }
+  const withPacks = importCalendarPackVariant(
+    importCalendarPackVariant(
+      useStore.getState(),
+      rioGrandeDoSul,
+      holidays2026Packs,
+      "all",
+      ONBOARDING_PROFILE_IDS.personal
+    ).snapshot,
+    formula12026Pack,
+    [formula12026Pack],
+    "all",
+    ONBOARDING_PROFILE_IDS.personal
+  ).snapshot;
+  store.replaceAllData(withPacks);
   store.unlockOnboardingPersonalDemo();
 
   const sandbox = useStore.getState();

@@ -158,6 +158,9 @@ export function DesktopProductNavigation({
             highlighted={highlightDestination === destination.id}
           />
         ))}
+      </nav>
+
+      <div className="col-start-3 hidden items-center gap-1 justify-self-end md:flex">
         {showHeaderMinimizeToggle && onToggleHeaderMinimized ? (
           <button
             type="button"
@@ -173,19 +176,25 @@ export function DesktopProductNavigation({
                 ? "Mostrar contextos e categorias"
                 : "Minimizar contextos e categorias"
             }
-            className="ml-1 grid size-10 place-items-center rounded-xl text-muted-foreground/55 transition-colors hover:bg-muted/45 hover:text-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+            className="grid size-10 place-items-center rounded-xl text-muted-foreground/55 transition-colors hover:bg-muted/45 hover:text-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
             onClick={onToggleHeaderMinimized}
           >
-            {headerMinimized ? (
-              <ChevronsUpDown className="size-[18px]" />
-            ) : (
-              <ChevronsDownUp className="size-[18px]" />
-            )}
+            <span className="relative grid size-[18px] place-items-center">
+              <ChevronsUpDown
+                className={cn(
+                  "absolute size-[18px] transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
+                  headerMinimized ? "scale-100 opacity-100" : "scale-75 opacity-0"
+                )}
+              />
+              <ChevronsDownUp
+                className={cn(
+                  "absolute size-[18px] transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
+                  headerMinimized ? "scale-75 opacity-0" : "scale-100 opacity-100"
+                )}
+              />
+            </span>
           </button>
         ) : null}
-      </nav>
-
-      <div className="col-start-3 hidden items-center gap-1 justify-self-end md:flex">
         {onToggleOrganize ? (
           <button
             type="button"

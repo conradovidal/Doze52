@@ -21,10 +21,11 @@ import {
   ONBOARDING_CATEGORY_IDS,
   getOnboardingCategoryDefinition,
 } from "@/lib/store";
-import type {
-  GuidedOnboardingState,
-  OnboardingCategoryChoice,
-  OnboardingContext,
+import {
+  getGuidedOnboardingProgress,
+  type GuidedOnboardingState,
+  type OnboardingCategoryChoice,
+  type OnboardingContext,
 } from "@/lib/onboarding";
 import {
   CATEGORY_COLOR_BASE_AMBER,
@@ -64,6 +65,8 @@ export type GuidedCalendarDraft = {
 type GuidedOnboardingPanelProps = {
   state: GuidedOnboardingState;
   draft: GuidedCalendarDraft | null;
+  showHabitSteps: boolean;
+  isMobile: boolean;
   onClose: () => void;
   onConfigureContext: (context: OnboardingContext) => void;
   onChooseCategory: (
@@ -115,7 +118,6 @@ const getDateCopy = (
     if (isBirthday) {
       return {
         title: "Adicione o aniversário de alguém importante.",
-        description: "Escolha o dia no calendário.",
         prompt: "De quem é esse aniversário?",
         placeholder: "Ex.: Aniversário da mãe",
       };
@@ -123,7 +125,6 @@ const getDateCopy = (
     if (isDelivery) {
       return {
         title: "Adicione uma entrega importante.",
-        description: "Escolha o dia dessa entrega.",
         prompt: "Qual é essa entrega?",
         placeholder: "Ex.: Lançamento do produto",
       };
@@ -133,7 +134,6 @@ const getDateCopy = (
         context === "personal"
           ? "Adicione uma data importante para você."
           : "Adicione uma data importante do seu trabalho.",
-      description: "Escolha o dia no calendário.",
       prompt:
         context === "personal"
           ? "O que torna essa data importante?"
@@ -144,16 +144,14 @@ const getDateCopy = (
 
   if (isBirthday) {
     return {
-      title: "Agora adicione o aniversário de outra pessoa importante.",
-      description: "Escolha outro dia no calendário.",
+      title: "Boa! Agora registre o aniversário de mais alguém especial.",
       prompt: "De quem é esse aniversário?",
       placeholder: "Ex.: Aniversário do pai",
     };
   }
   if (isDelivery) {
     return {
-      title: "Agora adicione outra entrega importante.",
-      description: "Escolha o dia dessa entrega.",
+      title: "Boa! Agora registre outra entrega importante.",
       prompt: "Qual é essa entrega?",
       placeholder: "Ex.: Lançamento do produto",
     };
@@ -161,9 +159,8 @@ const getDateCopy = (
   return {
     title:
       context === "personal"
-        ? "Agora adicione outra data importante."
-        : "Agora adicione outra data importante do seu trabalho.",
-    description: "Escolha outro dia no calendário.",
+        ? "Boa! Agora registre outra data importante."
+        : "Boa! Agora registre outra data importante do seu trabalho.",
     prompt:
       context === "personal"
         ? "O que torna essa data importante?"
@@ -184,7 +181,6 @@ const getPeriodCopy = (
     if (isTravel) {
       return {
         title: "Adicione uma viagem ou um período de férias.",
-        description: "Marque do primeiro ao último dia.",
         prompt: "Que viagem ou férias são essas?",
         placeholder: "Ex.: Viagem em família",
       };
@@ -192,7 +188,6 @@ const getPeriodCopy = (
     if (isProject) {
       return {
         title: "Adicione um projeto importante.",
-        description: "Selecione o primeiro e o último dia.",
         prompt: "Qual é esse projeto?",
         placeholder: "Ex.: Projeto concluído",
       };
@@ -202,7 +197,6 @@ const getPeriodCopy = (
         context === "personal"
           ? "Adicione um período importante para você."
           : "Adicione um período importante do seu trabalho.",
-      description: "Selecione o primeiro e o último dia desse período.",
       prompt:
         context === "personal"
           ? "O que torna esse período importante?"
@@ -213,16 +207,14 @@ const getPeriodCopy = (
 
   if (isTravel) {
     return {
-      title: "Agora adicione outra viagem ou período de férias.",
-      description: "Marque do primeiro ao último dia.",
+      title: "Boa! Agora registre outra viagem ou período de férias.",
       prompt: "Que viagem ou férias são essas?",
       placeholder: "Ex.: Férias em família",
     };
   }
   if (isProject) {
     return {
-      title: "Agora adicione outro projeto importante.",
-      description: "Selecione o primeiro e o último dia.",
+      title: "Boa! Agora registre outro projeto importante.",
       prompt: "Qual é esse projeto?",
       placeholder: "Ex.: Reestruturação comercial",
     };
@@ -230,9 +222,8 @@ const getPeriodCopy = (
   return {
     title:
       context === "personal"
-        ? "Agora adicione outro período importante."
-        : "Agora adicione outro período importante do seu trabalho.",
-    description: "Selecione o primeiro e o último dia.",
+        ? "Boa! Agora registre outro período importante."
+        : "Boa! Agora registre outro período importante do seu trabalho.",
     prompt:
       context === "personal"
         ? "O que torna esse período importante?"
@@ -245,10 +236,12 @@ export const getGuidedSelectionNotice = ({
   state,
   isMobile,
   mobileRangeStart,
+  draft,
 }: {
   state: GuidedOnboardingState;
   isMobile: boolean;
   mobileRangeStart?: string | null;
+  draft?: GuidedCalendarDraft | null;
 }): GuidedSelectionNotice | null => {
   if (state.step === "date_instruction") {
     const copy = getDateCopy(
@@ -262,30 +255,58 @@ export const getGuidedSelectionNotice = ({
       instruction: isMobile ? "Toque no dia." : "Clique no dia.",
     };
   }
-  if (state.step !== "period_instruction") return null;
-  const copy = getPeriodCopy(
-    state.context ?? "personal",
-    state.periodCategoryId,
-    state.periodItemsCreated ?? 0
-  );
-  return {
-    mode: "period",
-    title:
-      isMobile && mobileRangeStart
-        ? "Agora escolha o último dia."
-        : copy.title,
-    instruction:
-      isMobile && mobileRangeStart
-        ? `Início em ${formatDate(mobileRangeStart)}.`
-        : isMobile
-          ? "Toque no primeiro e no último dia."
-          : "Clique e arraste do início ao fim.",
-  };
+  if (state.step === "date_details" && !isMobile && draft) {
+    const copy = getDateCopy(
+      state.context ?? "personal",
+      state.dateCategoryId,
+      state.dateItemsCreated ?? 0
+    );
+    return {
+      mode: "date",
+      title: copy.title,
+      instruction: formatDate(draft.startDate),
+    };
+  }
+  if (state.step === "period_instruction") {
+    const copy = getPeriodCopy(
+      state.context ?? "personal",
+      state.periodCategoryId,
+      state.periodItemsCreated ?? 0
+    );
+    return {
+      mode: "period",
+      title:
+        isMobile && mobileRangeStart
+          ? "Agora escolha o último dia."
+          : copy.title,
+      instruction:
+        isMobile && mobileRangeStart
+          ? `Início em ${formatDate(mobileRangeStart)}.`
+          : isMobile
+            ? "Toque no primeiro e no último dia."
+            : "Clique e arraste do início ao fim.",
+    };
+  }
+  if (state.step === "period_details" && !isMobile && draft) {
+    const copy = getPeriodCopy(
+      state.context ?? "personal",
+      state.periodCategoryId,
+      state.periodItemsCreated ?? 0
+    );
+    return {
+      mode: "period",
+      title: copy.title,
+      instruction: `${formatDate(draft.startDate)} — ${formatDate(draft.endDate)}`,
+    };
+  }
+  return null;
 };
 
 export function GuidedOnboardingPanel({
   state,
   draft,
+  showHabitSteps,
+  isMobile,
   onClose,
   onConfigureContext,
   onChooseCategory,
@@ -313,19 +334,8 @@ export function GuidedOnboardingPanel({
     state.periodCategoryId,
     periodItemsCreated
   );
-  const progressStep = state.step === "context_selection"
-    ? 1
-    : state.step.startsWith("date")
-      ? 2
-      : state.step.startsWith("period")
-        ? 3
-        : state.step.startsWith("edit")
-          ? 4
-          : state.step.startsWith("calendar")
-            ? 5
-            : state.step === "year_instruction"
-              ? 6
-              : 7;
+  const { current: progressStep, total: progressTotal } =
+    getGuidedOnboardingProgress(state.step, { showHabitSteps });
 
   React.useEffect(() => {
     setTitle("");
@@ -349,7 +359,7 @@ export function GuidedOnboardingPanel({
             Monte o seu ano
           </p>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Passo {progressStep} de 7
+            Passo {progressStep} de {progressTotal}
           </p>
         </div>
         <Button
@@ -364,9 +374,9 @@ export function GuidedOnboardingPanel({
         </Button>
       </div>
       <AnimatedProgress
-        value={(progressStep / 7) * 100}
+        value={(progressStep / progressTotal) * 100}
         label="Progresso do guia inicial"
-        statusText={`${progressStep} de 7`}
+        statusText={`${progressStep} de ${progressTotal}`}
       />
     </div>
   );
@@ -499,7 +509,7 @@ export function GuidedOnboardingPanel({
             Por qual contexto você quer começar?
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Escolha onde começar a dar visibilidade ao que importa para você.
+            Escolha por onde começar — dá para alternar entre eles depois.
           </p>
           <div className="mt-4 grid gap-2">
             {CONTEXT_OPTIONS.map((option) => {
@@ -576,6 +586,12 @@ export function GuidedOnboardingPanel({
     ) {
       const period = state.step === "period_details";
       const copy = period ? periodCopy : dateCopy;
+      if (!isMobile) {
+        // No desktop, o formulário oficial de evento assume a criação, e o
+        // aviso fixo no topo (guidedSelectionNotice) já orienta a pessoa —
+        // este card modal não precisa aparecer.
+        return null;
+      }
       return (
         <form
           className="mt-4 space-y-3"
@@ -675,7 +691,12 @@ export function GuidedOnboardingPanel({
       className="inverse-product-surface fixed top-[calc(env(safe-area-inset-top,0px)+4.6rem)] left-1/2 z-50 max-h-[calc(100dvh-6rem)] w-[min(42rem,calc(100vw-.75rem))] -translate-x-1/2 overflow-y-auto rounded-[1.5rem] border border-border bg-card p-4 text-card-foreground shadow-[0_30px_95px_-20px_rgba(15,23,42,0.82)] animate-in fade-in-0 duration-200 motion-reduce:animate-none sm:p-5 md:top-1/2 md:w-[30rem] md:-translate-y-1/2"
     >
       {header}
-      {content}
+      <div
+        key={state.step}
+        className="animate-in fade-in slide-in-from-bottom-1 duration-300 motion-reduce:animate-none"
+      >
+        {content}
+      </div>
     </section>
   );
 }

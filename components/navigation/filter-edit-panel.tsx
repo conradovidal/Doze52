@@ -62,6 +62,7 @@ type FilterEditPanelProps = {
   onEditProfile: (profileId: string) => void;
   onCreateCategory: () => void;
   onEditCategory: (categoryId: string) => void;
+  categoryCreateOpen?: boolean;
   highlightedProfileId?: string | null;
   highlightedCategoryId?: string | null;
   highlightedCategoryEffect?: "focus" | "reveal";
@@ -80,6 +81,7 @@ export function FilterEditPanel({
   onEditProfile,
   onCreateCategory,
   onEditCategory,
+  categoryCreateOpen = false,
   highlightedProfileId,
   highlightedCategoryId,
   highlightedCategoryEffect,
@@ -211,9 +213,6 @@ export function FilterEditPanel({
             {section === "annual" ? (
               <>
                 <section>
-                  <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Contextos
-                  </h3>
                   <ProfileBar
                     isInlineEditMode
                     editingProfileId={editingProfileId}
@@ -225,9 +224,6 @@ export function FilterEditPanel({
                 </section>
 
                 <section className="relative mt-6 border-t border-border/55 pt-5">
-                  <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Categorias
-                  </h3>
                   <CategoryBar
                     isInlineEditMode
                     editingProfileId={editingProfileId}
@@ -237,7 +233,7 @@ export function FilterEditPanel({
                     highlightedCategoryEffect={highlightedCategoryEffect}
                     highlightCreate={highlightCreate}
                   />
-                  {highlightCreate && onDismissGuidedSelection ? (
+                  {highlightCreate && !categoryCreateOpen && onDismissGuidedSelection ? (
                     <GuidedToolbarNoticeCard
                       notice={guidedToolbarNotice!}
                       onClose={onDismissGuidedSelection}
