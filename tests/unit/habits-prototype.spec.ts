@@ -68,7 +68,7 @@ test("gera chave de check-in estável por hábito e data", () => {
   );
 });
 
-test("monta quatro hábitos demonstrativos coerentes com o ano de exemplo", () => {
+test("monta dois hábitos demonstrativos coerentes com o ano de exemplo", () => {
   const categories: CategoryItem[] = [
     { id: "travel", profileId: "personal", name: "Viagens", color: "#fff", visible: true },
     { id: "friends", profileId: "personal", name: "Amigos", color: "#fff", visible: true },
@@ -112,15 +112,12 @@ test("monta quatro hábitos demonstrativos coerentes com o ano de exemplo", () =
   expect(showcase.habits.map((habit) => habit.name)).toEqual([
     "Exercício",
     "Ler 20 minutos",
-    "Dormir antes das 23h",
-    "Dia sem fumar",
   ]);
   expect(showcase.visibleHabitIds).toEqual(
-    showcase.habits.slice(0, 3).map((habit) => habit.id)
+    showcase.habits.map((habit) => habit.id)
   );
-  expect(showcase.visibleHabitIds).not.toContain(showcase.habits[3]?.id);
 
-  const [exercise, reading, sleep, smokeFree] = showcase.habits;
+  const [exercise, reading] = showcase.habits;
   const completed = (habitId: string, dateIso: string) =>
     Boolean(showcase.checkIns[getHabitCheckInKey(habitId, dateIso)]?.completed);
   for (const dateIso of ["2026-07-25", "2026-07-26", "2026-07-27", "2026-07-28", "2026-07-29", "2026-07-30"]) {
@@ -131,13 +128,6 @@ test("monta quatro hábitos demonstrativos coerentes com o ano de exemplo", () =
       (dateIso) => completed(reading.id, dateIso)
     )
   ).toBe(true);
-  expect(completed(sleep.id, "2026-08-20")).toBe(false);
-
-  const smokeFreeCount = Object.values(showcase.checkIns).filter(
-    (checkIn) => checkIn.habitId === smokeFree.id
-  ).length;
-  expect(smokeFreeCount).toBeGreaterThan(150);
-  expect(smokeFreeCount).toBeLessThan(240);
 
   const exerciseCount = Object.values(showcase.checkIns).filter(
     (checkIn) => checkIn.habitId === exercise.id
@@ -158,7 +148,7 @@ test("monta quatro hábitos demonstrativos coerentes com o ano de exemplo", () =
       showcase.habits.filter((habit) => completed(habit.id, dateIso)).length
     );
   }
-  expect([...markerCounts].toSorted()).toEqual([0, 1, 2, 3, 4]);
+  expect([...markerCounts].toSorted()).toEqual([0, 1, 2]);
 });
 
 test("não cria check-ins demonstrativos no futuro", () => {

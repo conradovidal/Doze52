@@ -23,6 +23,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import {
   ChevronDown,
+  ChevronRight,
   CircleCheck,
   GripVertical,
   PencilLine,
@@ -35,6 +36,7 @@ import {
   type GuidedToolbarNotice,
 } from "@/components/onboarding/guided-toolbar-notice";
 import { GuidedTargetOutline } from "@/components/onboarding/guided-target-outline";
+import { HabitEditList } from "@/components/habits/habit-edit-list";
 import { getCategoryColorToken } from "@/lib/category-palette";
 import {
   arraysEqual,
@@ -328,14 +330,24 @@ export function HabitControls({
     resetDragState();
   };
 
-  const habitButtons = (
-    <div
+  const createButton = !creationDisabled ? (
+    <button
+      type="button"
+      data-onboarding-habit-create={guidedNotice?.target === "habit" ? "true" : undefined}
+      aria-label="Criar novo hábito"
+      title="Criar novo hábito"
       className={cn(
-        mobile
-          ? "grid w-full grid-cols-2 gap-1.5 min-[430px]:grid-cols-3"
-          : "flex min-h-8 w-max min-w-full flex-nowrap items-center justify-center gap-1.5 sm:gap-2"
+        "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-border bg-card text-foreground shadow-none transition-all duration-[160ms] ease-[cubic-bezier(0.22,1,0.36,1)] hover:border-foreground/20 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45",
+        mobile && "h-10 w-full rounded-[8px]",
       )}
+      onClick={onRequestCreate}
     >
+      <Plus className="size-3.5" aria-hidden="true" />
+    </button>
+  ) : null;
+
+  const habitChipButtons = (
+    <>
       {habits.map((habit) => {
         const selected = mobile
           ? selectedHabit?.id === habit.id
@@ -399,22 +411,19 @@ export function HabitControls({
           </button>
         );
       })}
+    </>
+  );
 
-      {!creationDisabled ? (
-        <button
-          type="button"
-          data-onboarding-habit-create={guidedNotice?.target === "habit" ? "true" : undefined}
-          aria-label="Criar novo hábito"
-          title="Criar novo hábito"
-          className={cn(
-            "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-border bg-card text-foreground shadow-none transition-all duration-[160ms] ease-[cubic-bezier(0.22,1,0.36,1)] hover:border-foreground/20 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45",
-            mobile && "h-10 w-full rounded-[8px]",
-          )}
-          onClick={onRequestCreate}
-        >
-          <Plus className="size-3.5" aria-hidden="true" />
-        </button>
-      ) : null}
+  const habitButtons = (
+    <div
+      className={cn(
+        mobile
+          ? "grid w-full grid-cols-2 gap-1.5 min-[430px]:grid-cols-3"
+          : "flex min-h-8 w-max shrink-0 flex-nowrap items-center gap-1.5 sm:gap-2"
+      )}
+    >
+      {habitChipButtons}
+      {createButton}
     </div>
   );
 
@@ -533,46 +542,81 @@ export function HabitControls({
           </span>
         </div>
       ) : (
-        <div className="flex items-center justify-center gap-1.5 pb-0.5">
-          <div className="inline-flex h-8 items-center overflow-hidden rounded-[10px] border border-primary bg-primary text-[0.78rem] font-semibold text-primary-foreground">
-            <span className="inline-flex h-8 w-7 items-center justify-center" aria-hidden="true">
-              <CircleCheck className="size-3.5" />
-            </span>
-            <span className="pr-2.5">Hábitos</span>
+        <div className="relative -mx-4 w-[calc(100%+2rem)] overflow-x-auto px-4 pb-0.5 doze52-scrollbar-none sm:mx-0 sm:w-full sm:px-0">
+          <div className="flex w-max min-w-full flex-nowrap items-center justify-center gap-x-2 gap-y-1.5 sm:gap-x-2.5">
+            <div className="inline-flex h-8 shrink-0 items-center overflow-hidden rounded-[10px] border border-primary bg-primary text-[0.78rem] font-semibold text-primary-foreground">
+              <span className="inline-flex h-8 w-7 items-center justify-center" aria-hidden="true">
+                <CircleCheck className="size-3.5" />
+              </span>
+              <span className="pr-2.5">Hábitos</span>
+            </div>
+            {!isEditing ? (
+              <button
+                type="button"
+                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] text-foreground/70 shadow-none transition-colors duration-150 ease-out hover:bg-muted hover:text-foreground active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45"
+                aria-expanded={expanded}
+                aria-controls={controlsId}
+                aria-label={expanded ? "Recolher hábitos" : "Mostrar hábitos"}
+                title={expanded ? "Recolher hábitos" : "Mostrar hábitos"}
+                onClick={() => setExpandedPersisted((current) => !current)}
+              >
+                <ChevronRight
+                  className={cn(
+                    "h-3.5 w-3.5 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
+                    expanded && "rotate-180"
+                  )}
+                  aria-hidden="true"
+                />
+              </button>
+            ) : null}
+
+            {isEditing ? (
+              editableHabitButtons
+            ) : (
+              <div
+                className={cn(
+                  "grid transition-[grid-template-columns,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
+                  expanded
+                    ? "grid-cols-[1fr] opacity-100"
+                    : "pointer-events-none grid-cols-[0fr] opacity-0"
+                )}
+              >
+                <div className="flex min-h-8 min-w-0 shrink-0 flex-nowrap items-center gap-1.5 overflow-hidden sm:gap-2">
+                  {createButton}
+                  {habitChipButtons}
+                </div>
+              </div>
+            )}
           </div>
-          {!isEditing ? (
-            <button
-              type="button"
-              className="inline-flex size-8 items-center justify-center rounded-[10px] border border-border bg-card text-foreground/70 transition-colors hover:border-foreground/18 hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45"
-              aria-expanded={expanded}
-              aria-controls={controlsId}
-              aria-label={expanded ? "Recolher hábitos" : "Mostrar hábitos"}
-              title={expanded ? "Recolher hábitos" : "Mostrar hábitos"}
-              onClick={() => setExpandedPersisted((current) => !current)}
-            >
-              <ChevronDown
-                className={cn("size-3.5 transition-transform", expanded && "rotate-180")}
-                aria-hidden="true"
-              />
-            </button>
-          ) : null}
         </div>
       )}
 
-      <CollapsibleControlRegion
-        id={controlsId}
-        expanded={expanded || isEditing}
-        contentClassName={cn(
-          mobile
-            ? cn(
-                "px-2",
-                expanded ? "border-t border-border/55 py-2" : "border-0 py-0"
-              )
-            : "-mx-4 overflow-x-auto px-4 pb-0.5 doze52-scrollbar-none sm:mx-0 sm:px-0"
-        )}
-      >
-          {isEditing ? editableHabitButtons : habitButtons}
-      </CollapsibleControlRegion>
+      {mobile ? (
+        <CollapsibleControlRegion
+          id={controlsId}
+          expanded={expanded || isEditing}
+          contentClassName={cn(
+            "px-2",
+            expanded ? "border-t border-border/55 py-2" : "border-0 py-0"
+          )}
+        >
+          {isEditing ? (
+            <HabitEditList
+              habits={habits}
+              selectedHabit={selectedHabit}
+              mobile
+              creationDisabled={creationDisabled}
+              onSelectHabit={onSelectHabit}
+              onRequestCreate={onRequestCreate}
+              onEditHabit={onEditHabit}
+              onReorderHabits={onReorderHabits}
+            />
+          ) : (
+            habitButtons
+          )}
+        </CollapsibleControlRegion>
+      ) : null}
+
       {guidedNotice && onDismissGuidedNotice ? (
         <>
           {guidedNotice.target === "habit" ? (

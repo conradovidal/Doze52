@@ -24,6 +24,7 @@ export function DesktopHabitsPrototype({
   onOpenDayPicker,
   onRequestCreate,
   isEditing,
+  headerMinimized = false,
   readOnly = false,
   onEditHabit,
   onReorderHabits,
@@ -48,6 +49,7 @@ export function DesktopHabitsPrototype({
   onOpenDayPicker: (dateIso: string, anchor: HTMLElement) => void;
   onRequestCreate: () => void;
   isEditing: boolean;
+  headerMinimized?: boolean;
   readOnly?: boolean;
   onEditHabit: (habitId: string) => void;
   onReorderHabits: (orderedIds: string[]) => void;
@@ -79,21 +81,23 @@ export function DesktopHabitsPrototype({
       data-habits-layout="desktop-year"
       className="flex min-h-0 flex-1 flex-col"
     >
-      <HabitControls
-        habits={habits}
-        selectedHabit={selectedHabit}
-        visibleHabitIds={visibleHabitIds}
-        creationDisabled={creationDisabled}
-        onSelectHabit={onSelectHabit}
-        onToggleHabitVisibility={onSelectHabit}
-        onRequestCreate={onRequestCreate}
-        isEditing={isEditing}
-        onEditHabit={onEditHabit}
-        onReorderHabits={onReorderHabits}
-        guidedNotice={controlsNotice}
-        onDismissGuidedNotice={onDismissGuidedNotice}
-        onGuidedNoticeAction={onGuidedNoticeAction}
-      />
+      {!headerMinimized ? (
+        <HabitControls
+          habits={habits}
+          selectedHabit={selectedHabit}
+          visibleHabitIds={visibleHabitIds}
+          creationDisabled={creationDisabled}
+          onSelectHabit={onSelectHabit}
+          onToggleHabitVisibility={onSelectHabit}
+          onRequestCreate={onRequestCreate}
+          isEditing={isEditing}
+          onEditHabit={onEditHabit}
+          onReorderHabits={onReorderHabits}
+          guidedNotice={controlsNotice}
+          onDismissGuidedNotice={onDismissGuidedNotice}
+          onGuidedNoticeAction={onGuidedNoticeAction}
+        />
+      ) : null}
 
       <div
         className="min-h-0 flex-1 overflow-hidden pb-1"

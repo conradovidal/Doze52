@@ -8,6 +8,7 @@ import {
   ChevronRight,
   LayoutGrid,
   PencilLine,
+  Plus,
 } from "lucide-react";
 import { BrandLogo } from "@/components/brand-logo";
 import {
@@ -27,6 +28,7 @@ import {
   DesktopProductNavigation,
   type UtilityPanelSection,
 } from "@/components/navigation/adaptive-navigation";
+import { FilterEditPanel } from "@/components/navigation/filter-edit-panel";
 import { ProfileBar } from "@/components/profile-bar";
 import { ProfileIcon } from "@/components/profile-icon";
 import {
@@ -47,6 +49,7 @@ import { CollapsibleControlRegion } from "@/components/ui/collapsible-control-re
 import { useStore } from "@/lib/store";
 import { useScrollEdgeFade } from "@/lib/use-scroll-edge-fade";
 import type { OnboardingFocusTarget } from "@/lib/onboarding";
+import type { CalendarPack } from "@/lib/calendar-packs/types";
 import type { ProductDestinationId } from "@/lib/product-navigation";
 import type { AnchorPoint } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -86,7 +89,7 @@ type AppHeaderProps = {
   onGuidedToolbarAction?: (target: GuidedToolbarNotice["target"]) => void;
   onGuidedCalendarOpen?: () => void;
   onGuidedCalendarClose?: () => void;
-  onGuidedCalendarImported?: (uf?: string) => void;
+  onGuidedCalendarImported?: (pack?: CalendarPack) => void;
   guidedCalendarSelectionActive?: boolean;
   guidedEditPreviewActive?: boolean;
   onboardingLayoutLocked?: boolean;
@@ -100,8 +103,11 @@ type AppHeaderProps = {
   controlledInlineEditMode?: boolean;
   onFilterLayoutChange?: () => void;
   exitInlineEditRequestKey?: number;
+  expandCategoriesRequestKey?: number;
   onYearLabelClick?: () => void;
   onGuidedThemeChange?: () => void;
+  headerMinimized?: boolean;
+  onToggleHeaderMinimized?: () => void;
 };
 
 const getPreferredEditingProfileId = (
@@ -146,8 +152,11 @@ export function AppHeader({
   controlledInlineEditMode,
   onFilterLayoutChange,
   exitInlineEditRequestKey = 0,
+  expandCategoriesRequestKey = 0,
   onYearLabelClick,
   onGuidedThemeChange,
+  headerMinimized = false,
+  onToggleHeaderMinimized,
 }: AppHeaderProps) {
   const profiles = useStore((s) => s.profiles);
   const categories = useStore((s) => s.categories);
@@ -208,6 +217,7 @@ export function AppHeader({
   const previousProfileManagerOpenRef = React.useRef(false);
   const handledCategoryCreateRequestRef = React.useRef(0);
   const handledExitInlineEditRequestRef = React.useRef(0);
+  const handledExpandCategoriesRequestRef = React.useRef(0);
 
   const utilityIconClass =
     "h-8 w-8 rounded-[10px] border-border bg-card text-muted-foreground shadow-none transition-colors hover:border-foreground/18 hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 md:h-9 md:w-9";
@@ -255,6 +265,19 @@ export function AppHeader({
       null,
     [profiles, selectedProfileIds]
   );
+
+  const canMinimizeHeader = useAdaptiveNavigation && !isMobileMode;
+  // Initial value matches SSR (always expanded) to avoid a hydration
+  // mismatch; the real viewport-based default is applied client-side right
+  // after mount, before paint. headerMinimized itself is owned by the parent
+  // (shared with the Habits surface, which has its own equivalent chrome to
+  // hide using the very same toggle).
+  const [categoriesRowExpanded, setCategoriesRowExpanded] = React.useState(true);
+
+  React.useLayoutEffect(() => {
+    if (!canMinimizeHeader) return;
+    setCategoriesRowExpanded(window.innerHeight >= 900);
+  }, [canMinimizeHeader]);
 
   React.useEffect(() => {
     if (!effectiveInlineEditMode) return;
@@ -327,6 +350,17 @@ export function AppHeader({
 
   React.useEffect(() => {
     if (
+      expandCategoriesRequestKey <= 0 ||
+      expandCategoriesRequestKey === handledExpandCategoriesRequestRef.current
+    ) {
+      return;
+    }
+    handledExpandCategoriesRequestRef.current = expandCategoriesRequestKey;
+    setCategoriesRowExpanded(true);
+  }, [expandCategoriesRequestKey]);
+
+  React.useEffect(() => {
+    if (
       categoryCreateRequestKey <= 0 ||
       categoryCreateRequestKey === handledCategoryCreateRequestRef.current
     ) {
@@ -390,19 +424,31 @@ export function AppHeader({
     selectedProfileIds,
   ]);
 
+  // Desktop consolidates Anual + Hábitos editing into the same panel/trigger
+  // (FilterEditPanel); mobile keeps each surface's own separate edit mode.
   const organizeActive =
-    activeDestination === "habits" ? habitsEditingActive : effectiveInlineEditMode;
+    isMobileMode && activeDestination === "habits"
+      ? habitsEditingActive
+      : effectiveInlineEditMode;
   const organizeDisabled =
-    activeDestination === "habits" ? habitsOrganizeDisabled : inlineEditDisabled;
+    isMobileMode && activeDestination === "habits"
+      ? habitsOrganizeDisabled
+      : inlineEditDisabled;
 
   const handleToggleOrganize = React.useCallback(() => {
     if (organizeDisabled) return;
-    if (activeDestination === "habits") {
+    if (isMobileMode && activeDestination === "habits") {
       onToggleHabitsEditing?.();
       return;
     }
     toggleInlineEditMode();
-  }, [activeDestination, organizeDisabled, onToggleHabitsEditing, toggleInlineEditMode]);
+  }, [
+    activeDestination,
+    isMobileMode,
+    organizeDisabled,
+    onToggleHabitsEditing,
+    toggleInlineEditMode,
+  ]);
 
   const openCreateProfile = React.useCallback(() => {
     pendingProfileCreateRestoreRef.current = {
@@ -438,7 +484,7 @@ export function AppHeader({
   const guidedOutlineSelector =
     guidedToolbarNotice?.target === "edit"
       ? '[data-onboarding-edit-control][data-onboarding-highlighted="true"], [data-product-organize="desktop"][data-onboarding-highlighted="true"]'
-      : guidedToolbarNotice?.target === "calendars"
+      : guidedToolbarNotice?.target === "calendars" && !categoryCreateOpen
         ? '[data-onboarding-calendar-control][data-onboarding-highlighted="true"]'
         : guidedToolbarNotice?.target === "habit-surface"
           ? '[data-product-navigation="desktop"] [data-product-destination="habits"]'
@@ -460,11 +506,13 @@ export function AppHeader({
             : "md:space-y-3.5",
           isMobileMode
             ? "mb-0"
-            : useAdaptiveNavigation && !showCalendarControls
-              ? "mb-0"
-              : useAdaptiveNavigation
-                ? DESKTOP_CONTROL_GRID_GAP_CLASS
-                : "mb-4 md:mb-5"
+            : headerMinimized
+              ? DESKTOP_CONTROL_GRID_GAP_CLASS
+              : useAdaptiveNavigation && !showCalendarControls
+                ? "mb-0"
+                : useAdaptiveNavigation
+                  ? DESKTOP_CONTROL_GRID_GAP_CLASS
+                  : "mb-4 md:mb-5"
         )}
       >
         <div
@@ -504,6 +552,12 @@ export function AppHeader({
               themeHighlighted={guidedToolbarNotice?.target === "theme"}
               themeDisabled={themeToggleDisabled}
               onGuidedThemeChange={onGuidedThemeChange}
+              showHeaderMinimizeToggle={canMinimizeHeader}
+              headerMinimized={headerMinimized}
+              onToggleHeaderMinimized={() => {
+                onToggleHeaderMinimized?.();
+                onFilterLayoutChange?.();
+              }}
             />
           ) : null}
           {guidedToolbarNotice?.target === "theme" &&
@@ -686,9 +740,7 @@ export function AppHeader({
                   requireExplicitVariant={guidedCalendarSelectionActive}
                   onOpen={onGuidedCalendarOpen}
                   onClose={onGuidedCalendarClose}
-                  onImported={(pack) =>
-                    onGuidedCalendarImported?.(pack.regionCode)
-                  }
+                  onImported={(pack) => onGuidedCalendarImported?.(pack)}
                 />
                 {guidedToolbarNotice?.target === "calendars" &&
                 onDismissGuidedSelection ? (
@@ -876,8 +928,14 @@ export function AppHeader({
                       : "border-t border-border/45 pt-2.5 md:pt-3"
                   ),
               onboardingLayoutReserved &&
-                (isMobileMode ? "min-h-[10.25rem]" : "min-h-[5.6rem]")
+                (isMobileMode ? "min-h-[10.25rem]" : undefined)
             )}
+          >
+          <CollapsibleControlRegion
+            id="app-header-filter-region"
+            expanded={
+              !(headerMinimized && canMinimizeHeader && !onboardingLayoutLocked)
+            }
           >
           <div
             className={cn(
@@ -1015,6 +1073,94 @@ export function AppHeader({
                   </div>
               </CollapsibleControlRegion>
               </div>
+            ) : useAdaptiveNavigation ? (
+              <div
+                ref={categoryScrollRef}
+                style={categoryScrollFadeStyle}
+                className="relative -mx-4 w-[calc(100%+2rem)] overflow-x-auto px-4 pb-0.5 doze52-scrollbar-none sm:mx-0 sm:w-full sm:px-0"
+              >
+                <div className="flex w-max min-w-full flex-nowrap items-center justify-center gap-x-2 gap-y-1.5 sm:gap-x-2.5">
+                  <div className="flex shrink-0 flex-nowrap items-center justify-center gap-1.5 sm:gap-2">
+                    <ProfileBar
+                      compact
+                      className="w-max flex-nowrap justify-start sm:w-auto"
+                      highlightedProfileId={highlightedProfileId}
+                    />
+
+                    {guidedToolbarNotice?.target === "edit" &&
+                    onDismissGuidedSelection ? (
+                      <GuidedToolbarNoticeCard
+                        notice={guidedToolbarNotice}
+                        onClose={onDismissGuidedSelection}
+                        onAction={() => onGuidedToolbarAction?.("edit")}
+                        placement="viewport"
+                        portaled
+                        anchorSelector='[data-product-organize="desktop"][data-onboarding-highlighted="true"]'
+                        anchorPlacement="below-center"
+                      />
+                    ) : null}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCategoriesRowExpanded((current) => !current);
+                      onFilterLayoutChange?.();
+                    }}
+                    aria-pressed={categoriesRowExpanded}
+                    aria-expanded={categoriesRowExpanded}
+                    aria-controls="app-header-categories-inline"
+                    aria-label={
+                      categoriesRowExpanded
+                        ? "Recolher categorias"
+                        : "Mostrar categorias"
+                    }
+                    title={
+                      categoriesRowExpanded
+                        ? "Recolher categorias"
+                        : "Mostrar categorias"
+                    }
+                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] text-foreground/70 shadow-none transition-colors duration-150 ease-out hover:bg-muted hover:text-foreground active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45"
+                  >
+                    <ChevronRight
+                      className={cn(
+                        "h-3.5 w-3.5 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
+                        categoriesRowExpanded && "rotate-180"
+                      )}
+                      aria-hidden="true"
+                    />
+                  </button>
+
+                  <div
+                    id="app-header-categories-inline"
+                    className={cn(
+                      "grid transition-[grid-template-columns,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
+                      categoriesRowExpanded
+                        ? "grid-cols-[1fr] opacity-100"
+                        : "pointer-events-none grid-cols-[0fr] opacity-0"
+                    )}
+                  >
+                    <div className="flex min-w-0 shrink-0 flex-nowrap items-center gap-1.5 overflow-hidden sm:gap-2">
+                      <button
+                        type="button"
+                        onClick={openCreateCategory}
+                        disabled={!editingProfileId}
+                        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-border bg-card text-foreground shadow-none transition-all hover:border-foreground/20 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45 disabled:cursor-not-allowed disabled:opacity-45"
+                        aria-label="Criar nova categoria"
+                        title="Criar nova categoria"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                      </button>
+                      <CategoryBar
+                        compact
+                        className="w-max flex-nowrap justify-start sm:w-auto"
+                        highlightedCategoryId={highlightedCategoryId}
+                        highlightedCategoryEffect={highlightedCategoryEffect}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
             ) : (
               <>
               <div className="-mx-4 w-[calc(100%+2rem)] overflow-x-auto px-4 pb-0.5 doze52-scrollbar-none sm:mx-0 sm:w-full sm:px-0">
@@ -1081,42 +1227,7 @@ export function AppHeader({
                 </div>
               </div>
 
-              {useAdaptiveNavigation ? (
-              <CollapsibleControlRegion
-                id="app-header-categories"
-                expanded={effectiveCategoriesExpanded}
-              >
-                  <div
-                    ref={categoryScrollRef}
-                    style={categoryScrollFadeStyle}
-                    className="relative -mx-4 overflow-x-auto px-4 pb-0.5 doze52-scrollbar-none sm:mx-0 sm:px-0"
-                  >
-                    <CategoryBar
-                      compact
-                      className="w-max min-w-full flex-nowrap justify-center"
-                      isInlineEditMode={effectiveInlineEditMode}
-                      editingProfileId={editingProfileId}
-                      onCreateCategory={openCreateCategory}
-                      onEditCategory={openEditCategory}
-                      highlightedCategoryId={highlightedCategoryId}
-                      highlightedCategoryEffect={highlightedCategoryEffect}
-                      highlightCreate={guidedToolbarNotice?.target === "calendars"}
-                    />
-                    {guidedToolbarNotice?.target === "calendars" &&
-                    !categoryCreateOpen &&
-                    onDismissGuidedSelection ? (
-                      <GuidedToolbarNoticeCard
-                        notice={guidedToolbarNotice}
-                        onClose={onDismissGuidedSelection}
-                        placement="viewport"
-                        portaled
-                        anchorSelector="[data-onboarding-calendar-control]"
-                        anchorPlacement="below-center"
-                      />
-                    ) : null}
-                  </div>
-              </CollapsibleControlRegion>
-              ) : effectiveCategoriesExpanded ? (
+              {effectiveCategoriesExpanded ? (
                 <div
                   id="app-header-categories"
                   className="w-full origin-top transition-[opacity,transform] duration-150 ease-out"
@@ -1142,13 +1253,14 @@ export function AppHeader({
               </>
             )}
           </div>
+          </CollapsibleControlRegion>
 
           {guidedSelectionNotice && onDismissGuidedSelection ? (
             <div
               data-guided-selection-overlay
               className={cn(
                 "pointer-events-auto absolute inset-x-0 z-[50] flex w-full items-center justify-center overflow-hidden bg-background",
-                isMobileMode ? "inset-y-0" : "top-px -bottom-3"
+                isMobileMode ? "inset-y-0" : "-top-12 bottom-0"
               )}
             >
               <div
@@ -1174,6 +1286,31 @@ export function AppHeader({
 
       </header>
 
+      {useAdaptiveNavigation && !isMobileMode ? (
+        <FilterEditPanel
+          open={effectiveInlineEditMode}
+          activeDestination={activeDestination}
+          onOpenChange={(next) => {
+            if (!next && effectiveInlineEditMode) {
+              toggleInlineEditMode();
+            }
+          }}
+          editingProfileId={editingProfileId}
+          onEditingProfileChange={setEditingProfileId}
+          onCreateProfile={openCreateProfile}
+          onEditProfile={openEditProfile}
+          onCreateCategory={openCreateCategory}
+          onEditCategory={openEditCategory}
+          categoryCreateOpen={categoryCreateOpen}
+          highlightedProfileId={highlightedProfileId}
+          highlightedCategoryId={highlightedCategoryId}
+          highlightedCategoryEffect={highlightedCategoryEffect}
+          guidedToolbarNotice={guidedToolbarNotice}
+          onDismissGuidedSelection={onDismissGuidedSelection}
+          onRequireAuth={() => onOpenAuthDialog()}
+        />
+      ) : null}
+
       <ProfileManager
         open={profileManagerOpen}
         onOpenChange={handleProfileManagerOpenChange}
@@ -1195,9 +1332,7 @@ export function AppHeader({
           guidedCalendarSelection={guidedCalendarSelectionActive}
           onCalendarOpen={onGuidedCalendarOpen}
           onCalendarClose={onGuidedCalendarClose}
-          onCalendarImported={(pack) =>
-            onGuidedCalendarImported?.(pack.regionCode)
-          }
+          onCalendarImported={(pack) => onGuidedCalendarImported?.(pack)}
         />
       ) : (
         <CategoryManager

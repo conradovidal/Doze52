@@ -76,6 +76,7 @@ type StoreState = {
   clearOnboardingPersonalDemo: () => void;
   configureOnboardingContext: (input: {
     context: OnboardingContext;
+    year: number;
   }) => boolean;
   createOnboardingCategory: (input: {
     context: OnboardingContext;
@@ -442,7 +443,7 @@ const getPersonalDemoCategories = (): CategoryItem[] => [
     DEMO_CATEGORY_IDS.workEvents,
     ONBOARDING_PROFILE_IDS.professional,
     "Eventos",
-    CATEGORY_COLOR_BASE_GRAPHITE
+    CATEGORY_COLOR_BASE_GREEN
   ),
   demoCategory(
     ONBOARDING_CATEGORY_IDS.workMeetings,
@@ -453,8 +454,8 @@ const getPersonalDemoCategories = (): CategoryItem[] => [
   demoCategory(
     ONBOARDING_CATEGORY_IDS.workTrips,
     ONBOARDING_PROFILE_IDS.professional,
-    "Produto",
-    CATEGORY_COLOR_BASE_VIOLET
+    "Projetos",
+    CATEGORY_COLOR_BASE_AMBER
   ),
   demoCategory(
     DEMO_CATEGORY_IDS.workMarketing,
@@ -1261,11 +1262,72 @@ export const getOnboardingPersonalDemoSnapshot = (
     ).snapshot;
   }
 
-  return {
+  const finalSnapshot: OnboardingPersonalDemoSnapshot = {
     ...snapshot,
     events: [...personalDemoEvents, ...snapshot.events],
   };
+
+  // O aniversário (pessoal) e a entrega (profissional) ficam de fora do ano
+  // de exemplo desde o início: são exatamente as categorias que o tour guiado
+  // pede para a pessoa criar por conta própria (ver getOnboardingCategoryDefinition,
+  // intent "date"). Feriados e Corridas F1 também ficam de fora: são só
+  // calendários prontos de demonstração, não fazem parte do ano que
+  // efetivamente sobrevive ao onboarding.
+  const excludedCategoryIds = new Set<string>([
+    ONBOARDING_CATEGORY_IDS.birthday,
+    ONBOARDING_CATEGORY_IDS.workDeliveries,
+    DEMO_CATEGORY_IDS.holidays,
+    DEMO_CATEGORY_IDS.formula1,
+    DEMO_CATEGORY_IDS.workPerformance,
+  ]);
+  const categories = finalSnapshot.categories.filter(
+    (category) => !excludedCategoryIds.has(category.id)
+  );
+  const categoryIds = new Set(categories.map((category) => category.id));
+  const events = finalSnapshot.events.filter((event) =>
+    categoryIds.has(event.categoryId)
+  );
+
+  return { ...finalSnapshot, categories, events };
 };
+
+export const getOnboardingContextSeedSnapshot = (
+  year: number,
+  context: OnboardingContext
+): OnboardingPersonalDemoSnapshot => {
+  const fullSnapshot = getOnboardingPersonalDemoSnapshot(year);
+  const profileId =
+    context === "personal"
+      ? ONBOARDING_PROFILE_IDS.personal
+      : ONBOARDING_PROFILE_IDS.professional;
+  const categories = fullSnapshot.categories.filter(
+    (category) =>
+      category.profileId === profileId &&
+      isOnboardingPersonalDemoGroup(category.calendarPackGroupId)
+  );
+  const categoryIds = new Set(categories.map((category) => category.id));
+  const events = fullSnapshot.events.filter((event) =>
+    categoryIds.has(event.categoryId)
+  );
+  const profile = fullSnapshot.profiles.find((p) => p.id === profileId);
+
+  return {
+    profiles: profile ? [{ ...profile }] : [],
+    categories,
+    events,
+  };
+};
+
+// As 2 categorias que ficam visíveis quando o guia termina: a que já existia
+// no ano de exemplo (Eventos/Projetos) e a que a pessoa criou com a própria
+// mão durante o tour (Aniversários), mantendo o restante do ano de exemplo
+// como dado real, só oculto por padrão.
+export const getOnboardingClosingVisibleCategoryIds = (
+  context: OnboardingContext
+): string[] =>
+  context === "personal"
+    ? [ONBOARDING_CATEGORY_IDS.events, ONBOARDING_CATEGORY_IDS.birthday]
+    : [ONBOARDING_CATEGORY_IDS.workTrips, DEMO_CATEGORY_IDS.workEvents];
 
 export const isOnboardingPersonalDemoSnapshot = (
   snapshot: OnboardingPersonalDemoSnapshot
@@ -1367,7 +1429,7 @@ export const getOnboardingCategoryDefinition = (
     : {
         id: ONBOARDING_CATEGORY_IDS.workTrips,
         name: "Projetos",
-        color: CATEGORY_COLOR_BASE_GREEN,
+        color: CATEGORY_COLOR_BASE_AMBER,
       };
 };
 
@@ -1674,7 +1736,7 @@ export const useStore = create<StoreState>()(
             events: [],
           };
         }),
-      configureOnboardingContext: ({ context }) => {
+      configureOnboardingContext: ({ context, year }) => {
         let configured = false;
         set((state) => {
           if (state.events.some((event) => !event.calendarPackGroupId)) {
@@ -1699,13 +1761,14 @@ export const useStore = create<StoreState>()(
             icon,
             position: 0,
           };
+          const seed = getOnboardingContextSeedSnapshot(year, context);
 
           configured = true;
           return {
             profiles: [profile],
             selectedProfileIds: [id],
-            categories: [],
-            events: [],
+            categories: seed.categories,
+            events: seed.events,
           };
         });
         return configured;

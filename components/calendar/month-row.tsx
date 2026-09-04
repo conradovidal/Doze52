@@ -36,7 +36,10 @@ import {
   compareEventsByVisualPriority,
   isRenderableEventDateRange,
 } from "@/lib/event-order";
-import { getDesktopHabitRowMinHeight } from "@/lib/habits-prototype";
+import {
+  getCompletedHabitsForDate,
+  getDesktopHabitRowMinHeight,
+} from "@/lib/habits-prototype";
 import { cn } from "@/lib/utils";
 import { isOnboardingPersonalDemoGroup } from "@/lib/store";
 import {
@@ -114,6 +117,7 @@ export function MonthRow({
   monthIndex,
   density = "year",
   verticalScale = 1,
+  compactBottomPaddingPx,
   events,
   visibleCategoryIds,
   profileIconByCategoryId,
@@ -145,6 +149,7 @@ export function MonthRow({
   monthIndex: number;
   density?: MonthRowDensity;
   verticalScale?: number;
+  compactBottomPaddingPx?: number;
   events: CalendarRenderEvent[];
   visibleCategoryIds: string[];
   profileIconByCategoryId: Map<string, ProfileIconId>;
@@ -335,14 +340,33 @@ export function MonthRow({
   const eventBandHeightPx =
     rowsForHeightTotal * EVENT_ITEM_HEIGHT_PX +
     Math.max(0, rowsForHeightTotal - 1) * EVENT_ITEM_GAP_PX;
+  const resolvedBottomPaddingPx =
+    typeof compactBottomPaddingPx === "number"
+      ? compactBottomPaddingPx
+      : layoutDensity.monthRowBottomPaddingPx;
   const baseContentHeight =
     baseEventsTopOffset +
     eventBandHeightPx +
-    layoutDensity.monthRowBottomPaddingPx;
-  const minHeightPx = isHabitMode
-    ? scaleVerticalSpacing(
-        getDesktopHabitRowMinHeight(habitPresentation?.habits.length ?? 0)
+    resolvedBottomPaddingPx;
+  // Cada mês tem sua própria altura em modo hábito: parte de 1 hábito e só
+  // cresce até o pico real de hábitos marcados no mesmo dia dentro do mês
+  // (não do total de hábitos visíveis no seletor, que é global).
+  const maxHabitsMarkedInMonth = habitPresentation
+    ? inMonthDays.reduce(
+        (max, day) =>
+          Math.max(
+            max,
+            getCompletedHabitsForDate(
+              habitPresentation.habits,
+              habitPresentation.checkIns,
+              day.iso
+            ).length
+          ),
+        1
       )
+    : 0;
+  const minHeightPx = isHabitMode
+    ? scaleVerticalSpacing(getDesktopHabitRowMinHeight(maxHabitsMarkedInMonth))
     : scaleVerticalSpacing(
         Math.max(layoutDensity.monthRowBaseMinHeightPx, baseContentHeight)
       );

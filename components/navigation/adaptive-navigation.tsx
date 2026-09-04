@@ -3,6 +3,8 @@
 import * as React from "react";
 import {
   CalendarDays,
+  ChevronsDownUp,
+  ChevronsUpDown,
   CircleCheck,
   LayoutGrid,
   UserRound,
@@ -39,6 +41,9 @@ type ProductNavigationProps = {
   themeHighlighted?: boolean;
   themeDisabled?: boolean;
   onGuidedThemeChange?: () => void;
+  showHeaderMinimizeToggle?: boolean;
+  headerMinimized?: boolean;
+  onToggleHeaderMinimized?: () => void;
 };
 
 const ICON_BY_NAME: Record<
@@ -128,6 +133,9 @@ export function DesktopProductNavigation({
   themeHighlighted = false,
   themeDisabled = false,
   onGuidedThemeChange,
+  showHeaderMinimizeToggle = false,
+  headerMinimized = false,
+  onToggleHeaderMinimized,
 }: ProductNavigationProps) {
   const handleAccount = (event: React.MouseEvent<HTMLButtonElement>) => {
     if (authLoading) return;
@@ -153,6 +161,40 @@ export function DesktopProductNavigation({
       </nav>
 
       <div className="col-start-3 hidden items-center gap-1 justify-self-end md:flex">
+        {showHeaderMinimizeToggle && onToggleHeaderMinimized ? (
+          <button
+            type="button"
+            data-product-header-minimize="desktop"
+            aria-pressed={headerMinimized}
+            aria-label={
+              headerMinimized
+                ? "Mostrar contextos e categorias"
+                : "Minimizar contextos e categorias"
+            }
+            title={
+              headerMinimized
+                ? "Mostrar contextos e categorias"
+                : "Minimizar contextos e categorias"
+            }
+            className="grid size-10 place-items-center rounded-xl text-muted-foreground/55 transition-colors hover:bg-muted/45 hover:text-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+            onClick={onToggleHeaderMinimized}
+          >
+            <span className="relative grid size-[18px] place-items-center">
+              <ChevronsUpDown
+                className={cn(
+                  "absolute size-[18px] transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
+                  headerMinimized ? "scale-100 opacity-100" : "scale-75 opacity-0"
+                )}
+              />
+              <ChevronsDownUp
+                className={cn(
+                  "absolute size-[18px] transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
+                  headerMinimized ? "scale-75 opacity-0" : "scale-100 opacity-100"
+                )}
+              />
+            </span>
+          </button>
+        ) : null}
         {onToggleOrganize ? (
           <button
             type="button"
