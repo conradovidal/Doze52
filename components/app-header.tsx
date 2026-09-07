@@ -92,6 +92,7 @@ type AppHeaderProps = {
   onGuidedCalendarImported?: (pack?: CalendarPack) => void;
   guidedCalendarSelectionActive?: boolean;
   guidedEditPreviewActive?: boolean;
+  accountNudgeHighlightProfile?: boolean;
   onboardingLayoutLocked?: boolean;
   onboardingLayoutReserved?: boolean;
   mobileExamplePreviewActive?: boolean;
@@ -141,6 +142,7 @@ export function AppHeader({
   onGuidedCalendarImported,
   guidedCalendarSelectionActive = false,
   guidedEditPreviewActive = false,
+  accountNudgeHighlightProfile = false,
   onboardingLayoutLocked = false,
   onboardingLayoutReserved = false,
   mobileExamplePreviewActive = false,
@@ -248,7 +250,8 @@ export function AppHeader({
   const calendarLauncherDisabled =
     mobileExamplePreviewActive ||
     (onboardingLayoutLocked && !guidedCalendarSelectionActive);
-  const yearSelectDisabled = onboardingLayoutLocked;
+  const yearSelectDisabled =
+    onboardingLayoutLocked && guidedToolbarNotice?.target !== "year";
   const themeToggleDisabled =
     onboardingLayoutLocked && guidedToolbarNotice?.target !== "theme";
   const isMobileMode = isMobileCalendarUi === true;
@@ -273,10 +276,21 @@ export function AppHeader({
   // (shared with the Habits surface, which has its own equivalent chrome to
   // hide using the very same toggle).
   const [categoriesRowExpanded, setCategoriesRowExpanded] = React.useState(true);
+  // Assim que a pessoa usa o botão de recolher/mostrar, a decisão passa a ser
+  // dela: o padrão por altura não volta a mandar até o fim da sessão.
+  const categoriesRowManuallySetRef = React.useRef(false);
 
   React.useLayoutEffect(() => {
     if (!canMinimizeHeader) return;
-    setCategoriesRowExpanded(window.innerHeight >= 900);
+    const shortViewportQuery = window.matchMedia("(min-height: 900px)");
+    const applyViewportDefault = () => {
+      if (categoriesRowManuallySetRef.current) return;
+      setCategoriesRowExpanded(shortViewportQuery.matches);
+    };
+    applyViewportDefault();
+    shortViewportQuery.addEventListener("change", applyViewportDefault);
+    return () =>
+      shortViewportQuery.removeEventListener("change", applyViewportDefault);
   }, [canMinimizeHeader]);
 
   React.useEffect(() => {
@@ -544,8 +558,14 @@ export function AppHeader({
               onToggleOrganize={handleToggleOrganize}
               organizeActive={organizeActive}
               organizeDisabled={organizeDisabled}
-              organizeHighlighted={guidedToolbarNotice?.target === "edit"}
-              highlightProfile={guidedToolbarNotice?.target === "profile"}
+              organizeHighlighted={
+                guidedToolbarNotice?.target === "edit" ||
+                guidedToolbarNotice?.target === "wrap-up"
+              }
+              highlightProfile={
+                guidedToolbarNotice?.target === "profile" ||
+                accountNudgeHighlightProfile
+              }
               highlightDestination={
                 guidedToolbarNotice?.target === "habit-surface" ? "habits" : undefined
               }
@@ -576,15 +596,21 @@ export function AppHeader({
               anchorPlacement="below-end"
             />
           ) : null}
-          {guidedToolbarNotice?.target === "profile" &&
+          {guidedToolbarNotice?.target === "visibility" &&
           onDismissGuidedSelection ? (
             <GuidedToolbarNoticeCard
               notice={guidedToolbarNotice}
               onClose={onDismissGuidedSelection}
+              onAction={
+                guidedToolbarNotice.actionLabel
+                  ? () => onGuidedToolbarAction?.("visibility")
+                  : undefined
+              }
               placement="viewport"
               portaled
-              anchorSelector="[data-product-account='desktop']"
-              anchorPlacement="below-end"
+              anchorSelector="[data-onboarding-category-id]"
+              anchorMultiple
+              anchorPlacement="below-center"
             />
           ) : null}
           {guidedToolbarNotice?.target === "habit-surface" &&
@@ -909,7 +935,11 @@ export function AppHeader({
           <div aria-hidden="true" className="h-12" />
         ) : null}
 
-        {showCalendarControls ? (
+        {showCalendarControls ? (() => {
+          const categoriesRegionExpanded = !(
+            headerMinimized && canMinimizeHeader && !onboardingLayoutLocked
+          );
+          return (
           <div
             data-onboarding-filter-region
             className={cn(
@@ -921,10 +951,7 @@ export function AppHeader({
                       ? DESKTOP_CONTROL_MAX_WIDTH_CLASS
                       : "max-w-[62rem]",
                     useAdaptiveNavigation
-                      ? cn(
-                          DESKTOP_CONTROL_DIVIDER_CLASS,
-                          DESKTOP_CONTROL_ROW_GAP_CLASS
-                        )
+                      ? DESKTOP_CONTROL_ROW_GAP_CLASS
                       : "border-t border-border/45 pt-2.5 md:pt-3"
                   ),
               onboardingLayoutReserved &&
@@ -933,8 +960,11 @@ export function AppHeader({
           >
           <CollapsibleControlRegion
             id="app-header-filter-region"
-            expanded={
-              !(headerMinimized && canMinimizeHeader && !onboardingLayoutLocked)
+            expanded={categoriesRegionExpanded}
+            contentClassName={
+              !isMobileMode && useAdaptiveNavigation
+                ? cn(categoriesRegionExpanded && DESKTOP_CONTROL_DIVIDER_CLASS)
+                : undefined
             }
           >
           <div
@@ -1087,12 +1117,18 @@ export function AppHeader({
                       highlightedProfileId={highlightedProfileId}
                     />
 
-                    {guidedToolbarNotice?.target === "edit" &&
+                    {(guidedToolbarNotice?.target === "edit" ||
+                      (guidedToolbarNotice?.target === "wrap-up" &&
+                        !effectiveInlineEditMode)) &&
                     onDismissGuidedSelection ? (
                       <GuidedToolbarNoticeCard
                         notice={guidedToolbarNotice}
                         onClose={onDismissGuidedSelection}
-                        onAction={() => onGuidedToolbarAction?.("edit")}
+                        onAction={
+                          guidedToolbarNotice.target === "edit"
+                            ? () => onGuidedToolbarAction?.("edit")
+                            : undefined
+                        }
                         placement="viewport"
                         portaled
                         anchorSelector='[data-product-organize="desktop"][data-onboarding-highlighted="true"]'
@@ -1104,6 +1140,7 @@ export function AppHeader({
                   <button
                     type="button"
                     onClick={() => {
+                      categoriesRowManuallySetRef.current = true;
                       setCategoriesRowExpanded((current) => !current);
                       onFilterLayoutChange?.();
                     }}
@@ -1156,6 +1193,9 @@ export function AppHeader({
                         className="w-max flex-nowrap justify-start sm:w-auto"
                         highlightedCategoryId={highlightedCategoryId}
                         highlightedCategoryEffect={highlightedCategoryEffect}
+                        highlightAllVisible={
+                          guidedToolbarNotice?.target === "visibility"
+                        }
                       />
                     </div>
                   </div>
@@ -1177,12 +1217,18 @@ export function AppHeader({
                       highlightedProfileId={highlightedProfileId}
                     />
 
-                    {guidedToolbarNotice?.target === "edit" &&
+                    {(guidedToolbarNotice?.target === "edit" ||
+                      (guidedToolbarNotice?.target === "wrap-up" &&
+                        !effectiveInlineEditMode)) &&
                     onDismissGuidedSelection ? (
                       <GuidedToolbarNoticeCard
                         notice={guidedToolbarNotice}
                         onClose={onDismissGuidedSelection}
-                        onAction={() => onGuidedToolbarAction?.("edit")}
+                        onAction={
+                          guidedToolbarNotice.target === "edit"
+                            ? () => onGuidedToolbarAction?.("edit")
+                            : undefined
+                        }
                         placement="viewport"
                         portaled
                         anchorSelector='[data-product-organize="desktop"][data-onboarding-highlighted="true"]'
@@ -1275,7 +1321,8 @@ export function AppHeader({
             </div>
           ) : null}
           </div>
-        ) : null}
+          );
+        })() : null}
 
         {!showCalendarControls || isMobileMode || useAdaptiveNavigation ? null : (
           <div
@@ -1288,7 +1335,9 @@ export function AppHeader({
 
       {useAdaptiveNavigation && !isMobileMode ? (
         <FilterEditPanel
-          open={effectiveInlineEditMode}
+          // Um modal de cada vez: quando a criação de categoria assume, o
+          // painel sai de cena em vez de virar um segundo scrim por baixo.
+          open={effectiveInlineEditMode && !categoryCreateOpen}
           activeDestination={activeDestination}
           onOpenChange={(next) => {
             if (!next && effectiveInlineEditMode) {
@@ -1307,6 +1356,7 @@ export function AppHeader({
           highlightedCategoryEffect={highlightedCategoryEffect}
           guidedToolbarNotice={guidedToolbarNotice}
           onDismissGuidedSelection={onDismissGuidedSelection}
+          onGuidedWrapUpAction={() => onGuidedToolbarAction?.("wrap-up")}
           onRequireAuth={() => onOpenAuthDialog()}
         />
       ) : null}
@@ -1333,6 +1383,11 @@ export function AppHeader({
           onCalendarOpen={onGuidedCalendarOpen}
           onCalendarClose={onGuidedCalendarClose}
           onCalendarImported={(pack) => onGuidedCalendarImported?.(pack)}
+          onBack={
+            effectiveInlineEditMode
+              ? () => setCategoryCreateOpen(false)
+              : undefined
+          }
         />
       ) : (
         <CategoryManager

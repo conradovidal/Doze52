@@ -29,7 +29,9 @@ import { DateRangeQuickPicker } from "@/components/date-range-quick-picker";
 import { RecurrenceUntilPicker } from "@/components/recurrence-until-picker";
 import { getCategoryColorToken } from "@/lib/category-palette";
 import {
+  ONBOARDING_CATEGORY_IDS,
   ONBOARDING_DEFAULT_CATEGORY_ID,
+  ONBOARDING_PROFILE_IDS,
   isOnboardingPersonalDemoGroup,
   useStore,
   type EventInput,
@@ -44,6 +46,13 @@ import { MOTION_SPRING } from "@/lib/motion";
 
 const FIELD_LABEL_CLASS =
   "text-[12px] font-semibold tracking-[-0.01em] text-foreground/78";
+
+// Fora do onboarding o campo convida em vez de exemplificar: um exemplo fixo
+// só serve quando o contexto já diz que tipo de coisa entra ali.
+const TITLE_PLACEHOLDER_SINGLE_DAY = "O que acontece nesse dia?";
+const TITLE_PLACEHOLDER_RANGE = "O que acontece nesses dias?";
+const TITLE_PLACEHOLDER_BIRTHDAY = "Ex.: Simone, Ana Paula, Rebecca";
+const TITLE_PLACEHOLDER_WORK = "Ex.: Reunião de planejamento";
 
 type RecurrenceDraft = "none" | RecurrenceType;
 type EventInputField = keyof EventInput;
@@ -138,12 +147,12 @@ export function EventDialog({
   const titleId = React.useId();
   const descriptionId = React.useId();
   const returnFocusRef = React.useRef<HTMLElement | null>(null);
+  const titleInputRef = React.useRef<HTMLInputElement | null>(null);
   const initializedSessionRef = React.useRef<string | null>(null);
   const changedFieldsRef = React.useRef<Set<EventInputField>>(new Set());
   const isManagedEvent = Boolean(
     initialEvent?.calendarPackGroupId && !allowManagedMutation
   );
-  const isGuidedCreation = Boolean(guidedIntent && !initialEvent && !isManagedEvent);
   const guidedCopy = guidedIntent ? GUIDED_COPY[guidedIntent] : null;
 
   const categoryById = React.useMemo(
@@ -322,6 +331,105 @@ export function EventDialog({
     categoryId.length > 0 &&
     hasValidCategory;
 
+  // Aniversários pedem nomes de pessoas; o contexto de trabalho pede o
+  // vocabulário do trabalho. Fora desses casos o campo faz uma pergunta em vez
+  // de dar um exemplo que não conversa com o que a pessoa está criando.
+  const suggestsPeopleNames =
+    categoryId === ONBOARDING_CATEGORY_IDS.birthday ||
+    (!initialEvent && initialRecurrenceType === "yearly");
+  const isWorkProfile = profileId === ONBOARDING_PROFILE_IDS.professional;
+  const titlePlaceholder = suggestsPeopleNames
+    ? TITLE_PLACEHOLDER_BIRTHDAY
+    : isWorkProfile
+      ? TITLE_PLACEHOLDER_WORK
+      : guidedCopy?.placeholder ??
+        (startDate && endDate && startDate !== endDate
+          ? TITLE_PLACEHOLDER_RANGE
+          : TITLE_PLACEHOLDER_SINGLE_DAY);
+  // A recorrência que vem junto com a categoria é invisível: sem esta linha a
+  // pessoa só descobre que a data se repete quando o ano seguinte aparece.
+  const categoryImpliedRecurrence =
+    !initialEvent && initialRecurrenceType === "yearly" && recurrenceType === "yearly";
+
+  const handleSave = async () => {
+    try {
+      setActiveAction("save");
+      setIsSaving(true);
+      setSubmitError(null);
+      const categoryIds = new Set(categories.map((category) => category.id));
+      validateEventInput(
+        {
+          id: initialEvent?.id ?? crypto.randomUUID(),
+          title,
+          categoryId,
+          startDate,
+          endDate,
+          notes,
+          recurrenceType: recurrenceType === "none" ? undefined : recurrenceType,
+          recurrenceUntil:
+            recurrenceType === "none" || recurrenceUntil.length === 0
+              ? undefined
+              : recurrenceUntil,
+          color:
+            categories.find((category) => category.id === categoryId)?.color ??
+            "#2563eb",
+          createdAt: initialEvent?.createdAt ?? new Date().toISOString(),
+          dayOrder: initialEvent?.dayOrder ?? 0,
+        },
+        categoryIds
+      );
+      const input: EventInput = {
+        title,
+        categoryId,
+        startDate,
+        endDate,
+        notes,
+        recurrenceType: recurrenceType === "none" ? undefined : recurrenceType,
+        recurrenceUntil:
+          recurrenceType === "none" || recurrenceUntil.length === 0
+            ? undefined
+            : recurrenceUntil,
+      };
+      if (initialEvent) {
+        const patch: EventUpdatePatch = {};
+        for (const field of changedFieldsRef.current) {
+          Object.assign(patch, { [field]: input[field] });
+        }
+        await onSubmit({ mode: "update", patch });
+      } else {
+        await onSubmit({ mode: "create", input });
+      }
+      onOpenChange(false);
+    } catch (error) {
+      const message =
+        error instanceof ValidationError
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : "Falhou ao salvar. Tente novamente.";
+      logDevError("event-dialog.submit", {
+        message,
+        hasInitialEvent: Boolean(initialEvent),
+      });
+      logProdError("Falha ao salvar evento.");
+      setSubmitError(message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Digitar e apertar Enter salva, como em qualquer formulário. Dentro do
+  // bloco de notas o Enter continua quebrando linha, e o Escape (que o Radix
+  // já trata) continua cancelando.
+  const handleContentKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
+    if (event.key !== "Enter" || event.defaultPrevented) return;
+    if (event.nativeEvent.isComposing) return;
+    if (!(event.target instanceof HTMLInputElement)) return;
+    if (!canSave || isSaving) return;
+    event.preventDefault();
+    void handleSave();
+  };
+
   const editorTitle = isManagedEvent
     ? "Detalhes do evento"
     : initialEvent
@@ -370,16 +478,23 @@ export function EventDialog({
             </label>
             <Input
               id="event-title"
+              ref={titleInputRef}
               className="h-10 rounded-xl text-[15px]"
-              placeholder={guidedCopy?.placeholder ?? "Ex.: Reunião de planejamento"}
+              placeholder={titlePlaceholder}
               value={title}
               disabled={isManagedEvent}
-              autoFocus={isGuidedCreation}
               onChange={(event) => {
                 changedFieldsRef.current.add("title");
                 setTitle(event.target.value);
               }}
             />
+            {categoryImpliedRecurrence ? (
+              <p className="text-xs font-medium text-primary/90">
+                {currentCategory
+                  ? `Recorrência anual ativada em ${currentCategory.name}.`
+                  : "Recorrência anual ativada."}
+              </p>
+            ) : null}
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -615,72 +730,7 @@ export function EventDialog({
               pendingLabel="Salvando…"
               errorLabel="Tentar salvar"
               disabled={!canSave || isSaving}
-              onClick={async () => {
-              try {
-                setActiveAction("save");
-                setIsSaving(true);
-                setSubmitError(null);
-                const categoryIds = new Set(categories.map((category) => category.id));
-                validateEventInput(
-                  {
-                    id: initialEvent?.id ?? crypto.randomUUID(),
-                    title,
-                    categoryId,
-                    startDate,
-                    endDate,
-                    notes,
-                    recurrenceType: recurrenceType === "none" ? undefined : recurrenceType,
-                    recurrenceUntil:
-                      recurrenceType === "none" || recurrenceUntil.length === 0
-                        ? undefined
-                        : recurrenceUntil,
-                    color:
-                      categories.find((category) => category.id === categoryId)?.color ??
-                      "#2563eb",
-                    createdAt: initialEvent?.createdAt ?? new Date().toISOString(),
-                    dayOrder: initialEvent?.dayOrder ?? 0,
-                  },
-                  categoryIds
-                );
-                const input: EventInput = {
-                  title,
-                  categoryId,
-                  startDate,
-                  endDate,
-                  notes,
-                  recurrenceType: recurrenceType === "none" ? undefined : recurrenceType,
-                  recurrenceUntil:
-                    recurrenceType === "none" || recurrenceUntil.length === 0
-                      ? undefined
-                      : recurrenceUntil,
-                };
-                if (initialEvent) {
-                  const patch: EventUpdatePatch = {};
-                  for (const field of changedFieldsRef.current) {
-                    Object.assign(patch, { [field]: input[field] });
-                  }
-                  await onSubmit({ mode: "update", patch });
-                } else {
-                  await onSubmit({ mode: "create", input });
-                }
-                onOpenChange(false);
-              } catch (error) {
-                const message =
-                  error instanceof ValidationError
-                    ? error.message
-                    : error instanceof Error
-                      ? error.message
-                      : "Falhou ao salvar. Tente novamente.";
-                logDevError("event-dialog.submit", {
-                  message,
-                  hasInitialEvent: Boolean(initialEvent),
-                });
-                logProdError("Falha ao salvar evento.");
-                setSubmitError(message);
-              } finally {
-                setIsSaving(false);
-              }
-              }}
+              onClick={() => void handleSave()}
             >
               Salvar
             </AsyncStateButton>
@@ -719,6 +769,20 @@ export function EventDialog({
     });
   };
 
+  // Clicar num dia e já poder digitar: sem isto o foco cai no botão de fechar,
+  // que é o primeiro elemento focável do conteúdo.
+  const handleOpenAutoFocus = (event: Event) => {
+    rememberAnchorFocus();
+    if (isManagedEvent) return;
+    event.preventDefault();
+    requestAnimationFrame(() => {
+      const input = titleInputRef.current;
+      if (!input) return;
+      input.focus();
+      input.setSelectionRange(input.value.length, input.value.length);
+    });
+  };
+
   const rememberAnchorFocus = () => {
     if (returnFocusRef.current?.isConnected) return;
     const anchorElement = anchorPoint
@@ -750,7 +814,8 @@ export function EventDialog({
           sideOffset={12}
           collisionPadding={12}
           className="max-h-[calc(100dvh-1.5rem)] w-[min(440px,calc(100vw-1.5rem))] overflow-y-auto p-0"
-          onOpenAutoFocus={rememberAnchorFocus}
+          onKeyDown={handleContentKeyDown}
+          onOpenAutoFocus={handleOpenAutoFocus}
           onCloseAutoFocus={(event) => {
             event.preventDefault();
             restoreFocus();
@@ -774,7 +839,8 @@ export function EventDialog({
       <DialogContent
         showCloseButton={false}
         className="max-h-[calc(100dvh-1.5rem)] overflow-y-auto p-5 sm:max-w-[440px] sm:p-6"
-        onOpenAutoFocus={rememberAnchorFocus}
+        onKeyDown={handleContentKeyDown}
+        onOpenAutoFocus={handleOpenAutoFocus}
         onCloseAutoFocus={(event) => {
           event.preventDefault();
           restoreFocus();

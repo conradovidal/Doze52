@@ -296,7 +296,7 @@ export const getGuidedSelectionNotice = ({
     return {
       mode: "period",
       title: copy.title,
-      instruction: `${formatDate(draft.startDate)} — ${formatDate(draft.endDate)}`,
+      instruction: `${formatDate(draft.startDate)} a ${formatDate(draft.endDate)}`,
     };
   }
   return null;
@@ -509,7 +509,7 @@ export function GuidedOnboardingPanel({
             Por qual contexto você quer começar?
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Escolha por onde começar — dá para alternar entre eles depois.
+            Dá para alternar entre eles depois.
           </p>
           <div className="mt-4 grid gap-2">
             {CONTEXT_OPTIONS.map((option) => {
@@ -605,7 +605,7 @@ export function GuidedOnboardingPanel({
             <p className="mt-1 text-xs font-medium text-primary">
               {draft.startDate === draft.endDate
                 ? formatDate(draft.startDate)
-                : `${formatDate(draft.startDate)} — ${formatDate(draft.endDate)}`}
+                : `${formatDate(draft.startDate)} a ${formatDate(draft.endDate)}`}
             </p>
           </div>
           <Input

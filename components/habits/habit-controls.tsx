@@ -57,7 +57,6 @@ import {
   DESKTOP_CONTROL_DIVIDER_CLASS,
   DESKTOP_CONTROL_GRID_GAP_CLASS,
   DESKTOP_CONTROL_MAX_WIDTH_CLASS,
-  DESKTOP_CONTROL_REGION_TOP_GAP_CLASS,
   DESKTOP_CONTROL_ROW_GAP_CLASS,
 } from "@/lib/desktop-control-layout";
 
@@ -266,6 +265,11 @@ export function HabitControls({
     },
     []
   );
+  // Um card de onboarding apontando pro "+" ou pra vitrine não pode conviver
+  // com a lista recolhida — força aberto enquanto o guia (desktop ou a
+  // jornada própria do mobile) estiver instruindo algo aqui, mesmo que a
+  // pessoa tenha recolhido antes.
+  const effectiveExpanded = expanded || isEditing || Boolean(guidedNotice);
   const controlsId = React.useId();
   const [activeDrag, setActiveDrag] = React.useState<DragState | null>(null);
   const [draftOrderIds, setDraftOrderIds] = React.useState<string[] | null>(null);
@@ -509,7 +513,12 @@ export function HabitControls({
               DESKTOP_CONTROL_MAX_WIDTH_CLASS,
               DESKTOP_CONTROL_DIVIDER_CLASS,
               DESKTOP_CONTROL_ROW_GAP_CLASS,
-              DESKTOP_CONTROL_REGION_TOP_GAP_CLASS,
+              // Este mb-3 só conta enquanto a faixa está visível (some junto
+              // com o conteúdo ao recolher, dentro da região com overflow
+              // escondido) — é o par do mb-2 incondicional no wrapper
+              // (DesktopHabitsPrototype), que sozinho cobre o estado
+              // recolhido. Juntos reproduzem os dois espaços fixos que o
+              // <header> do Anual já tem prontos (gap acima + margem abaixo).
               DESKTOP_CONTROL_GRID_GAP_CLASS
             )
       )}
@@ -530,13 +539,16 @@ export function HabitControls({
             <button
               type="button"
               className="inline-flex h-8 w-8 items-center justify-center rounded-[10px] border border-border bg-card text-foreground/70 shadow-none transition-[background-color,border-color,color,box-shadow,transform] duration-150 ease-out hover:border-foreground/18 hover:bg-muted hover:text-foreground active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45"
-              aria-expanded={expanded}
+              aria-expanded={effectiveExpanded}
               aria-controls={controlsId}
-              aria-label={expanded ? "Recolher hábitos" : "Mostrar hábitos"}
+              aria-label={effectiveExpanded ? "Recolher hábitos" : "Mostrar hábitos"}
               onClick={() => setExpandedPersisted((current) => !current)}
             >
               <ChevronDown
-                className={cn("size-4 transition-transform duration-300", expanded && "rotate-180")}
+                className={cn(
+                  "size-4 transition-transform duration-300",
+                  effectiveExpanded && "rotate-180"
+                )}
               />
             </button>
           </span>
@@ -594,10 +606,10 @@ export function HabitControls({
       {mobile ? (
         <CollapsibleControlRegion
           id={controlsId}
-          expanded={expanded || isEditing}
+          expanded={effectiveExpanded}
           contentClassName={cn(
             "px-2",
-            expanded ? "border-t border-border/55 py-2" : "border-0 py-0"
+            effectiveExpanded ? "border-t border-border/55 py-2" : "border-0 py-0"
           )}
         >
           {isEditing ? (

@@ -35,6 +35,12 @@ type MobileCalendarExperienceProps = {
   guidedSelectionRange?: { startDate: string; endDate: string } | null;
   onGuidedDaySelect?: (dateIso: string) => void;
   scrollToTodayRequestKey?: number;
+  /**
+   * Faixa opcional em fluxo, no topo do ano — hoje o aviso de "comece pelo
+   * desktop". Fica fora da região que rola, então acompanha a tela sem
+   * cobrir o calendário nem travar a rolagem.
+   */
+  notice?: React.ReactNode;
 };
 
 const MONTH_LABELS = [
@@ -149,6 +155,7 @@ export function MobileCalendarExperience({
   guidedSelectionRange = null,
   onGuidedDaySelect,
   scrollToTodayRequestKey = 0,
+  notice = null,
 }: MobileCalendarExperienceProps) {
   const categories = useStore((s) => s.categories as CategoryItem[]);
   const selectedProfileIds = useStore((s) => s.selectedProfileIds);
@@ -434,6 +441,8 @@ export function MobileCalendarExperience({
       data-mobile-calendar-experience
       className="flex min-h-0 w-full flex-1 flex-col"
     >
+      {notice}
+
       <div
         ref={listRef}
         onScroll={syncActiveFromScroll}

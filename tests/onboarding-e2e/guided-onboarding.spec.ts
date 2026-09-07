@@ -347,7 +347,13 @@ const completePersonalOnboarding = async (
     const guidedCalendarChoice = categoryDialog.locator(
       '[data-onboarding-calendar-choice="true"]'
     );
-    await expect(guidedCalendarChoice).toContainText("Clique aqui");
+    // O destaque agora é o anel do produto no card alvo, não uma etiqueta
+    // encaixada no meio do parágrafo.
+    await expect(guidedCalendarChoice).not.toContainText(/clique aqui/i);
+    await expect(guidedCalendarChoice).toHaveClass(/product-spotlight-target/);
+    await expect(
+      page.locator('[data-slot="dialog-overlay"][data-state="open"]')
+    ).toHaveCount(1);
     await categoryDialog
       .getByRole("button", { name: /Adicionar calendário pronto/ })
       .click();
@@ -842,7 +848,7 @@ test("seletor de destino integra o card de mover eventos", async ({
   await deleteDialog.getByRole("button", { name: "Cancelar" }).click();
 });
 
-test("mobile recomenda o desktop e libera uma prévia somente na sessão", async ({
+test("mobile trava a Anual até a jornada de Hábitos terminar", async ({
   page,
 }, testInfo) => {
   test.skip(
@@ -850,61 +856,158 @@ test("mobile recomenda o desktop e libera uma prévia somente na sessão", async
     "Entrada desktop-first validada no viewport mobile"
   );
 
-  await page.goto("/?mobileUi=1");
-
-  const gate = page.locator("[data-mobile-desktop-first-gate]");
-  await expect(gate).toBeVisible();
-  await expect(gate).toContainText("Comece pelo desktop.");
-  await expect(gate).toContainText(
-    "O Doze 52 foi pensado para montar e visualizar o ano inteiro em uma tela maior."
+  // Um link direto para `?surface=annual` não vale para quem nunca passou
+  // pela jornada de Hábitos — ela é redirecionada de volta, mesmo por URL.
+  await page.goto("/?mobileUi=1&surface=annual");
+  await expect(page.locator("[data-habits-prototype]")).toBeVisible();
+  await expect(page.locator("[data-mobile-calendar-experience]")).toHaveCount(
+    0
   );
-  await expect(
-    page.getByRole("region", { name: "Guia inicial do Doze 52" })
-  ).toHaveCount(0);
-  const onboardingBeforePreview = await page.evaluate(() =>
-    window.localStorage.getItem("doze52:onboarding:v2")
+  // O botão de debug "Reiniciar onboarding" (só em dev/teste) fica fixo no
+  // mesmo canto inferior esquerdo do link Anual da navegação e intercepta o
+  // clique real do navegador nesta largura — tira do caminho para o teste.
+  await page.getByRole("button", { name: "Reiniciar onboarding" }).evaluate(
+    (button) => {
+      (button as HTMLElement).style.pointerEvents = "none";
+    }
   );
 
-  await gate.getByRole("button", { name: "Entrar na minha conta" }).click();
-  const authDialog = page.getByRole("dialog", { name: "Entrar" });
-  await expect(authDialog).toBeVisible();
-  await authDialog.getByRole("button", { name: "Cancelar" }).click();
+  const habitCard = page.locator("[data-guided-toolbar-notice]");
+  const annualNav = page.locator(
+    'nav[data-product-navigation="mobile"] a[data-product-destination="annual"]'
+  );
 
-  await gate
-    .getByRole("button", { name: "Explorar o ano de exemplo" })
+  // Passo 1: o "+" já vem destacado, sem "Continuar" no meio do caminho.
+  await expect(habitCard).toContainText("Passo 1 de 3");
+  await expect(habitCard).toContainText("Assim funcionam os hábitos.");
+  await expect(annualNav).toHaveAttribute("aria-disabled", "true");
+  await page
+    .locator('[data-habits-prototype] button[aria-label="Criar novo hábito"]')
     .click();
-  await expect(gate).toBeHidden();
-  await expect(page.locator("[data-mobile-calendar-experience]")).toBeVisible();
-  await expect(page.locator("[data-onboarding-edit-control]")).toBeDisabled();
-  await expect(page.locator("[data-onboarding-calendar-control]")).toBeDisabled();
-  await expect(page.locator("[data-onboarding-year-control]")).toBeEnabled();
-  await expect(page.locator("[data-onboarding-theme-control]")).toBeEnabled();
-  await expect(page.getByRole("button", { name: "Novo evento" })).toHaveCount(0);
+  await page.getByLabel("Nome do hábito").fill("Beber água");
+  await page.getByRole("button", { name: "Criar hábito" }).click();
 
-  await page.locator('[data-onboarding-profile-id][title="Profissional"]').click();
+  // Passo 2: avança sozinho ao criar; ainda travada na Anual.
+  await expect(habitCard).toContainText("Passo 2 de 3");
+  await expect(annualNav).toHaveAttribute("aria-disabled", "true");
+  await page
+    .locator('[data-habits-prototype] button[aria-pressed="false"]:not([disabled])')
+    .last()
+    .click();
+
+  // Passo 3: avança sozinho ao marcar; a Anual libera e é o próprio alvo
+  // apontado pelo card.
+  await expect(habitCard).toContainText("Passo 3 de 3");
+  await expect(habitCard).toContainText("Isto é Hábitos.");
+  await expect(annualNav).not.toHaveAttribute("aria-disabled", "true");
+
+  await annualNav.click();
+  await expect(page).toHaveURL(/surface=annual/);
+  await expect(page.locator("[data-mobile-calendar-experience]")).toBeVisible();
   await expect(
-    page.locator('[data-onboarding-category-id][title="Produto"]')
+    page.locator("[data-calendar-event-id]").first()
   ).toBeVisible();
 
+  // A jornada continua na Anual: ano (que já ensina o atalho de voltar a
+  // hoje, num só passo), tema, organizar, e por fim o Perfil — mesmo card
+  // reaproveitado, sem toque de "Continuar" só no último (a pessoa toca no
+  // botão real).
+  const yearLabel = page.locator(
+    '[data-onboarding-year-control] button[title="Ir para hoje"]'
+  );
+  const initialYearText = await yearLabel.textContent();
+
+  await expect(habitCard).toContainText("Passo 1 de 4");
+  await expect(habitCard).toContainText("Aqui você troca o ano.");
+  await expect(habitCard).toContainText("voltar direto a hoje");
+  await page
+    .locator('[data-onboarding-year-control] button[aria-label^="Voltar"]')
+    .click();
+  await expect(yearLabel).not.toHaveText(initialYearText ?? "");
+  // "Continuar" aqui não é só avançar passo: já demonstra o atalho que o
+  // card acabou de explicar, voltando o ano para hoje sozinho.
+  await habitCard.getByRole("button", { name: "Continuar" }).click();
+  await expect(yearLabel).toHaveText(initialYearText ?? "");
+
+  await expect(habitCard).toContainText("Passo 2 de 4");
+  await expect(habitCard).toContainText("Escolha o clima do seu ano.");
+  await habitCard.getByRole("button", { name: "Continuar" }).click();
+
+  await expect(habitCard).toContainText("Passo 3 de 4");
+  await expect(habitCard).toContainText("Organize contextos e categorias.");
+  await habitCard.getByRole("button", { name: "Continuar" }).click();
+
+  await expect(habitCard).toContainText("Passo 4 de 4");
+  await expect(habitCard).toContainText("Guarde esse ano com você.");
+  await expect(
+    habitCard.getByRole("button", { name: "Continuar" })
+  ).toHaveCount(0);
+
+  // Último passo: sem botão no card — toca no Perfil de verdade, que abre o
+  // painel de conta já em Cadastro e encerra a jornada.
+  await page
+    .locator('nav[data-product-navigation="mobile"] [data-onboarding-auth-entry]')
+    .click();
+  const accountPanel = page.getByRole("dialog", {
+    name: "Conta e configurações",
+  });
+  await expect(accountPanel).toBeVisible();
+  await expect(
+    accountPanel.getByRole("button", { name: "Cadastro" })
+  ).toHaveClass(/bg-background/);
+  await accountPanel.getByRole("button", { name: "Close" }).click();
+  await expect(habitCard).toHaveCount(0);
+
+  const mobileStepAfterProfile = await page.evaluate(() =>
+    window.localStorage.getItem("doze52:mobile-habits-onboarding:v1")
+  );
+  expect(mobileStepAfterProfile).toBe("completed");
+
+  // A faixa da Anual reaparece agora com a variante de quem acabou de
+  // terminar a jornada inteira.
+  const notice = page.locator("[data-mobile-desktop-first-notice]");
+  await expect(notice).toBeVisible();
+  await expect(notice).toContainText("Um gostinho do Anual.");
+
+  await notice.getByRole("button", { name: "Entrar na minha conta" }).click();
+  const authDialog = page.getByRole("dialog", { name: "Entrar" });
+  await expect(authDialog).toBeVisible();
+  // Quem terminou a jornada de Hábitos ainda não tem conta — abre direto em
+  // Cadastro, não em Login.
+  await expect(
+    authDialog.getByRole("heading", { name: "Criar conta", exact: true })
+  ).toBeVisible();
+  await authDialog.getByRole("button", { name: "Cancelar" }).click();
+
+  await notice.getByRole("button", { name: "Dispensar" }).click();
+  await expect(notice).toHaveCount(0);
+
   const persisted = await page.evaluate(() => ({
-    sessionPreview: window.sessionStorage.getItem(
-      "doze52:mobile-example-preview:session"
+    noticeDismissed: window.localStorage.getItem(
+      "doze52:mobile-desktop-first-notice:dismissed"
     ),
-    onboardingRaw: window.localStorage.getItem("doze52:onboarding:v2"),
+    mobileHabitsStep: window.localStorage.getItem(
+      "doze52:mobile-habits-onboarding:v1"
+    ),
   }));
-  expect(persisted.sessionPreview).toBe("1");
-  expect(persisted.onboardingRaw).toBe(onboardingBeforePreview);
+  expect(persisted.noticeDismissed).toBe("true");
+  expect(persisted.mobileHabitsStep).toBe("completed");
 
   await page.reload();
-  await expect(gate).toBeHidden();
+  await expect(notice).toHaveCount(0);
+  await expect(page.locator("[data-mobile-calendar-experience]")).toBeVisible();
 
+  // Quem já criou um hábito de verdade pela jornada do mobile não deve ver o
+  // guia completo do desktop de novo ao abrir por lá: `hasExistingHabits`
+  // entra em `hasEstablishedSetup`, que já desativa `guidedOnboardingEligible`
+  // fora de uma sessão em progresso.
   await page.goto("/?mobileUi=0");
   await expect(
     page.getByRole("region", { name: "Guia inicial do Doze 52" })
-  ).toHaveAttribute("data-guided-onboarding-step", "context_selection");
+  ).toHaveCount(0);
 });
 
-test("mobile preserva progresso parcial e exige continuação no desktop", async ({
+test("mobile preserva progresso parcial e recomenda continuar no desktop", async ({
   page,
 }, testInfo) => {
   test.skip(
@@ -922,25 +1025,22 @@ test("mobile preserva progresso parcial e exige continuação no desktop", async
     "date_category_selection"
   );
 
-  await page.goto("/?mobileUi=1");
-  const gate = page.locator("[data-mobile-desktop-first-gate]");
-  await expect(gate).toContainText(
-    "Continue a montagem do seu ano no desktop."
-  );
-  await expect(
-    gate.getByRole("button", { name: "Explorar o ano de exemplo" })
-  ).toHaveCount(0);
+  await page.goto("/?mobileUi=1&surface=annual");
+  const notice = page.locator("[data-mobile-desktop-first-notice]");
+  await expect(notice).toContainText("Continue no desktop.");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.locator("body")).toHaveCSS("pointer-events", "auto");
   await expect(panel).toHaveCount(0);
 
   const persisted = await page.evaluate(() => ({
-    sessionPreview: window.sessionStorage.getItem(
-      "doze52:mobile-example-preview:session"
+    noticeDismissed: window.localStorage.getItem(
+      "doze52:mobile-desktop-first-notice:dismissed"
     ),
     onboarding: JSON.parse(
       window.localStorage.getItem("doze52:onboarding:v2") ?? "null"
     ) as { step?: string } | null,
   }));
-  expect(persisted.sessionPreview).toBeNull();
+  expect(persisted.noticeDismissed).toBeNull();
   expect(persisted.onboarding?.step).toBe("date_category_selection");
 });
 

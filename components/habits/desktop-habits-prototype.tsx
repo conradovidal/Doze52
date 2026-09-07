@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { YearGrid } from "@/components/calendar/year-grid";
+import { CollapsibleControlRegion } from "@/components/ui/collapsible-control-region";
 import { HabitControls } from "@/components/habits/habit-controls";
 import { GuidedToolbarNoticeCard } from "@/components/onboarding/guided-toolbar-notice";
 import type { Habit, HabitCheckIn } from "@/lib/types";
@@ -81,7 +82,17 @@ export function DesktopHabitsPrototype({
       data-habits-layout="desktop-year"
       className="flex min-h-0 flex-1 flex-col"
     >
-      {!headerMinimized ? (
+      {/* Mesmo mecanismo do Anual (CollapsibleControlRegion): a faixa some com
+          animação, sem deixar linha residual — a borda vive dentro do
+          HabitControls, então ela colapsa junto com o conteúdo. O mb-2 fica
+          aqui, fora da região que anima (nunca é cortado ao recolher) —
+          reproduz o espaço fixo que o <header> do Anual já tem entre o topo
+          e a faixa de categorias, independente de estar expandida ou não. */}
+      <CollapsibleControlRegion
+        id="habits-header-region"
+        expanded={!headerMinimized}
+        className="mb-2"
+      >
         <HabitControls
           habits={habits}
           selectedHabit={selectedHabit}
@@ -97,7 +108,7 @@ export function DesktopHabitsPrototype({
           onDismissGuidedNotice={onDismissGuidedNotice}
           onGuidedNoticeAction={onGuidedNoticeAction}
         />
-      ) : null}
+      </CollapsibleControlRegion>
 
       <div
         className="min-h-0 flex-1 overflow-hidden pb-1"
@@ -139,8 +150,10 @@ export function DesktopHabitsPrototype({
           onAction={onGuidedNoticeAction}
           placement="viewport"
           portaled
-          anchorSelector='[data-onboarding-retrospective-date="true"]'
-          anchorMultiple
+          // Perto de "hoje", não do meio das duas semanas de retrospectiva —
+          // é o dia que ela reconhece de cara, o resto do intervalo é só
+          // contexto.
+          anchorSelector={`[data-day-iso="${todayIso}"]`}
           anchorPlacement="above-center"
         />
       ) : null}

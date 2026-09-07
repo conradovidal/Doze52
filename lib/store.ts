@@ -1318,17 +1318,6 @@ export const getOnboardingContextSeedSnapshot = (
   };
 };
 
-// As 2 categorias que ficam visíveis quando o guia termina: a que já existia
-// no ano de exemplo (Eventos/Projetos) e a que a pessoa criou com a própria
-// mão durante o tour (Aniversários), mantendo o restante do ano de exemplo
-// como dado real, só oculto por padrão.
-export const getOnboardingClosingVisibleCategoryIds = (
-  context: OnboardingContext
-): string[] =>
-  context === "personal"
-    ? [ONBOARDING_CATEGORY_IDS.events, ONBOARDING_CATEGORY_IDS.birthday]
-    : [ONBOARDING_CATEGORY_IDS.workTrips, DEMO_CATEGORY_IDS.workEvents];
-
 export const isOnboardingPersonalDemoSnapshot = (
   snapshot: OnboardingPersonalDemoSnapshot
 ) => {

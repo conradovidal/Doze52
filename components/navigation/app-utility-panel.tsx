@@ -217,6 +217,13 @@ type AppUtilityPanelProps = {
   onOpenAuthDialog: () => void;
   onDismissGuidedNotice?: () => void;
   onGuidedAppearanceOpen?: () => void;
+  /**
+   * Força o formulário de conta a abrir em "Cadastro" em vez do padrão
+   * "Login" — usado pela jornada própria do mobile (goto_profile em
+   * lib/mobile-habits-onboarding.ts): quem chega até aqui por ela ainda não
+   * tem conta.
+   */
+  authInitialMode?: "login" | "signup";
 };
 
 export function AppUtilityPanel({
@@ -229,6 +236,7 @@ export function AppUtilityPanel({
   onOpenAuthDialog,
   onDismissGuidedNotice,
   onGuidedAppearanceOpen,
+  authInitialMode = "login",
 }: AppUtilityPanelProps) {
   const router = useRouter();
   const { notify } = useFeedback();
@@ -510,7 +518,11 @@ export function AppUtilityPanel({
           </div>
         ) : (
           <div className="mx-auto max-w-sm text-left">
-            <AuthForm open={open} onSuccess={() => onOpenChange(false)} />
+            <AuthForm
+              open={open}
+              initialMode={authInitialMode}
+              onSuccess={() => onOpenChange(false)}
+            />
           </div>
         );
       case "plan":
