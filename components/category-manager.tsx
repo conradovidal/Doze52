@@ -363,6 +363,15 @@ export function CategoryManager({
         desktopPlacement="right-start"
         mobileMode="sheet"
         className="sm:max-w-[500px] p-5 sm:p-6"
+        onKeyDown={(event) => {
+          // Mesmo critério do diálogo de evento: digitar e apertar Enter salva.
+          if (event.key !== "Enter" || event.defaultPrevented) return;
+          if (event.nativeEvent.isComposing) return;
+          if (!(event.target instanceof HTMLInputElement)) return;
+          if (!canSave || isSaving) return;
+          event.preventDefault();
+          void handleSave();
+        }}
       >
         <DialogHeader>
           <div className="flex items-center gap-2 pr-8">
@@ -389,6 +398,7 @@ export function CategoryManager({
           <Input
             id="category-name"
             aria-label="Nome da categoria"
+            autoFocus
             value={name}
             onChange={(e) =>
               setName(e.target.value.slice(0, CATEGORY_NAME_MAX_LENGTH))

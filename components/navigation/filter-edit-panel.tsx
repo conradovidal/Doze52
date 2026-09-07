@@ -1,19 +1,21 @@
 "use client";
 
 import * as React from "react";
-import { CalendarDays, CircleCheck } from "lucide-react";
+import { ArrowLeft, CalendarDays, CircleCheck } from "lucide-react";
 import { ProfileBar } from "@/components/profile-bar";
 import { CategoryBar } from "@/components/category-bar";
 import { HabitEditList } from "@/components/habits/habit-edit-list";
 import {
   HABIT_COLORS,
-  HabitEditorDialog,
+  HabitEditorFields,
 } from "@/components/habits/habit-editor-dialog";
 import { ProUpgradeDialog } from "@/components/billing/pro-upgrade-dialog";
 import {
   GuidedToolbarNoticeCard,
   type GuidedToolbarNotice,
 } from "@/components/onboarding/guided-toolbar-notice";
+import { WrapUpCategorySuggestions } from "@/components/onboarding/wrap-up-category-suggestions";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -68,6 +70,7 @@ type FilterEditPanelProps = {
   highlightedCategoryEffect?: "focus" | "reveal";
   guidedToolbarNotice?: GuidedToolbarNotice | null;
   onDismissGuidedSelection?: () => void;
+  onGuidedWrapUpAction?: () => void;
   onRequireAuth?: (anchorPoint?: AnchorPoint) => void;
 };
 
@@ -87,16 +90,20 @@ export function FilterEditPanel({
   highlightedCategoryEffect,
   guidedToolbarNotice,
   onDismissGuidedSelection,
+  onGuidedWrapUpAction,
   onRequireAuth,
 }: FilterEditPanelProps) {
   const highlightCreate = guidedToolbarNotice?.target === "calendars";
+  const showWrapUpNotice =
+    guidedToolbarNotice?.target === "wrap-up" && Boolean(onGuidedWrapUpAction);
 
   const [section, setSection] = React.useState<ProductDestinationId>(
     activeDestination
   );
   React.useEffect(() => {
-    if (open) setSection(activeDestination);
-  }, [open, activeDestination]);
+    if (!open) return;
+    setSection(showWrapUpNotice ? "annual" : activeDestination);
+  }, [open, activeDestination, showWrapUpNotice]);
 
   const { notify } = useFeedback();
   const { limits, isPro, isLoading: isBillingLoading, error: billingError } =
@@ -122,6 +129,15 @@ export function FilterEditPanel({
   const [draftName, setDraftName] = React.useState("");
   const [draftColor, setDraftColor] = React.useState<string>(HABIT_COLORS[0]);
   const [upgradeOpen, setUpgradeOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    // Fechar o painel inteiro (Escape, clique fora) não deve deixar a
+    // próxima abertura caindo direto na edição de hábito.
+    if (!open) {
+      setHabitDialogOpen(false);
+      setEditingHabitId(null);
+    }
+  }, [open]);
 
   const creationUnavailable = isBillingLoading || Boolean(billingError);
   const reachedHabitLimit = activeHabits.length >= limits.maxHabits;
@@ -190,27 +206,61 @@ export function FilterEditPanel({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         data-filter-edit-panel
-        className="flex h-[min(28rem,86dvh)] w-[min(30rem,calc(100vw-3rem))] max-w-[30rem] flex-col overflow-hidden p-0"
+        // Piso igual ao tamanho de sempre; teto só como rede de segurança —
+        // o conteúdo cresce em vez de rolar, e só rola se ultrapassar o teto.
+        className="flex min-h-[min(28rem,86dvh)] max-h-[86dvh] w-[min(30rem,calc(100vw-3rem))] max-w-[30rem] flex-col overflow-hidden p-0"
       >
         <DialogDescription className="sr-only">
           Gerencie contextos, categorias e hábitos.
         </DialogDescription>
         <div className="flex h-full min-h-0 flex-col">
           <header className="grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-3 border-b border-border px-5 py-4">
-            <DialogTitle className="text-base font-semibold">
-              Organizar
-            </DialogTitle>
-            <SegmentedControl
-              value={section}
-              options={ORGANIZE_SECTION_OPTIONS}
-              onValueChange={setSection}
-              aria-label="Visão a organizar"
-              className="min-w-0 justify-self-center"
-            />
-            <span aria-hidden="true" />
+            {habitDialogOpen ? (
+              <div className="col-span-3 flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  className="-ml-1.5"
+                  aria-label="Voltar para Organizar"
+                  onClick={() => setHabitDialogOpen(false)}
+                >
+                  <ArrowLeft className="size-4" />
+                </Button>
+                <DialogTitle className="text-base font-semibold">
+                  {editingHabitId ? "Editar hábito" : "Novo hábito"}
+                </DialogTitle>
+              </div>
+            ) : (
+              <>
+                <DialogTitle className="text-base font-semibold">
+                  Organizar
+                </DialogTitle>
+                <SegmentedControl
+                  value={section}
+                  options={ORGANIZE_SECTION_OPTIONS}
+                  onValueChange={setSection}
+                  aria-label="Visão a organizar"
+                  className="min-w-0 justify-self-center"
+                />
+                <span aria-hidden="true" />
+              </>
+            )}
           </header>
           <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
-            {section === "annual" ? (
+            {habitDialogOpen ? (
+              <HabitEditorFields
+                dialogSemantics={false}
+                name={draftName}
+                color={draftColor}
+                onNameChange={setDraftName}
+                onColorChange={setDraftColor}
+                onSubmit={submitHabit}
+                editing={Boolean(editingHabitId)}
+                onDelete={editingHabitId ? deleteEditingHabit : undefined}
+                onCancel={() => setHabitDialogOpen(false)}
+              />
+            ) : section === "annual" ? (
               <>
                 <section>
                   <ProfileBar
@@ -224,15 +274,34 @@ export function FilterEditPanel({
                 </section>
 
                 <section className="relative mt-6 border-t border-border/55 pt-5">
-                  <CategoryBar
-                    isInlineEditMode
-                    editingProfileId={editingProfileId}
-                    onCreateCategory={onCreateCategory}
-                    onEditCategory={onEditCategory}
-                    highlightedCategoryId={highlightedCategoryId}
-                    highlightedCategoryEffect={highlightedCategoryEffect}
-                    highlightCreate={highlightCreate}
-                  />
+                  {showWrapUpNotice &&
+                  editingProfileId &&
+                  guidedToolbarNotice?.categorySuggestions?.length ? (
+                    <WrapUpCategorySuggestions
+                      profileId={editingProfileId}
+                      suggestions={guidedToolbarNotice.categorySuggestions}
+                      cap={limits.maxCategories}
+                    >
+                      <CategoryBar
+                        isInlineEditMode
+                        editingProfileId={editingProfileId}
+                        onCreateCategory={onCreateCategory}
+                        onEditCategory={onEditCategory}
+                        highlightedCategoryId={highlightedCategoryId}
+                        highlightedCategoryEffect={highlightedCategoryEffect}
+                      />
+                    </WrapUpCategorySuggestions>
+                  ) : (
+                    <CategoryBar
+                      isInlineEditMode
+                      editingProfileId={editingProfileId}
+                      onCreateCategory={onCreateCategory}
+                      onEditCategory={onEditCategory}
+                      highlightedCategoryId={highlightedCategoryId}
+                      highlightedCategoryEffect={highlightedCategoryEffect}
+                      highlightCreate={highlightCreate}
+                    />
+                  )}
                   {highlightCreate && !categoryCreateOpen && onDismissGuidedSelection ? (
                     <GuidedToolbarNoticeCard
                       notice={guidedToolbarNotice!}
@@ -242,6 +311,20 @@ export function FilterEditPanel({
                       anchorSelector="[data-onboarding-calendar-control]"
                       anchorPlacement="below-center"
                     />
+                  ) : null}
+                  {showWrapUpNotice ? (
+                    // No fluxo normal do documento (não flutuando por cima):
+                    // o conteúdo cresce e empurra o card para baixo, em vez
+                    // de arriscar sobrepor as próprias sugestões que ele
+                    // descreve conforme a lista de categorias muda de altura.
+                    <div className="mt-4">
+                      <GuidedToolbarNoticeCard
+                        notice={guidedToolbarNotice!}
+                        onClose={() => onDismissGuidedSelection?.()}
+                        onAction={onGuidedWrapUpAction}
+                        inline
+                      />
+                    </div>
                   ) : null}
                 </section>
               </>
@@ -262,17 +345,6 @@ export function FilterEditPanel({
         </div>
       </DialogContent>
 
-      <HabitEditorDialog
-        open={habitDialogOpen}
-        name={draftName}
-        color={draftColor}
-        onOpenChange={setHabitDialogOpen}
-        onNameChange={setDraftName}
-        onColorChange={setDraftColor}
-        onSubmit={submitHabit}
-        editing={Boolean(editingHabitId)}
-        onDelete={editingHabitId ? deleteEditingHabit : undefined}
-      />
       <ProUpgradeDialog
         open={upgradeOpen}
         onOpenChange={setUpgradeOpen}

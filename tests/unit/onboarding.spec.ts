@@ -170,9 +170,14 @@ test("cria contexto, categoria incremental de datas e pula direto para edição"
     at: "2026-07-20T10:02:00.000Z",
   });
   expect(state).toMatchObject({
-    step: "edit_instruction",
+    step: "visibility_instruction",
     dateItemsCreated: 2,
   });
+
+  state = reduceGuidedOnboardingState(state, {
+    type: "continue_from_visibility",
+  });
+  expect(state.step).toBe("edit_instruction");
 
   state = reduceGuidedOnboardingState(state, {
     type: "open_edit_preview",
@@ -210,6 +215,12 @@ test("cria contexto, categoria incremental de datas e pula direto para edição"
     type: "confirm_theme",
     complete: true,
     at: "2026-07-20T10:05:00.000Z",
+  });
+  expect(state.step).toBe("wrap_up_instruction");
+
+  state = reduceGuidedOnboardingState(state, {
+    type: "continue_from_wrap_up",
+    at: "2026-07-20T10:06:00.000Z",
   });
   expect(state).toMatchObject({
     step: "completed",
@@ -267,13 +278,28 @@ test("onboarding desktop termina em Hábitos sem retornar ao ano", () => {
     })
   ).toEqual(retrospective);
 
-  const completed = reduceGuidedOnboardingState(retrospective, {
+  // Sem tema confirmado ainda, o guia segue para o tema (não volta ao Anual,
+  // e ainda não termina) antes do resumo final e do convite de conta.
+  const afterHabits = reduceGuidedOnboardingState(retrospective, {
     type: "finish_habit_onboarding",
     at: "2026-08-26T12:01:00.000Z",
   });
+  expect(afterHabits.step).toBe("theme_instruction");
+
+  const themed = reduceGuidedOnboardingState(afterHabits, {
+    type: "confirm_theme",
+    complete: true,
+    at: "2026-08-26T12:01:30.000Z",
+  });
+  expect(themed.step).toBe("wrap_up_instruction");
+
+  const completed = reduceGuidedOnboardingState(themed, {
+    type: "continue_from_wrap_up",
+    at: "2026-08-26T12:02:00.000Z",
+  });
   expect(completed).toMatchObject({
     step: "completed",
-    completedAt: "2026-08-26T12:01:00.000Z",
+    completedAt: "2026-08-26T12:02:00.000Z",
   });
 
   expect(

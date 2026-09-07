@@ -28,16 +28,19 @@ import {
 } from "@/components/onboarding/guided-onboarding-panel";
 import { AccountNudge } from "@/components/onboarding/account-nudge";
 import { DemoExplorationInvite } from "@/components/onboarding/demo-exploration-invite";
-import { MobileDesktopFirstGate } from "@/components/onboarding/mobile-desktop-first-gate";
+import { MobileDesktopFirstNotice } from "@/components/onboarding/mobile-desktop-first-notice";
 import { OnboardingExitDialog } from "@/components/onboarding/onboarding-exit-dialog";
-import type { GuidedToolbarNotice } from "@/components/onboarding/guided-toolbar-notice";
+import { GuidedTargetOutline } from "@/components/onboarding/guided-target-outline";
+import {
+  GuidedToolbarNoticeCard,
+  type GuidedToolbarNotice,
+} from "@/components/onboarding/guided-toolbar-notice";
 import { Button } from "@/components/ui/button";
 import { useFeedback } from "@/components/ui/feedback-provider";
 import {
   isOnboardingProfilesSnapshot,
   isOnboardingCategoriesSnapshot,
   isOnboardingPersonalDemoSnapshot,
-  getOnboardingClosingVisibleCategoryIds,
   ONBOARDING_CATEGORY_IDS,
   ONBOARDING_PROFILE_IDS,
   ONBOARDING_PERSONAL_DEMO_GROUP_ID,
@@ -50,7 +53,6 @@ import { useCalendarCatalog } from "@/lib/calendar-catalog/runtime";
 import {
   getCalendarPackGroupId,
   reconcileInstalledCalendarPacks,
-  removeCalendarPackByCategory,
 } from "@/lib/calendar-packs/import";
 import type { CalendarPack } from "@/lib/calendar-packs/types";
 import {
@@ -67,6 +69,8 @@ import {
   getGuidedOnboardingProgress,
   hasAuthorCalendarEvents,
   getGuidedCategoryRevealRemainingMs,
+  getWrapUpCategorySuggestions,
+  isGuidedOnboardingInProgress,
   readGuidedOnboardingState,
   readProductOnboardingState,
   resetAllProductOnboarding,
@@ -89,11 +93,17 @@ import { getSupabaseBrowserClient, hasSupabaseEnv } from "@/lib/supabase";
 import { expandEventsForYear } from "@/lib/recurrence";
 import { buildOnboardingHabitShowcase } from "@/lib/habits-prototype";
 import {
+  readMobileHabitsOnboardingStep,
+  resetMobileHabitsOnboarding,
+  writeMobileHabitsOnboardingStep,
+  type MobileHabitsOnboardingStep,
+} from "@/lib/mobile-habits-onboarding";
+import {
   ensureSnapshotCoverage,
   materializeUserOwnedSnapshot,
 } from "@/lib/snapshot-ownership";
 import { cn } from "@/lib/utils";
-import type { AnchorPoint } from "@/lib/types";
+import type { AnchorPoint, CategoryItem } from "@/lib/types";
 import { trackOnboardingRegion } from "@/lib/onboarding-region";
 import { isHabitsPrototypeEnabled } from "@/lib/feature-flags";
 import { useHabitsStore } from "@/lib/habits-store";
@@ -176,26 +186,28 @@ const HabitsPrototype = dynamic(() =>
   ),
   { ssr: false }
 );
-const MOBILE_EXAMPLE_PREVIEW_SESSION_KEY =
-  "doze52:mobile-example-preview:session";
+const MOBILE_DESKTOP_FIRST_NOTICE_STORAGE_KEY =
+  "doze52:mobile-desktop-first-notice:dismissed";
 
-const readMobileExamplePreviewSession = () => {
+const readDesktopFirstNoticeDismissed = () => {
   if (typeof window === "undefined") return false;
 
   try {
     return (
-      window.sessionStorage.getItem(MOBILE_EXAMPLE_PREVIEW_SESSION_KEY) === "1"
+      window.localStorage.getItem(MOBILE_DESKTOP_FIRST_NOTICE_STORAGE_KEY) ===
+      "true"
     );
   } catch {
     return false;
   }
 };
 
-const writeMobileExamplePreviewSession = () => {
+const writeDesktopFirstNoticeDismissed = () => {
   try {
-    window.sessionStorage.setItem(MOBILE_EXAMPLE_PREVIEW_SESSION_KEY, "1");
+    window.localStorage.setItem(MOBILE_DESKTOP_FIRST_NOTICE_STORAGE_KEY, "true");
   } catch {
-    // A prévia continua válida para a página atual quando o storage está indisponível.
+    // A faixa volta na próxima visita se o storage falhar; ela é dispensável,
+    // então reaparecer é bem menos grave do que travar a tela.
   }
 };
 
@@ -458,6 +470,26 @@ export default function HomePage() {
     writeDesktopVisitConfirmed();
     setHasConfirmedDesktopVisit(true);
   }, [isMobileCalendarUi, hasConfirmedDesktopVisit]);
+  // Espelho do passo salvo por HabitsPrototype (lib/mobile-habits-onboarding.ts)
+  // — a fonte da verdade continua lá; isto só existe para travar/destacar o
+  // botão Anual da navegação, que não é filho daquele componente. Começa
+  // nulo (não `readMobileHabitsOnboardingStep()` direto) para não arriscar
+  // um descompasso de hidratação nesta página, que é renderizada no
+  // servidor; HabitsPrototype relê e confirma o valor real assim que monta.
+  const [mobileHabitsOnboardingStep, setMobileHabitsOnboardingStep] =
+    React.useState<MobileHabitsOnboardingStep | null>(null);
+  // Sem isso, o espelho só é populado quando `HabitsPrototype` monta — quem
+  // chega direto na Anual (link, recarregou lá) sem passar por Hábitos
+  // nesta sessão de navegador ficaria com os passos annual_*/goto_profile
+  // salvos no storage mas invisíveis, porque o componente que os leria de
+  // volta nunca montou.
+  React.useEffect(() => {
+    setMobileHabitsOnboardingStep(readMobileHabitsOnboardingStep());
+  }, []);
+  const mobileHabitsOnboardingNavLocked =
+    (mobileHabitsOnboardingStep === "create_habit" ||
+      mobileHabitsOnboardingStep === "mark_day") &&
+    !(guidedOnboarding && isGuidedOnboardingInProgress(guidedOnboarding));
   const [activeDestination, setActiveDestination] =
     React.useState<ProductDestinationId>("annual");
   // Desktop-only "minimize chrome" toggle, shared by the Anual and Hábitos
@@ -487,8 +519,11 @@ export default function HomePage() {
   const [utilityPanelOpen, setUtilityPanelOpen] = React.useState(false);
   const [utilityPanelSection, setUtilityPanelSection] =
     React.useState<UtilityPanelSection>("account");
-  const [mobileExamplePreviewDismissed, setMobileExamplePreviewDismissed] =
-    React.useState(readMobileExamplePreviewSession);
+  const [utilityPanelAuthMode, setUtilityPanelAuthMode] = React.useState<
+    "login" | "signup"
+  >("login");
+  const [desktopFirstNoticeDismissed, setDesktopFirstNoticeDismissed] =
+    React.useState(readDesktopFirstNoticeDismissed);
   const [mobileActiveDateIso, setMobileActiveDateIso] = React.useState(() =>
     format(new Date(), "yyyy-MM-dd")
   );
@@ -593,12 +628,20 @@ export default function HomePage() {
     // actually eligible to run — otherwise an established account that
     // merely has a leftover "context_selection" step in local storage
     // would have its real Hábitos view replaced by undeletable demo data.
-    showGuidedOnboarding &&
+    // No desktop isso equivale ao antigo `showGuidedOnboarding` (que já é
+    // `guidedOnboardingEligible && isMobileCalendarUi === false`). No mobile
+    // o tour guiado não roda, mas a vitrine precisa aparecer mesmo assim: é
+    // por lá que chega a maior parte do tráfego, e abrir a grade vazia é a
+    // pior primeira impressão justamente onde ela mais custa.
+    guidedOnboardingEligible &&
       guidedOnboarding &&
       activeDestination === "habits" &&
-      isMobileCalendarUi === false &&
       todayIso
   );
+  // No mobile a vitrine nunca trava a tela: ela entra sempre pela via
+  // "display" (soma aos hábitos reais em vez de substituí-los), para que o
+  // "+" continue disponível desde o primeiro segundo.
+  const habitShowcaseDisplayOnly = isMobileCalendarUi === true;
   const guidedHabitShowcaseSource = React.useMemo(
     () =>
       habitShowcaseDataEligible && todayIso
@@ -614,6 +657,7 @@ export default function HomePage() {
   // Passo em que a vitrine ainda é só demonstrativa (nada é criado de verdade
   // ainda) — trava toda a interação, como hoje.
   const onboardingHabitShowcase =
+    !habitShowcaseDisplayOnly &&
     guidedHabitShowcaseSource &&
     guidedOnboarding &&
     shouldPresentOnboardingHabitShowcase(guidedOnboarding.step)
@@ -621,10 +665,13 @@ export default function HomePage() {
       : null;
   // A partir do passo de criar o primeiro hábito, a vitrine continua visível
   // (o hábito real nasce ao lado dela), mas deixa de travar a interação.
+  // No mobile essa é a única via: a vitrine já entra composta com os hábitos
+  // reais desde o começo, sem passo travado.
   const onboardingHabitShowcaseDisplay =
     guidedHabitShowcaseSource &&
     guidedOnboarding &&
-    (guidedOnboarding.step === "habit_instruction" ||
+    (habitShowcaseDisplayOnly ||
+      guidedOnboarding.step === "habit_instruction" ||
       guidedOnboarding.step === "habit_created_confirmation")
       ? guidedHabitShowcaseSource
       : null;
@@ -753,17 +800,39 @@ export default function HomePage() {
     if (surfaceInitializedRef.current) return;
 
     surfaceInitializedRef.current = true;
-    const initialDestination = resolveInitialProductDestination({
+    const resolvedDestination = resolveInitialProductDestination({
       search: window.location.search,
       isMobile: isMobileCalendarUi,
     });
+    // A trava do nav (handleDestinationSelect) só intercepta cliques — um
+    // link direto para `?surface=annual` a contorna completamente. Mesma
+    // regra aqui: quem ainda está criando o hábito ou marcando o primeiro
+    // dia não entra na Anual, nem por URL. `null` conta como travado
+    // também — é o valor de quem nunca abriu Hábitos nem uma vez (o próprio
+    // link de entrada já foi direto para a Anual); manda para Hábitos, que
+    // decide sozinho se essa pessoa é mesmo nova ou já estabelecida.
+    // Duas exceções: autenticado nunca trava (a jornada é só para anônimo);
+    // e quem já está em progresso no guia do desktop (ex.: abriu o tour lá,
+    // depois trocou de aparelho) também não — ela está noutro fluxo guiado,
+    // não faz sentido empurrá-la para o de Hábitos por cima.
+    const mobileStepAtLoad = readMobileHabitsOnboardingStep();
+    const initialDestination =
+      resolvedDestination === "annual" &&
+      isMobileCalendarUi === true &&
+      !session?.user.id &&
+      !isGuidedOnboardingInProgress(readGuidedOnboardingState()) &&
+      (mobileStepAtLoad === null ||
+        mobileStepAtLoad === "create_habit" ||
+        mobileStepAtLoad === "mark_day")
+        ? "habits"
+        : resolvedDestination;
     setActiveDestination(initialDestination);
     window.history.replaceState(
       window.history.state,
       "",
       buildProductDestinationUrl(window.location.href, initialDestination)
     );
-  }, [isMobileCalendarUi]);
+  }, [isMobileCalendarUi, session?.user.id]);
 
   React.useEffect(() => {
     if (windowContext !== "main") return;
@@ -1373,23 +1442,56 @@ export default function HomePage() {
   const isInitialMobileOnboarding =
     guidedOnboarding?.step === "context_selection";
   const isMobileExamplePreview = Boolean(
-    isMobileOnboardingPending &&
-      isInitialMobileOnboarding &&
-      mobileExamplePreviewDismissed
+    isMobileOnboardingPending && isInitialMobileOnboarding
   );
   // Anual mobile is a read/consult surface, not a place to build the year —
   // that lives on desktop. Established mobile users (e.g. someone who signed
   // up and started habits from their phone) fall outside guidedOnboarding
-  // once they have real content, so gate them here too until this browser
-  // has confirmed at least one non-mobile visit. This is a local, per-browser
-  // heuristic (no server-side "completed desktop onboarding" flag exists
-  // yet), so it can re-trigger on a new device/browser even for someone who
-  // already did this on desktop elsewhere — acceptable for now, revisit if
-  // that turns out to be common.
-  const showMobileDesktopFirstGate = Boolean(
-    (isMobileOnboardingPending &&
-      (!isInitialMobileOnboarding || !mobileExamplePreviewDismissed)) ||
-      (isMobileCalendarUi === true && !hasConfirmedDesktopVisit && !authLoading)
+  // once they have real content, so the notice greets them too until this
+  // browser has confirmed at least one non-mobile visit. This is a local,
+  // per-browser heuristic (no server-side "completed desktop onboarding" flag
+  // exists yet), so it can re-trigger on a new device/browser even for
+  // someone who already did this on desktop elsewhere — acceptable for now,
+  // revisit if that turns out to be common.
+  //
+  // Isso já foi um Dialog sem saída (sem botão de fechar, com Escape e
+  // clique-fora cancelados), que deixava `pointer-events: none` no body e
+  // impedia até rolar o ano. Agora é uma faixa em fluxo no topo da Anual:
+  // a mensagem continua, o bloqueio não.
+  //
+  // Dois públicos precisam da faixa: quem chega neste navegador sem nunca ter
+  // visto o desktop, e quem começou a montar o ano no desktop e voltou ao
+  // celular com o guia pela metade — esse segundo já marcou a visita, então
+  // `hasConfirmedDesktopVisit` sozinho o deixaria de fora.
+  //
+  // Mas `hasConfirmedDesktopVisit` é uma heurística por NAVEGADOR — uma conta
+  // autenticada com dados reais já confirmados pelo servidor (ano montado,
+  // categorias criadas) não pode ver essa faixa só porque é a primeira vez
+  // que ESTE navegador específico abre a Anual. A fonte da verdade da conta é
+  // o servidor, não um flag local; `hasEstablishedSetup` só é confiável aqui
+  // depois que `remoteReady` confirma que os dados já foram sincronizados.
+  const isEstablishedAccount = Boolean(
+    session?.user.id && remoteReady && hasEstablishedSetup
+  );
+  // Enquanto a continuação da jornada mobile está no ar na Anual (ver
+  // mobileAnnualOnboardingNotice), essa faixa fica de fora — os dois juntos
+  // disputariam o mesmo espaço no topo. Ela volta a fazer sentido só depois
+  // que a jornada termina de verdade (variant "onboarding", abaixo).
+  const mobileAnnualOnboardingActive = Boolean(
+    mobileHabitsOnboardingStep &&
+      mobileHabitsOnboardingStep !== "create_habit" &&
+      mobileHabitsOnboardingStep !== "mark_day" &&
+      mobileHabitsOnboardingStep !== "goto_annual" &&
+      mobileHabitsOnboardingStep !== "completed" &&
+      mobileHabitsOnboardingStep !== "dismissed"
+  );
+  const showMobileDesktopFirstNotice = Boolean(
+    isMobileCalendarUi === true &&
+      !authLoading &&
+      !desktopFirstNoticeDismissed &&
+      !isEstablishedAccount &&
+      !mobileAnnualOnboardingActive &&
+      (!hasConfirmedDesktopVisit || isMobileOnboardingPending)
   );
   const isDemoExploration =
     guidedOnboarding?.step === "demo_exploration" && !session?.user.id;
@@ -1449,28 +1551,21 @@ export default function HomePage() {
     if (!inlineEditModeActive) setWorkspaceEditMode("calendar");
   }, [guidedOnboarding?.step, inlineEditModeActive]);
 
-  React.useEffect(() => {
-    // No mobile o guia começa em Hábitos de propósito (ver
-    // resolveInitialProductDestination) — só o desktop precisa ser
-    // redirecionado para o Anual, já que é lá que os primeiros passos
-    // (escolher contexto, criar categoria) acontecem.
-    if (isMobileCalendarUi !== false) return;
-    if (guidedOnboarding?.step !== "context_selection") return;
-    if (activeDestination === "annual") return;
-    setActiveDestination("annual");
-    window.history.replaceState(
-      window.history.state,
-      "",
-      buildProductDestinationUrl(window.location.href, "annual")
-    );
-  }, [activeDestination, guidedOnboarding?.step, isMobileCalendarUi]);
-
   const recordDemoInteraction = React.useCallback(
     (key: string) => {
       if (readGuidedOnboardingState().step !== "demo_exploration") return;
       updateGuidedOnboarding({ type: "record_demo_interaction", key });
     },
     [updateGuidedOnboarding]
+  );
+
+  const handleYearChange = React.useCallback(
+    (nextYear: number) => {
+      setYear(nextYear);
+      resetCalendarFocusOnYearChange();
+      recordDemoInteraction(`year:${nextYear}`);
+    },
+    [recordDemoInteraction, resetCalendarFocusOnYearChange]
   );
 
   React.useEffect(() => {
@@ -1557,10 +1652,24 @@ export default function HomePage() {
       updateGuidedOnboarding({ type: "configure_profile", context });
       setGuidedDraft(null);
       setMobileGuidedRangeStart(null);
+      // Antes de escolher o contexto ela pode explorar a aplicação livremente,
+      // inclusive os Hábitos — mas a partir daqui o guia segue no Anual, que é
+      // onde os próximos passos (criar categoria, etc.) acontecem. No mobile o
+      // guia já começa em Hábitos de propósito, então não mexe lá.
+      if (isMobileCalendarUi === false && activeDestination !== "annual") {
+        setActiveDestination("annual");
+        window.history.replaceState(
+          window.history.state,
+          "",
+          buildProductDestinationUrl(window.location.href, "annual")
+        );
+      }
     },
     [
+      activeDestination,
       configureOnboardingContext,
       initialYear,
+      isMobileCalendarUi,
       notify,
       resetCalendarFocusOnYearChange,
       updateGuidedOnboarding,
@@ -1615,63 +1724,62 @@ export default function HomePage() {
     });
   }, [notify]);
 
-  const finalizeGuidedOnboarding = React.useCallback(
+  // O ano de exemplo é um vislumbre de como a aplicação fica com uso
+  // consistente — não vira dado da pessoa. No resumo final sobrevive só o
+  // que é dela: a categoria que ela criou durante o tour (com os itens que
+  // ela salvou nela) e o calendário pronto que ela escolheu, com os eventos
+  // dele. Nada de categoria vazia sobrando. Roda uma única vez, ao entrar no
+  // passo de resumo (wrap_up_instruction) — dali em diante ela já está livre
+  // para adicionar categorias (inclusive pelas sugestões), então o
+  // encerramento do guia não repete esse corte.
+  const trimToRealCategories = React.useCallback(
     (next: GuidedOnboardingState) => {
-      if (next.step !== "completed") return;
-      const context = next.context ?? "personal";
-      const keepCategoryIds = new Set(
-        getOnboardingClosingVisibleCategoryIds(context)
-      );
       const current = useStore.getState();
-      const categoriesToRemove = current.categories.filter(
-        (category) => !keepCategoryIds.has(category.id)
+      const createdCategoryIds = new Set(
+        [next.dateCategoryId, next.periodCategoryId].filter(
+          (categoryId): categoryId is string => Boolean(categoryId)
+        )
       );
-      const packCategoriesToRemove = categoriesToRemove.filter(
-        (category) =>
-          category.calendarPackGroupId &&
-          !isOnboardingPersonalDemoGroup(category.calendarPackGroupId)
-      );
-      const ordinaryCategoryIdsToRemove = new Set(
-        categoriesToRemove
+      // O pack escolhido no passo dos calendários prontos fica instalado
+      // inteiro: ela seguiu a instrução do guia de propósito, e é ele que dá
+      // volume ao ano. O fallback cobre estados antigos, salvos antes de o
+      // guia registrar o grupo do pack.
+      const chosenPackGroupId = next.addedCalendarPackGroupId;
+      const isChosenPackCategory = (category: CategoryItem) =>
+        Boolean(category.calendarPackGroupId) &&
+        !isOnboardingPersonalDemoGroup(category.calendarPackGroupId) &&
+        (!chosenPackGroupId ||
+          category.calendarPackGroupId === chosenPackGroupId);
+      const keepCategoryIds = new Set(
+        current.categories
           .filter(
             (category) =>
-              !category.calendarPackGroupId ||
-              isOnboardingPersonalDemoGroup(category.calendarPackGroupId)
+              createdCategoryIds.has(category.id) ||
+              isChosenPackCategory(category)
           )
           .map((category) => category.id)
       );
-      // Dentro das categorias mantidas, só o que a pessoa criou com a própria
-      // mão sobrevive: os eventos que já vinham prontos no ano de exemplo
-      // (ex.: Eventos) somem, deixando a categoria pronta para ela começar do
-      // zero. Os dois aniversários que ela criou não carregam essa marca,
-      // então não são afetados.
-      const categories = current.categories.filter(
-        (category) => !ordinaryCategoryIdsToRemove.has(category.id)
+      const categories = current.categories.filter((category) =>
+        keepCategoryIds.has(category.id)
       );
-      const events = current.events.filter((event) => {
-        if (ordinaryCategoryIdsToRemove.has(event.categoryId)) return false;
-        if (
-          keepCategoryIds.has(event.categoryId) &&
-          isOnboardingPersonalDemoGroup(event.calendarPackGroupId)
-        ) {
-          return false;
-        }
-        return true;
-      });
-      let snapshot = { profiles: current.profiles, categories, events };
-      for (const category of packCategoriesToRemove) {
-        snapshot = removeCalendarPackByCategory(
-          snapshot,
-          calendarPacks,
-          category.id
-        ).snapshot;
-      }
-      replaceAllData(snapshot);
+      const events = current.events.filter((event) =>
+        keepCategoryIds.has(event.categoryId)
+      );
+      replaceAllData({ profiles: current.profiles, categories, events });
       unlockOnboardingPersonalDemo();
+    },
+    [replaceAllData, unlockOnboardingPersonalDemo]
+  );
+
+  const finalizeGuidedOnboarding = React.useCallback(
+    (next: GuidedOnboardingState) => {
+      if (next.step !== "completed") return;
       announceGuidedCompletion();
       setActiveDestination("annual");
       resetCalendarFocusOnYearChange();
-      setHeaderMinimized(false);
+      // Revelar o chrome aqui é decisão do guia, não da pessoa: usa o setter
+      // interno para não travar o padrão automático por altura da janela.
+      setHeaderMinimizedState(false);
       requestCategoriesRowExpanded();
       window.history.replaceState(
         window.history.state,
@@ -1681,12 +1789,8 @@ export default function HomePage() {
     },
     [
       announceGuidedCompletion,
-      calendarPacks,
-      replaceAllData,
       requestCategoriesRowExpanded,
       resetCalendarFocusOnYearChange,
-      setHeaderMinimized,
-      unlockOnboardingPersonalDemo,
     ]
   );
 
@@ -1695,9 +1799,21 @@ export default function HomePage() {
     try {
       window.localStorage.removeItem("yiv-store");
       window.localStorage.removeItem("doze52:habits-store:v1");
+      // Sem isso, reiniciar o onboarding do desktop não tocava nas chaves do
+      // mobile — a jornada própria de Hábitos (Parte 3) ficava travada no
+      // que já tivesse sido salvo antes (ex.: "completed" de um teste
+      // anterior) e caía direto na dica antiga em vez de reabrir do passo 1.
+      window.localStorage.removeItem("doze52:desktop-visit-confirmed");
+      window.localStorage.removeItem(
+        "doze52:mobile-desktop-first-notice:dismissed"
+      );
+      window.localStorage.removeItem(
+        "doze52:mobile-onboarding:desktop-hint-dismissed"
+      );
     } catch {
       // Recarrega mesmo assim; sem storage disponível não há o que limpar.
     }
+    resetMobileHabitsOnboarding();
     resetAllProductOnboarding();
     window.location.reload();
   }, []);
@@ -2308,7 +2424,7 @@ export default function HomePage() {
         target: "year",
         title: "Aqui você troca o ano.",
         instruction:
-          "Depois do guia, use estas setas para consultar o ano anterior ou o próximo.",
+          "Use as setas para ver o ano anterior ou o próximo. Clique no número no centro para voltar para hoje.",
         actionLabel: "Continuar",
         stepLabel,
       };
@@ -2321,7 +2437,7 @@ export default function HomePage() {
         target: "period-navigation",
         title: "Navegue pelo seu ano.",
         instruction:
-          "Clique nos rótulos Q1–Q4 e JAN–DEZ para ir direto a trimestres e meses.",
+          "Clique nos rótulos Q1-Q4 e JAN-DEZ para ir direto a trimestres e meses. Arraste de um rótulo a outro para criar um período com vários meses ou trimestres de uma vez.",
         actionLabel: "Continuar",
         stepLabel,
       };
@@ -2357,8 +2473,8 @@ export default function HomePage() {
         target: "habit-created",
         title: "Seu primeiro hábito está pronto.",
         instruction:
-          "Antes de finalizar, registre como foram as duas últimas semanas — marque os dias que conseguir. Não precisa ser exato.",
-        actionLabel: "Finalizar guia",
+          "Antes de continuar, marque os dias das duas últimas semanas que conseguir lembrar.",
+        actionLabel: "Continuar",
         stepLabel,
       };
     }
@@ -2368,17 +2484,41 @@ export default function HomePage() {
         title: "Escolha o clima do seu ano.",
         instruction:
           "Teste o tema claro e escuro e fique com o que combina mais com você.",
-        actionLabel:
-          !isHabitsPrototypeEnabled ||
-          isMobileCalendarUi === true ||
-          guidedOnboarding.themeConfirmedAt
-            ? "Finalizar guia"
-            : undefined,
+        actionLabel: guidedOnboarding.themeConfirmedAt ? "Continuar" : undefined,
         stepLabel,
       };
     }
+    if (guidedOnboarding.step === "visibility_instruction") {
+      return {
+        target: "visibility",
+        title: "Esconda o que não precisa agora.",
+        instruction:
+          "Clique numa categoria para ocultá-la do seu ano. Ela continua guardada e volta quando você quiser.",
+        actionLabel: "Continuar",
+        stepLabel,
+      };
+    }
+    if (guidedOnboarding.step === "wrap_up_instruction") {
+      return {
+        target: "wrap-up",
+        title: "Veja o que você já construiu.",
+        instruction: inlineEditModeActive
+          ? "Sua categoria, seu calendário e seu hábito já estão aqui. Arraste até três sugestões abaixo que fizerem mais sentido pra você."
+          : "Abra o Organizar para ver o que você já construiu e escolher mais algumas categorias.",
+        actionLabel: inlineEditModeActive ? "Finalizar guia" : undefined,
+        stepLabel,
+        categorySuggestions: getWrapUpCategorySuggestions(
+          guidedOnboarding.context
+        ),
+      };
+    }
     return null;
-  }, [guidedOnboarding, isMobileCalendarUi, showGuidedOnboarding]);
+  }, [
+    guidedOnboarding,
+    inlineEditModeActive,
+    isMobileCalendarUi,
+    showGuidedOnboarding,
+  ]);
 
   const handleGuidedToolbarAction = React.useCallback((
     target: GuidedToolbarNotice["target"]
@@ -2397,6 +2537,10 @@ export default function HomePage() {
       return;
     }
     if (target === "year" && current.step === "year_instruction") {
+      const todayYear = todayIso ? Number(todayIso.slice(0, 4)) : year;
+      if (year !== todayYear) {
+        handleYearChange(todayYear);
+      }
       const next = updateGuidedOnboarding({
         type: "continue_from_year",
         showPeriodNavigation:
@@ -2421,13 +2565,36 @@ export default function HomePage() {
         type: "confirm_theme",
         complete: true,
       });
+      if (next.step === "wrap_up_instruction") trimToRealCategories(next);
+      return;
+    }
+    if (
+      target === "visibility" &&
+      current.step === "visibility_instruction"
+    ) {
+      updateGuidedOnboarding({ type: "continue_from_visibility" });
+      return;
+    }
+    if (target === "wrap-up" && current.step === "wrap_up_instruction") {
+      const next = updateGuidedOnboarding({ type: "continue_from_wrap_up" });
+      setWorkspaceEditMode(null);
+      finalizeGuidedOnboarding(next);
+      return;
+    }
+    if (target === "profile" && current.step === "profile_instruction") {
+      const next = updateGuidedOnboarding({ type: "finish_profile_onboarding" });
       finalizeGuidedOnboarding(next);
     }
   }, [
     finalizeGuidedOnboarding,
+    handleYearChange,
     isMobileCalendarUi,
     resetCalendarFocusOnYearChange,
+    setWorkspaceEditMode,
+    todayIso,
+    trimToRealCategories,
     updateGuidedOnboarding,
+    year,
   ]);
 
   const handleGuidedCalendarOpen = React.useCallback(() => {
@@ -2477,15 +2644,6 @@ export default function HomePage() {
     handleGuidedCalendarImported(pack);
   }, [calendarPacks, categories, guidedOnboarding?.step, handleGuidedCalendarImported]);
 
-  const handleYearChange = React.useCallback(
-    (nextYear: number) => {
-      setYear(nextYear);
-      resetCalendarFocusOnYearChange();
-      recordDemoInteraction(`year:${nextYear}`);
-    },
-    [recordDemoInteraction, resetCalendarFocusOnYearChange]
-  );
-
   React.useEffect(() => {
     setMobileActiveDateIso((currentIso) => {
       if (Number(currentIso.slice(0, 4)) === year) return currentIso;
@@ -2497,6 +2655,29 @@ export default function HomePage() {
   const handleDestinationSelect = React.useCallback(
     (destination: ProductDestinationId) => {
       if (destination === activeDestination) return;
+      if (destination === "annual" && isMobileCalendarUi === true) {
+        // A jornada própria de Hábitos (lib/mobile-habits-onboarding.ts) leva
+        // até aqui de propósito: quem ainda está criando o hábito ou
+        // marcando o primeiro dia não pode pular direto para a Anual. Lê o
+        // storage direto (não o espelho em estado) para não depender do
+        // React já ter propagado a última mudança.
+        const mobileStep = readMobileHabitsOnboardingStep();
+        const desktopTourInProgress = isGuidedOnboardingInProgress(
+          readGuidedOnboardingState()
+        );
+        if (
+          !desktopTourInProgress &&
+          (mobileStep === "create_habit" || mobileStep === "mark_day")
+        ) {
+          return;
+        }
+        if (mobileStep === "goto_annual") {
+          // Chegou na Anual: a jornada continua aqui, pelo cabeçalho, antes
+          // de terminar no Perfil (ver mobileAnnualOnboardingNotice abaixo).
+          writeMobileHabitsOnboardingStep("annual_year");
+          setMobileHabitsOnboardingStep("annual_year");
+        }
+      }
       const currentGuidedState = readGuidedOnboardingState();
       if (
         destination === "habits" &&
@@ -2537,10 +2718,25 @@ export default function HomePage() {
       setUtilityPanelSection(section);
       setUtilityPanelOpen(true);
       if (readGuidedOnboardingState().step === "profile_instruction") {
-        updateGuidedOnboarding({ type: "open_profile" });
+        // Abrir a conta a partir daqui já encerra o guia — ela segue direto
+        // para o cadastro, sem mais um passo entre o convite e a ação.
+        const next = updateGuidedOnboarding({
+          type: "finish_profile_onboarding",
+        });
+        finalizeGuidedOnboarding(next);
+      }
+      if (readMobileHabitsOnboardingStep() === "goto_profile") {
+        // Último passo da jornada própria do mobile: abrir o Perfil a
+        // partir daqui já encerra ela, do mesmo jeito que o tour desktop
+        // faz acima.
+        writeMobileHabitsOnboardingStep("completed");
+        setMobileHabitsOnboardingStep("completed");
+        setUtilityPanelAuthMode("signup");
+      } else {
+        setUtilityPanelAuthMode("login");
       }
     },
-    [updateGuidedOnboarding]
+    [finalizeGuidedOnboarding, updateGuidedOnboarding]
   );
 
   const handleToggleHabitsEditing = React.useCallback(() => {
@@ -2575,14 +2771,126 @@ export default function HomePage() {
   const isCalendarSurfaceActive = !isHabitsSurfaceActive;
   const headerGuidedToolbarNotice =
     isHabitsPrototypeEnabled &&
-    (guidedToolbarNotice?.target === "theme" ||
-      guidedToolbarNotice?.target === "appearance" ||
+    (guidedToolbarNotice?.target === "appearance" ||
       guidedToolbarNotice?.target === "year" ||
       guidedToolbarNotice?.target === "habit-showcase" ||
       guidedToolbarNotice?.target === "habit" ||
       guidedToolbarNotice?.target === "habit-created")
       ? null
       : guidedToolbarNotice;
+
+  // Continuação da jornada própria do mobile depois da Anual (ver
+  // lib/mobile-habits-onboarding.ts): ano, tema, organizar e o atalho do ano
+  // para hoje — cada um aponta pro controle real do cabeçalho, sem duplicar
+  // nada de app-header.tsx (que outra frente edita agora). O card e o
+  // destaque são só nossos, buscando o elemento por seletor, exatamente como
+  // já fizemos com o "+" e o botão Anual da navegação.
+  const mobileAnnualOnboardingNotice = React.useMemo<{
+    notice: GuidedToolbarNotice;
+    targetSelector: string;
+    // A maioria dos alvos só existe uma vez visível no DOM — o seletor do
+    // tema é a exceção (há uma instância desktop escondida também
+    // presente), então precisa do modo `multiple` do GuidedTargetOutline
+    // para não parar no primeiro match (que pode ser o escondido) e
+    // simplesmente não desenhar nada.
+    targetMultiple?: boolean;
+  } | null>(() => {
+    if (
+      !isCalendarSurfaceActive ||
+      isMobileCalendarUi !== true ||
+      session?.user.id
+    ) {
+      return null;
+    }
+    if (mobileHabitsOnboardingStep === "annual_year") {
+      return {
+        // A mesma caixa já cobre as setas e o ano no meio — não precisa de
+        // dois passos nem de dois alvos para as duas funções.
+        targetSelector: "[data-onboarding-year-control]",
+        notice: {
+          target: "year",
+          title: "Aqui você troca o ano.",
+          instruction:
+            "Use estas setas para consultar o ano anterior ou o próximo. Toque no ano a qualquer momento para voltar direto a hoje.",
+          actionLabel: "Continuar",
+          stepLabel: "Passo 1 de 4",
+        },
+      };
+    }
+    if (mobileHabitsOnboardingStep === "annual_theme") {
+      return {
+        targetSelector:
+          'button[aria-label="Ativar tema escuro"], button[aria-label="Ativar tema claro"]',
+        targetMultiple: true,
+        notice: {
+          target: "theme",
+          title: "Escolha o clima do seu ano.",
+          instruction:
+            "Teste o tema claro e escuro e fique com o que combina mais com você.",
+          actionLabel: "Continuar",
+          stepLabel: "Passo 2 de 4",
+        },
+      };
+    }
+    if (mobileHabitsOnboardingStep === "annual_organize") {
+      return {
+        targetSelector: '[data-product-organize="mobile"]',
+        notice: {
+          target: "mobile-organize",
+          title: "Organize contextos e categorias.",
+          instruction: "Toque em Organizar para abrir o modo de edição.",
+          actionLabel: "Continuar",
+          stepLabel: "Passo 3 de 4",
+        },
+      };
+    }
+    if (mobileHabitsOnboardingStep === "goto_profile") {
+      return {
+        targetSelector: "[data-onboarding-auth-entry]",
+        // Mesmo caso do tema: existe uma instância desktop escondida com o
+        // mesmo atributo.
+        targetMultiple: true,
+        notice: {
+          target: "profile",
+          title: "Guarde esse ano com você.",
+          instruction: "Toque em Perfil para criar sua conta e acessar de qualquer aparelho.",
+          stepLabel: "Passo 4 de 4",
+        },
+      };
+    }
+    return null;
+  }, [
+    isCalendarSurfaceActive,
+    isMobileCalendarUi,
+    mobileHabitsOnboardingStep,
+    session?.user.id,
+  ]);
+
+  const dismissMobileAnnualOnboarding = React.useCallback(() => {
+    writeMobileHabitsOnboardingStep("dismissed");
+    setMobileHabitsOnboardingStep("dismissed");
+  }, []);
+
+  const advanceMobileAnnualOnboarding = React.useCallback(() => {
+    const sequence: MobileHabitsOnboardingStep[] = [
+      "annual_year",
+      "annual_theme",
+      "annual_organize",
+      "goto_profile",
+    ];
+    if (mobileHabitsOnboardingStep === "annual_year") {
+      // O passo explica o atalho "toque no ano pra voltar a hoje" — "Continuar"
+      // já demonstra na hora, em vez de só descrever.
+      setScrollToTodayRequestKey((key) => key + 1);
+    }
+    const currentIndex = sequence.indexOf(
+      mobileHabitsOnboardingStep as MobileHabitsOnboardingStep
+    );
+    const next = sequence[currentIndex + 1];
+    if (!next) return;
+    writeMobileHabitsOnboardingStep(next);
+    setMobileHabitsOnboardingStep(next);
+  }, [mobileHabitsOnboardingStep]);
 
   if (windowContext === "popup") {
     return (
@@ -2615,11 +2923,15 @@ export default function HomePage() {
             authLoading={authLoading}
             onDestinationSelect={handleDestinationSelect}
             onOpenUtilityPanel={handleOpenUtilityPanel}
+            disabledDestination={
+              mobileHabitsOnboardingNavLocked ? "annual" : undefined
+            }
           />
           <AppUtilityPanel
             open={utilityPanelOpen}
             section={utilityPanelSection}
             isMobile={isMobileCalendarUi}
+            authInitialMode={utilityPanelAuthMode}
             returnFocusRef={utilityPanelTriggerRef}
             guidedAppearanceNotice={
               guidedToolbarNotice?.target === "appearance"
@@ -2684,6 +2996,9 @@ export default function HomePage() {
           guidedEditPreviewActive={
             isCalendarSurfaceActive && guidedOnboarding?.step === "edit_preview"
           }
+          accountNudgeHighlightProfile={
+            accountNudgeVisible && !session?.user.id
+          }
           onboardingLayoutLocked={false}
           onboardingLayoutReserved={
             isCalendarSurfaceActive && Boolean(guidedSelectionNotice)
@@ -2698,7 +3013,16 @@ export default function HomePage() {
           onYearLabelClick={
             isMobileCalendarUi === true
               ? () => setScrollToTodayRequestKey((key) => key + 1)
-              : undefined
+              : () => {
+                  const todayYear = todayIso
+                    ? Number(todayIso.slice(0, 4))
+                    : year;
+                  if (todayYear !== year) {
+                    handleYearChange(todayYear);
+                  } else {
+                    requestDesktopTodayCenter();
+                  }
+                }
           }
           onGuidedThemeChange={() =>
             updateGuidedOnboarding({ type: "confirm_theme" })
@@ -2767,6 +3091,8 @@ export default function HomePage() {
               });
             }
           }}
+          onMobileOnboardingStepChange={setMobileHabitsOnboardingStep}
+          hasEstablishedAccountData={isEstablishedAccount}
           onGuidedNoticeAction={(input) => {
             const current = readGuidedOnboardingState();
             if (current.step === "habit_showcase_instruction") {
@@ -2780,7 +3106,24 @@ export default function HomePage() {
             const next = updateGuidedOnboarding({
               type: "finish_habit_onboarding",
             });
-            finalizeGuidedOnboarding(next);
+            if (next.step === "completed") {
+              finalizeGuidedOnboarding(next);
+              return;
+            }
+            if (next.step === "wrap_up_instruction") {
+              // Tema já tinha sido confirmado antes — pula direto para o
+              // resumo, cortando o ano de exemplo aqui mesmo.
+              trimToRealCategories(next);
+            }
+            // O guia continua no Anual a partir daqui (tema, resumo, conta)
+            // — é lá que vive a UI desses passos finais.
+            setActiveDestination("annual");
+            resetCalendarFocusOnYearChange();
+            window.history.replaceState(
+              window.history.state,
+              "",
+              buildProductDestinationUrl(window.location.href, "annual")
+            );
           }}
         />
       ) : isMobileCalendarUi === true ? (
@@ -2807,6 +3150,37 @@ export default function HomePage() {
           guidedSelectionRange={guidedDraft}
           onGuidedDaySelect={handleMobileGuidedDaySelect}
           scrollToTodayRequestKey={scrollToTodayRequestKey}
+          notice={
+            showMobileDesktopFirstNotice ? (
+              <MobileDesktopFirstNotice
+                variant={
+                  // "completed" só acontece por dois caminhos: uma conta já
+                  // estabelecida (excluída de showMobileDesktopFirstNotice
+                  // via isEstablishedAccount, então nunca chega aqui assim)
+                  // ou quem acabou de terminar a jornada de Hábitos e tocou
+                  // em Anual de propósito — é sempre essa segunda pessoa.
+                  mobileHabitsOnboardingStep === "completed"
+                    ? "onboarding"
+                    : isInitialMobileOnboarding && !hasEstablishedSetup
+                      ? "example"
+                      : "resuming"
+                }
+                onOpenLogin={() => {
+                  setAuthDialogInitialMode(
+                    mobileHabitsOnboardingStep === "completed"
+                      ? "signup"
+                      : "login"
+                  );
+                  setAuthDialogAnchorPoint(undefined);
+                  setAuthDialogOpen(true);
+                }}
+                onDismiss={() => {
+                  writeDesktopFirstNoticeDismissed();
+                  setDesktopFirstNoticeDismissed(true);
+                }}
+              />
+            ) : null
+          }
         />
       ) : (
         <div
@@ -2900,26 +3274,6 @@ export default function HomePage() {
         onConfirm={confirmDismissGuidedOnboarding}
       />
 
-      {isCalendarSurfaceActive && showMobileDesktopFirstGate ? (
-        <MobileDesktopFirstGate
-          allowExample={isInitialMobileOnboarding && !hasEstablishedSetup}
-          onExploreExample={() => {
-            writeMobileExamplePreviewSession();
-            setMobileExamplePreviewDismissed(true);
-          }}
-          onOpenLogin={() => {
-            setAuthDialogInitialMode("login");
-            setAuthDialogAnchorPoint(undefined);
-            setAuthDialogOpen(true);
-          }}
-          onBackToHabits={
-            isHabitsPrototypeEnabled
-              ? () => handleDestinationSelect("habits")
-              : undefined
-          }
-        />
-      ) : null}
-
       {isCalendarSurfaceActive &&
       (isDemoExploration ||
         (showGuidedOnboarding &&
@@ -2939,6 +3293,20 @@ export default function HomePage() {
         />
       ) : null}
 
+      {mobileAnnualOnboardingNotice ? (
+        <>
+          <GuidedTargetOutline
+            selector={mobileAnnualOnboardingNotice.targetSelector}
+            multiple={mobileAnnualOnboardingNotice.targetMultiple}
+          />
+          <GuidedToolbarNoticeCard
+            notice={mobileAnnualOnboardingNotice.notice}
+            onClose={dismissMobileAnnualOnboarding}
+            onAction={advanceMobileAnnualOnboarding}
+          />
+        </>
+      ) : null}
+
       {accountNudgeVisible && !session?.user.id ? (
         <AccountNudge
           onDismiss={() => setAccountNudgeVisible(false)}
@@ -2954,8 +3322,7 @@ export default function HomePage() {
       {isCalendarSurfaceActive &&
       isMobileCalendarUi &&
       !showGuidedOnboarding &&
-      !isMobileExamplePreview &&
-      !showMobileDesktopFirstGate ? (
+      !isMobileExamplePreview ? (
         <div
           className="fixed right-4 z-40"
           style={{
