@@ -30,7 +30,6 @@ import { AccountNudge } from "@/components/onboarding/account-nudge";
 import { DemoExplorationInvite } from "@/components/onboarding/demo-exploration-invite";
 import { MobileDesktopFirstNotice } from "@/components/onboarding/mobile-desktop-first-notice";
 import { OnboardingExitDialog } from "@/components/onboarding/onboarding-exit-dialog";
-import { GuidedTargetOutline } from "@/components/onboarding/guided-target-outline";
 import {
   GuidedToolbarNoticeCard,
   type GuidedToolbarNotice,
@@ -93,6 +92,7 @@ import { getSupabaseBrowserClient, hasSupabaseEnv } from "@/lib/supabase";
 import { expandEventsForYear } from "@/lib/recurrence";
 import { buildOnboardingHabitShowcase } from "@/lib/habits-prototype";
 import {
+  getMobileHabitsOnboardingStepLabel,
   readMobileHabitsOnboardingStep,
   resetMobileHabitsOnboarding,
   writeMobileHabitsOnboardingStep,
@@ -105,7 +105,6 @@ import {
 import { cn } from "@/lib/utils";
 import type { AnchorPoint, CategoryItem } from "@/lib/types";
 import { trackOnboardingRegion } from "@/lib/onboarding-region";
-import { isHabitsPrototypeEnabled } from "@/lib/feature-flags";
 import { useHabitsStore } from "@/lib/habits-store";
 import {
   buildProductDestinationUrl,
@@ -180,6 +179,10 @@ const isDetailedSyncDiagnosticsEnabled =
   process.env.NEXT_PUBLIC_APP_ENV === "dev";
 
 const MOBILE_CALENDAR_UI_MAX_WIDTH_PX = 767;
+// Categorias sempre ocultadas na demonstração de "esconder categoria" do
+// onboarding guiado — fazem parte do conjunto de categorias-seed
+// (lib/store.ts) presente em todo onboarding.
+const VISIBILITY_DEMO_CATEGORY_NAMES = new Set(["Família", "Viagens"]);
 const HabitsPrototype = dynamic(() =>
   import("@/components/habits/habits-prototype").then(
     (module) => module.HabitsPrototype
@@ -365,6 +368,7 @@ export default function HomePage() {
   const profiles = useStore((s) => s.profiles);
   const events = useStore((s) => s.events);
   const categories = useStore((s) => s.categories);
+  const setCategoriesVisibility = useStore((s) => s.setCategoriesVisibility);
   const ensureEventMetadata = useStore((s) => s.ensureEventMetadata);
   const replaceAllData = useStore((s) => s.replaceAllData);
   const resetToOnboardingData = useStore((s) => s.resetToOnboardingData);
@@ -395,7 +399,6 @@ export default function HomePage() {
   const { session, loading: authLoading } = useAuth();
 
   React.useEffect(() => {
-    if (!isHabitsPrototypeEnabled) return;
     void import("@/components/habits/habits-prototype");
   }, []);
 
@@ -487,7 +490,8 @@ export default function HomePage() {
     setMobileHabitsOnboardingStep(readMobileHabitsOnboardingStep());
   }, []);
   const mobileHabitsOnboardingNavLocked =
-    (mobileHabitsOnboardingStep === "create_habit" ||
+    (mobileHabitsOnboardingStep === "intro" ||
+      mobileHabitsOnboardingStep === "create_habit" ||
       mobileHabitsOnboardingStep === "mark_day") &&
     !(guidedOnboarding && isGuidedOnboardingInProgress(guidedOnboarding));
   const [activeDestination, setActiveDestination] =
@@ -498,7 +502,11 @@ export default function HomePage() {
   // default is applied client-side right after mount, before paint.
   const [headerMinimized, setHeaderMinimizedState] = React.useState(false);
   const headerMinimizedManuallySetRef = React.useRef(false);
-  const canMinimizeHeader = isHabitsPrototypeEnabled && isMobileCalendarUi === false;
+  const canMinimizeHeader = isMobileCalendarUi === false;
+  // Única fonte de verdade para "esta sessão de onboarding guiado deve
+  // incluir os passos de Hábitos": não é mobile (o mobile tem sua própria
+  // jornada em lib/mobile-habits-onboarding.ts).
+  const showHabitSteps = isMobileCalendarUi !== true;
   const setHeaderMinimized = React.useCallback((next: boolean) => {
     headerMinimizedManuallySetRef.current = true;
     setHeaderMinimizedState(next);
@@ -796,7 +804,7 @@ export default function HomePage() {
   }, [windowContext]);
 
   React.useEffect(() => {
-    if (!isHabitsPrototypeEnabled || isMobileCalendarUi === null) return;
+    if (isMobileCalendarUi === null) return;
     if (surfaceInitializedRef.current) return;
 
     surfaceInitializedRef.current = true;
@@ -822,6 +830,7 @@ export default function HomePage() {
       !session?.user.id &&
       !isGuidedOnboardingInProgress(readGuidedOnboardingState()) &&
       (mobileStepAtLoad === null ||
+        mobileStepAtLoad === "intro" ||
         mobileStepAtLoad === "create_habit" ||
         mobileStepAtLoad === "mark_day")
         ? "habits"
@@ -1479,6 +1488,7 @@ export default function HomePage() {
   // que a jornada termina de verdade (variant "onboarding", abaixo).
   const mobileAnnualOnboardingActive = Boolean(
     mobileHabitsOnboardingStep &&
+      mobileHabitsOnboardingStep !== "intro" &&
       mobileHabitsOnboardingStep !== "create_habit" &&
       mobileHabitsOnboardingStep !== "mark_day" &&
       mobileHabitsOnboardingStep !== "goto_annual" &&
@@ -1495,6 +1505,15 @@ export default function HomePage() {
   );
   const isDemoExploration =
     guidedOnboarding?.step === "demo_exploration" && !session?.user.id;
+  // Quem sai do guia já tendo escolhido um contexto (dismissed_preserved,
+  // não demo_exploration) também precisa criar categorias/perfis livremente
+  // até o convite de conta aparecer (accountNudge, após 3 criações — ver
+  // trackPostExitCreation) — sem isso, o ano de exemplo já chega com 4
+  // categorias por contexto (#95) e esbarra no limite do plano gratuito (3)
+  // antes da 1a criação pós-onboarding.
+  const isPreservedExitExploration =
+    guidedOnboarding?.step === "dismissed_preserved" && !session?.user.id;
+  const bypassCreationLimits = isDemoExploration || isPreservedExitExploration;
   const showDemoInvite = Boolean(
     isDemoExploration &&
       guidedOnboarding?.demoInviteEligibleAt &&
@@ -1530,14 +1549,13 @@ export default function HomePage() {
     ) {
       updateGuidedOnboarding({
         type: "open_edit_preview",
-        continueToCalendar:
-          isHabitsPrototypeEnabled && isMobileCalendarUi !== true,
+        continueToCalendar: showHabitSteps,
       });
     }
   }, [
     guidedOnboarding?.step,
     inlineEditModeActive,
-    isMobileCalendarUi,
+    showHabitSteps,
     updateGuidedOnboarding,
   ]);
 
@@ -2383,7 +2401,6 @@ export default function HomePage() {
 
   const guidedToolbarNotice = React.useMemo<GuidedToolbarNotice | null>(() => {
     if (!showGuidedOnboarding || !guidedOnboarding) return null;
-    const showHabitSteps = isHabitsPrototypeEnabled && isMobileCalendarUi !== true;
     const { current, total } = getGuidedOnboardingProgress(
       guidedOnboarding.step,
       { showHabitSteps }
@@ -2437,7 +2454,7 @@ export default function HomePage() {
         target: "period-navigation",
         title: "Navegue pelo seu ano.",
         instruction:
-          "Clique nos rótulos Q1-Q4 e JAN-DEZ para ir direto a trimestres e meses. Arraste de um rótulo a outro para criar um período com vários meses ou trimestres de uma vez.",
+          "Clique nos rótulos Q1-Q4 e JAN-DEZ para ir direto a trimestres e meses.",
         actionLabel: "Continuar",
         stepLabel,
       };
@@ -2503,8 +2520,8 @@ export default function HomePage() {
         target: "wrap-up",
         title: "Veja o que você já construiu.",
         instruction: inlineEditModeActive
-          ? "Sua categoria, seu calendário e seu hábito já estão aqui. Arraste até três sugestões abaixo que fizerem mais sentido pra você."
-          : "Abra o Organizar para ver o que você já construiu e escolher mais algumas categorias.",
+          ? "Sua categoria, seu calendário e seu hábito já estão aqui. Arraste até três sugestões abaixo que fizerem mais sentido pra você. E no dia a dia, marcar seus hábitos também funciona direto pelo celular."
+          : "Abra o Organizar para ver o que você já construiu e escolher mais algumas categorias. E no dia a dia, marcar seus hábitos também funciona direto pelo celular.",
         actionLabel: inlineEditModeActive ? "Finalizar guia" : undefined,
         stepLabel,
         categorySuggestions: getWrapUpCategorySuggestions(
@@ -2518,7 +2535,32 @@ export default function HomePage() {
     inlineEditModeActive,
     isMobileCalendarUi,
     showGuidedOnboarding,
+    showHabitSteps,
   ]);
+
+  // Demonstra a funcionalidade de esconder categoria: ao entrar neste
+  // passo, oculta "Família" e "Viagens" automaticamente, para o resultado
+  // ("categoria escondida") já aparecer junto com a instrução, em vez de
+  // depender só do texto. São sempre as mesmas duas — não as recém-criadas
+  // pela própria pessoa nem uma seleção genérica.
+  const visibilityDemoAppliedRef = React.useRef(false);
+  React.useEffect(() => {
+    if (guidedOnboarding?.step !== "visibility_instruction") {
+      visibilityDemoAppliedRef.current = false;
+      return;
+    }
+    if (visibilityDemoAppliedRef.current) return;
+    visibilityDemoAppliedRef.current = true;
+    const idsToHide = categories
+      .filter(
+        (category) =>
+          category.visible && VISIBILITY_DEMO_CATEGORY_NAMES.has(category.name)
+      )
+      .map((category) => category.id);
+    if (idsToHide.length > 0) {
+      setCategoriesVisibility(idsToHide, false);
+    }
+  }, [guidedOnboarding?.step, categories, setCategoriesVisibility]);
 
   const handleGuidedToolbarAction = React.useCallback((
     target: GuidedToolbarNotice["target"]
@@ -2527,8 +2569,7 @@ export default function HomePage() {
     if (target === "edit" && current.step === "edit_instruction") {
       updateGuidedOnboarding({
         type: "open_edit_preview",
-        continueToCalendar:
-          isHabitsPrototypeEnabled && isMobileCalendarUi !== true,
+        continueToCalendar: showHabitSteps,
       });
       return;
     }
@@ -2541,11 +2582,7 @@ export default function HomePage() {
       if (year !== todayYear) {
         handleYearChange(todayYear);
       }
-      const next = updateGuidedOnboarding({
-        type: "continue_from_year",
-        showPeriodNavigation:
-          isHabitsPrototypeEnabled && isMobileCalendarUi !== true,
-      });
+      const next = updateGuidedOnboarding({ type: "continue_from_year" });
       finalizeGuidedOnboarding(next);
       return;
     }
@@ -2556,7 +2593,7 @@ export default function HomePage() {
       resetCalendarFocusOnYearChange();
       updateGuidedOnboarding({
         type: "continue_from_period_navigation",
-        showHabit: true,
+        showHabit: showHabitSteps,
       });
       return;
     }
@@ -2588,9 +2625,9 @@ export default function HomePage() {
   }, [
     finalizeGuidedOnboarding,
     handleYearChange,
-    isMobileCalendarUi,
     resetCalendarFocusOnYearChange,
     setWorkspaceEditMode,
+    showHabitSteps,
     todayIso,
     trimToRealCategories,
     updateGuidedOnboarding,
@@ -2614,17 +2651,19 @@ export default function HomePage() {
       if (!pack) return;
       const uf = pack.regionCode;
       const packGroupId = getCalendarPackGroupId(pack);
+      const current = readGuidedOnboardingState();
       const next = updateGuidedOnboarding({
         type: "calendar_added",
         uf,
         packGroupId,
+        showPeriodNavigation: showHabitSteps,
       });
-      if (next.step === "year_instruction") {
+      if (next.step !== current.step) {
         setWorkspaceEditMode(null);
         if (uf) void trackOnboardingRegion(uf);
       }
     },
-    [updateGuidedOnboarding]
+    [showHabitSteps, updateGuidedOnboarding]
   );
 
   React.useEffect(() => {
@@ -2667,7 +2706,9 @@ export default function HomePage() {
         );
         if (
           !desktopTourInProgress &&
-          (mobileStep === "create_habit" || mobileStep === "mark_day")
+          (mobileStep === "intro" ||
+            mobileStep === "create_habit" ||
+            mobileStep === "mark_day")
         ) {
           return;
         }
@@ -2744,11 +2785,7 @@ export default function HomePage() {
   }, []);
 
   React.useLayoutEffect(() => {
-    if (
-      !isHabitsPrototypeEnabled ||
-      activeDestination !== "annual" ||
-      isMobileCalendarUi !== false
-    ) {
+    if (activeDestination !== "annual" || isMobileCalendarUi !== false) {
       return;
     }
     const scrollRegion = desktopCalendarScrollRef.current;
@@ -2766,11 +2803,9 @@ export default function HomePage() {
     updateGuidedOnboarding({ type: "continue_from_period_navigation" });
   }, [guidedOnboarding?.step, isMobileCalendarUi, updateGuidedOnboarding]);
 
-  const isHabitsSurfaceActive =
-    isHabitsPrototypeEnabled && activeDestination === "habits";
+  const isHabitsSurfaceActive = activeDestination === "habits";
   const isCalendarSurfaceActive = !isHabitsSurfaceActive;
   const headerGuidedToolbarNotice =
-    isHabitsPrototypeEnabled &&
     (guidedToolbarNotice?.target === "appearance" ||
       guidedToolbarNotice?.target === "year" ||
       guidedToolbarNotice?.target === "habit-showcase" ||
@@ -2785,16 +2820,7 @@ export default function HomePage() {
   // nada de app-header.tsx (que outra frente edita agora). O card e o
   // destaque são só nossos, buscando o elemento por seletor, exatamente como
   // já fizemos com o "+" e o botão Anual da navegação.
-  const mobileAnnualOnboardingNotice = React.useMemo<{
-    notice: GuidedToolbarNotice;
-    targetSelector: string;
-    // A maioria dos alvos só existe uma vez visível no DOM — o seletor do
-    // tema é a exceção (há uma instância desktop escondida também
-    // presente), então precisa do modo `multiple` do GuidedTargetOutline
-    // para não parar no primeiro match (que pode ser o escondido) e
-    // simplesmente não desenhar nada.
-    targetMultiple?: boolean;
-  } | null>(() => {
+  const mobileAnnualOnboardingNotice = React.useMemo<GuidedToolbarNotice | null>(() => {
     if (
       !isCalendarSurfaceActive ||
       isMobileCalendarUi !== true ||
@@ -2804,58 +2830,39 @@ export default function HomePage() {
     }
     if (mobileHabitsOnboardingStep === "annual_year") {
       return {
-        // A mesma caixa já cobre as setas e o ano no meio — não precisa de
-        // dois passos nem de dois alvos para as duas funções.
-        targetSelector: "[data-onboarding-year-control]",
-        notice: {
-          target: "year",
-          title: "Aqui você troca o ano.",
-          instruction:
-            "Use estas setas para consultar o ano anterior ou o próximo. Toque no ano a qualquer momento para voltar direto a hoje.",
-          actionLabel: "Continuar",
-          stepLabel: "Passo 1 de 4",
-        },
+        target: "year",
+        title: "Aqui você troca o ano.",
+        instruction:
+          "Use estas setas para consultar o ano anterior ou o próximo. Toque no ano a qualquer momento para voltar direto a hoje.",
+        actionLabel: "Continuar",
+        stepLabel: getMobileHabitsOnboardingStepLabel("annual_year"),
       };
     }
     if (mobileHabitsOnboardingStep === "annual_theme") {
       return {
-        targetSelector:
-          'button[aria-label="Ativar tema escuro"], button[aria-label="Ativar tema claro"]',
-        targetMultiple: true,
-        notice: {
-          target: "theme",
-          title: "Escolha o clima do seu ano.",
-          instruction:
-            "Teste o tema claro e escuro e fique com o que combina mais com você.",
-          actionLabel: "Continuar",
-          stepLabel: "Passo 2 de 4",
-        },
+        target: "theme",
+        title: "Escolha o clima do seu ano.",
+        instruction:
+          "Teste o tema claro e escuro e fique com o que combina mais com você.",
+        actionLabel: "Continuar",
+        stepLabel: getMobileHabitsOnboardingStepLabel("annual_theme"),
       };
     }
     if (mobileHabitsOnboardingStep === "annual_organize") {
       return {
-        targetSelector: '[data-product-organize="mobile"]',
-        notice: {
-          target: "mobile-organize",
-          title: "Organize contextos e categorias.",
-          instruction: "Toque em Organizar para abrir o modo de edição.",
-          actionLabel: "Continuar",
-          stepLabel: "Passo 3 de 4",
-        },
+        target: "mobile-organize",
+        title: "Organize contextos e categorias.",
+        instruction: "Toque em Organizar para abrir o modo de edição.",
+        actionLabel: "Continuar",
+        stepLabel: getMobileHabitsOnboardingStepLabel("annual_organize"),
       };
     }
     if (mobileHabitsOnboardingStep === "goto_profile") {
       return {
-        targetSelector: "[data-onboarding-auth-entry]",
-        // Mesmo caso do tema: existe uma instância desktop escondida com o
-        // mesmo atributo.
-        targetMultiple: true,
-        notice: {
-          target: "profile",
-          title: "Guarde esse ano com você.",
-          instruction: "Toque em Perfil para criar sua conta e acessar de qualquer aparelho.",
-          stepLabel: "Passo 4 de 4",
-        },
+        target: "profile",
+        title: "Guarde esse ano com você.",
+        instruction: "Toque em Perfil para criar sua conta e acessar de qualquer aparelho.",
+        stepLabel: getMobileHabitsOnboardingStepLabel("goto_profile"),
       };
     }
     return null;
@@ -2906,17 +2913,14 @@ export default function HomePage() {
       className={cn(
         "mx-auto w-full max-w-none",
         isMobileCalendarUi
-          ? cn(
-              "flex h-[100dvh] min-h-0 flex-col overflow-hidden px-3 pt-2",
-              isHabitsPrototypeEnabled ? "pb-0" : "pb-1"
-            )
+          ? "flex h-[100dvh] min-h-0 flex-col overflow-hidden px-3 pt-2 pb-0"
           : cn(
               "flex h-full min-h-0 flex-col overflow-hidden pt-3 pb-2 md:pb-4",
               "px-4"
             )
       )}
     >
-      {isHabitsPrototypeEnabled && isMobileCalendarUi !== null ? (
+      {isMobileCalendarUi !== null ? (
         <>
           <AdaptiveNavigation
             activeDestination={activeDestination}
@@ -2925,6 +2929,12 @@ export default function HomePage() {
             onOpenUtilityPanel={handleOpenUtilityPanel}
             disabledDestination={
               mobileHabitsOnboardingNavLocked ? "annual" : undefined
+            }
+            highlightDestination={
+              mobileHabitsOnboardingStep === "goto_annual" ? "annual" : undefined
+            }
+            highlightProfile={
+              mobileAnnualOnboardingNotice?.target === "profile"
             }
           />
           <AppUtilityPanel
@@ -2967,7 +2977,7 @@ export default function HomePage() {
           isAuthenticated={Boolean(session)}
           isMobileCalendarUi={isMobileCalendarUi === true}
           showCalendarControls={isCalendarSurfaceActive}
-          useAdaptiveNavigation={isHabitsPrototypeEnabled}
+          useAdaptiveNavigation
           activeDestination={activeDestination}
           onDestinationSelect={handleDestinationSelect}
           onOpenUtilityPanel={handleOpenUtilityPanel}
@@ -2983,6 +2993,11 @@ export default function HomePage() {
           }
           guidedToolbarNotice={
             isCalendarSurfaceActive ? headerGuidedToolbarNotice : null
+          }
+          mobileContinuationHighlightTarget={
+            isCalendarSurfaceActive
+              ? mobileAnnualOnboardingNotice?.target ?? null
+              : null
           }
           onDismissGuidedSelection={dismissGuidedOnboarding}
           onGuidedToolbarAction={handleGuidedToolbarAction}
@@ -3030,7 +3045,7 @@ export default function HomePage() {
           headerMinimized={headerMinimized}
           onToggleHeaderMinimized={() => setHeaderMinimized(!headerMinimized)}
           mobileExamplePreviewActive={isMobileExamplePreview}
-          demoExplorationActive={isDemoExploration}
+          demoExplorationActive={bypassCreationLimits}
           onCategoryCreated={(categoryId) => {
             recordDemoInteraction(`mutation:category:create:${categoryId}`);
             trackPostExitCreation(`category:${categoryId}`);
@@ -3219,7 +3234,6 @@ export default function HomePage() {
               }}
               isMobileInteractionMode={false}
               guidedYearNotice={
-                isHabitsPrototypeEnabled &&
                 guidedToolbarNotice?.target === "year"
                   ? guidedToolbarNotice
                   : null
@@ -3241,7 +3255,7 @@ export default function HomePage() {
               guidedPeriodInteracted={Boolean(
                 guidedOnboarding?.periodNavigationInteractedAt
               )}
-              showScaleControl={!isHabitsPrototypeEnabled}
+              showScaleControl={false}
               scrollViewportRef={desktopCalendarScrollRef}
               scrollRegion="calendar"
             />
@@ -3253,7 +3267,7 @@ export default function HomePage() {
         <GuidedOnboardingPanel
           state={guidedOnboarding}
           draft={guidedDraft}
-          showHabitSteps={isHabitsPrototypeEnabled && isMobileCalendarUi !== true}
+          showHabitSteps={showHabitSteps}
           isMobile={isMobileCalendarUi === true}
           onClose={dismissGuidedOnboarding}
           onConfigureContext={handleConfigureGuidedContext}
@@ -3294,17 +3308,16 @@ export default function HomePage() {
       ) : null}
 
       {mobileAnnualOnboardingNotice ? (
-        <>
-          <GuidedTargetOutline
-            selector={mobileAnnualOnboardingNotice.targetSelector}
-            multiple={mobileAnnualOnboardingNotice.targetMultiple}
-          />
-          <GuidedToolbarNoticeCard
-            notice={mobileAnnualOnboardingNotice.notice}
-            onClose={dismissMobileAnnualOnboarding}
-            onAction={advanceMobileAnnualOnboarding}
-          />
-        </>
+        <GuidedToolbarNoticeCard
+          notice={mobileAnnualOnboardingNotice}
+          onClose={dismissMobileAnnualOnboarding}
+          onAction={advanceMobileAnnualOnboarding}
+          // O alvo ("Perfil") vive na nav inferior — grudar o card no topo
+          // afastaria a explicação do botão que ela aponta.
+          mobilePlacement={
+            mobileAnnualOnboardingNotice.target === "profile" ? "bottom" : "top"
+          }
+        />
       ) : null}
 
       {accountNudgeVisible && !session?.user.id ? (
@@ -3326,9 +3339,7 @@ export default function HomePage() {
         <div
           className="fixed right-4 z-40"
           style={{
-            bottom: isHabitsPrototypeEnabled
-              ? "calc(env(safe-area-inset-bottom, 0px) + 4.75rem)"
-              : "calc(env(safe-area-inset-bottom, 0px) + 2.75rem)",
+            bottom: "calc(env(safe-area-inset-bottom, 0px) + 4.75rem)",
           }}
         >
           <Button
@@ -3409,7 +3420,7 @@ export default function HomePage() {
         <button
           type="button"
           onClick={handleRestartOnboardingForTesting}
-          className="fixed bottom-3 left-3 z-[60] rounded-full border border-border/70 bg-background/90 px-3 py-1.5 text-[11px] font-medium text-muted-foreground shadow-sm backdrop-blur-sm transition-colors hover:text-foreground"
+          className="fixed bottom-[calc(3.75rem+env(safe-area-inset-bottom,0px)+0.75rem)] left-3 z-30 rounded-full border border-border/70 bg-background/90 px-3 py-1.5 text-[11px] font-medium text-muted-foreground shadow-sm backdrop-blur-sm transition-colors hover:text-foreground md:bottom-3 md:z-[60]"
         >
           Reiniciar onboarding
         </button>

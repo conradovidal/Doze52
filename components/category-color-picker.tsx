@@ -17,6 +17,10 @@ type CategoryColorPickerProps = {
   disabled?: boolean;
   className?: string;
   ariaLabel?: string;
+  // Só faz sentido para uma lista custom (`colors`) pequena o bastante pra
+  // caber numa única linha — o conjunto padrão (24 cores) continua fixo em
+  // 8 colunas/3 linhas independente disso.
+  columns?: number;
 };
 
 export function CategoryColorPicker({
@@ -27,6 +31,7 @@ export function CategoryColorPicker({
   disabled = false,
   className,
   ariaLabel = "Cor da categoria",
+  columns,
 }: CategoryColorPickerProps) {
   const { mode } = useTheme();
   const normalizedValue = value
@@ -56,7 +61,14 @@ export function CategoryColorPicker({
           <legend className="text-[11px] font-medium tracking-wide text-muted-foreground">
             {set.label}
           </legend>
-          <div className="grid grid-cols-8 gap-2 sm:gap-2.5">
+          <div
+            className={cn(!columns && "grid-cols-8", "grid gap-2 sm:gap-2.5")}
+            style={
+              columns
+                ? { gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }
+                : undefined
+            }
+          >
             {set.colors.map((preset) => {
               const token = getCategoryColorToken(preset, mode);
               const selected = preset.toLowerCase() === normalizedValue;

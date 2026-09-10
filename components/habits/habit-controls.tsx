@@ -35,7 +35,6 @@ import {
   GuidedToolbarNoticeCard,
   type GuidedToolbarNotice,
 } from "@/components/onboarding/guided-toolbar-notice";
-import { GuidedTargetOutline } from "@/components/onboarding/guided-target-outline";
 import { HabitEditList } from "@/components/habits/habit-edit-list";
 import { getCategoryColorToken } from "@/lib/category-palette";
 import {
@@ -343,6 +342,7 @@ export function HabitControls({
       className={cn(
         "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-border bg-card text-foreground shadow-none transition-all duration-[160ms] ease-[cubic-bezier(0.22,1,0.36,1)] hover:border-foreground/20 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45",
         mobile && "h-10 w-full rounded-[8px]",
+        guidedNotice?.target === "habit" && "product-spotlight-target",
       )}
       onClick={onRequestCreate}
     >
@@ -630,24 +630,19 @@ export function HabitControls({
       ) : null}
 
       {guidedNotice && onDismissGuidedNotice ? (
-        <>
-          {guidedNotice.target === "habit" ? (
-            <GuidedTargetOutline selector="[data-onboarding-habit-create]" />
-          ) : null}
-          <GuidedToolbarNoticeCard
-            notice={guidedNotice}
-            onClose={onDismissGuidedNotice}
-            onAction={onGuidedNoticeAction}
-            placement="viewport"
-            portaled
-            anchorSelector={
-              guidedNotice.target === "habit"
-                ? "[data-onboarding-habit-create]"
-                : "[data-onboarding-habit-controls]"
-            }
-            anchorPlacement="below-center"
-          />
-        </>
+        <GuidedToolbarNoticeCard
+          notice={guidedNotice}
+          onClose={onDismissGuidedNotice}
+          onAction={onGuidedNoticeAction}
+          placement="viewport"
+          portaled
+          anchorSelector={
+            guidedNotice.target === "habit"
+              ? "[data-onboarding-habit-create]"
+              : "[data-onboarding-habit-controls]"
+          }
+          anchorPlacement="below-center"
+        />
       ) : null}
     </section>
   );

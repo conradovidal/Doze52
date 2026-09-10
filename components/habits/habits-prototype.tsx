@@ -9,7 +9,6 @@ import { DesktopHabitsPrototype } from "@/components/habits/desktop-habits-proto
 import { HabitControls } from "@/components/habits/habit-controls";
 import { HabitDayPicker } from "@/components/habits/habit-day-picker";
 import { HABIT_COLORS, HabitEditorDialog } from "@/components/habits/habit-editor-dialog";
-import { GuidedTargetOutline } from "@/components/onboarding/guided-target-outline";
 import { GuidedToolbarNoticeCard } from "@/components/onboarding/guided-toolbar-notice";
 import { useFeedback } from "@/components/ui/feedback-provider";
 import { CATEGORY_COLOR_BASE_BLUE } from "@/lib/category-palette";
@@ -24,6 +23,7 @@ import {
 } from "@/lib/habits-prototype";
 import { useHabitsStore } from "@/lib/habits-store";
 import {
+  getMobileHabitsOnboardingStepLabel,
   readMobileHabitsOnboardingStep,
   writeMobileHabitsOnboardingStep,
   type MobileHabitsOnboardingStep,
@@ -155,7 +155,7 @@ export function HabitsPrototype({
     React.useState<MobileHabitsOnboardingStep>(() => {
       const stored = readMobileHabitsOnboardingStep();
       if (stored) return stored;
-      return habits.length === 0 ? "create_habit" : "completed";
+      return habits.length === 0 ? "intro" : "completed";
     });
   const setMobileOnboardingStep = React.useCallback(
     (step: MobileHabitsOnboardingStep) => {
@@ -468,25 +468,37 @@ export function HabitsPrototype({
     toggleHabitVisibilityInStore(habitId);
   };
 
-  // Os três passos usam o mesmo card do tour desktop (GuidedToolbarNoticeCard),
-  // só o conteúdo muda. Nenhum tem botão: os dois primeiros avançam sozinhos
-  // quando a pessoa cria o hábito e marca o primeiro dia (ver
-  // createHabit/toggleHabitDay acima); o terceiro termina quando ela toca no
-  // próprio botão Anual da navegação (ver app/page.tsx), não num botão do
-  // card. Nenhum toque de "Continuar" no meio do caminho.
+  // Os quatro passos usam o mesmo card do tour desktop (GuidedToolbarNoticeCard),
+  // só o conteúdo muda. Só o de abertura ("intro") tem botão — os outros três
+  // avançam sozinhos: os dois seguintes quando a pessoa cria o hábito e marca
+  // o primeiro dia (ver createHabit/toggleHabitDay acima), o último quando
+  // toca no próprio botão Anual da navegação (ver app/page.tsx), não num
+  // botão do card.
   const mobileOnboardingNotice = React.useMemo(():
     | import("@/components/onboarding/guided-toolbar-notice").GuidedToolbarNotice
     | null => {
     if (!mobileOnboardingActive) return null;
+    if (mobileOnboardingStep === "intro") {
+      return {
+        // Sem alvo específico na tela — é a abertura, antes de qualquer
+        // ação. Continua com um toque no "Continuar" do próprio card.
+        target: "mobile-intro",
+        title: "Isto é o Doze 52 no celular.",
+        instruction:
+          "Aqui você foca nos seus hábitos, dia após dia. O ano completo, com todos os eventos e planos, vive no desktop — os dois se completam.",
+        actionLabel: "Continuar",
+        stepLabel: getMobileHabitsOnboardingStepLabel("intro"),
+      };
+    }
     if (mobileOnboardingStep === "create_habit") {
       return {
-        // Mesmo target do desktop: destaca o "+" com o mecanismo já
-        // existente (GuidedTargetOutline). Sem botão: chega já convidando a
-        // criar, num só toque.
+        // Mesmo target do desktop: destaca o "+" via product-spotlight-target
+        // (guidedNotice repassado ao HabitControls). Sem botão: chega já
+        // convidando a criar, num só toque.
         target: "habit",
         title: "Assim funcionam os hábitos.",
         instruction: "Estes dois são só exemplo. Toque no + e crie o seu.",
-        stepLabel: "Passo 1 de 3",
+        stepLabel: getMobileHabitsOnboardingStepLabel("create_habit"),
       };
     }
     if (mobileOnboardingStep === "mark_day") {
@@ -495,18 +507,19 @@ export function HabitsPrototype({
         title: "Agora é seu.",
         instruction:
           "Toque em um dia recente para marcar que você cumpriu. Esse é o gesto principal do app.",
-        stepLabel: "Passo 2 de 3",
+        stepLabel: getMobileHabitsOnboardingStepLabel("mark_day"),
       };
     }
     if (mobileOnboardingStep === "goto_annual") {
       return {
         // Destaca o botão Anual da navegação (não fica dentro deste
-        // componente, ver o GuidedTargetOutline abaixo).
+        // componente — app/page.tsx repassa highlightDestination="annual"
+        // ao AdaptiveNavigation quando este passo estiver ativo).
         target: "mobile-goto-annual",
         title: "Isto é Hábitos.",
         instruction:
           "A visão Anual, com seus eventos, complementa esta aqui. Toque em Anual para conhecer.",
-        stepLabel: "Passo 3 de 3",
+        stepLabel: getMobileHabitsOnboardingStepLabel("goto_annual"),
       };
     }
     return null;
@@ -667,13 +680,6 @@ export function HabitsPrototype({
         guidedNotice={mobileOnboardingNotice}
       />
 
-      {mobileOnboardingNotice?.target === "habit" ? (
-        <GuidedTargetOutline selector="[data-onboarding-habit-create]" />
-      ) : null}
-      {mobileOnboardingNotice?.target === "mobile-goto-annual" ? (
-        <GuidedTargetOutline selector='nav[data-product-navigation="mobile"] a[data-product-destination="annual"]' />
-      ) : null}
-
       {mobileOnboardingNotice ? (
         mobileOnboardingNotice.target === "mobile-goto-annual" ? (
           // Este passo aponta pro botão Anual da navegação, lá embaixo — o
@@ -689,6 +695,21 @@ export function HabitsPrototype({
             <GuidedToolbarNoticeCard
               notice={mobileOnboardingNotice}
               onClose={dismissMobileOnboarding}
+              onAction={
+                mobileOnboardingNotice.target === "mobile-intro"
+                  ? () => setMobileOnboardingStep("create_habit")
+                  : undefined
+              }
+              secondaryLabel={
+                mobileOnboardingNotice.target === "mobile-intro" && onRequireAuth
+                  ? "Entrar na minha conta"
+                  : undefined
+              }
+              onSecondaryAction={
+                mobileOnboardingNotice.target === "mobile-intro"
+                  ? onRequireAuth
+                  : undefined
+              }
               inline
             />
           </div>

@@ -35,9 +35,14 @@ import {
   CATEGORY_COLOR_BASE_GREEN,
   CATEGORY_COLOR_BASE_ORANGE,
   CATEGORY_COLOR_BASE_RED,
+  CATEGORY_COLOR_BASE_TERRA,
   CATEGORY_COLOR_BASE_VIOLET,
 } from "@/lib/category-palette";
 
+// TERRA entra aqui porque é a cor padrão de "Datas importantes" (categoria
+// genérica de data — ver getOnboardingCategoryDefinition em lib/store.ts);
+// sem ela nesta lista, nenhuma amostra aparecia marcada como selecionada
+// para essa sugestão, mesmo já tendo uma cor atribuída.
 const ONBOARDING_QUICK_COLORS = [
   CATEGORY_COLOR_BASE_AMBER,
   CATEGORY_COLOR_BASE_ORANGE,
@@ -47,6 +52,7 @@ const ONBOARDING_QUICK_COLORS = [
   CATEGORY_COLOR_BASE_CYAN,
   CATEGORY_COLOR_BASE_GREEN,
   CATEGORY_COLOR_BASE_GRAPHITE,
+  CATEGORY_COLOR_BASE_TERRA,
 ] as const;
 
 const getDefaultChoiceColors = (
@@ -466,6 +472,7 @@ export function GuidedOnboardingPanel({
             compact
             value={selectedCategoryColor}
             colors={ONBOARDING_QUICK_COLORS}
+            columns={ONBOARDING_QUICK_COLORS.length}
             disabled={!selectedCategoryChoice}
             onChange={(color) => {
               if (!selectedCategoryChoice) return;

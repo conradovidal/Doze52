@@ -71,28 +71,54 @@ function SuggestionChip({
   );
 }
 
+// Tempo do "encaixe": mantém o card que está saindo com a classe de eviction
+// (encolher + esmaecer, ver isEvicting em category-bar.tsx) por um instante
+// antes de de fato trocar os dados, para a saída se ler como uma animação e
+// não como um corte seco.
+const SWAP_TRANSITION_MS = 180;
+
 export function WrapUpCategorySuggestions({
   profileId,
   suggestions,
   cap,
+  onRemoveCategory,
   children,
 }: {
   profileId?: string;
   suggestions: WrapUpCategorySuggestion[];
   cap: number | null;
+  // Remove uma categoria existente, incluindo as vindas de um calendário
+  // pronto (ex.: Feriados) — o `deleteCategory` do store recusa essas por
+  // design, então quem chama precisa saber lidar com o caminho de remoção
+  // de calendário. Sem isso, cai no `deleteCategory` comum (não remove
+  // calendários prontos).
+  onRemoveCategory?: (categoryId: string) => boolean;
   children: React.ReactNode;
 }) {
   const categories = useStore((s) => s.categories);
   const createCategory = useStore((s) => s.createCategory);
-  const deleteCategory = useStore((s) => s.deleteCategory);
+  const deleteCategoryFallback = useStore((s) => s.deleteCategory);
+  const removeCategory = React.useCallback(
+    (categoryId: string) =>
+      onRemoveCategory
+        ? onRemoveCategory(categoryId)
+        : deleteCategoryFallback({
+            categoryId,
+            strategy: { type: "delete-events" },
+          }),
+    [onRemoveCategory, deleteCategoryFallback]
+  );
 
-  const [coreCategoryIds] = React.useState<Set<string>>(
+  // Qualquer categoria do perfil pode ser trocada agora — não só as
+  // adotadas por aqui: se a 3a posição for uma categoria criada durante a
+  // prática guiada (não uma sugestão), ela também sai quando uma nova
+  // sugestão é arrastada para cima.
+  const profileCategories = React.useMemo(
     () =>
-      new Set(
-        categories
-          .filter((category) => !profileId || category.profileId === profileId)
-          .map((category) => category.id)
-      )
+      categories.filter(
+        (category) => !profileId || category.profileId === profileId
+      ),
+    [categories, profileId]
   );
   const [adopted, setAdopted] = React.useState<
     { suggestionId: string; categoryId: string }[]
@@ -100,8 +126,27 @@ export function WrapUpCategorySuggestions({
   const [dragOverSuggestionId, setDragOverSuggestionId] = React.useState<
     string | null
   >(null);
+  const [pendingEvictingCategoryId, setPendingEvictingCategoryId] =
+    React.useState<string | null>(null);
+  const [enteringCategoryId, setEnteringCategoryId] = React.useState<
+    string | null
+  >(null);
   const dragCounterRef = React.useRef(0);
   const draggingSuggestionIdRef = React.useRef<string | null>(null);
+  const enteringTimeoutRef = React.useRef<number | null>(null);
+
+  React.useEffect(
+    () => () => {
+      if (enteringTimeoutRef.current != null) {
+        window.clearTimeout(enteringTimeoutRef.current);
+      }
+    },
+    []
+  );
+
+  const atCap = cap != null && profileCategories.length >= cap;
+  const lastCategoryId =
+    profileCategories[profileCategories.length - 1]?.id;
 
   const adoptSuggestion = React.useCallback(
     (suggestionId: string) => {
@@ -109,31 +154,56 @@ export function WrapUpCategorySuggestions({
       if (!suggestion) return;
       if (adopted.some((entry) => entry.suggestionId === suggestion.id)) return;
 
-      const newCategoryId = createCategory({
-        name: suggestion.name,
-        color: suggestion.color,
-        profileId: profileId ?? "",
-      });
-      if (!newCategoryId) return;
+      const evictingCategoryId = atCap ? lastCategoryId : undefined;
 
-      let next = [...adopted, { suggestionId: suggestion.id, categoryId: newCategoryId }];
-      if (cap != null) {
-        while (coreCategoryIds.size + next.length > cap) {
-          const [oldest, ...rest] = next;
-          deleteCategory({
-            categoryId: oldest.categoryId,
-            strategy: { type: "delete-events" },
-          });
-          next = rest;
+      const commitSwap = () => {
+        // Se a remoção falhar (ex.: algum bloqueio do store que não
+        // previmos), não cria a nova categoria por cima — senão o limite
+        // vira decoração: a contagem só cresce e nunca mais tromba no cap.
+        if (evictingCategoryId && !removeCategory(evictingCategoryId)) {
+          setPendingEvictingCategoryId(null);
+          return;
         }
+        const newCategoryId = createCategory({
+          name: suggestion.name,
+          color: suggestion.color,
+          profileId: profileId ?? "",
+        });
+        if (!newCategoryId) return;
+        setAdopted((current) => [
+          ...current.filter((entry) => entry.categoryId !== evictingCategoryId),
+          { suggestionId: suggestion.id, categoryId: newCategoryId },
+        ]);
+        setPendingEvictingCategoryId(null);
+        setEnteringCategoryId(newCategoryId);
+        if (enteringTimeoutRef.current != null) {
+          window.clearTimeout(enteringTimeoutRef.current);
+        }
+        enteringTimeoutRef.current = window.setTimeout(() => {
+          setEnteringCategoryId(null);
+        }, SWAP_TRANSITION_MS + 220);
+      };
+
+      if (evictingCategoryId) {
+        // Deixa o card em "saindo" por um instante antes de trocar os dados,
+        // para a troca aparecer como uma animação em vez de um corte seco.
+        setPendingEvictingCategoryId(evictingCategoryId);
+        window.setTimeout(commitSwap, SWAP_TRANSITION_MS);
+      } else {
+        commitSwap();
       }
-      setAdopted(next);
     },
-    [suggestions, adopted, createCategory, deleteCategory, cap, coreCategoryIds, profileId]
+    [
+      suggestions,
+      adopted,
+      atCap,
+      lastCategoryId,
+      createCategory,
+      removeCategory,
+      profileId,
+    ]
   );
 
-  const atCap = cap != null && coreCategoryIds.size + adopted.length >= cap;
-  const oldestAdoptedCategoryId = adopted[0]?.categoryId;
   const dragOverSuggestion = dragOverSuggestionId
     ? suggestions.find((item) => item.id === dragOverSuggestionId)
     : undefined;
@@ -144,7 +214,8 @@ export function WrapUpCategorySuggestions({
       ? { name: "Arraste aqui", dashed: true }
       : null;
   const previewEvictingCategoryId =
-    dragOverSuggestion && atCap ? oldestAdoptedCategoryId : undefined;
+    pendingEvictingCategoryId ??
+    (dragOverSuggestion && atCap ? lastCategoryId : undefined);
 
   const childWithPreview = React.isValidElement(children)
     ? React.cloneElement(
@@ -155,8 +226,13 @@ export function WrapUpCategorySuggestions({
             dashed?: boolean;
           } | null;
           previewEvictingCategoryId?: string;
+          previewEnteringCategoryId?: string;
         }>,
-        { previewGhostSuggestion, previewEvictingCategoryId }
+        {
+          previewGhostSuggestion,
+          previewEvictingCategoryId,
+          previewEnteringCategoryId: enteringCategoryId ?? undefined,
+        }
       )
     : children;
 

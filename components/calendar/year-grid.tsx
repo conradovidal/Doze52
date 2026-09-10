@@ -33,7 +33,6 @@ import {
   GuidedToolbarNoticeCard,
   type GuidedToolbarNotice,
 } from "@/components/onboarding/guided-toolbar-notice";
-import { GuidedTargetOutline } from "@/components/onboarding/guided-target-outline";
 import {
   LATERAL_KEY_ACTIVE_CLASS,
   LATERAL_KEY_BASE_CLASS,
@@ -213,15 +212,14 @@ export function YearGrid({
   const setCalendarZoomPercent = useStore((s) => s.setCalendarZoomPercent);
   const [yearDirection, setYearDirection] = React.useState<1 | -1>(1);
   const [isYearTransitioning, setIsYearTransitioning] = React.useState(false);
-  const guidedYearLocked = guidedYearNotice?.target === "year";
   const requestYearChange = React.useCallback(
     (nextYear: number) => {
-      if (guidedYearLocked || isYearTransitioning || nextYear === year) return;
+      if (isYearTransitioning || nextYear === year) return;
       setYearDirection(getYearTransitionDirection(year, nextYear));
       setIsYearTransitioning(true);
       onYearChange(nextYear);
     },
-    [guidedYearLocked, isYearTransitioning, onYearChange, year]
+    [isYearTransitioning, onYearChange, year]
   );
   const visibleCategoryIds = React.useMemo(
     () => {
@@ -1043,7 +1041,8 @@ export function YearGrid({
               guidedYearNotice?.target === "year" ? "true" : undefined
             }
             className={cn(
-              "relative inline-flex h-8 items-center overflow-visible rounded-[10px] border border-border bg-card"
+              "relative inline-flex h-8 items-center overflow-visible rounded-[10px] border border-border bg-card",
+              guidedYearNotice?.target === "year" && "product-spotlight-target"
             )}
           >
             <button
@@ -1051,39 +1050,40 @@ export function YearGrid({
               data-onboarding-year-control
               aria-label={`Voltar para ${year - 1}`}
               title={`Voltar para ${year - 1}`}
-              disabled={guidedYearLocked || isYearTransitioning}
+              disabled={isYearTransitioning}
               className="grid size-8 place-items-center rounded-[9px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-45"
               onClick={() => requestYearChange(year - 1)}
             >
               <ChevronLeft className="size-3.5" />
             </button>
-            <span
-              aria-label={`Ano ${year}`}
+            <button
+              type="button"
+              aria-label={`Ano ${year}. Ir para hoje`}
               aria-live="polite"
-              className="min-w-11 text-center text-xs font-semibold tabular-nums text-foreground"
+              title="Ir para hoje"
+              disabled={isYearTransitioning}
+              className="min-w-11 rounded-[9px] text-center text-xs font-semibold tabular-nums text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-45"
+              onClick={() => requestYearChange(Number(todayIso.slice(0, 4)))}
             >
               {year}
-            </span>
+            </button>
             <button
               type="button"
               aria-label={`Avançar para ${year + 1}`}
               title={`Avançar para ${year + 1}`}
-              disabled={guidedYearLocked || isYearTransitioning}
+              disabled={isYearTransitioning}
               className="grid size-8 place-items-center rounded-[9px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-45"
               onClick={() => requestYearChange(year + 1)}
             >
               <ChevronRight className="size-3.5" />
             </button>
             {guidedYearNotice?.target === "year" && onDismissGuidedYearNotice ? (
-              <>
-                <GuidedTargetOutline selector="[data-calendar-year-stepper]" />
-                <GuidedToolbarNoticeCard
-                  notice={guidedYearNotice}
-                  onClose={onDismissGuidedYearNotice}
-                  onAction={onGuidedYearAction}
-                  placement="above"
-                />
-              </>
+              <GuidedToolbarNoticeCard
+                notice={guidedYearNotice}
+                onClose={onDismissGuidedYearNotice}
+                onAction={onGuidedYearAction}
+                placement="above"
+              />
             ) : null}
           </div>
           {showScaleControl ? (

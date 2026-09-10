@@ -551,13 +551,11 @@ export function CalendarPackLauncher({
               const targetProfileName = targetProfileId
                 ? profileNameById.get(targetProfileId)
                 : null;
-              const targetProfile = targetProfileId
-                ? profiles.find((profile) => profile.id === targetProfileId) ?? null
-                : null;
               const showAddDetails =
                 !isPresent &&
                 (expandedPackId === pack.id ||
-                  (isGuidedCard && hasRequiredVariant));
+                  ((isGuidedCard || Boolean(fixedTargetProfileId)) &&
+                    hasRequiredVariant));
               const variantGroup = pack.variantGroup;
 
               return (
@@ -676,7 +674,10 @@ export function CalendarPackLauncher({
                           </AsyncStateButton>
                         </>
                       ) : showAddDetails ? (
-                        isGuidedCard ? (
+                        // Sem perfil pra escolher (contexto fixo ou só 1
+                        // existente), pedir pra confirmar um contexto óbvio
+                        // só atrapalha — vira clique direto, como Feriados.
+                        isGuidedCard || fixedTargetProfileId ? (
                           <AsyncStateButton
                             type="button"
                             variant="premium"
@@ -684,7 +685,7 @@ export function CalendarPackLauncher({
                             className="rounded-full"
                             disabled={isBusy || !hasRequiredVariant}
                             onClick={() =>
-                              handleImport(pack, variants, activeProfileId)
+                              handleImport(pack, variants, targetProfileId)
                             }
                             state={getAddButtonState(currentFlow)}
                             pendingLabel="Adicionando…"
@@ -692,22 +693,10 @@ export function CalendarPackLauncher({
                             errorLabel="Tentar adicionar"
                           >
                             <Check className="size-3.5" />
-                            Adicionar feriados
+                            {isGuidedCard ? "Adicionar feriados" : "Adicionar calendário"}
                           </AsyncStateButton>
                         ) : (
                         <div className="flex min-w-0 items-center justify-end gap-1.5">
-                          {fixedTargetProfileId ? (
-                            <span className="inline-flex h-7 max-w-[9rem] items-center gap-1.5 rounded-[9px] border border-border bg-card px-2.5 text-xs font-semibold text-foreground">
-                              {targetProfile ? (
-                                <ProfileIcon
-                                  icon={targetProfile.icon}
-                                  size={13}
-                                  className="shrink-0"
-                                />
-                              ) : null}
-                              <span className="truncate">{targetProfileName ?? "Contexto"}</span>
-                            </span>
-                          ) : (
                           <Select
                             value={targetProfileId ?? ""}
                             onValueChange={(profileId) =>
@@ -737,7 +726,6 @@ export function CalendarPackLauncher({
                               ))}
                             </SelectContent>
                           </Select>
-                          )}
                           <AsyncStateButton
                             type="button"
                             variant="premium"
