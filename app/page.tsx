@@ -500,7 +500,8 @@ export default function HomePage() {
   const mobileHabitsOnboardingNavLocked =
     (mobileHabitsOnboardingStep === "intro" ||
       mobileHabitsOnboardingStep === "create_habit" ||
-      mobileHabitsOnboardingStep === "mark_day") &&
+      mobileHabitsOnboardingStep === "mark_day" ||
+      mobileHabitsOnboardingStep === "save_progress") &&
     !(guidedOnboarding && isGuidedOnboardingInProgress(guidedOnboarding));
   const [activeDestination, setActiveDestination] =
     React.useState<ProductDestinationId>("annual");
@@ -2736,11 +2737,12 @@ export default function HomePage() {
           !desktopTourInProgress &&
           (mobileStep === "intro" ||
             mobileStep === "create_habit" ||
-            mobileStep === "mark_day")
+            mobileStep === "mark_day" ||
+            mobileStep === "save_progress")
         ) {
           return;
         }
-        if (mobileStep === "goto_annual" && !isAccountContinuityEnabled) {
+        if (mobileStep === "goto_annual") {
           // Chegou na Anual: a jornada continua aqui, pelo cabeçalho, antes
           // de terminar no Perfil (ver mobileAnnualOnboardingNotice abaixo).
           writeMobileHabitsOnboardingStep("annual_year");
@@ -2795,13 +2797,12 @@ export default function HomePage() {
         finalizeGuidedOnboarding(next);
       }
       if (readMobileHabitsOnboardingStep() === "goto_profile" || readMobileHabitsOnboardingStep() === "save_progress") {
-        // Último passo da jornada própria do mobile: abrir o Perfil a
-        // partir daqui já encerra ela, do mesmo jeito que o tour desktop
-        // faz acima.
-        if (!isAccountContinuityEnabled) {
-          writeMobileHabitsOnboardingStep("completed");
-          setMobileHabitsOnboardingStep("completed");
-        }
+        // Abrir o Perfil a partir daqui (seja no convite antecipado de
+        // save_progress ou no passo final goto_profile) já encerra a
+        // jornada própria do mobile, do mesmo jeito que o tour desktop faz
+        // acima.
+        writeMobileHabitsOnboardingStep("completed");
+        setMobileHabitsOnboardingStep("completed");
         setUtilityPanelAuthMode("signup");
       } else {
         setUtilityPanelAuthMode("login");
@@ -2854,7 +2855,7 @@ export default function HomePage() {
     if (
       !isCalendarSurfaceActive ||
       isMobileCalendarUi !== true ||
-      session?.user.id || isAccountContinuityEnabled
+      session?.user.id
     ) {
       return null;
     }

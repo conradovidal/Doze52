@@ -451,8 +451,8 @@ export function HabitsPrototype({
     if (!habit || showcaseActive || showcaseHabitIds.has(habit.id)) return;
     toggleHabitCheckInInStore(habit.id, dateIso);
     if (mobileOnboardingStep === "mark_day") {
-      if (isAccountContinuityEnabled) trackContinuityMetric("save_invited");
-      setMobileOnboardingStep(isAccountContinuityEnabled ? "save_progress" : "goto_annual");
+      trackContinuityMetric("save_invited");
+      setMobileOnboardingStep("save_progress");
     }
     onHabitCheckIn?.();
   };
@@ -683,13 +683,23 @@ export function HabitsPrototype({
         guidedNotice={mobileOnboardingNotice}
       />
 
-      {isAccountContinuityEnabled && mobileOnboardingActive && mobileOnboardingStep === "save_progress" ? (
+      {mobileOnboardingActive && mobileOnboardingStep === "save_progress" ? (
         <section aria-label="Guardar progresso" className="inverse-product-surface mx-3 my-2 rounded-xl border bg-card p-4 text-card-foreground">
+          <p className="text-xs text-muted-foreground">
+            {getMobileHabitsOnboardingStepLabel("save_progress")}
+          </p>
           <h2 className="font-semibold">Seu primeiro passo já está registrado.</h2>
           <p className="mt-1 text-sm">Crie sua conta para guardar seu hábito e continuar em outro aparelho.</p>
           <div className="mt-3 flex flex-wrap gap-3">
             <button className="rounded-lg bg-primary px-3 py-2 text-primary-foreground" onClick={(event) => onRequestSignup?.(event.currentTarget)}>Criar conta e salvar</button>
-            <button className="underline" onClick={() => setMobileOnboardingStep("completed")}>Continuar sem conta</button>
+            <button
+              className="underline"
+              onClick={() => {
+                setMobileOnboardingStep("goto_annual");
+              }}
+            >
+              Continuar sem conta
+            </button>
           </div>
         </section>
       ) : null}
