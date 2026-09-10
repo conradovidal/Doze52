@@ -108,7 +108,13 @@ type StoreState = {
   focusMonth: (month: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11) => void;
   setCalendarZoomPercent: (percent: number) => void;
   resetCalendarFocusOnYearChange: () => void;
-  createCategory: (input: { name: string; color: string; profileId: string }) => string;
+  createCategory: (input: {
+    name: string;
+    color: string;
+    profileId: string;
+    onboardingSuggestionId?: string;
+    replaceCategoryId?: string;
+  }) => string;
   addCategory: (name: string, color: string, profileId?: string) => void;
   updateCategory: (id: string, patch: Partial<Omit<CategoryItem, "id">>) => void;
   deleteCategory: (input: {
@@ -2191,18 +2197,25 @@ export const useStore = create<StoreState>()(
           const profileId = state.profiles.some((profile) => profile.id === input.profileId)
             ? input.profileId
             : fallbackProfileId;
-          return {
-            categories: [
-              ...state.categories,
-              {
-                id,
-                profileId,
-                name,
-                color: input.color,
-                visible: true,
-              },
-            ],
+          const category: CategoryItem = {
+            id,
+            profileId,
+            name,
+            color: input.color,
+            visible: true,
+            onboardingSuggestionId: input.onboardingSuggestionId,
           };
+          const replaceIndex = input.replaceCategoryId
+            ? state.categories.findIndex(
+                (candidate) => candidate.id === input.replaceCategoryId
+              )
+            : -1;
+          if (replaceIndex < 0) {
+            return { categories: [...state.categories, category] };
+          }
+          const categories = [...state.categories];
+          categories.splice(replaceIndex, 1, category);
+          return { categories };
         });
         return id;
       },

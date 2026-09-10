@@ -29,10 +29,12 @@ export type GuidedToolbarNotice = {
   title: string;
   instruction: string;
   actionLabel?: string;
+  actionDisabled?: boolean;
   stepLabel?: string;
   // Só preenchido no passo de resumo (target "wrap-up"): categorias-exemplo
   // que a pessoa pode arrastar para o ano dela.
   categorySuggestions?: { id: string; name: string; color: string }[];
+  categorySuggestionCategoryIds?: Record<string, string>;
 };
 
 const OPEN_OVERLAY_SELECTOR = '[data-slot="dialog-overlay"][data-state="open"]';
@@ -297,6 +299,7 @@ export function GuidedToolbarNoticeCard({
           variant="premium"
           size="sm"
           className="mt-3 w-full"
+          disabled={notice.actionDisabled}
           onClick={onAction}
         >
           <Check className="size-4" aria-hidden="true" />

@@ -280,6 +280,9 @@ export function FilterEditPanel({
                     <WrapUpCategorySuggestions
                       profileId={editingProfileId}
                       suggestions={guidedToolbarNotice.categorySuggestions}
+                      suggestionCategoryIds={
+                        guidedToolbarNotice.categorySuggestionCategoryIds
+                      }
                       cap={limits.maxCategories}
                     >
                       <CategoryBar

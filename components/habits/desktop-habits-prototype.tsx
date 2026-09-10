@@ -8,6 +8,8 @@ import { GuidedToolbarNoticeCard } from "@/components/onboarding/guided-toolbar-
 import type { Habit, HabitCheckIn } from "@/lib/types";
 import type { GuidedToolbarNotice } from "@/components/onboarding/guided-toolbar-notice";
 
+import { DESKTOP_CONTROL_REGION_TOP_GAP_CLASS } from "@/lib/desktop-control-layout";
+
 const noop = () => undefined;
 
 export function DesktopHabitsPrototype({
@@ -82,16 +84,11 @@ export function DesktopHabitsPrototype({
       data-habits-layout="desktop-year"
       className="flex min-h-0 flex-1 flex-col"
     >
-      {/* Mesmo mecanismo do Anual (CollapsibleControlRegion): a faixa some com
-          animação, sem deixar linha residual — a borda vive dentro do
-          HabitControls, então ela colapsa junto com o conteúdo. O mb-2 fica
-          aqui, fora da região que anima (nunca é cortado ao recolher) —
-          reproduz o espaço fixo que o <header> do Anual já tem entre o topo
-          e a faixa de categorias, independente de estar expandida ou não. */}
+      {/* Mesmo espaço entre navegação e controles usado pelo Anual. */}
       <CollapsibleControlRegion
         id="habits-header-region"
         expanded={!headerMinimized}
-        className="mb-2"
+        className={DESKTOP_CONTROL_REGION_TOP_GAP_CLASS}
       >
         <HabitControls
           habits={habits}

@@ -39,12 +39,11 @@ import {
 } from "../../lib/onboarding-region";
 import {
   CATEGORY_COLOR_BASE_AMBER,
-  CATEGORY_COLOR_BASE_BLUE,
   CATEGORY_COLOR_BASE_CORAL,
-  CATEGORY_COLOR_BASE_GREEN,
   CATEGORY_COLOR_BASE_OLIVE,
   CATEGORY_COLOR_BASE_ORANGE,
   CATEGORY_COLOR_BASE_SAND,
+  CATEGORY_COLOR_BASE_TERRA,
   CATEGORY_COLOR_BASE_TEAL,
   CATEGORY_COLOR_BASE_VIOLET,
   CATEGORY_PRESET_COLORS,
@@ -107,7 +106,7 @@ test("organiza 24 cores e mantém padrões distintos no onboarding", () => {
   ).toBe(CATEGORY_COLOR_BASE_AMBER);
   expect(
     getOnboardingCategoryDefinition("personal", "date", "generic").color
-  ).toBe(CATEGORY_COLOR_BASE_BLUE);
+  ).toBe(CATEGORY_COLOR_BASE_TERRA);
   expect(
     getOnboardingCategoryDefinition("personal", "period", "specific").color
   ).not.toBe(
@@ -121,7 +120,7 @@ test("organiza 24 cores e mantém padrões distintos no onboarding", () => {
   ).toBe(CATEGORY_COLOR_BASE_VIOLET);
   expect(
     getOnboardingCategoryDefinition("work", "period", "specific").color
-  ).toBe(CATEGORY_COLOR_BASE_GREEN);
+  ).toBe(CATEGORY_COLOR_BASE_AMBER);
 });
 
 test("normaliza a antiga cor escura para uma opção oficial", () => {
@@ -1334,4 +1333,55 @@ test("materialização cria IDs distintos e preserva relacionamentos", () => {
   expect([...firstIds].some((id) => secondIds.has(id))).toBe(false);
   expect(first.categories[0]?.profileId).toBe(first.profiles[0]?.id);
   expect(first.events[0]?.categoryId).toBe(first.categories[0]?.id);
+});
+
+test("preserva a origem das sugestões sem alterar a versão do onboarding", () => {
+  const state = reduceGuidedOnboardingState(
+    { ...initialState(), step: "wrap_up_instruction" },
+    {
+      type: "set_wrap_up_suggestions",
+      entries: { saude: "category-health" },
+    }
+  );
+  expect(state).toMatchObject({
+    version: 15,
+    wrapUpSuggestionCategoryIds: { saude: "category-health" },
+  });
+  expect(migrateGuidedOnboardingState(state)).toMatchObject({
+    version: 15,
+    step: "wrap_up_instruction",
+    wrapUpSuggestionCategoryIds: { saude: "category-health" },
+  });
+});
+
+test("substitui a terceira categoria promovida em uma única atualização", () => {
+  const profile = getOnboardingDefaultProfiles()[0];
+  if (!profile) throw new Error("Template sem contexto");
+  useStore.setState({
+    profiles: [profile],
+    selectedProfileIds: [profile.id],
+    categories: [
+      { id: "fixed-1", profileId: profile.id, name: "Família", color: "#EF8F8F", visible: true },
+      { id: "fixed-2", profileId: profile.id, name: "Amigos", color: "#4F8FD6", visible: true },
+      { id: "promoted-1", profileId: profile.id, name: "Saúde", color: "#58B76F", visible: true, onboardingSuggestionId: "saude" },
+    ],
+    events: [],
+  });
+
+  const replacementId = useStore.getState().createCategory({
+    name: "Estudos",
+    color: "#B79AEF",
+    profileId: profile.id,
+    onboardingSuggestionId: "estudos",
+    replaceCategoryId: "promoted-1",
+  });
+  const categories = useStore.getState().categories;
+  expect(categories).toHaveLength(3);
+  expect(categories.map((category) => category.id)).toEqual([
+    "fixed-1",
+    "fixed-2",
+    replacementId,
+  ]);
+  expect(categories[2]?.onboardingSuggestionId).toBe("estudos");
+  useStore.getState().resetToOnboardingData();
 });

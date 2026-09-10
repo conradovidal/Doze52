@@ -35,7 +35,6 @@ import {
   GuidedToolbarNoticeCard,
   type GuidedToolbarNotice,
 } from "@/components/onboarding/guided-toolbar-notice";
-import { GuidedTargetOutline } from "@/components/onboarding/guided-target-outline";
 import { HabitEditList } from "@/components/habits/habit-edit-list";
 import { getCategoryColorToken } from "@/lib/category-palette";
 import {
@@ -513,12 +512,7 @@ export function HabitControls({
               DESKTOP_CONTROL_MAX_WIDTH_CLASS,
               DESKTOP_CONTROL_DIVIDER_CLASS,
               DESKTOP_CONTROL_ROW_GAP_CLASS,
-              // Este mb-3 só conta enquanto a faixa está visível (some junto
-              // com o conteúdo ao recolher, dentro da região com overflow
-              // escondido) — é o par do mb-2 incondicional no wrapper
-              // (DesktopHabitsPrototype), que sozinho cobre o estado
-              // recolhido. Juntos reproduzem os dois espaços fixos que o
-              // <header> do Anual já tem prontos (gap acima + margem abaixo).
+              // Mesmo espaço entre controles e grade usado pelo Anual.
               DESKTOP_CONTROL_GRID_GAP_CLASS
             )
       )}
@@ -587,7 +581,7 @@ export function HabitControls({
             ) : (
               <div
                 className={cn(
-                  "grid transition-[grid-template-columns,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
+                  "grid h-8 overflow-hidden transition-[grid-template-columns,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
                   expanded
                     ? "grid-cols-[1fr] opacity-100"
                     : "pointer-events-none grid-cols-[0fr] opacity-0"
@@ -631,9 +625,6 @@ export function HabitControls({
 
       {guidedNotice && onDismissGuidedNotice ? (
         <>
-          {guidedNotice.target === "habit" ? (
-            <GuidedTargetOutline selector="[data-onboarding-habit-create]" />
-          ) : null}
           <GuidedToolbarNoticeCard
             notice={guidedNotice}
             onClose={onDismissGuidedNotice}

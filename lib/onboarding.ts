@@ -93,6 +93,7 @@ export type GuidedOnboardingState = {
   demoInteractionKeys?: string[];
   demoInviteEligibleAt?: string;
   postExitCreationKeys?: string[];
+  wrapUpSuggestionCategoryIds?: Record<string, string>;
   exitConfirmedAt?: string;
   completedAt?: string;
   dismissedAt?: string;
@@ -114,7 +115,7 @@ export type GuidedOnboardingAction =
   | { type: "close_calendar" }
   | { type: "calendar_added"; uf?: string; packGroupId?: string; at?: string }
   | { type: "continue_from_year"; showPeriodNavigation?: boolean; at?: string }
-  | { type: "continue_from_period_navigation"; showHabit?: boolean; at?: string }
+  | { type: "continue_from_period_navigation"; showHabit?: boolean; finishAnnual?: boolean; at?: string }
   | { type: "interact_with_period_navigation"; at?: string }
   | {
       type: "open_habits_surface";
@@ -130,6 +131,10 @@ export type GuidedOnboardingAction =
   | { type: "open_profile"; at?: string }
   | { type: "open_appearance"; at?: string }
   | { type: "confirm_theme"; complete?: boolean; at?: string }
+  | {
+      type: "set_wrap_up_suggestions";
+      entries: Record<string, string>;
+    }
   | { type: "continue_from_wrap_up"; at?: string }
   | { type: "finish_profile_onboarding"; at?: string }
   | { type: "complete"; at?: string }
@@ -176,6 +181,7 @@ type LegacyGuidedOnboardingState = {
   demoInteractionKeys?: unknown;
   demoInviteEligibleAt?: string;
   postExitCreationKeys?: unknown;
+  wrapUpSuggestionCategoryIds?: unknown;
   exitConfirmedAt?: string;
   completedAt?: string;
   dismissedAt?: string;
@@ -309,6 +315,18 @@ export const migrateGuidedOnboardingState = (
               candidate.step === "theme_instruction")
           ? "completed"
           : candidate.step;
+    const wrapUpSuggestionCategoryIds =
+      typeof candidate.wrapUpSuggestionCategoryIds === "object" &&
+      candidate.wrapUpSuggestionCategoryIds !== null
+        ? Object.fromEntries(
+            Object.entries(candidate.wrapUpSuggestionCategoryIds).filter(
+              (entry): entry is [string, string] =>
+                entry[0].trim().length > 0 &&
+                typeof entry[1] === "string" &&
+                entry[1].trim().length > 0
+            )
+          )
+        : undefined;
     return {
       version: 15,
       step: migratedStep,
@@ -366,6 +384,7 @@ export const migrateGuidedOnboardingState = (
       postExitCreationKeys: Array.isArray(candidate.postExitCreationKeys)
         ? [...new Set(candidate.postExitCreationKeys.filter((key): key is string => typeof key === "string" && key.length > 0))]
         : [],
+      wrapUpSuggestionCategoryIds,
       exitConfirmedAt: candidate.exitConfirmedAt,
       completedAt:
         migratedStep === "completed"
@@ -683,7 +702,7 @@ export const reduceGuidedOnboardingState = (
       if (state.step !== "period_navigation_instruction") return state;
       return {
         ...state,
-        step: action.showHabit ? "habit_surface_instruction" : "theme_instruction",
+        step: action.finishAnnual ? "wrap_up_instruction" : action.showHabit ? "habit_surface_instruction" : "theme_instruction",
       };
     case "interact_with_period_navigation":
       return state.step === "period_navigation_instruction" && !state.periodNavigationInteractedAt
@@ -770,6 +789,10 @@ export const reduceGuidedOnboardingState = (
         step: "wrap_up_instruction",
       };
     }
+    case "set_wrap_up_suggestions":
+      return state.step === "wrap_up_instruction"
+        ? { ...state, wrapUpSuggestionCategoryIds: { ...action.entries } }
+        : state;
     case "continue_from_wrap_up":
       return state.step === "wrap_up_instruction"
         ? buildCompletedState(state, action.at)

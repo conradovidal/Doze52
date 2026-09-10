@@ -19,7 +19,6 @@ import {
   GuidedToolbarNoticeCard,
   type GuidedToolbarNotice,
 } from "@/components/onboarding/guided-toolbar-notice";
-import { GuidedTargetOutline } from "@/components/onboarding/guided-target-outline";
 import { CategoryBar } from "@/components/category-bar";
 import { CategoryCreationFlow } from "@/components/category-creation-flow";
 import { CategoryManager } from "@/components/category-manager";
@@ -108,6 +107,7 @@ type AppHeaderProps = {
   onYearLabelClick?: () => void;
   onGuidedThemeChange?: () => void;
   headerMinimized?: boolean;
+  onboardingActive?: boolean;
   onToggleHeaderMinimized?: () => void;
 };
 
@@ -158,6 +158,7 @@ export function AppHeader({
   onYearLabelClick,
   onGuidedThemeChange,
   headerMinimized = false,
+  onboardingActive = false,
   onToggleHeaderMinimized,
 }: AppHeaderProps) {
   const profiles = useStore((s) => s.profiles);
@@ -278,6 +279,7 @@ export function AppHeader({
   const [categoriesRowExpanded, setCategoriesRowExpanded] = React.useState(true);
   // Assim que a pessoa usa o botão de recolher/mostrar, a decisão passa a ser
   // dela: o padrão por altura não volta a mandar até o fim da sessão.
+  const effectiveCategoriesRowExpanded = onboardingActive || categoriesRowExpanded;
   const categoriesRowManuallySetRef = React.useRef(false);
 
   React.useLayoutEffect(() => {
@@ -495,20 +497,8 @@ export function AppHeader({
     setCategoryEditOpen(true);
   }, []);
 
-  const guidedOutlineSelector =
-    guidedToolbarNotice?.target === "edit"
-      ? '[data-onboarding-edit-control][data-onboarding-highlighted="true"], [data-product-organize="desktop"][data-onboarding-highlighted="true"]'
-      : guidedToolbarNotice?.target === "calendars" && !categoryCreateOpen
-        ? '[data-onboarding-calendar-control][data-onboarding-highlighted="true"]'
-        : guidedToolbarNotice?.target === "habit-surface"
-          ? '[data-product-navigation="desktop"] [data-product-destination="habits"]'
-          : null;
-
   return (
     <>
-      {guidedOutlineSelector ? (
-        <GuidedTargetOutline selector={guidedOutlineSelector} />
-      ) : null}
       <header
         className={cn(
           "bg-background",
@@ -955,7 +945,7 @@ export function AppHeader({
                       : "border-t border-border/45 pt-2.5 md:pt-3"
                   ),
               onboardingLayoutReserved &&
-                (isMobileMode ? "min-h-[10.25rem]" : undefined)
+                (isMobileMode ? "min-h-[10.25rem]" : "min-h-[5.25rem]")
             )}
           >
           <CollapsibleControlRegion
@@ -1140,20 +1130,21 @@ export function AppHeader({
                   <button
                     type="button"
                     onClick={() => {
+                      if (onboardingActive) return;
                       categoriesRowManuallySetRef.current = true;
                       setCategoriesRowExpanded((current) => !current);
                       onFilterLayoutChange?.();
                     }}
-                    aria-pressed={categoriesRowExpanded}
-                    aria-expanded={categoriesRowExpanded}
+                    aria-pressed={effectiveCategoriesRowExpanded}
+                    aria-expanded={effectiveCategoriesRowExpanded}
                     aria-controls="app-header-categories-inline"
                     aria-label={
-                      categoriesRowExpanded
+                      effectiveCategoriesRowExpanded
                         ? "Recolher categorias"
                         : "Mostrar categorias"
                     }
                     title={
-                      categoriesRowExpanded
+                      effectiveCategoriesRowExpanded
                         ? "Recolher categorias"
                         : "Mostrar categorias"
                     }
@@ -1162,7 +1153,7 @@ export function AppHeader({
                     <ChevronRight
                       className={cn(
                         "h-3.5 w-3.5 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
-                        categoriesRowExpanded && "rotate-180"
+                        effectiveCategoriesRowExpanded && "rotate-180"
                       )}
                       aria-hidden="true"
                     />
@@ -1171,8 +1162,8 @@ export function AppHeader({
                   <div
                     id="app-header-categories-inline"
                     className={cn(
-                      "grid transition-[grid-template-columns,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
-                      categoriesRowExpanded
+                      "grid h-8 overflow-hidden transition-[grid-template-columns,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
+                      effectiveCategoriesRowExpanded
                         ? "grid-cols-[1fr] opacity-100"
                         : "pointer-events-none grid-cols-[0fr] opacity-0"
                     )}

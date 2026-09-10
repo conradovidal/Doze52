@@ -14,3 +14,7 @@ export const isHabitsPrototypeEnabled = isHabitsPrototypeAvailable({
   nodeEnv: process.env.NODE_ENV,
   appEnv: process.env.NEXT_PUBLIC_APP_ENV,
 });
+
+// Enable only after continuity_contract_version() has been verified in the target environment.
+export const isAccountContinuityEnabled =
+  process.env.NEXT_PUBLIC_FEATURE_ACCOUNT_CONTINUITY === "true";

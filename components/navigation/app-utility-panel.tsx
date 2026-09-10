@@ -208,6 +208,9 @@ function AccountAvatar({
 }
 
 type AppUtilityPanelProps = {
+  onOpenAnnualHelp?: () => void;
+  continuityStatus?: string;
+  onRetryContinuity?: () => void;
   open: boolean;
   section: UtilityPanelSection;
   isMobile: boolean;
@@ -227,6 +230,9 @@ type AppUtilityPanelProps = {
 };
 
 export function AppUtilityPanel({
+  onOpenAnnualHelp,
+  continuityStatus,
+  onRetryContinuity,
   open,
   section,
   isMobile,
@@ -482,6 +488,7 @@ export function AppUtilityPanel({
               </div>
             )}
             <p className="mt-1 text-sm text-muted-foreground">{email}</p>
+            {continuityStatus ? <div role="status" aria-label="Sincronização de hábitos" className="mt-3 text-sm text-muted-foreground">{continuityStatus}{onRetryContinuity ? <Button variant="ghost" size="sm" onClick={onRetryContinuity}>Tentar novamente</Button> : null}</div> : null}
 
             {standalone ? (
               <button
@@ -566,6 +573,7 @@ export function AppUtilityPanel({
       case "help":
         return (
           <div className="max-w-xl rounded-2xl border border-border bg-card p-2">
+            {onOpenAnnualHelp ? <PanelAction icon={HelpCircle} onClick={onOpenAnnualHelp}>Introdução ao Anual</PanelAction> : null}
             {session ? <PanelAction icon={Bug} onClick={openFeedback}>Enviar feedback</PanelAction> : null}
             <a href={`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent("Dúvida: ")}`} className="flex h-11 w-full items-center gap-3 rounded-xl px-3 text-sm font-medium text-foreground hover:bg-muted/60">
               <CircleHelp className="size-4 shrink-0 text-muted-foreground" />

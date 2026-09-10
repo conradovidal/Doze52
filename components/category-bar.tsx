@@ -21,7 +21,7 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Eye, EyeOff, GripVertical, PencilLine, Plus } from "lucide-react";
+import { ArrowDown, Eye, EyeOff, GripVertical, PencilLine, Plus } from "lucide-react";
 import {
   arraysEqual,
   INLINE_SORTABLE_MEASURING,
@@ -100,6 +100,12 @@ type CategoryBarProps = {
     color?: string;
     dashed?: boolean;
   } | null;
+  promotedCategoryIds?: ReadonlySet<string>;
+  onDemotePromotedCategory?: (categoryId: string) => void;
+  onPromotedCategoryDragStart?: (
+    event: React.DragEvent<HTMLButtonElement>,
+    categoryId: string
+  ) => void;
 };
 
 type DragState = {
@@ -124,6 +130,9 @@ function EditCategoryChip({
   isEvicting = false,
   style,
   chipRef,
+  canDemote = false,
+  onDemote,
+  onDemoteDragStart,
 }: {
   category: CategoryItem;
   onEdit?: () => void;
@@ -137,6 +146,9 @@ function EditCategoryChip({
   isEvicting?: boolean;
   style?: React.CSSProperties;
   chipRef?: (node: HTMLElement | null) => void;
+  canDemote?: boolean;
+  onDemote?: () => void;
+  onDemoteDragStart?: (event: React.DragEvent<HTMLButtonElement>) => void;
 }) {
   const { mode: themeMode } = useTheme();
   const contentHiddenClass = isPlaceholder ? "invisible" : "";
@@ -263,6 +275,24 @@ function EditCategoryChip({
             <PencilLine className="h-3.5 w-3.5" />
           </span>
         </div>
+      ) : canDemote ? (
+        <div className="pr-1">
+          <button
+            type="button"
+            draggable
+            onDragStart={onDemoteDragStart}
+            onClick={(event) => {
+              event.stopPropagation();
+              onDemote?.();
+            }}
+            aria-label={`Mover ${category.name} para sugestões`}
+            title="Mover para sugestões"
+            className={cn(CHIP_EDIT_ACTION_CLASS, mobileDense && "h-8 w-8")}
+            style={categoryActionHoverStyle}
+          >
+            <ArrowDown className="h-3.5 w-3.5" />
+          </button>
+        </div>
       ) : onEdit ? (
         <div className="pr-1">
           <button
@@ -356,12 +386,18 @@ function SortableEditCategoryChip({
   mobileDense = false,
   onEdit,
   isEvicting = false,
+  canDemote = false,
+  onDemote,
+  onDemoteDragStart,
 }: {
   category: CategoryItem;
   dragEnabled: boolean;
   mobileDense?: boolean;
   onEdit: () => void;
   isEvicting?: boolean;
+  canDemote?: boolean;
+  onDemote?: () => void;
+  onDemoteDragStart?: (event: React.DragEvent<HTMLButtonElement>) => void;
 }) {
   const {
     attributes,
@@ -399,6 +435,9 @@ function SortableEditCategoryChip({
       isEvicting={isEvicting}
       style={style}
       chipRef={setNodeRef}
+      canDemote={canDemote}
+      onDemote={onDemote}
+      onDemoteDragStart={onDemoteDragStart}
     />
   );
 }
@@ -417,6 +456,9 @@ export function CategoryBar({
   highlightAllVisible = false,
   previewEvictingCategoryId,
   previewGhostSuggestion,
+  promotedCategoryIds,
+  onDemotePromotedCategory,
+  onPromotedCategoryDragStart,
 }: CategoryBarProps) {
   const { mode: themeMode } = useTheme();
   const selectedProfileIds = useStore((s) => s.selectedProfileIds);
@@ -730,6 +772,11 @@ export function CategoryBar({
               mobileDense={mobileDense}
               onEdit={() => onEditCategory?.(category.id)}
               isEvicting={previewEvictingCategoryId === category.id}
+              canDemote={Boolean(promotedCategoryIds?.has(category.id))}
+              onDemote={() => onDemotePromotedCategory?.(category.id)}
+              onDemoteDragStart={(event) =>
+                onPromotedCategoryDragStart?.(event, category.id)
+              }
             />
           ))}
 

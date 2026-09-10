@@ -20,6 +20,7 @@ export type CategoryItem = {
   calendarPackVariantId?: string;
   calendarPackCategoryKey?: string;
   calendarPackVersion?: number;
+  onboardingSuggestionId?: string;
 };
 
 export type RecurrenceType = "weekly" | "biweekly" | "monthly" | "yearly";

@@ -1,5 +1,7 @@
 "use client";
 
+import { trackContinuityMetric } from "@/lib/product-metrics";
+import { isAccountContinuityEnabled } from "@/lib/feature-flags";
 import * as React from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
@@ -9,7 +11,6 @@ import { DesktopHabitsPrototype } from "@/components/habits/desktop-habits-proto
 import { HabitControls } from "@/components/habits/habit-controls";
 import { HabitDayPicker } from "@/components/habits/habit-day-picker";
 import { HABIT_COLORS, HabitEditorDialog } from "@/components/habits/habit-editor-dialog";
-import { GuidedTargetOutline } from "@/components/onboarding/guided-target-outline";
 import { GuidedToolbarNoticeCard } from "@/components/onboarding/guided-toolbar-notice";
 import { useFeedback } from "@/components/ui/feedback-provider";
 import { CATEGORY_COLOR_BASE_BLUE } from "@/lib/category-palette";
@@ -449,7 +450,8 @@ export function HabitsPrototype({
     if (!habit || showcaseActive || showcaseHabitIds.has(habit.id)) return;
     toggleHabitCheckInInStore(habit.id, dateIso);
     if (mobileOnboardingStep === "mark_day") {
-      setMobileOnboardingStep("goto_annual");
+      if (isAccountContinuityEnabled) trackContinuityMetric("save_invited");
+      setMobileOnboardingStep(isAccountContinuityEnabled ? "save_progress" : "goto_annual");
     }
     onHabitCheckIn?.();
   };
@@ -480,9 +482,7 @@ export function HabitsPrototype({
     if (!mobileOnboardingActive) return null;
     if (mobileOnboardingStep === "create_habit") {
       return {
-        // Mesmo target do desktop: destaca o "+" com o mecanismo já
-        // existente (GuidedTargetOutline). Sem botão: chega já convidando a
-        // criar, num só toque.
+        // Mesmo alvo do desktop: destaca o "+" com o fundo tonal do guia.
         target: "habit",
         title: "Assim funcionam os hábitos.",
         instruction: "Estes dois são só exemplo. Toque no + e crie o seu.",
@@ -500,8 +500,7 @@ export function HabitsPrototype({
     }
     if (mobileOnboardingStep === "goto_annual") {
       return {
-        // Destaca o botão Anual da navegação (não fica dentro deste
-        // componente, ver o GuidedTargetOutline abaixo).
+        // Destaca o botão Anual da navegação inferior.
         target: "mobile-goto-annual",
         title: "Isto é Hábitos.",
         instruction:
@@ -610,7 +609,7 @@ export function HabitsPrototype({
           // primeiro hábito" seria enganoso para quem já tem hábitos reais
           // no computador e só está vendo este aparelho vazio.
           message:
-            "Hábitos ainda não sincronizam entre aparelhos. Toque no + para acompanhar por aqui também.",
+            isAccountContinuityEnabled ? "Seus hábitos acompanham sua conta. Toque no + para começar." : "Hábitos ainda não sincronizam entre aparelhos. Toque no + para acompanhar por aqui também.",
           onDismiss: () => setCreateHintDismissed(true),
         }
       : activeHabits.length === 0 && !createHintDismissed
@@ -667,13 +666,16 @@ export function HabitsPrototype({
         guidedNotice={mobileOnboardingNotice}
       />
 
-      {mobileOnboardingNotice?.target === "habit" ? (
-        <GuidedTargetOutline selector="[data-onboarding-habit-create]" />
+      {isAccountContinuityEnabled && mobileOnboardingActive && mobileOnboardingStep === "save_progress" ? (
+        <section aria-label="Guardar progresso" className="inverse-product-surface mx-3 my-2 rounded-xl border bg-card p-4 text-card-foreground">
+          <h2 className="font-semibold">Seu primeiro passo já está registrado.</h2>
+          <p className="mt-1 text-sm">Crie sua conta para guardar seu hábito e continuar em outro aparelho.</p>
+          <div className="mt-3 flex flex-wrap gap-3">
+            <button className="rounded-lg bg-primary px-3 py-2 text-primary-foreground" onClick={(event) => onRequestSignup?.(event.currentTarget)}>Criar conta e salvar</button>
+            <button className="underline" onClick={() => setMobileOnboardingStep("completed")}>Continuar sem conta</button>
+          </div>
+        </section>
       ) : null}
-      {mobileOnboardingNotice?.target === "mobile-goto-annual" ? (
-        <GuidedTargetOutline selector='nav[data-product-navigation="mobile"] a[data-product-destination="annual"]' />
-      ) : null}
-
       {mobileOnboardingNotice ? (
         mobileOnboardingNotice.target === "mobile-goto-annual" ? (
           // Este passo aponta pro botão Anual da navegação, lá embaixo — o
