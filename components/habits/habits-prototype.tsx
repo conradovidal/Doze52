@@ -1,5 +1,7 @@
 "use client";
 
+import { trackContinuityMetric } from "@/lib/product-metrics";
+import { isAccountContinuityEnabled } from "@/lib/feature-flags";
 import * as React from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
@@ -449,7 +451,8 @@ export function HabitsPrototype({
     if (!habit || showcaseActive || showcaseHabitIds.has(habit.id)) return;
     toggleHabitCheckInInStore(habit.id, dateIso);
     if (mobileOnboardingStep === "mark_day") {
-      setMobileOnboardingStep("goto_annual");
+      if (isAccountContinuityEnabled) trackContinuityMetric("save_invited");
+      setMobileOnboardingStep(isAccountContinuityEnabled ? "save_progress" : "goto_annual");
     }
     onHabitCheckIn?.();
   };
@@ -623,7 +626,7 @@ export function HabitsPrototype({
           // primeiro hábito" seria enganoso para quem já tem hábitos reais
           // no computador e só está vendo este aparelho vazio.
           message:
-            "Hábitos ainda não sincronizam entre aparelhos. Toque no + para acompanhar por aqui também.",
+            isAccountContinuityEnabled ? "Seus hábitos acompanham sua conta. Toque no + para começar." : "Hábitos ainda não sincronizam entre aparelhos. Toque no + para acompanhar por aqui também.",
           onDismiss: () => setCreateHintDismissed(true),
         }
       : activeHabits.length === 0 && !createHintDismissed
@@ -680,6 +683,16 @@ export function HabitsPrototype({
         guidedNotice={mobileOnboardingNotice}
       />
 
+      {isAccountContinuityEnabled && mobileOnboardingActive && mobileOnboardingStep === "save_progress" ? (
+        <section aria-label="Guardar progresso" className="inverse-product-surface mx-3 my-2 rounded-xl border bg-card p-4 text-card-foreground">
+          <h2 className="font-semibold">Seu primeiro passo já está registrado.</h2>
+          <p className="mt-1 text-sm">Crie sua conta para guardar seu hábito e continuar em outro aparelho.</p>
+          <div className="mt-3 flex flex-wrap gap-3">
+            <button className="rounded-lg bg-primary px-3 py-2 text-primary-foreground" onClick={(event) => onRequestSignup?.(event.currentTarget)}>Criar conta e salvar</button>
+            <button className="underline" onClick={() => setMobileOnboardingStep("completed")}>Continuar sem conta</button>
+          </div>
+        </section>
+      ) : null}
       {mobileOnboardingNotice ? (
         mobileOnboardingNotice.target === "mobile-goto-annual" ? (
           // Este passo aponta pro botão Anual da navegação, lá embaixo — o

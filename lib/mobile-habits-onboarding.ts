@@ -16,6 +16,7 @@ export type MobileHabitsOnboardingStep =
   | "intro"
   | "create_habit"
   | "mark_day"
+  | "save_progress"
   | "goto_annual"
   | "annual_year"
   | "annual_theme"
@@ -28,6 +29,7 @@ const STEPS: readonly MobileHabitsOnboardingStep[] = [
   "intro",
   "create_habit",
   "mark_day",
+  "save_progress",
   "goto_annual",
   "annual_year",
   "annual_theme",

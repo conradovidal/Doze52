@@ -1,5 +1,6 @@
 "use client";
 
+import { track } from "@vercel/analytics";
 import { getTodayIsoInTimeZone } from "@/lib/date";
 import type { GuidedOnboardingState } from "@/lib/onboarding";
 import { logDevError, logProdError } from "@/lib/safe-log";
@@ -142,4 +143,10 @@ export const recordProductActivityDay = async (userId: string) => {
   } catch (error) {
     reportMetricsFailure("product-metrics.activity", error);
   }
+};
+
+export type ContinuityMetric = "save_invited" | "authenticated" | "sync_confirmed" | "sync_failed" | "annual_started" | "annual_completed";
+export const trackContinuityMetric = (event: ContinuityMetric) => {
+  // No habit names, dates, email addresses or account identifiers.
+  if (typeof window !== "undefined") track(`continuity_${event}`);
 };
