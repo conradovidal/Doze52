@@ -102,9 +102,22 @@ export function FilterEditPanel({
   const [section, setSection] = React.useState<ProductDestinationId>(
     activeDestination
   );
+  const wasOpenRef = React.useRef(false);
+  const wasWrapUpNoticeRef = React.useRef(false);
   React.useEffect(() => {
-    if (!open) return;
-    setSection(showWrapUpNotice ? "annual" : activeDestination);
+    // Só re-sincroniza a aba (Anual/Hábitos) com o destino ativo no momento
+    // em que o painel abre, ou quando o aviso de "wrap up" liga (ele exige
+    // Anual) — não a cada mudança de activeDestination enquanto o painel já
+    // está aberto, senão uma navegação de fundo (como o guia de onboarding
+    // trocando de superfície) troca a aba escolhida pela pessoa sem que ela
+    // tenha pedido isso.
+    const justOpened = open && !wasOpenRef.current;
+    const wrapUpNoticeJustAppeared = showWrapUpNotice && !wasWrapUpNoticeRef.current;
+    if (open && (justOpened || wrapUpNoticeJustAppeared)) {
+      setSection(showWrapUpNotice ? "annual" : activeDestination);
+    }
+    wasOpenRef.current = open;
+    wasWrapUpNoticeRef.current = showWrapUpNotice;
   }, [open, activeDestination, showWrapUpNotice]);
 
   const { notify } = useFeedback();
