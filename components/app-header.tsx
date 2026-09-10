@@ -1354,7 +1354,7 @@ export function AppHeader({
               data-guided-selection-overlay
               className={cn(
                 "pointer-events-auto absolute inset-x-0 z-[50] flex w-full items-center justify-center overflow-hidden bg-background",
-                isMobileMode ? "inset-y-0" : "-top-12 bottom-0"
+                isMobileMode ? "inset-y-0" : "top-0 bottom-0"
               )}
             >
               <div

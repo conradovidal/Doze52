@@ -533,6 +533,16 @@ export default function HomePage() {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, [canMinimizeHeader]);
+  // Expande o header e as categorias em sequência (não ao mesmo tempo), para
+  // que as duas animações de "recolher geral" fiquem legíveis em vez de
+  // disparar juntas. 300ms casa com a duração de transição do
+  // CollapsibleControlRegion do header.
+  const resetHeaderLayoutSequenced = React.useCallback(() => {
+    setHeaderMinimized(false);
+    window.setTimeout(() => {
+      requestCategoriesRowExpanded();
+    }, 300);
+  }, [requestCategoriesRowExpanded, setHeaderMinimized]);
   const [utilityPanelOpen, setUtilityPanelOpen] = React.useState(false);
   const [utilityPanelSection, setUtilityPanelSection] =
     React.useState<UtilityPanelSection>("account");
@@ -1684,6 +1694,7 @@ export default function HomePage() {
       }
       setYear(initialYear);
       resetCalendarFocusOnYearChange();
+      resetHeaderLayoutSequenced();
       updateGuidedOnboarding({ type: "configure_profile", context });
       setGuidedDraft(null);
       setMobileGuidedRangeStart(null);
@@ -1709,6 +1720,7 @@ export default function HomePage() {
       isMobileCalendarUi,
       notify,
       resetCalendarFocusOnYearChange,
+      resetHeaderLayoutSequenced,
       updateGuidedOnboarding,
     ]
   );
