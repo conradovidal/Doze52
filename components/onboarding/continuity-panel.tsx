@@ -25,8 +25,14 @@ export function ContinuityPanel({
 }) {
   const [selected, setSelected] = useState<string[]>([]);
 
-  const showInvite =
-    authenticated && !isMobile && c.ready && c.progress?.status === "pending";
+  // Convite automático desligado de propósito: a origem/status já é
+  // registrada (útil para uma futura decisão de quem vale notificar ou
+  // oferecer "refazer o guia"), mas ainda não decidimos a experiência de
+  // convite em si. `authenticated`/`isMobile` seguem recebidos para quando
+  // essa decisão for tomada.
+  void authenticated;
+  void isMobile;
+  const showInvite = false;
   const [dismissedIssues, setDismissedIssues] = useState("");
   const issueKey = JSON.stringify([
     c.conflicts.map((op) => op.operationId),
