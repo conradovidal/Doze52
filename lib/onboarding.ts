@@ -112,8 +112,14 @@ export type GuidedOnboardingAction =
   | { type: "finish_edit_preview" }
   | { type: "open_calendar" }
   | { type: "close_calendar" }
-  | { type: "calendar_added"; uf?: string; packGroupId?: string; at?: string }
-  | { type: "continue_from_year"; showPeriodNavigation?: boolean; at?: string }
+  | {
+      type: "calendar_added";
+      uf?: string;
+      packGroupId?: string;
+      showPeriodNavigation?: boolean;
+      at?: string;
+    }
+  | { type: "continue_from_year"; at?: string }
   | { type: "continue_from_period_navigation"; showHabit?: boolean; at?: string }
   | { type: "interact_with_period_navigation"; at?: string }
   | {
@@ -647,7 +653,7 @@ export const reduceGuidedOnboardingState = (
         : state;
     case "continue_from_visibility":
       return state.step === "visibility_instruction"
-        ? { ...state, step: "edit_instruction" }
+        ? { ...state, step: "year_instruction" }
         : state;
     case "open_calendar":
       return state.step === "calendar_instruction"
@@ -657,28 +663,30 @@ export const reduceGuidedOnboardingState = (
       return state.step === "calendar_selection"
         ? { ...state, step: "calendar_instruction" }
         : state;
-    case "calendar_added":
-      return state.step === "calendar_instruction" ||
-        state.step === "calendar_selection"
-        ? {
-            ...state,
-            step: "year_instruction",
-            holidayUf: action.uf ?? state.holidayUf,
-            addedCalendarPackGroupId:
-              action.packGroupId ?? state.addedCalendarPackGroupId,
-            holidayCalendarAddedAt:
-              state.holidayCalendarAddedAt ?? action.at ?? nowIso(),
-          }
-        : state;
-    case "continue_from_year":
-      if (state.step !== "year_instruction") return state;
+    case "calendar_added": {
+      if (state.step !== "calendar_instruction" && state.step !== "calendar_selection") {
+        return state;
+      }
+      const withCalendar: GuidedOnboardingState = {
+        ...state,
+        holidayUf: action.uf ?? state.holidayUf,
+        addedCalendarPackGroupId:
+          action.packGroupId ?? state.addedCalendarPackGroupId,
+        holidayCalendarAddedAt:
+          state.holidayCalendarAddedAt ?? action.at ?? nowIso(),
+      };
       if (action.showPeriodNavigation) {
-        return { ...state, step: "period_navigation_instruction" };
+        return { ...withCalendar, step: "period_navigation_instruction" };
       }
-      if (!state.themeConfirmedAt) {
-        return { ...state, step: "theme_instruction" };
+      if (!withCalendar.themeConfirmedAt) {
+        return { ...withCalendar, step: "theme_instruction" };
       }
-      return buildCompletedState(state, action.at);
+      return buildCompletedState(withCalendar, action.at);
+    }
+    case "continue_from_year":
+      return state.step === "year_instruction"
+        ? { ...state, step: "edit_instruction" }
+        : state;
     case "continue_from_period_navigation":
       if (state.step !== "period_navigation_instruction") return state;
       return {
@@ -906,11 +914,11 @@ const GUIDED_ONBOARDING_STEP_POSITION: Partial<
   date_instruction: 2,
   date_details: 2,
   visibility_instruction: 3,
-  edit_instruction: 4,
-  edit_preview: 4,
-  calendar_instruction: 5,
-  calendar_selection: 5,
-  year_instruction: 6,
+  year_instruction: 4,
+  edit_instruction: 5,
+  edit_preview: 5,
+  calendar_instruction: 6,
+  calendar_selection: 6,
   period_navigation_instruction: 7,
 };
 

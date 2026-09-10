@@ -13,6 +13,7 @@
 // num só: chega já convidando a criar o hábito, com o "+" destacado (mesmo
 // mecanismo do desktop), sem toque extra nenhum antes disso.
 export type MobileHabitsOnboardingStep =
+  | "intro"
   | "create_habit"
   | "mark_day"
   | "goto_annual"
@@ -24,6 +25,7 @@ export type MobileHabitsOnboardingStep =
   | "dismissed";
 
 const STEPS: readonly MobileHabitsOnboardingStep[] = [
+  "intro",
   "create_habit",
   "mark_day",
   "goto_annual",
@@ -34,6 +36,30 @@ const STEPS: readonly MobileHabitsOnboardingStep[] = [
   "completed",
   "dismissed",
 ];
+
+// Sequência única de "Passo X de 8" mostrada nos cards, do intro ao Perfil —
+// as duas metades (Hábitos e Anual) contavam separado (3 e 4) antes disso.
+export const MOBILE_HABITS_ONBOARDING_TOTAL_STEPS = 8;
+
+const STEP_POSITION: Partial<Record<MobileHabitsOnboardingStep, number>> = {
+  intro: 1,
+  create_habit: 2,
+  mark_day: 3,
+  goto_annual: 4,
+  annual_year: 5,
+  annual_theme: 6,
+  annual_organize: 7,
+  goto_profile: 8,
+};
+
+export const getMobileHabitsOnboardingStepLabel = (
+  step: MobileHabitsOnboardingStep
+) => {
+  const position = STEP_POSITION[step];
+  return position
+    ? `Passo ${position} de ${MOBILE_HABITS_ONBOARDING_TOTAL_STEPS}`
+    : undefined;
+};
 
 const STORAGE_KEY = "doze52:mobile-habits-onboarding:v1";
 

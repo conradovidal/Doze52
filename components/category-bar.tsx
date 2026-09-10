@@ -95,11 +95,17 @@ type CategoryBarProps = {
   // botão de ocultar tudo, que ficam fora do círculo.
   highlightAllVisible?: boolean;
   previewEvictingCategoryId?: string;
+  previewEnteringCategoryId?: string;
   previewGhostSuggestion?: {
     name: string;
     color?: string;
     dashed?: boolean;
   } | null;
+  // Uso dentro de uma coluna de grid que colapsa a largura para "recolher"
+  // (ver app-header.tsx, categoriesRowExpanded): sem isto, o `flex-wrap`
+  // padrão empilha cada chip em sua própria linha quando a largura
+  // disponível encolhe, inflando a altura do cabeçalho em vez de escondê-la.
+  nowrap?: boolean;
 };
 
 type DragState = {
@@ -122,6 +128,7 @@ function EditCategoryChip({
   isPlaceholder = false,
   isOverlay = false,
   isEvicting = false,
+  isEntering = false,
   style,
   chipRef,
 }: {
@@ -135,10 +142,20 @@ function EditCategoryChip({
   isPlaceholder?: boolean;
   isOverlay?: boolean;
   isEvicting?: boolean;
+  isEntering?: boolean;
   style?: React.CSSProperties;
   chipRef?: (node: HTMLElement | null) => void;
 }) {
   const { mode: themeMode } = useTheme();
+  // Chega já "escondido" (encolhido/esmaecido) e solta a classe um frame
+  // depois — o mesmo mount-then-animate que dá vida à saída (isEvicting),
+  // só que na chegada, pra trocar de categoria parecer um movimento só.
+  const [entering, setEntering] = React.useState(isEntering);
+  React.useEffect(() => {
+    if (!isEntering) return;
+    const frame = requestAnimationFrame(() => setEntering(false));
+    return () => cancelAnimationFrame(frame);
+  }, [isEntering]);
   const contentHiddenClass = isPlaceholder ? "invisible" : "";
   const colorToken = getCategoryColorToken(category.color, themeMode);
   const categoryTintStyle: React.CSSProperties = {
@@ -166,7 +183,8 @@ function EditCategoryChip({
         mobileDense && "h-10 w-full rounded-[8px]",
         isOverlay && CHIP_OVERLAY_CLASS,
         isPlaceholder && "bg-background/80",
-        isEvicting && "scale-90 opacity-0 -translate-y-1"
+        isEvicting && "scale-90 opacity-0 translate-y-1",
+        entering && "scale-90 opacity-0 -translate-y-1"
       )}
     >
       {isPlaceholder ? (
@@ -356,12 +374,14 @@ function SortableEditCategoryChip({
   mobileDense = false,
   onEdit,
   isEvicting = false,
+  isEntering = false,
 }: {
   category: CategoryItem;
   dragEnabled: boolean;
   mobileDense?: boolean;
   onEdit: () => void;
   isEvicting?: boolean;
+  isEntering?: boolean;
 }) {
   const {
     attributes,
@@ -397,6 +417,7 @@ function SortableEditCategoryChip({
       setHandleRef={setActivatorNodeRef}
       isPlaceholder={dragEnabled && isDragging}
       isEvicting={isEvicting}
+      isEntering={isEntering}
       style={style}
       chipRef={setNodeRef}
     />
@@ -416,7 +437,9 @@ export function CategoryBar({
   highlightCreate = false,
   highlightAllVisible = false,
   previewEvictingCategoryId,
+  previewEnteringCategoryId,
   previewGhostSuggestion,
+  nowrap = false,
 }: CategoryBarProps) {
   const { mode: themeMode } = useTheme();
   const selectedProfileIds = useStore((s) => s.selectedProfileIds);
@@ -665,8 +688,10 @@ export function CategoryBar({
         ) : (
           <div
             className={cn(
-              "flex flex-wrap items-center gap-1.5 sm:gap-2",
-              highlightAllVisible && "product-spotlight-target rounded-xl"
+              nowrap
+                ? "flex flex-nowrap items-center gap-1.5 overflow-hidden sm:gap-2"
+                : "flex flex-wrap items-center gap-1.5 sm:gap-2",
+              highlightAllVisible && "product-spotlight-group rounded-xl"
             )}
           >
             {categoryButtons}
@@ -679,7 +704,6 @@ export function CategoryBar({
             onClick={onCreateCategory}
             className={CREATE_ACTION_CLASS}
             data-onboarding-calendar-control
-            data-onboarding-highlighted="true"
             aria-label="Adicionar categoria"
             title="Adicionar categoria"
           >
@@ -730,6 +754,7 @@ export function CategoryBar({
               mobileDense={mobileDense}
               onEdit={() => onEditCategory?.(category.id)}
               isEvicting={previewEvictingCategoryId === category.id}
+              isEntering={previewEnteringCategoryId === category.id}
             />
           ))}
 
@@ -755,7 +780,6 @@ export function CategoryBar({
             aria-label="Criar nova categoria"
             title="Criar nova categoria"
             data-onboarding-calendar-control={highlightCreate ? "true" : undefined}
-            data-onboarding-highlighted={highlightCreate ? "true" : undefined}
           >
             <Plus className="h-3.5 w-3.5" />
           </button>

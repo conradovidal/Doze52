@@ -84,14 +84,17 @@ export function DesktopHabitsPrototype({
     >
       {/* Mesmo mecanismo do Anual (CollapsibleControlRegion): a faixa some com
           animação, sem deixar linha residual — a borda vive dentro do
-          HabitControls, então ela colapsa junto com o conteúdo. O mb-2 fica
-          aqui, fora da região que anima (nunca é cortado ao recolher) —
-          reproduz o espaço fixo que o <header> do Anual já tem entre o topo
-          e a faixa de categorias, independente de estar expandida ou não. */}
+          HabitControls, então ela colapsa junto com o conteúdo. O mt-2/mb-2
+          ficam aqui, fora da região que anima (nunca são cortados ao
+          recolher) — reproduzem os dois espaços fixos que o <header> do
+          Anual já tem prontos (gap acima da faixa de categorias + margem
+          abaixo dela), independente de estar expandida ou não. Era só mb-2
+          antes, o que não cria espaço nenhum acima (margin-bottom não afeta
+          o que vem antes do elemento). */}
       <CollapsibleControlRegion
         id="habits-header-region"
         expanded={!headerMinimized}
-        className="mb-2"
+        className="mt-2"
       >
         <HabitControls
           habits={habits}

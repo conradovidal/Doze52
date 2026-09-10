@@ -590,7 +590,7 @@ export function AppUtilityPanel({
         const Icon = topic.icon;
         const selected = activeSection === topic.id;
         return (
-          <button key={topic.id} type="button" aria-current={selected ? "page" : undefined} data-onboarding-appearance-topic={topic.id === "account" ? "true" : undefined} className={cn("flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60", selected ? "bg-foreground text-background" : "text-muted-foreground hover:bg-muted hover:text-foreground", guidedAppearanceNotice && topic.id === "account" && "guided-control-target")} onClick={() => { setActiveSection(topic.id); if (topic.id === "account") onGuidedAppearanceOpen?.(); }}>
+          <button key={topic.id} type="button" aria-current={selected ? "page" : undefined} data-onboarding-appearance-topic={topic.id === "account" ? "true" : undefined} className={cn("flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60", selected ? "bg-foreground text-background" : "text-muted-foreground hover:bg-muted hover:text-foreground", guidedAppearanceNotice && topic.id === "account" && "product-spotlight-target")} onClick={() => { setActiveSection(topic.id); if (topic.id === "account") onGuidedAppearanceOpen?.(); }}>
             <Icon className="size-4 shrink-0" /><span className="min-w-0 truncate text-sm font-semibold">{topic.label}</span>
           </button>
         );

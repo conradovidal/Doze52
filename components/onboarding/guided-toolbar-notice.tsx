@@ -23,6 +23,7 @@ export type GuidedToolbarNotice = {
     | "wrap-up"
     // Passos da jornada curta e própria do mobile (lib/mobile-habits-onboarding.ts).
     // Não fazem parte do tour desktop.
+    | "mobile-intro"
     | "mobile-goto-annual"
     | "mobile-organize"
     | "mobile-today";
@@ -81,6 +82,8 @@ export function GuidedToolbarNoticeCard({
   notice,
   onClose,
   onAction,
+  secondaryLabel,
+  onSecondaryAction,
   align = "start",
   placement = "below",
   portaled = false,
@@ -94,6 +97,11 @@ export function GuidedToolbarNoticeCard({
   notice: GuidedToolbarNotice;
   onClose: () => void;
   onAction?: () => void;
+  // Link de texto secundário, abaixo do botão principal — hoje só usado
+  // pelo passo de abertura do mobile, para oferecer "Entrar na minha conta"
+  // sem competir com o "Continuar".
+  secondaryLabel?: string;
+  onSecondaryAction?: () => void;
   align?: "start" | "end";
   placement?: "below" | "right" | "above" | "viewport" | "panel";
   portaled?: boolean;
@@ -302,6 +310,15 @@ export function GuidedToolbarNoticeCard({
           <Check className="size-4" aria-hidden="true" />
           {notice.actionLabel}
         </Button>
+      ) : null}
+      {secondaryLabel && onSecondaryAction ? (
+        <button
+          type="button"
+          className="mt-2.5 block w-full text-center text-xs font-semibold text-primary underline underline-offset-2"
+          onClick={onSecondaryAction}
+        >
+          {secondaryLabel}
+        </button>
       ) : null}
     </aside>
   );

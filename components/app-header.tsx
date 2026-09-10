@@ -19,7 +19,6 @@ import {
   GuidedToolbarNoticeCard,
   type GuidedToolbarNotice,
 } from "@/components/onboarding/guided-toolbar-notice";
-import { GuidedTargetOutline } from "@/components/onboarding/guided-target-outline";
 import { CategoryBar } from "@/components/category-bar";
 import { CategoryCreationFlow } from "@/components/category-creation-flow";
 import { CategoryManager } from "@/components/category-manager";
@@ -48,6 +47,8 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { CollapsibleControlRegion } from "@/components/ui/collapsible-control-region";
 import { useStore } from "@/lib/store";
 import { useScrollEdgeFade } from "@/lib/use-scroll-edge-fade";
+import { useCalendarCatalog } from "@/lib/calendar-catalog/runtime";
+import { removeCalendarPackByCategory } from "@/lib/calendar-packs/import";
 import type { OnboardingFocusTarget } from "@/lib/onboarding";
 import type { CalendarPack } from "@/lib/calendar-packs/types";
 import type { ProductDestinationId } from "@/lib/product-navigation";
@@ -85,6 +86,11 @@ type AppHeaderProps = {
   onboardingFocusTarget?: OnboardingFocusTarget;
   guidedSelectionNotice?: GuidedSelectionNotice | null;
   guidedToolbarNotice?: GuidedToolbarNotice | null;
+  // Alvo do aviso de continuação mobile (Anual → Hábitos, ver
+  // mobileAnnualOnboardingNotice em app/page.tsx). É um fluxo à parte do
+  // guidedToolbarNotice acima, mas mira os mesmos botões (tema, organizar),
+  // então só precisa somar mais uma condição ao destaque de cada um.
+  mobileContinuationHighlightTarget?: string | null;
   onDismissGuidedSelection?: () => void;
   onGuidedToolbarAction?: (target: GuidedToolbarNotice["target"]) => void;
   onGuidedCalendarOpen?: () => void;
@@ -135,6 +141,7 @@ export function AppHeader({
   onboardingFocusTarget = null,
   guidedSelectionNotice = null,
   guidedToolbarNotice = null,
+  mobileContinuationHighlightTarget = null,
   onDismissGuidedSelection,
   onGuidedToolbarAction,
   onGuidedCalendarOpen,
@@ -162,9 +169,38 @@ export function AppHeader({
 }: AppHeaderProps) {
   const profiles = useStore((s) => s.profiles);
   const categories = useStore((s) => s.categories);
+  const events = useStore((s) => s.events);
   const selectedProfileIds = useStore((s) => s.selectedProfileIds);
   const setSelectedProfiles = useStore((s) => s.setSelectedProfiles);
   const setCategoriesVisibility = useStore((s) => s.setCategoriesVisibility);
+  const deleteCategory = useStore((s) => s.deleteCategory);
+  const replaceAllData = useStore((s) => s.replaceAllData);
+  const { calendarPacks } = useCalendarCatalog();
+  // Passado ao resumo final do onboarding (WrapUpCategorySuggestions): a
+  // 3a posição pode ser um calendário pronto (ex.: Feriados), que
+  // `deleteCategory` recusa por design — passa pelo caminho de remoção de
+  // calendário quando é o caso, senão exclui como categoria comum.
+  const handleRemoveWrapUpCategory = React.useCallback(
+    (categoryId: string) => {
+      const category = categories.find((candidate) => candidate.id === categoryId);
+      if (!category) return false;
+      if (category.calendarPackGroupId) {
+        const result = removeCalendarPackByCategory(
+          { profiles, categories, events },
+          calendarPacks,
+          categoryId
+        );
+        if (result.removedCategoryCount === 0) return false;
+        replaceAllData(result.snapshot);
+        return true;
+      }
+      return deleteCategory({
+        categoryId,
+        strategy: { type: "delete-events" },
+      });
+    },
+    [calendarPacks, categories, deleteCategory, events, profiles, replaceAllData]
+  );
 
   const [isInlineEditMode, setIsInlineEditMode] = React.useState(false);
   const [yearSelectOpen, setYearSelectOpen] = React.useState(false);
@@ -495,20 +531,8 @@ export function AppHeader({
     setCategoryEditOpen(true);
   }, []);
 
-  const guidedOutlineSelector =
-    guidedToolbarNotice?.target === "edit"
-      ? '[data-onboarding-edit-control][data-onboarding-highlighted="true"], [data-product-organize="desktop"][data-onboarding-highlighted="true"]'
-      : guidedToolbarNotice?.target === "calendars" && !categoryCreateOpen
-        ? '[data-onboarding-calendar-control][data-onboarding-highlighted="true"]'
-        : guidedToolbarNotice?.target === "habit-surface"
-          ? '[data-product-navigation="desktop"] [data-product-destination="habits"]'
-          : null;
-
   return (
     <>
-      {guidedOutlineSelector ? (
-        <GuidedTargetOutline selector={guidedOutlineSelector} />
-      ) : null}
       <header
         className={cn(
           "bg-background",
@@ -648,7 +672,9 @@ export function AppHeader({
                   className={cn(
                     "grid size-9 shrink-0 place-items-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-transparent disabled:hover:text-muted-foreground",
                     organizeActive &&
-                      "bg-foreground text-background hover:bg-foreground/90 hover:text-background"
+                      "bg-foreground text-background hover:bg-foreground/90 hover:text-background",
+                    mobileContinuationHighlightTarget === "mobile-organize" &&
+                      "product-spotlight-target"
                   )}
                   onClick={handleToggleOrganize}
                 >
@@ -664,7 +690,10 @@ export function AppHeader({
                 >
                   <ThemeToggle
                     variant="bare"
-                    highlighted={guidedToolbarNotice?.target === "theme"}
+                    highlighted={
+                      guidedToolbarNotice?.target === "theme" ||
+                      mobileContinuationHighlightTarget === "theme"
+                    }
                     disabled={themeToggleDisabled}
                     onThemeChange={onGuidedThemeChange}
                   />
@@ -705,7 +734,11 @@ export function AppHeader({
                     variant="premium"
                     size="sm"
                     disabled={inlineEditDisabled}
-                    className={utilityActiveEditClass}
+                    className={cn(
+                      utilityActiveEditClass,
+                      guidedToolbarNotice?.target === "edit" &&
+                        "product-spotlight-target"
+                    )}
                     onClick={toggleInlineEditMode}
                     aria-label="Finalizar edição de contextos e categorias"
                     title="Finalizar edição de contextos e categorias"
@@ -725,7 +758,11 @@ export function AppHeader({
                     variant="outline"
                     size="icon-sm"
                     disabled={inlineEditDisabled}
-                    className={utilityIconClass}
+                    className={cn(
+                      utilityIconClass,
+                      guidedToolbarNotice?.target === "edit" &&
+                        "product-spotlight-target"
+                    )}
                     onClick={toggleInlineEditMode}
                     aria-label="Editar contextos e categorias"
                     title="Editar contextos e categorias"
@@ -788,58 +825,64 @@ export function AppHeader({
                 )}
               >
                 {useAdaptiveNavigation ? (
-                  <div
-                    data-onboarding-year-control
-                    data-onboarding-highlighted={
-                      guidedToolbarNotice?.target === "year" ? "true" : undefined
-                    }
-                    className={cn(
-                      "inline-flex h-9 items-center rounded-xl border border-border bg-card",
-                      guidedToolbarNotice?.target === "year" &&
-                        "product-spotlight-target"
-                    )}
-                  >
-                    <button
-                      type="button"
-                      aria-label={`Voltar para ${year - 1}`}
-                      title={`Voltar para ${year - 1}`}
-                      disabled={yearSelectDisabled}
-                      className="grid size-9 place-items-center rounded-l-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-45"
-                      onClick={() => onYearChange(year - 1)}
+                  isMobileMode ? (
+                    <div
+                      data-onboarding-year-control
+                      data-onboarding-highlighted={
+                        guidedToolbarNotice?.target === "year" ||
+                        mobileContinuationHighlightTarget === "year"
+                          ? "true"
+                          : undefined
+                      }
+                      className={cn(
+                        "inline-flex h-9 items-center rounded-xl border border-border bg-card",
+                        (guidedToolbarNotice?.target === "year" ||
+                          mobileContinuationHighlightTarget === "year") &&
+                          "product-spotlight-target"
+                      )}
                     >
-                      <ChevronLeft className="size-4" />
-                    </button>
-                    {onYearLabelClick ? (
                       <button
                         type="button"
-                        aria-label={`Ano ${year}. Ir para hoje`}
-                        aria-live="polite"
-                        title="Ir para hoje"
-                        className="min-w-9 text-center text-[0.9rem] font-semibold tabular-nums text-foreground transition-colors hover:text-foreground/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:rounded-md"
-                        onClick={onYearLabelClick}
+                        aria-label={`Voltar para ${year - 1}`}
+                        title={`Voltar para ${year - 1}`}
+                        disabled={yearSelectDisabled}
+                        className="grid size-9 place-items-center rounded-l-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-45"
+                        onClick={() => onYearChange(year - 1)}
                       >
-                        {year}
+                        <ChevronLeft className="size-4" />
                       </button>
-                    ) : (
-                      <span
-                        aria-label={`Ano ${year}`}
-                        aria-live="polite"
-                        className="min-w-9 text-center text-[0.9rem] font-semibold tabular-nums text-foreground"
+                      {onYearLabelClick ? (
+                        <button
+                          type="button"
+                          aria-label={`Ano ${year}. Ir para hoje`}
+                          aria-live="polite"
+                          title="Ir para hoje"
+                          className="min-w-9 text-center text-[0.9rem] font-semibold tabular-nums text-foreground transition-colors hover:text-foreground/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:rounded-md"
+                          onClick={onYearLabelClick}
+                        >
+                          {year}
+                        </button>
+                      ) : (
+                        <span
+                          aria-label={`Ano ${year}`}
+                          aria-live="polite"
+                          className="min-w-9 text-center text-[0.9rem] font-semibold tabular-nums text-foreground"
+                        >
+                          {year}
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        aria-label={`Avançar para ${year + 1}`}
+                        title={`Avançar para ${year + 1}`}
+                        disabled={yearSelectDisabled}
+                        className="grid size-9 place-items-center rounded-r-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-45"
+                        onClick={() => onYearChange(year + 1)}
                       >
-                        {year}
-                      </span>
-                    )}
-                    <button
-                      type="button"
-                      aria-label={`Avançar para ${year + 1}`}
-                      title={`Avançar para ${year + 1}`}
-                      disabled={yearSelectDisabled}
-                      className="grid size-9 place-items-center rounded-r-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-45"
-                      onClick={() => onYearChange(year + 1)}
-                    >
-                      <ChevronRight className="size-4" />
-                    </button>
-                  </div>
+                        <ChevronRight className="size-4" />
+                      </button>
+                    </div>
+                  ) : null
                 ) : (
                   <Select
                     value={String(year)}
@@ -1190,6 +1233,7 @@ export function AppHeader({
                       </button>
                       <CategoryBar
                         compact
+                        nowrap
                         className="w-max flex-nowrap justify-start sm:w-auto"
                         highlightedCategoryId={highlightedCategoryId}
                         highlightedCategoryEffect={highlightedCategoryEffect}
@@ -1357,6 +1401,7 @@ export function AppHeader({
           guidedToolbarNotice={guidedToolbarNotice}
           onDismissGuidedSelection={onDismissGuidedSelection}
           onGuidedWrapUpAction={() => onGuidedToolbarAction?.("wrap-up")}
+          onRemoveWrapUpCategory={handleRemoveWrapUpCategory}
           onRequireAuth={() => onOpenAuthDialog()}
         />
       ) : null}

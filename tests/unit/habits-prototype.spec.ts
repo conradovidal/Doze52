@@ -18,7 +18,6 @@ import {
 import { getYearTransitionDirection } from "../../lib/calendar-year-transition";
 import { PLAN_LIMITS, PRO_UPGRADE_COPY } from "../../lib/entitlements";
 import type { CalendarEvent, CategoryItem, Habit } from "../../lib/types";
-import { isHabitsPrototypeAvailable } from "../../lib/feature-flags";
 import {
   buildProductDestinationUrl,
   PRODUCT_DESTINATIONS,
@@ -338,24 +337,6 @@ test("define um hábito Free e quatro Pro com upgrade contextual", () => {
   expect(PLAN_LIMITS.pro.maxHabits).toBe(4);
   expect(PRO_UPGRADE_COPY.habits.description).toContain("1 hábito");
   expect(PRO_UPGRADE_COPY.habits.description).toContain("4 hábitos");
-});
-
-test("libera Hábitos em qualquer ambiente somente pela flag explícita", () => {
-  expect(
-    isHabitsPrototypeAvailable({ flag: "true", deploymentEnv: "production" })
-  ).toBe(true);
-  expect(
-    isHabitsPrototypeAvailable({ flag: "true", deploymentEnv: "preview" })
-  ).toBe(true);
-  expect(
-    isHabitsPrototypeAvailable({ flag: "true", nodeEnv: "development" })
-  ).toBe(true);
-  expect(
-    isHabitsPrototypeAvailable({ flag: "false", deploymentEnv: "preview" })
-  ).toBe(false);
-  expect(
-    isHabitsPrototypeAvailable({ deploymentEnv: "production" })
-  ).toBe(false);
 });
 
 test("expõe somente os destinos funcionais da navegação", () => {

@@ -139,9 +139,10 @@ export function CategoryCreationFlow({
               }
               className={cn(
                 "grid h-auto min-h-24 grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1 rounded-xl p-4 text-left",
-                // O anel de destaque do produto já diz "é aqui"; uma etiqueta
-                // encaixada no meio da frase só se confundiria com o texto.
-                guidedCalendarSelection && "product-spotlight-target"
+                // O card mantém a aparência original (mesmo componente do
+                // vizinho) — só a borda fica um pouco mais grossa, para
+                // sugerir "é este" sem recorrer a fundo/anel.
+                guidedCalendarSelection && "border-2 border-foreground/30"
               )}
               disabled={!profile}
               onClick={chooseCalendarPacks}

@@ -71,6 +71,7 @@ type FilterEditPanelProps = {
   guidedToolbarNotice?: GuidedToolbarNotice | null;
   onDismissGuidedSelection?: () => void;
   onGuidedWrapUpAction?: () => void;
+  onRemoveWrapUpCategory?: (categoryId: string) => boolean;
   onRequireAuth?: (anchorPoint?: AnchorPoint) => void;
 };
 
@@ -91,6 +92,7 @@ export function FilterEditPanel({
   guidedToolbarNotice,
   onDismissGuidedSelection,
   onGuidedWrapUpAction,
+  onRemoveWrapUpCategory,
   onRequireAuth,
 }: FilterEditPanelProps) {
   const highlightCreate = guidedToolbarNotice?.target === "calendars";
@@ -281,6 +283,7 @@ export function FilterEditPanel({
                       profileId={editingProfileId}
                       suggestions={guidedToolbarNotice.categorySuggestions}
                       cap={limits.maxCategories}
+                      onRemoveCategory={onRemoveWrapUpCategory}
                     >
                       <CategoryBar
                         isInlineEditMode
@@ -312,20 +315,6 @@ export function FilterEditPanel({
                       anchorPlacement="below-center"
                     />
                   ) : null}
-                  {showWrapUpNotice ? (
-                    // No fluxo normal do documento (não flutuando por cima):
-                    // o conteúdo cresce e empurra o card para baixo, em vez
-                    // de arriscar sobrepor as próprias sugestões que ele
-                    // descreve conforme a lista de categorias muda de altura.
-                    <div className="mt-4">
-                      <GuidedToolbarNoticeCard
-                        notice={guidedToolbarNotice!}
-                        onClose={() => onDismissGuidedSelection?.()}
-                        onAction={onGuidedWrapUpAction}
-                        inline
-                      />
-                    </div>
-                  ) : null}
                 </section>
               </>
             ) : (
@@ -341,6 +330,22 @@ export function FilterEditPanel({
                 />
               </section>
             )}
+            {showWrapUpNotice ? (
+              // Fica fora das duas seções (Anual/Hábitos) de propósito: é o
+              // resumo do guia inteiro, não de uma aba só — trocar de aba
+              // não pode fazer o card sumir. No fluxo normal do documento
+              // (não flutuando por cima), o conteúdo cresce e empurra o
+              // card para baixo, em vez de arriscar sobrepor o que ele
+              // descreve.
+              <div className="mt-4">
+                <GuidedToolbarNoticeCard
+                  notice={guidedToolbarNotice!}
+                  onClose={() => onDismissGuidedSelection?.()}
+                  onAction={onGuidedWrapUpAction}
+                  inline
+                />
+              </div>
+            ) : null}
           </div>
         </div>
       </DialogContent>

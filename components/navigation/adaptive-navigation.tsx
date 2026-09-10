@@ -269,6 +269,7 @@ export function AdaptiveNavigation({
   onDestinationSelect,
   onOpenUtilityPanel,
   highlightDestination,
+  highlightProfile = false,
   disabledDestination,
 }: ProductNavigationProps) {
   const handleAccount = (event: React.MouseEvent<HTMLButtonElement>) => {
@@ -296,9 +297,13 @@ export function AdaptiveNavigation({
       <button
         type="button"
         data-onboarding-auth-entry
+        data-onboarding-highlighted={highlightProfile ? "true" : undefined}
         aria-label="Abrir perfil"
         disabled={authLoading}
-        className="inline-flex min-h-12 min-w-16 flex-1 items-center justify-center rounded-xl text-muted-foreground/55 transition-colors hover:bg-muted/45 hover:text-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 disabled:opacity-45"
+        className={cn(
+          "inline-flex min-h-12 min-w-16 flex-1 items-center justify-center rounded-xl text-muted-foreground/55 transition-colors hover:bg-muted/45 hover:text-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 disabled:opacity-45",
+          highlightProfile && "text-foreground/80 product-spotlight-target"
+        )}
         onClick={handleAccount}
       >
         {authLoading ? null : <AccountGlyph compact />}
