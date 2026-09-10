@@ -1,3 +1,5 @@
+import { isAccountContinuityEnabled } from "./feature-flags";
+import { withoutOnboardingExamples } from "./snapshot-ownership";
 import type {
   CalendarEvent,
   CalendarProfile,
@@ -610,7 +612,7 @@ export const loadRemoteData = async (): Promise<CalendarSnapshot> => {
 };
 
 export const saveSnapshot = async (snapshot: CalendarSnapshot): Promise<void> => {
-  pendingSnapshot = cloneSnapshot(snapshot);
+  pendingSnapshot = cloneSnapshot(isAccountContinuityEnabled ? withoutOnboardingExamples(snapshot) : snapshot);
   if (saveInFlight) return saveInFlight;
   saveInFlight = (async () => {
     while (pendingSnapshot) {

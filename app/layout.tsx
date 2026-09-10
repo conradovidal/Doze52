@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
+import "./theme-tokens.css";
 import { AuthProvider } from "@/lib/auth";
 import { BillingProvider } from "@/lib/use-billing";
 import {

@@ -1,5 +1,6 @@
 "use client";
 
+import { isAccountContinuityEnabled } from "./feature-flags";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import {
@@ -116,7 +117,7 @@ export const useHabitsStore = create<HabitsStoreState>()(
       setSelectedHabitId: (id) => set({ selectedHabitId: id }),
     }),
     {
-      name: "doze52:habits-store:v1",
+      name: isAccountContinuityEnabled ? "doze52:habits-view:v2" : "doze52:habits-store:v1",
       partialize: (state) => ({
         habits: state.habits,
         checkIns: state.checkIns,
