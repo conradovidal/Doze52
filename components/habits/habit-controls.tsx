@@ -53,8 +53,6 @@ import { useTheme } from "@/lib/theme";
 import type { Habit } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import {
-  DESKTOP_CONTROL_DIVIDER_CLASS,
-  DESKTOP_CONTROL_GRID_GAP_CLASS,
   DESKTOP_CONTROL_MAX_WIDTH_CLASS,
   DESKTOP_CONTROL_ROW_GAP_CLASS,
 } from "@/lib/desktop-control-layout";
@@ -511,15 +509,7 @@ export function HabitControls({
           : cn(
               "mx-auto flex w-full flex-col items-center",
               DESKTOP_CONTROL_MAX_WIDTH_CLASS,
-              DESKTOP_CONTROL_DIVIDER_CLASS,
-              DESKTOP_CONTROL_ROW_GAP_CLASS,
-              // Este mb-3 só conta enquanto a faixa está visível (some junto
-              // com o conteúdo ao recolher, dentro da região com overflow
-              // escondido) — é o par do mb-2 incondicional no wrapper
-              // (DesktopHabitsPrototype), que sozinho cobre o estado
-              // recolhido. Juntos reproduzem os dois espaços fixos que o
-              // <header> do Anual já tem prontos (gap acima + margem abaixo).
-              DESKTOP_CONTROL_GRID_GAP_CLASS
+              DESKTOP_CONTROL_ROW_GAP_CLASS
             )
       )}
     >

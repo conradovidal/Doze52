@@ -49,6 +49,7 @@ import { useStore } from "@/lib/store";
 import { useScrollEdgeFade } from "@/lib/use-scroll-edge-fade";
 import { useCalendarCatalog } from "@/lib/calendar-catalog/runtime";
 import { removeCalendarPackByCategory } from "@/lib/calendar-packs/import";
+import type { OnboardingHabitShowcase } from "@/lib/habits-prototype";
 import type { OnboardingFocusTarget } from "@/lib/onboarding";
 import type { CalendarPack } from "@/lib/calendar-packs/types";
 import type { ProductDestinationId } from "@/lib/product-navigation";
@@ -56,6 +57,8 @@ import type { AnchorPoint } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import {
   DESKTOP_CONTROL_DIVIDER_CLASS,
+  DESKTOP_CONTROL_DIVIDER_COLLAPSED_CLASS,
+  DESKTOP_CONTROL_FIXED_HEIGHT_CLASS,
   DESKTOP_CONTROL_GRID_GAP_CLASS,
   DESKTOP_CONTROL_MAX_WIDTH_CLASS,
   DESKTOP_CONTROL_NAV_GAP_CLASS,
@@ -81,6 +84,12 @@ type AppHeaderProps = {
   onToggleHabitsEditing?: () => void;
   habitsEditingActive?: boolean;
   habitsOrganizeDisabled?: boolean;
+  // Vitrine de hábitos do ano de exemplo (ver app/page.tsx), repassada até
+  // o FilterEditPanel para a aba Hábitos do "Organizar" também mostrar os
+  // hábitos de exemplo, do mesmo jeito que a aba Anual já mostra as
+  // categorias de exemplo.
+  habitShowcase?: OnboardingHabitShowcase | null;
+  habitShowcaseLocked?: boolean;
   onOpenAuthDialog: (anchorPoint?: AnchorPoint) => void;
   onCalendarPackFocusYear: (year: number) => void;
   onboardingFocusTarget?: OnboardingFocusTarget;
@@ -137,6 +146,8 @@ export function AppHeader({
   onToggleHabitsEditing,
   habitsEditingActive = false,
   habitsOrganizeDisabled = false,
+  habitShowcase = null,
+  habitShowcaseLocked = false,
   onOpenAuthDialog,
   onCalendarPackFocusYear,
   onboardingFocusTarget = null,
@@ -316,7 +327,13 @@ export function AppHeader({
   const [categoriesRowExpanded, setCategoriesRowExpanded] = React.useState(true);
   // Assim que a pessoa usa o botão de recolher/mostrar, a decisão passa a ser
   // dela: o padrão por altura não volta a mandar até o fim da sessão.
-  const effectiveCategoriesRowExpanded = onboardingActive || categoriesRowExpanded;
+  // Enquanto o card flutuante do guia (data/período) está em cena, as
+  // categorias recolhem — sem isso, o card precisaria cobrir uma faixa maior
+  // (ou deixaria chips escapando pelas bordas) e o header oscilaria de altura
+  // entre passos. Contextos (Pessoal/Profissional) continuam visíveis.
+  const effectiveCategoriesRowExpanded = guidedSelectionNotice
+    ? false
+    : onboardingActive || categoriesRowExpanded;
   const categoriesRowManuallySetRef = React.useRef(false);
 
   React.useLayoutEffect(() => {
@@ -547,10 +564,16 @@ export function AppHeader({
             : "md:space-y-3.5",
           isMobileMode
             ? "mb-0"
-            : headerMinimized
-              ? DESKTOP_CONTROL_GRID_GAP_CLASS
-              : useAdaptiveNavigation && !showCalendarControls
-                ? "mb-0"
+            : useAdaptiveNavigation && !showCalendarControls
+              ? // Hábitos: a faixa de controles e o espaçamento ao redor dela
+                // vivem inteiramente em DesktopHabitsPrototype (que replica
+                // esses mesmos dois gaps fixos), então o <header> não soma
+                // nada aqui — em nenhum dos dois estados — para não dobrar
+                // (ou faltar) espaçamento e desalinhar o topo do calendário
+                // em relação ao Anual.
+                "mb-0"
+              : headerMinimized
+                ? DESKTOP_CONTROL_GRID_GAP_CLASS
                 : useAdaptiveNavigation
                   ? DESKTOP_CONTROL_GRID_GAP_CLASS
                   : "mb-4 md:mb-5"
@@ -1001,15 +1024,23 @@ export function AppHeader({
                       : "border-t border-border/45 pt-2.5 md:pt-3"
                   ),
               onboardingLayoutReserved &&
-                (isMobileMode ? "min-h-[10.25rem]" : "min-h-[5.25rem]")
+                isMobileMode &&
+                "min-h-[10.25rem]"
             )}
           >
           <CollapsibleControlRegion
             id="app-header-filter-region"
             expanded={categoriesRegionExpanded}
+            fixedHeightClassName={
+              !isMobileMode && useAdaptiveNavigation
+                ? DESKTOP_CONTROL_FIXED_HEIGHT_CLASS
+                : undefined
+            }
             contentClassName={
               !isMobileMode && useAdaptiveNavigation
-                ? cn(categoriesRegionExpanded && DESKTOP_CONTROL_DIVIDER_CLASS)
+                ? categoriesRegionExpanded
+                  ? DESKTOP_CONTROL_DIVIDER_CLASS
+                  : DESKTOP_CONTROL_DIVIDER_COLLAPSED_CLASS
                 : undefined
             }
           >
@@ -1407,6 +1438,8 @@ export function AppHeader({
           onGuidedWrapUpAction={() => onGuidedToolbarAction?.("wrap-up")}
           onRemoveWrapUpCategory={handleRemoveWrapUpCategory}
           onRequireAuth={() => onOpenAuthDialog()}
+          habitShowcase={habitShowcase}
+          habitShowcaseLocked={habitShowcaseLocked}
         />
       ) : null}
 

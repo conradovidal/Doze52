@@ -650,6 +650,33 @@ export default function HomePage() {
   const showGuidedOnboarding = Boolean(
     guidedOnboardingEligible && isMobileCalendarUi === false
   );
+  // Antes de escolher Pessoal/Profissional a pessoa ainda está livre para
+  // colapsar/expandir o header manualmente — só depois que o contexto é
+  // confirmado é que o guia passa a exigir os dois sempre expandidos.
+  const guidedOnboardingContextChosen = Boolean(
+    showGuidedOnboarding && guidedOnboarding?.context
+  );
+  // No instante em que o contexto é escolhido, os dois controles (header e
+  // categorias) precisam terminar expandidos. Se o header estava recolhido,
+  // ele anima primeiro (via a própria prop headerMinimized) e só então as
+  // categorias entram — uma de cada vez, não as duas juntas.
+  const [categoriesForceExpandActive, setCategoriesForceExpandActive] =
+    React.useState(false);
+  React.useEffect(() => {
+    if (!guidedOnboardingContextChosen) {
+      setCategoriesForceExpandActive(false);
+      return;
+    }
+    if (!headerMinimized) {
+      setCategoriesForceExpandActive(true);
+      return;
+    }
+    const timer = window.setTimeout(
+      () => setCategoriesForceExpandActive(true),
+      320
+    );
+    return () => window.clearTimeout(timer);
+  }, [guidedOnboardingContextChosen, headerMinimized]);
 
   const habitShowcaseDataEligible = Boolean(
     // Only ever show the demo/example habits while the guided tour is
@@ -3039,6 +3066,8 @@ export default function HomePage() {
           onToggleHabitsEditing={handleToggleHabitsEditing}
           habitsEditingActive={workspaceEditMode === "habits"}
           habitsOrganizeDisabled={Boolean(onboardingHabitShowcase)}
+          habitShowcase={onboardingHabitShowcase ?? onboardingHabitShowcaseDisplay}
+          habitShowcaseLocked={Boolean(onboardingHabitShowcase)}
           onCalendarPackFocusYear={handleYearChange}
           onboardingFocusTarget={
             isCalendarSurfaceActive ? onboardingFocusTarget : null
@@ -3069,7 +3098,7 @@ export default function HomePage() {
           accountNudgeHighlightProfile={
             accountNudgeVisible && !session?.user.id
           }
-          onboardingActive={showGuidedOnboarding}
+          onboardingActive={categoriesForceExpandActive}
           onboardingLayoutLocked={false}
           onboardingLayoutReserved={
             isCalendarSurfaceActive && Boolean(guidedSelectionNotice)
@@ -3100,8 +3129,8 @@ export default function HomePage() {
           onGuidedThemeChange={() =>
             updateGuidedOnboarding({ type: "confirm_theme" })
           }
-          headerMinimized={showGuidedOnboarding ? false : headerMinimized}
-          onToggleHeaderMinimized={() => { if (!showGuidedOnboarding) setHeaderMinimized(!headerMinimized); }}
+          headerMinimized={guidedOnboardingContextChosen ? false : headerMinimized}
+          onToggleHeaderMinimized={() => { if (!guidedOnboardingContextChosen) setHeaderMinimized(!headerMinimized); }}
           mobileExamplePreviewActive={isMobileExamplePreview}
           demoExplorationActive={bypassCreationLimits}
           onCategoryCreated={(categoryId) => {
@@ -3126,7 +3155,7 @@ export default function HomePage() {
           todayIso={todayIso}
           isMobile={isMobileCalendarUi}
           isEditing={workspaceEditMode === "habits"}
-          headerMinimized={showGuidedOnboarding ? false : headerMinimized}
+          headerMinimized={guidedOnboardingContextChosen ? false : headerMinimized}
           onYearChange={handleYearChange}
           onRequireAuth={() => {
             setAuthDialogInitialMode("login");
@@ -3263,7 +3292,12 @@ export default function HomePage() {
             data-calendar-focus-root
             data-calendar-ui-mode="desktop"
             className={cn(
-              "relative h-full min-h-0 rounded-xl doze52-calendar-mode-transition",
+              // Sem doze52-calendar-mode-transition: essa faixa remonta toda
+              // vez que a Anual volta a renderizar depois de Hábitos (são
+              // branches diferentes do mesmo ternário) — a animação de
+              // entrada tocava de novo a cada troca de volta pra Anual,
+              // exatamente o "pulinho" que o calendário não pode ter.
+              "relative h-full min-h-0 rounded-xl",
               showGuidedOnboarding &&
                 (guidedOnboarding?.step === "date_instruction" ||
                   guidedOnboarding?.step === "date_details" ||
