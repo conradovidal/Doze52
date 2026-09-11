@@ -25,7 +25,10 @@ import {
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { useFeedback } from "@/components/ui/feedback-provider";
 import { useHabitsStore } from "@/lib/habits-store";
-import { orderActiveHabits } from "@/lib/habits-prototype";
+import {
+  orderActiveHabits,
+  type OnboardingHabitShowcase,
+} from "@/lib/habits-prototype";
 import { useBilling } from "@/lib/use-billing";
 import type { AnchorPoint } from "@/lib/types";
 import type { ProductDestinationId } from "@/lib/product-navigation";
@@ -73,6 +76,14 @@ type FilterEditPanelProps = {
   onGuidedWrapUpAction?: () => void;
   onRemoveWrapUpCategory?: (categoryId: string) => boolean;
   onRequireAuth?: (anchorPoint?: AnchorPoint) => void;
+  // Vitrine de hábitos do ano de exemplo (ver app/page.tsx): mesmos dados
+  // que já aparecem no calendário durante o onboarding. `habitShowcaseLocked`
+  // reflete o passo em que ela ainda é só demonstrativa (nenhum hábito real
+  // criado ainda) — replica showcaseActive/displayShowcase de
+  // habits-prototype.tsx para a aba Hábitos deste painel também compor
+  // vitrine + reais, em vez de só os reais (hoje sempre vazios nesse passo).
+  habitShowcase?: OnboardingHabitShowcase | null;
+  habitShowcaseLocked?: boolean;
 };
 
 export function FilterEditPanel({
@@ -94,6 +105,8 @@ export function FilterEditPanel({
   onGuidedWrapUpAction,
   onRemoveWrapUpCategory,
   onRequireAuth,
+  habitShowcase = null,
+  habitShowcaseLocked = false,
 }: FilterEditPanelProps) {
   const highlightCreate = guidedToolbarNotice?.target === "calendars";
   const showWrapUpNotice =
@@ -139,6 +152,21 @@ export function FilterEditPanel({
     [activeHabits, selectedHabitId]
   );
 
+  // Mesma composição de habits-prototype.tsx: enquanto travada, a vitrine
+  // substitui a lista (ainda não existe hábito real); depois, soma aos
+  // reais em vez de sumir. Os ids da vitrine não existem no store, então
+  // ficam de fora de tudo que grava (seleção, reordenação).
+  const showcaseHabitIds = React.useMemo(
+    () => new Set((habitShowcase?.habits ?? []).map((habit) => habit.id)),
+    [habitShowcase]
+  );
+  const presentedHabits = React.useMemo(() => {
+    if (!habitShowcase) return activeHabits;
+    return habitShowcaseLocked
+      ? habitShowcase.habits
+      : [...habitShowcase.habits, ...activeHabits];
+  }, [activeHabits, habitShowcase, habitShowcaseLocked]);
+
   const [habitDialogOpen, setHabitDialogOpen] = React.useState(false);
   const [editingHabitId, setEditingHabitId] = React.useState<string | null>(null);
   const [draftName, setDraftName] = React.useState("");
@@ -156,7 +184,8 @@ export function FilterEditPanel({
 
   const creationUnavailable = isBillingLoading || Boolean(billingError);
   const reachedHabitLimit = activeHabits.length >= limits.maxHabits;
-  const habitCreationDisabled = creationUnavailable || (isPro && reachedHabitLimit);
+  const habitCreationDisabled =
+    habitShowcaseLocked || creationUnavailable || (isPro && reachedHabitLimit);
 
   const requestCreateHabit = () => {
     if (creationUnavailable) {
@@ -215,6 +244,15 @@ export function FilterEditPanel({
     deleteHabitInStore(editingHabitId);
     setHabitDialogOpen(false);
     setEditingHabitId(null);
+  };
+
+  const selectHabit = (habitId: string) => {
+    if (showcaseHabitIds.has(habitId)) return;
+    toggleHabitVisibilityInStore(habitId);
+  };
+
+  const reorderHabits = (orderedIds: string[]) => {
+    reorderHabitsInStore(orderedIds.filter((id) => !showcaseHabitIds.has(id)));
   };
 
   return (
@@ -333,13 +371,13 @@ export function FilterEditPanel({
             ) : (
               <section>
                 <HabitEditList
-                  habits={activeHabits}
+                  habits={presentedHabits}
                   selectedHabit={selectedHabit}
                   creationDisabled={habitCreationDisabled}
-                  onSelectHabit={toggleHabitVisibilityInStore}
+                  onSelectHabit={selectHabit}
                   onRequestCreate={requestCreateHabit}
                   onEditHabit={requestEditHabit}
-                  onReorderHabits={reorderHabitsInStore}
+                  onReorderHabits={reorderHabits}
                 />
               </section>
             )}
