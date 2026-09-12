@@ -106,6 +106,10 @@ type CategoryBarProps = {
   // padrão empilha cada chip em sua própria linha quando a largura
   // disponível encolhe, inflando a altura do cabeçalho em vez de escondê-la.
   nowrap?: boolean;
+  // Trava criação, edição e reordenação (ex.: guia de onboarding ainda
+  // ativo) sem esconder nada — as categorias continuam visíveis normalmente,
+  // só a interação fica bloqueada até o guia terminar ou ser fechado.
+  locked?: boolean;
 };
 
 type DragState = {
@@ -129,6 +133,7 @@ function EditCategoryChip({
   isOverlay = false,
   isEvicting = false,
   isEntering = false,
+  editLocked = false,
   style,
   chipRef,
 }: {
@@ -143,6 +148,7 @@ function EditCategoryChip({
   isOverlay?: boolean;
   isEvicting?: boolean;
   isEntering?: boolean;
+  editLocked?: boolean;
   style?: React.CSSProperties;
   chipRef?: (node: HTMLElement | null) => void;
 }) {
@@ -290,9 +296,18 @@ function EditCategoryChip({
               onEdit?.();
             }}
             aria-label={`Editar categoria ${category.name}`}
-            title={`Editar categoria ${category.name}`}
-            className={cn(CHIP_EDIT_ACTION_CLASS, mobileDense && "h-8 w-8")}
-            style={categoryActionHoverStyle}
+            title={
+              editLocked
+                ? "Disponível quando o guia terminar"
+                : `Editar categoria ${category.name}`
+            }
+            disabled={editLocked}
+            className={cn(
+              CHIP_EDIT_ACTION_CLASS,
+              mobileDense && "h-8 w-8",
+              editLocked && "cursor-not-allowed opacity-45"
+            )}
+            style={editLocked ? undefined : categoryActionHoverStyle}
           >
             <PencilLine className="h-3.5 w-3.5" />
           </button>
@@ -375,6 +390,7 @@ function SortableEditCategoryChip({
   onEdit,
   isEvicting = false,
   isEntering = false,
+  editLocked = false,
 }: {
   category: CategoryItem;
   dragEnabled: boolean;
@@ -382,6 +398,7 @@ function SortableEditCategoryChip({
   onEdit: () => void;
   isEvicting?: boolean;
   isEntering?: boolean;
+  editLocked?: boolean;
 }) {
   const {
     attributes,
@@ -418,6 +435,7 @@ function SortableEditCategoryChip({
       isPlaceholder={dragEnabled && isDragging}
       isEvicting={isEvicting}
       isEntering={isEntering}
+      editLocked={editLocked}
       style={style}
       chipRef={setNodeRef}
     />
@@ -440,6 +458,7 @@ export function CategoryBar({
   previewEnteringCategoryId,
   previewGhostSuggestion,
   nowrap = false,
+  locked = false,
 }: CategoryBarProps) {
   const { mode: themeMode } = useTheme();
   const selectedProfileIds = useStore((s) => s.selectedProfileIds);
@@ -497,7 +516,8 @@ export function CategoryBar({
       null,
     [orderedCategoriesForEditingProfile, activeDrag]
   );
-  const dragEnabled = isInlineEditMode && orderedCategoriesForEditingProfile.length > 1;
+  const dragEnabled =
+    isInlineEditMode && orderedCategoriesForEditingProfile.length > 1 && !locked;
   const barClass = cn(
     mobileDense
       ? "grid w-full grid-cols-2 gap-1.5 min-[430px]:grid-cols-3"
@@ -755,6 +775,7 @@ export function CategoryBar({
               onEdit={() => onEditCategory?.(category.id)}
               isEvicting={previewEvictingCategoryId === category.id}
               isEntering={previewEnteringCategoryId === category.id}
+              editLocked={locked}
             />
           ))}
 
@@ -770,15 +791,15 @@ export function CategoryBar({
           <button
             type="button"
             onClick={onCreateCategory}
-            disabled={!editingProfileId}
+            disabled={!editingProfileId || locked}
             className={cn(
               CREATE_ACTION_CLASS,
               mobileDense && "h-10 w-full rounded-[8px]",
-              !editingProfileId &&
+              (!editingProfileId || locked) &&
                 "cursor-not-allowed border-border bg-card text-muted-foreground/55 hover:border-border hover:bg-card hover:text-muted-foreground/55"
             )}
             aria-label="Criar nova categoria"
-            title="Criar nova categoria"
+            title={locked ? "Disponível quando o guia terminar" : "Criar nova categoria"}
             data-onboarding-calendar-control={highlightCreate ? "true" : undefined}
           >
             <Plus className="h-3.5 w-3.5" />
