@@ -91,6 +91,25 @@ type CategoryBarProps = {
   highlightedCategoryId?: string | null;
   highlightedCategoryEffect?: "focus" | "reveal";
   highlightCreate?: boolean;
+  // Destaca só as categorias visíveis, como grupo — sem incluir o "+" nem o
+  // botão de ocultar tudo, que ficam fora do círculo.
+  highlightAllVisible?: boolean;
+  previewEvictingCategoryId?: string;
+  previewEnteringCategoryId?: string;
+  previewGhostSuggestion?: {
+    name: string;
+    color?: string;
+    dashed?: boolean;
+  } | null;
+  // Uso dentro de uma coluna de grid que colapsa a largura para "recolher"
+  // (ver app-header.tsx, categoriesRowExpanded): sem isto, o `flex-wrap`
+  // padrão empilha cada chip em sua própria linha quando a largura
+  // disponível encolhe, inflando a altura do cabeçalho em vez de escondê-la.
+  nowrap?: boolean;
+  // Trava criação, edição e reordenação (ex.: guia de onboarding ainda
+  // ativo) sem esconder nada — as categorias continuam visíveis normalmente,
+  // só a interação fica bloqueada até o guia terminar ou ser fechado.
+  locked?: boolean;
 };
 
 type DragState = {
@@ -112,6 +131,9 @@ function EditCategoryChip({
   setHandleRef,
   isPlaceholder = false,
   isOverlay = false,
+  isEvicting = false,
+  isEntering = false,
+  editLocked = false,
   style,
   chipRef,
 }: {
@@ -124,10 +146,22 @@ function EditCategoryChip({
   setHandleRef?: SortableHandleRef;
   isPlaceholder?: boolean;
   isOverlay?: boolean;
+  isEvicting?: boolean;
+  isEntering?: boolean;
+  editLocked?: boolean;
   style?: React.CSSProperties;
   chipRef?: (node: HTMLElement | null) => void;
 }) {
   const { mode: themeMode } = useTheme();
+  // Chega já "escondido" (encolhido/esmaecido) e solta a classe um frame
+  // depois — o mesmo mount-then-animate que dá vida à saída (isEvicting),
+  // só que na chegada, pra trocar de categoria parecer um movimento só.
+  const [entering, setEntering] = React.useState(isEntering);
+  React.useEffect(() => {
+    if (!isEntering) return;
+    const frame = requestAnimationFrame(() => setEntering(false));
+    return () => cancelAnimationFrame(frame);
+  }, [isEntering]);
   const contentHiddenClass = isPlaceholder ? "invisible" : "";
   const colorToken = getCategoryColorToken(category.color, themeMode);
   const categoryTintStyle: React.CSSProperties = {
@@ -146,13 +180,17 @@ function EditCategoryChip({
   return (
     <div
       data-premium-sortable
+      data-onboarding-category-id={category.id}
       ref={chipRef}
       style={categoryTintStyle}
       className={cn(
         CHIP_SHELL_CLASS,
+        `transition-[opacity,transform] ${MOTION_CLASS}`,
         mobileDense && "h-10 w-full rounded-[8px]",
         isOverlay && CHIP_OVERLAY_CLASS,
-        isPlaceholder && "bg-background/80"
+        isPlaceholder && "bg-background/80",
+        isEvicting && "scale-90 opacity-0 translate-y-1",
+        entering && "scale-90 opacity-0 -translate-y-1"
       )}
     >
       {isPlaceholder ? (
@@ -258,9 +296,18 @@ function EditCategoryChip({
               onEdit?.();
             }}
             aria-label={`Editar categoria ${category.name}`}
-            title={`Editar categoria ${category.name}`}
-            className={cn(CHIP_EDIT_ACTION_CLASS, mobileDense && "h-8 w-8")}
-            style={categoryActionHoverStyle}
+            title={
+              editLocked
+                ? "Disponível quando o guia terminar"
+                : `Editar categoria ${category.name}`
+            }
+            disabled={editLocked}
+            className={cn(
+              CHIP_EDIT_ACTION_CLASS,
+              mobileDense && "h-8 w-8",
+              editLocked && "cursor-not-allowed opacity-45"
+            )}
+            style={editLocked ? undefined : categoryActionHoverStyle}
           >
             <PencilLine className="h-3.5 w-3.5" />
           </button>
@@ -279,16 +326,79 @@ function EditCategoryChip({
   );
 }
 
+function GhostCategoryChip({
+  name,
+  color,
+  mobileDense = false,
+  dashed = false,
+}: {
+  name: string;
+  color?: string;
+  mobileDense?: boolean;
+  dashed?: boolean;
+}) {
+  const { mode: themeMode } = useTheme();
+  const colorToken = color ? getCategoryColorToken(color, themeMode) : null;
+
+  return (
+    <div
+      aria-hidden="true"
+      style={
+        colorToken
+          ? {
+              backgroundColor: colorToken.soft,
+              borderColor: colorToken.border,
+              color: colorToken.text,
+            }
+          : undefined
+      }
+      className={cn(
+        CHIP_SHELL_CLASS,
+        `transition-[opacity,transform] ${MOTION_CLASS}`,
+        dashed
+          ? "border-dashed bg-transparent text-muted-foreground/55"
+          : "onboarding-category-reveal",
+        "pointer-events-none",
+        mobileDense && "h-10 w-full rounded-[8px]"
+      )}
+    >
+      {dashed ? null : (
+        <span className={cn(CHIP_LEADING_SLOT_CLASS, mobileDense && "h-10 w-7")}>
+          <span
+            className="h-2.5 w-2.5 rounded-full"
+            style={{ backgroundColor: colorToken?.indicator }}
+          />
+        </span>
+      )}
+      <span
+        className={cn(
+          "flex min-w-0 flex-1 items-center self-stretch truncate text-[0.78rem] font-semibold",
+          dashed ? "px-3" : "pl-1 pr-3",
+          mobileDense && "text-left text-[0.74rem] leading-[0.84rem]"
+        )}
+      >
+        {name}
+      </span>
+    </div>
+  );
+}
+
 function SortableEditCategoryChip({
   category,
   dragEnabled,
   mobileDense = false,
   onEdit,
+  isEvicting = false,
+  isEntering = false,
+  editLocked = false,
 }: {
   category: CategoryItem;
   dragEnabled: boolean;
   mobileDense?: boolean;
   onEdit: () => void;
+  isEvicting?: boolean;
+  isEntering?: boolean;
+  editLocked?: boolean;
 }) {
   const {
     attributes,
@@ -323,6 +433,9 @@ function SortableEditCategoryChip({
       handleListeners={listeners}
       setHandleRef={setActivatorNodeRef}
       isPlaceholder={dragEnabled && isDragging}
+      isEvicting={isEvicting}
+      isEntering={isEntering}
+      editLocked={editLocked}
       style={style}
       chipRef={setNodeRef}
     />
@@ -340,6 +453,12 @@ export function CategoryBar({
   highlightedCategoryId,
   highlightedCategoryEffect = "focus",
   highlightCreate = false,
+  highlightAllVisible = false,
+  previewEvictingCategoryId,
+  previewEnteringCategoryId,
+  previewGhostSuggestion,
+  nowrap = false,
+  locked = false,
 }: CategoryBarProps) {
   const { mode: themeMode } = useTheme();
   const selectedProfileIds = useStore((s) => s.selectedProfileIds);
@@ -397,7 +516,8 @@ export function CategoryBar({
       null,
     [orderedCategoriesForEditingProfile, activeDrag]
   );
-  const dragEnabled = isInlineEditMode && orderedCategoriesForEditingProfile.length > 1;
+  const dragEnabled =
+    isInlineEditMode && orderedCategoriesForEditingProfile.length > 1 && !locked;
   const barClass = cn(
     mobileDense
       ? "grid w-full grid-cols-2 gap-1.5 min-[430px]:grid-cols-3"
@@ -500,9 +620,13 @@ export function CategoryBar({
   }
 
   if (!isInlineEditMode) {
-    return (
-      <div className={barClass}>
-        {displayedCategories.map((category) => {
+    // No mobile (mobileDense), cada categoria precisa ser filha direta do
+    // grid (barClass já é "grid grid-cols-2 ..."), senão o grid vê só ESTE
+    // wrapper como um único item, e os botões — que já são w-full — empilham
+    // um por linha dentro dele, um por baixo do outro, em vez de preencher
+    // as colunas. Fora do mobile, o `flex flex-wrap` continua sendo o
+    // container certo (a barra desktop não usa grid).
+    const categoryButtons = displayedCategories.map((category) => {
           const colorToken = getCategoryColorToken(category.color, themeMode);
           return (
             <button
@@ -531,7 +655,9 @@ export function CategoryBar({
                 highlightedCategoryId === category.id &&
                   (highlightedCategoryEffect === "reveal"
                     ? "onboarding-category-reveal relative z-[46]"
-                    : "onboarding-category-focus relative z-[46]")
+                    : "onboarding-category-focus relative z-[46]"),
+                previewEvictingCategoryId === category.id &&
+                  "scale-90 opacity-0 -translate-y-1"
               )}
               style={{
                 ...(mobileDense ? MOBILE_CHIP_BUTTON_STYLE : {}),
@@ -573,7 +699,24 @@ export function CategoryBar({
               </span>
             </button>
           );
-        })}
+        });
+
+    return (
+      <div className={barClass}>
+        {mobileDense ? (
+          categoryButtons
+        ) : (
+          <div
+            className={cn(
+              nowrap
+                ? "flex flex-nowrap items-center gap-1.5 overflow-hidden sm:gap-2"
+                : "flex flex-wrap items-center gap-1.5 sm:gap-2",
+              highlightAllVisible && "product-spotlight-group rounded-xl"
+            )}
+          >
+            {categoryButtons}
+          </div>
+        )}
 
         {highlightCreate ? (
           <button
@@ -581,7 +724,6 @@ export function CategoryBar({
             onClick={onCreateCategory}
             className={CREATE_ACTION_CLASS}
             data-onboarding-calendar-control
-            data-onboarding-highlighted="true"
             aria-label="Adicionar categoria"
             title="Adicionar categoria"
           >
@@ -631,23 +773,34 @@ export function CategoryBar({
               dragEnabled={dragEnabled}
               mobileDense={mobileDense}
               onEdit={() => onEditCategory?.(category.id)}
+              isEvicting={previewEvictingCategoryId === category.id}
+              isEntering={previewEnteringCategoryId === category.id}
+              editLocked={locked}
             />
           ))}
+
+          {previewGhostSuggestion ? (
+            <GhostCategoryChip
+              name={previewGhostSuggestion.name}
+              color={previewGhostSuggestion.color}
+              dashed={previewGhostSuggestion.dashed}
+              mobileDense={mobileDense}
+            />
+          ) : null}
 
           <button
             type="button"
             onClick={onCreateCategory}
-            disabled={!editingProfileId}
+            disabled={!editingProfileId || locked}
             className={cn(
               CREATE_ACTION_CLASS,
               mobileDense && "h-10 w-full rounded-[8px]",
-              !editingProfileId &&
+              (!editingProfileId || locked) &&
                 "cursor-not-allowed border-border bg-card text-muted-foreground/55 hover:border-border hover:bg-card hover:text-muted-foreground/55"
             )}
             aria-label="Criar nova categoria"
-            title="Criar nova categoria"
+            title={locked ? "Disponível quando o guia terminar" : "Criar nova categoria"}
             data-onboarding-calendar-control={highlightCreate ? "true" : undefined}
-            data-onboarding-highlighted={highlightCreate ? "true" : undefined}
           >
             <Plus className="h-3.5 w-3.5" />
           </button>

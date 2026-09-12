@@ -39,13 +39,12 @@ import {
 } from "../../lib/onboarding-region";
 import {
   CATEGORY_COLOR_BASE_AMBER,
-  CATEGORY_COLOR_BASE_BLUE,
   CATEGORY_COLOR_BASE_CORAL,
-  CATEGORY_COLOR_BASE_GREEN,
   CATEGORY_COLOR_BASE_OLIVE,
   CATEGORY_COLOR_BASE_ORANGE,
   CATEGORY_COLOR_BASE_SAND,
   CATEGORY_COLOR_BASE_TEAL,
+  CATEGORY_COLOR_BASE_TERRA,
   CATEGORY_COLOR_BASE_VIOLET,
   CATEGORY_PRESET_COLORS,
   getNearestCategoryColor,
@@ -107,7 +106,7 @@ test("organiza 24 cores e mantém padrões distintos no onboarding", () => {
   ).toBe(CATEGORY_COLOR_BASE_AMBER);
   expect(
     getOnboardingCategoryDefinition("personal", "date", "generic").color
-  ).toBe(CATEGORY_COLOR_BASE_BLUE);
+  ).toBe(CATEGORY_COLOR_BASE_TERRA);
   expect(
     getOnboardingCategoryDefinition("personal", "period", "specific").color
   ).not.toBe(
@@ -121,7 +120,7 @@ test("organiza 24 cores e mantém padrões distintos no onboarding", () => {
   ).toBe(CATEGORY_COLOR_BASE_VIOLET);
   expect(
     getOnboardingCategoryDefinition("work", "period", "specific").color
-  ).toBe(CATEGORY_COLOR_BASE_GREEN);
+  ).toBe(CATEGORY_COLOR_BASE_AMBER);
 });
 
 test("normaliza a antiga cor escura para uma opção oficial", () => {
@@ -170,9 +169,19 @@ test("cria contexto, categoria incremental de datas e pula direto para edição"
     at: "2026-07-20T10:02:00.000Z",
   });
   expect(state).toMatchObject({
-    step: "edit_instruction",
+    step: "visibility_instruction",
     dateItemsCreated: 2,
   });
+
+  state = reduceGuidedOnboardingState(state, {
+    type: "continue_from_visibility",
+  });
+  expect(state.step).toBe("year_instruction");
+
+  state = reduceGuidedOnboardingState(state, {
+    type: "continue_from_year",
+  });
+  expect(state.step).toBe("edit_instruction");
 
   state = reduceGuidedOnboardingState(state, {
     type: "open_edit_preview",
@@ -197,19 +206,20 @@ test("cria contexto, categoria incremental de datas e pula direto para edição"
     at: "2026-07-20T10:04:30.000Z",
   });
   expect(state).toMatchObject({
-    step: "year_instruction",
+    step: "theme_instruction",
     holidayUf: "RS",
   });
-
-  state = reduceGuidedOnboardingState(state, {
-    type: "continue_from_year",
-  });
-  expect(state.step).toBe("theme_instruction");
 
   state = reduceGuidedOnboardingState(state, {
     type: "confirm_theme",
     complete: true,
     at: "2026-07-20T10:05:00.000Z",
+  });
+  expect(state.step).toBe("wrap_up_instruction");
+
+  state = reduceGuidedOnboardingState(state, {
+    type: "continue_from_wrap_up",
+    at: "2026-07-20T10:06:00.000Z",
   });
   expect(state).toMatchObject({
     step: "completed",
@@ -220,8 +230,13 @@ test("cria contexto, categoria incremental de datas e pula direto para edição"
 
 test("onboarding desktop termina em Hábitos sem retornar ao ano", () => {
   const periodNavigation = reduceGuidedOnboardingState(
-    { ...initialState(), step: "year_instruction" },
-    { type: "continue_from_year", showPeriodNavigation: true }
+    { ...initialState(), step: "calendar_instruction" },
+    {
+      type: "calendar_added",
+      uf: "RS",
+      showPeriodNavigation: true,
+      at: "2026-08-26T11:58:00.000Z",
+    }
   );
   expect(periodNavigation.step).toBe("period_navigation_instruction");
 
@@ -267,13 +282,28 @@ test("onboarding desktop termina em Hábitos sem retornar ao ano", () => {
     })
   ).toEqual(retrospective);
 
-  const completed = reduceGuidedOnboardingState(retrospective, {
+  // Sem tema confirmado ainda, o guia segue para o tema (não volta ao Anual,
+  // e ainda não termina) antes do resumo final e do convite de conta.
+  const afterHabits = reduceGuidedOnboardingState(retrospective, {
     type: "finish_habit_onboarding",
     at: "2026-08-26T12:01:00.000Z",
   });
+  expect(afterHabits.step).toBe("theme_instruction");
+
+  const themed = reduceGuidedOnboardingState(afterHabits, {
+    type: "confirm_theme",
+    complete: true,
+    at: "2026-08-26T12:01:30.000Z",
+  });
+  expect(themed.step).toBe("wrap_up_instruction");
+
+  const completed = reduceGuidedOnboardingState(themed, {
+    type: "continue_from_wrap_up",
+    at: "2026-08-26T12:02:00.000Z",
+  });
   expect(completed).toMatchObject({
     step: "completed",
-    completedAt: "2026-08-26T12:01:00.000Z",
+    completedAt: "2026-08-26T12:02:00.000Z",
   });
 
   expect(

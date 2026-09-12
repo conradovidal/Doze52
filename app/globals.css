@@ -195,16 +195,6 @@
   color-scheme: light;
 }
 
-@keyframes product-spotlight-enter {
-  0%,
-  100% {
-    transform: scale(1);
-  }
-  45% {
-    transform: scale(1.08);
-  }
-}
-
 @keyframes onboarding-category-reveal {
   0% {
     transform: translateY(-3px) scale(0.96);
@@ -224,21 +214,6 @@
   animation: onboarding-category-reveal 900ms cubic-bezier(0.22, 1, 0.36, 1) 1;
 }
 
-.guided-control-target {
-  position: relative;
-  z-index: 61;
-  border-color: color-mix(in srgb, var(--foreground) 42%, var(--border)) !important;
-  box-shadow:
-    0 0 0 2px var(--background),
-    0 0 0 4px color-mix(in srgb, var(--foreground) 34%, transparent);
-}
-
-.guided-control-target-subtle {
-  box-shadow:
-    0 0 0 1px var(--background),
-    0 0 0 2px color-mix(in srgb, var(--foreground) 24%, transparent);
-}
-
 [data-onboarding-toolbar-spotlight="true"] > * {
   transition: opacity 180ms ease;
 }
@@ -248,22 +223,50 @@
   opacity: 0.48;
 }
 
+/*
+ * Realce do onboarding: em vez de uma caixa nova por cima (anel, halo,
+ * contorno), liga o mesmo fundo que o próprio alvo já usa no hover — sem
+ * elemento extra, sem raio de borda descasado, sem "vazar" do formato do
+ * botão. O padrão é só fundo: qualquer borda/contorno/anel de foco que o
+ * alvo já tivesse (inclusive o anel nativo de foco do teclado) é anulado
+ * enquanto o destaque está ativo, para nunca virar "fundo + contorno".
+ * O `!important` garante que ganha das classes já presentes (ex.:
+ * `bg-card`, `border-border`), do mesmo jeito que um `:hover` real ganharia.
+ */
 .product-spotlight-target {
   position: relative;
   z-index: 61;
-  border-color: var(--foreground) !important;
-  box-shadow:
-    0 0 0 2px var(--background),
-    0 0 0 5px var(--foreground),
-    0 0 0 9px color-mix(in srgb, var(--foreground) 24%, transparent);
-  animation: product-spotlight-enter 620ms cubic-bezier(0.22, 1, 0.36, 1) 1;
+  background-color: var(--muted) !important;
+  color: var(--foreground) !important;
+  border-color: transparent !important;
+  outline: none !important;
+  box-shadow: none !important;
+  transition: background-color 160ms ease-out, color 160ms ease-out;
+}
+
+/*
+ * Só o grupo de categorias (mostrar/esconder) não é um único botão com
+ * hover próprio para reaproveitar — é vários chips juntos. Aqui sim um
+ * fundo à parte faz sentido: `::before` cresce só na vertical (inset
+ * horizontal em 0, para nunca encostar nos botões ao lado) via
+ * `position: absolute`, que não afeta o layout dos vizinhos.
+ */
+.product-spotlight-group {
+  position: relative;
+  z-index: 61;
+}
+
+.product-spotlight-group::before {
+  content: "";
+  position: absolute;
+  inset: -8px 0;
+  z-index: -1;
+  border-radius: 14px;
+  background-color: var(--muted);
+  pointer-events: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .product-spotlight-target {
-    animation: none;
-  }
-
   .onboarding-category-reveal {
     animation: none;
   }
@@ -286,23 +289,6 @@
 }
 
 @layer utilities {
-  @keyframes doze52-calendar-mode-shift {
-    from {
-      opacity: 0.82;
-      transform: translateY(6px) scale(0.998);
-    }
-
-    to {
-      opacity: 1;
-      transform: translateY(0) scale(1);
-    }
-  }
-
-  .doze52-calendar-mode-transition {
-    animation: doze52-calendar-mode-shift 220ms cubic-bezier(0.22, 1, 0.36, 1);
-    transform-origin: top center;
-  }
-
   .doze52-scrollbar-none {
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
@@ -310,11 +296,5 @@
 
   .doze52-scrollbar-none::-webkit-scrollbar {
     display: none;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .doze52-calendar-mode-transition {
-      animation: none;
-    }
   }
 }

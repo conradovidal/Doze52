@@ -137,6 +137,7 @@ export function MonthRow({
   onSingleDayListHover,
   clearReorderTarget,
   onMonthLabelClick,
+  onMonthLabelMouseDown,
   monthLabelAriaLabel,
   monthLabelActive = false,
   monthLabelHighlighted = false,
@@ -181,6 +182,7 @@ export function MonthRow({
   onSingleDayListHover: (dayIso: string, insertIndex: number) => void;
   clearReorderTarget: () => void;
   onMonthLabelClick?: () => void;
+  onMonthLabelMouseDown?: () => void;
   monthLabelAriaLabel?: string;
   monthLabelActive?: boolean;
   monthLabelHighlighted?: boolean;
@@ -599,6 +601,10 @@ export function MonthRow({
           <button
             type="button"
             onClick={onMonthLabelClick}
+            onMouseDown={(event) => {
+              if (event.button !== 0) return;
+              onMonthLabelMouseDown?.();
+            }}
             aria-label={monthLabelAriaLabel ?? monthLabel}
             title={monthLabelAriaLabel ?? monthLabel}
             aria-pressed={monthLabelActive}
@@ -608,6 +614,7 @@ export function MonthRow({
               monthLabelActive ? LATERAL_KEY_ACTIVE_CLASS : LATERAL_KEY_REST_CLASS,
               monthLabelHighlighted && "product-spotlight-target"
             )}
+            data-month-label={monthIndex}
             data-onboarding-period-control={monthLabelHighlighted ? "true" : undefined}
             style={{ minHeight: `${minHeightPx}px` }}
           >

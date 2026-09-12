@@ -33,7 +33,6 @@ import {
   GuidedToolbarNoticeCard,
   type GuidedToolbarNotice,
 } from "@/components/onboarding/guided-toolbar-notice";
-import { GuidedTargetOutline } from "@/components/onboarding/guided-target-outline";
 import {
   LATERAL_KEY_ACTIVE_CLASS,
   LATERAL_KEY_BASE_CLASS,
@@ -72,6 +71,11 @@ type QuarterGroup = {
   quarterIndex: QuarterIndex;
   monthIndices: MonthIndex[];
 };
+type LabelRangeOrigin =
+  | { type: "month"; monthIndex: MonthIndex }
+  | { type: "quarter"; quarterIndex: QuarterIndex };
+const getLabelKey = (origin: LabelRangeOrigin) =>
+  origin.type === "month" ? `month:${origin.monthIndex}` : `quarter:${origin.quarterIndex}`;
 
 const CALENDAR_ZOOM_MIN_PERCENT = 100;
 const CALENDAR_ZOOM_MAX_PERCENT = 180;
@@ -81,6 +85,14 @@ const YEAR_ROW_BOTTOM_PADDING_ROOMY_PX = 12;
 const YEAR_ROW_BOTTOM_PADDING_FLOOR_PX = 4;
 const YEAR_ROW_BOTTOM_PADDING_MAX_SAVINGS_PX =
   12 * (YEAR_ROW_BOTTOM_PADDING_ROOMY_PX - YEAR_ROW_BOTTOM_PADDING_FLOOR_PX);
+// Quando sobra altura (viewport mais alto que o conteúdo do ano), o padding
+// também cresce além do "roomy" para consumir esse espaço em vez de deixá-lo
+// como faixa em branco abaixo da grade — o mesmo mecanismo de compactação,
+// só que na direção oposta. O teto evita linhas exageradamente espaçadas em
+// monitores muito altos; a sobra além dele fica como margem externa.
+const YEAR_ROW_BOTTOM_PADDING_CEILING_PX = 32;
+const YEAR_ROW_BOTTOM_PADDING_MAX_GROWTH_PX =
+  12 * (YEAR_ROW_BOTTOM_PADDING_CEILING_PX - YEAR_ROW_BOTTOM_PADDING_ROOMY_PX);
 
 const CALENDAR_VIEW_OPTIONS = [
   { value: "year", label: "Ano" },
@@ -200,15 +212,14 @@ export function YearGrid({
   const setCalendarZoomPercent = useStore((s) => s.setCalendarZoomPercent);
   const [yearDirection, setYearDirection] = React.useState<1 | -1>(1);
   const [isYearTransitioning, setIsYearTransitioning] = React.useState(false);
-  const guidedYearLocked = guidedYearNotice?.target === "year";
   const requestYearChange = React.useCallback(
     (nextYear: number) => {
-      if (guidedYearLocked || isYearTransitioning || nextYear === year) return;
+      if (isYearTransitioning || nextYear === year) return;
       setYearDirection(getYearTransitionDirection(year, nextYear));
       setIsYearTransitioning(true);
       onYearChange(nextYear);
     },
-    [guidedYearLocked, isYearTransitioning, onYearChange, year]
+    [isYearTransitioning, onYearChange, year]
   );
   const visibleCategoryIds = React.useMemo(
     () => {
@@ -291,17 +302,20 @@ export function YearGrid({
       const scrollHeight = viewport.scrollHeight;
       const monthCount = 12;
       setYearRowBottomPaddingPx((currentPaddingPx) => {
-        const currentSavingsPerRow =
-          YEAR_ROW_BOTTOM_PADDING_ROOMY_PX - currentPaddingPx;
+        // Desfaz o ajuste atual (para cima ou para baixo) para recuperar a
+        // altura "natural" do conteúdo com padding roomy, e então decide de
+        // novo: sobra vira crescimento, falta vira compactação.
+        const currentAdjustmentPerRow =
+          currentPaddingPx - YEAR_ROW_BOTTOM_PADDING_ROOMY_PX;
         const naturalScrollHeight =
-          scrollHeight + currentSavingsPerRow * monthCount;
-        const deficit = naturalScrollHeight - clientHeight;
-        const neededTotalSavings = Math.min(
-          YEAR_ROW_BOTTOM_PADDING_MAX_SAVINGS_PX,
-          Math.max(0, deficit)
-        );
+          scrollHeight - currentAdjustmentPerRow * monthCount;
+        const slack = clientHeight - naturalScrollHeight;
         const nextPaddingPx =
-          YEAR_ROW_BOTTOM_PADDING_ROOMY_PX - neededTotalSavings / monthCount;
+          slack >= 0
+            ? YEAR_ROW_BOTTOM_PADDING_ROOMY_PX +
+              Math.min(YEAR_ROW_BOTTOM_PADDING_MAX_GROWTH_PX, slack) / monthCount
+            : YEAR_ROW_BOTTOM_PADDING_ROOMY_PX -
+              Math.min(YEAR_ROW_BOTTOM_PADDING_MAX_SAVINGS_PX, -slack) / monthCount;
         return Math.abs(nextPaddingPx - currentPaddingPx) > 0.5
           ? nextPaddingPx
           : currentPaddingPx;
@@ -538,8 +552,14 @@ export function YearGrid({
     };
   }, [clearDragState, dragState.draggingEventId]);
 
+  const justDraggedLabelRef = React.useRef(false);
+
   const handleQuarterRailClick = React.useCallback(
     (quarterIndex: QuarterIndex) => {
+      if (justDraggedLabelRef.current) {
+        justDraggedLabelRef.current = false;
+        return;
+      }
       if (guidedPeriodNotice?.target === "period-navigation") {
         onGuidedPeriodInteraction?.();
       }
@@ -560,6 +580,10 @@ export function YearGrid({
 
   const handleMonthLabelClick = React.useCallback(
     (monthIndex: MonthIndex) => {
+      if (justDraggedLabelRef.current) {
+        justDraggedLabelRef.current = false;
+        return;
+      }
       if (guidedPeriodNotice?.target === "period-navigation") {
         onGuidedPeriodInteraction?.();
       }
@@ -571,6 +595,114 @@ export function YearGrid({
     },
     [focusMonth, focusQuarter, guidedPeriodNotice?.target, onGuidedPeriodInteraction, resolvedMonth, resolvedQuarter, viewMode]
   );
+
+  // Arrastar de um rótulo de mês/trimestre a outro forma um período com
+  // esses meses/trimestres inteiros (a mesma lógica de arrastar dias para
+  // criar um período, só que em granularidade maior). Um clique simples (sem
+  // cruzar para outro rótulo) continua navegando como antes — só entra em
+  // modo de seleção quando o ponteiro realmente sai do rótulo de origem.
+  const labelDragOriginRef = React.useRef<LabelRangeOrigin | null>(null);
+  const labelDragActiveRef = React.useRef(false);
+  const lastLabelRangeKeyRef = React.useRef<string | null>(null);
+
+  const getMonthRangeIso = React.useCallback(
+    (monthIndex: MonthIndex) => ({
+      firstIso: format(new Date(year, monthIndex, 1), "yyyy-MM-dd"),
+      lastIso: format(new Date(year, monthIndex + 1, 0), "yyyy-MM-dd"),
+    }),
+    [year]
+  );
+  const getQuarterRangeIso = React.useCallback(
+    (quarterIndex: QuarterIndex) => {
+      const months = QUARTER_MONTH_GROUPS[quarterIndex];
+      return {
+        firstIso: format(new Date(year, months[0], 1), "yyyy-MM-dd"),
+        lastIso: format(
+          new Date(year, months[months.length - 1] + 1, 0),
+          "yyyy-MM-dd"
+        ),
+      };
+    },
+    [year]
+  );
+  const getLabelRangeIso = React.useCallback(
+    (origin: LabelRangeOrigin) =>
+      origin.type === "month"
+        ? getMonthRangeIso(origin.monthIndex)
+        : getQuarterRangeIso(origin.quarterIndex),
+    [getMonthRangeIso, getQuarterRangeIso]
+  );
+  const resolveLabelOriginFromPoint = React.useCallback(
+    (clientX: number, clientY: number): LabelRangeOrigin | null => {
+      if (typeof document === "undefined") return null;
+      const elements = document.elementsFromPoint(clientX, clientY);
+      for (const element of elements) {
+        if (!(element instanceof HTMLElement)) continue;
+        const monthLabel = element.closest<HTMLElement>("[data-month-label]");
+        if (monthLabel?.dataset.monthLabel) {
+          return {
+            type: "month",
+            monthIndex: Number(monthLabel.dataset.monthLabel) as MonthIndex,
+          };
+        }
+        const quarterLabel = element.closest<HTMLElement>("[data-quarter-label]");
+        if (quarterLabel?.dataset.quarterLabel) {
+          return {
+            type: "quarter",
+            quarterIndex: Number(quarterLabel.dataset.quarterLabel) as QuarterIndex,
+          };
+        }
+      }
+      return null;
+    },
+    []
+  );
+
+  const handleLabelDragStart = React.useCallback((origin: LabelRangeOrigin) => {
+    labelDragOriginRef.current = origin;
+    labelDragActiveRef.current = false;
+    lastLabelRangeKeyRef.current = null;
+  }, []);
+
+  const handleLabelDragMove = React.useCallback(
+    (clientX: number, clientY: number) => {
+      const origin = labelDragOriginRef.current;
+      if (!origin) return;
+      const target = resolveLabelOriginFromPoint(clientX, clientY);
+      if (!target) return;
+      const targetKey = getLabelKey(target);
+      if (!labelDragActiveRef.current) {
+        if (targetKey === getLabelKey(origin)) return;
+        labelDragActiveRef.current = true;
+        onStartCreateRange(getLabelRangeIso(origin).firstIso);
+      }
+      if (lastLabelRangeKeyRef.current === targetKey) return;
+      lastLabelRangeKeyRef.current = targetKey;
+      onHoverCreateRange(getLabelRangeIso(target).lastIso);
+    },
+    [getLabelRangeIso, onHoverCreateRange, onStartCreateRange, resolveLabelOriginFromPoint]
+  );
+
+  const handleLabelDragEnd = React.useCallback(() => {
+    if (labelDragActiveRef.current) {
+      justDraggedLabelRef.current = true;
+    }
+    labelDragOriginRef.current = null;
+    labelDragActiveRef.current = false;
+    lastLabelRangeKeyRef.current = null;
+  }, []);
+
+  React.useEffect(() => {
+    const onMouseMove = (event: MouseEvent) =>
+      handleLabelDragMove(event.clientX, event.clientY);
+    const onMouseUp = () => handleLabelDragEnd();
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+  }, [handleLabelDragEnd, handleLabelDragMove]);
 
   const handleMobileDayCellActivate = React.useCallback(
     ({ monthIndex }: { monthIndex: number; dateIso: string }) => {
@@ -735,6 +867,10 @@ export function YearGrid({
             <button
               type="button"
               onClick={() => handleQuarterRailClick(group.quarterIndex)}
+              onMouseDown={(event) => {
+                if (event.button !== 0) return;
+                handleLabelDragStart({ type: "quarter", quarterIndex: group.quarterIndex });
+              }}
               aria-label={
                 isActiveQuarter
                   ? viewMode === "quarter"
@@ -750,6 +886,7 @@ export function YearGrid({
                 quarterRailShapeClass,
                 isQuarterSelected ? LATERAL_KEY_ACTIVE_CLASS : LATERAL_KEY_REST_CLASS
               )}
+              data-quarter-label={group.quarterIndex}
               data-onboarding-period-control={
                 guidedPeriodNotice?.target === "period-navigation" ? "true" : undefined
               }
@@ -807,6 +944,9 @@ export function YearGrid({
                     onSingleDayListHover={onSingleDayListHover}
                     clearReorderTarget={clearReorderTarget}
                     onMonthLabelClick={() => handleMonthLabelClick(monthIndex)}
+                    onMonthLabelMouseDown={() =>
+                      handleLabelDragStart({ type: "month", monthIndex })
+                    }
                     monthLabelAriaLabel={
                       isActiveMonth
                         ? `Voltar para ${QUARTER_LABELS[group.quarterIndex]}`
@@ -901,7 +1041,8 @@ export function YearGrid({
               guidedYearNotice?.target === "year" ? "true" : undefined
             }
             className={cn(
-              "relative inline-flex h-8 items-center overflow-visible rounded-[10px] border border-border bg-card"
+              "relative inline-flex h-8 items-center overflow-visible rounded-[10px] border border-border bg-card",
+              guidedYearNotice?.target === "year" && "product-spotlight-target"
             )}
           >
             <button
@@ -909,39 +1050,40 @@ export function YearGrid({
               data-onboarding-year-control
               aria-label={`Voltar para ${year - 1}`}
               title={`Voltar para ${year - 1}`}
-              disabled={guidedYearLocked || isYearTransitioning}
+              disabled={isYearTransitioning}
               className="grid size-8 place-items-center rounded-[9px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-45"
               onClick={() => requestYearChange(year - 1)}
             >
               <ChevronLeft className="size-3.5" />
             </button>
-            <span
-              aria-label={`Ano ${year}`}
+            <button
+              type="button"
+              aria-label={`Ano ${year}. Ir para hoje`}
               aria-live="polite"
-              className="min-w-11 text-center text-xs font-semibold tabular-nums text-foreground"
+              title="Ir para hoje"
+              disabled={isYearTransitioning}
+              className="min-w-11 rounded-[9px] text-center text-xs font-semibold tabular-nums text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-45"
+              onClick={() => requestYearChange(Number(todayIso.slice(0, 4)))}
             >
               {year}
-            </span>
+            </button>
             <button
               type="button"
               aria-label={`Avançar para ${year + 1}`}
               title={`Avançar para ${year + 1}`}
-              disabled={guidedYearLocked || isYearTransitioning}
+              disabled={isYearTransitioning}
               className="grid size-8 place-items-center rounded-[9px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-45"
               onClick={() => requestYearChange(year + 1)}
             >
               <ChevronRight className="size-3.5" />
             </button>
             {guidedYearNotice?.target === "year" && onDismissGuidedYearNotice ? (
-              <>
-                <GuidedTargetOutline selector="[data-calendar-year-stepper]" />
-                <GuidedToolbarNoticeCard
-                  notice={guidedYearNotice}
-                  onClose={onDismissGuidedYearNotice}
-                  onAction={onGuidedYearAction}
-                  placement="above"
-                />
-              </>
+              <GuidedToolbarNoticeCard
+                notice={guidedYearNotice}
+                onClose={onDismissGuidedYearNotice}
+                onAction={onGuidedYearAction}
+                placement="above"
+              />
             ) : null}
           </div>
           {showScaleControl ? (

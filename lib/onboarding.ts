@@ -1,6 +1,25 @@
 "use client";
 
 import type { CalendarEvent } from "@/lib/types";
+import {
+  CATEGORY_COLOR_BASE_AMBER,
+  CATEGORY_COLOR_BASE_CORAL,
+  CATEGORY_COLOR_BASE_CYAN,
+  CATEGORY_COLOR_BASE_EMERALD,
+  CATEGORY_COLOR_BASE_GRAPHITE,
+  CATEGORY_COLOR_BASE_GREEN,
+  CATEGORY_COLOR_BASE_INDIGO,
+  CATEGORY_COLOR_BASE_LIME,
+  CATEGORY_COLOR_BASE_MINT,
+  CATEGORY_COLOR_BASE_ORANGE,
+  CATEGORY_COLOR_BASE_PINK,
+  CATEGORY_COLOR_BASE_PURPLE,
+  CATEGORY_COLOR_BASE_ROSE,
+  CATEGORY_COLOR_BASE_SAND,
+  CATEGORY_COLOR_BASE_SKY,
+  CATEGORY_COLOR_BASE_TEAL,
+  CATEGORY_COLOR_BASE_VIOLET,
+} from "@/lib/category-palette";
 
 export type ProductOnboardingState = "pending" | "dismissed" | "completed";
 export type ProductOnboardingKey = "create-event";
@@ -35,9 +54,11 @@ export type GuidedOnboardingStep =
   | "habit_showcase_instruction"
   | "habit_instruction"
   | "habit_created_confirmation"
+  | "visibility_instruction"
   | "profile_instruction"
   | "appearance_instruction"
   | "theme_instruction"
+  | "wrap_up_instruction"
   | "demo_exploration"
   | "dismissed_preserved"
   | "completed"
@@ -91,8 +112,14 @@ export type GuidedOnboardingAction =
   | { type: "finish_edit_preview" }
   | { type: "open_calendar" }
   | { type: "close_calendar" }
-  | { type: "calendar_added"; uf?: string; packGroupId?: string; at?: string }
-  | { type: "continue_from_year"; showPeriodNavigation?: boolean; at?: string }
+  | {
+      type: "calendar_added";
+      uf?: string;
+      packGroupId?: string;
+      showPeriodNavigation?: boolean;
+      at?: string;
+    }
+  | { type: "continue_from_year"; at?: string }
   | { type: "continue_from_period_navigation"; showHabit?: boolean; at?: string }
   | { type: "interact_with_period_navigation"; at?: string }
   | {
@@ -104,10 +131,13 @@ export type GuidedOnboardingAction =
   | { type: "habit_saved"; at?: string }
   | { type: "interact_with_habit_retrospective"; at?: string }
   | { type: "finish_habit_onboarding"; at?: string }
+  | { type: "continue_from_visibility"; at?: string }
   | { type: "return_to_year"; at?: string }
   | { type: "open_profile"; at?: string }
   | { type: "open_appearance"; at?: string }
   | { type: "confirm_theme"; complete?: boolean; at?: string }
+  | { type: "continue_from_wrap_up"; at?: string }
+  | { type: "finish_profile_onboarding"; at?: string }
   | { type: "complete"; at?: string }
   | { type: "record_post_onboarding_event"; at?: string }
   | { type: "enter_demo_exploration"; at?: string }
@@ -145,6 +175,7 @@ type LegacyGuidedOnboardingState = {
   appearanceOpenedAt?: string;
   holidayUf?: string;
   holidayCalendarAddedAt?: string;
+  addedCalendarPackGroupId?: string;
   dateItemsCreated?: number;
   periodItemsCreated?: number;
   demoExplorationStartedAt?: string;
@@ -226,9 +257,11 @@ const isGuidedStep = (value: unknown): value is GuidedOnboardingStep =>
   value === "habit_showcase_instruction" ||
   value === "habit_instruction" ||
   value === "habit_created_confirmation" ||
+  value === "visibility_instruction" ||
   value === "profile_instruction" ||
   value === "appearance_instruction" ||
   value === "theme_instruction" ||
+  value === "wrap_up_instruction" ||
   value === "demo_exploration" ||
   value === "dismissed_preserved" ||
   value === "completed" ||
@@ -320,6 +353,10 @@ export const migrateGuidedOnboardingState = (
       holidayUf:
         typeof candidate.holidayUf === "string" ? candidate.holidayUf : undefined,
       holidayCalendarAddedAt: candidate.holidayCalendarAddedAt,
+      addedCalendarPackGroupId:
+        typeof candidate.addedCalendarPackGroupId === "string"
+          ? candidate.addedCalendarPackGroupId
+          : undefined,
       postOnboardingEventsCreated:
         typeof candidate.postOnboardingEventsCreated === "number"
           ? Math.max(0, candidate.postOnboardingEventsCreated)
@@ -571,7 +608,7 @@ export const reduceGuidedOnboardingState = (
       const nextDateCount = (state.dateItemsCreated ?? 0) + 1;
       return {
         ...state,
-        step: nextDateCount >= 2 ? "edit_instruction" : "date_instruction",
+        step: nextDateCount >= 2 ? "visibility_instruction" : "date_instruction",
         dateItemsCreated: nextDateCount,
         firstDateCreatedAt: state.firstDateCreatedAt ?? action.at ?? nowIso(),
       };
@@ -595,7 +632,7 @@ export const reduceGuidedOnboardingState = (
         ...state,
         step:
           nextPeriodCount >= 2
-            ? "edit_instruction"
+            ? "visibility_instruction"
             : "period_instruction",
         periodItemsCreated: nextPeriodCount,
         firstPeriodCreatedAt:
@@ -614,6 +651,10 @@ export const reduceGuidedOnboardingState = (
       return state.step === "edit_preview"
         ? { ...state, step: "calendar_instruction" }
         : state;
+    case "continue_from_visibility":
+      return state.step === "visibility_instruction"
+        ? { ...state, step: "year_instruction" }
+        : state;
     case "open_calendar":
       return state.step === "calendar_instruction"
         ? { ...state, step: "calendar_selection" }
@@ -622,28 +663,30 @@ export const reduceGuidedOnboardingState = (
       return state.step === "calendar_selection"
         ? { ...state, step: "calendar_instruction" }
         : state;
-    case "calendar_added":
-      return state.step === "calendar_instruction" ||
-        state.step === "calendar_selection"
-        ? {
-            ...state,
-            step: "year_instruction",
-            holidayUf: action.uf ?? state.holidayUf,
-            addedCalendarPackGroupId:
-              action.packGroupId ?? state.addedCalendarPackGroupId,
-            holidayCalendarAddedAt:
-              state.holidayCalendarAddedAt ?? action.at ?? nowIso(),
-          }
-        : state;
-    case "continue_from_year":
-      if (state.step !== "year_instruction") return state;
+    case "calendar_added": {
+      if (state.step !== "calendar_instruction" && state.step !== "calendar_selection") {
+        return state;
+      }
+      const withCalendar: GuidedOnboardingState = {
+        ...state,
+        holidayUf: action.uf ?? state.holidayUf,
+        addedCalendarPackGroupId:
+          action.packGroupId ?? state.addedCalendarPackGroupId,
+        holidayCalendarAddedAt:
+          state.holidayCalendarAddedAt ?? action.at ?? nowIso(),
+      };
       if (action.showPeriodNavigation) {
-        return { ...state, step: "period_navigation_instruction" };
+        return { ...withCalendar, step: "period_navigation_instruction" };
       }
-      if (!state.themeConfirmedAt) {
-        return { ...state, step: "theme_instruction" };
+      if (!withCalendar.themeConfirmedAt) {
+        return { ...withCalendar, step: "theme_instruction" };
       }
-      return buildCompletedState(state, action.at);
+      return buildCompletedState(withCalendar, action.at);
+    }
+    case "continue_from_year":
+      return state.step === "year_instruction"
+        ? { ...state, step: "edit_instruction" }
+        : state;
     case "continue_from_period_navigation":
       if (state.step !== "period_navigation_instruction") return state;
       return {
@@ -699,9 +742,11 @@ export const reduceGuidedOnboardingState = (
           }
         : state;
     case "finish_habit_onboarding":
-      return state.step === "habit_created_confirmation"
-        ? buildCompletedState(state, action.at)
-        : state;
+      if (state.step !== "habit_created_confirmation") return state;
+      return {
+        ...state,
+        step: state.themeConfirmedAt ? "wrap_up_instruction" : "theme_instruction",
+      };
     case "return_to_year":
       return state.step === "habit_created_confirmation"
         ? { ...state, step: "profile_instruction" }
@@ -727,11 +772,20 @@ export const reduceGuidedOnboardingState = (
       if (!action.complete) {
         return { ...state, themeConfirmedAt: action.at ?? nowIso() };
       }
-      return buildCompletedState(
-        { ...state, themeConfirmedAt: state.themeConfirmedAt ?? action.at ?? nowIso() },
-        action.at
-      );
+      return {
+        ...state,
+        themeConfirmedAt: state.themeConfirmedAt ?? action.at ?? nowIso(),
+        step: "wrap_up_instruction",
+      };
     }
+    case "continue_from_wrap_up":
+      return state.step === "wrap_up_instruction"
+        ? buildCompletedState(state, action.at)
+        : state;
+    case "finish_profile_onboarding":
+      return state.step === "profile_instruction"
+        ? buildCompletedState(state, action.at)
+        : state;
     case "complete":
       if (
         state.step !== "year_instruction" &&
@@ -859,17 +913,18 @@ const GUIDED_ONBOARDING_STEP_POSITION: Partial<
   date_category_reveal: 2,
   date_instruction: 2,
   date_details: 2,
-  edit_instruction: 3,
-  edit_preview: 3,
-  calendar_instruction: 4,
-  calendar_selection: 4,
-  year_instruction: 5,
-  period_navigation_instruction: 6,
+  visibility_instruction: 3,
+  year_instruction: 4,
+  edit_instruction: 5,
+  edit_preview: 5,
+  calendar_instruction: 6,
+  calendar_selection: 6,
+  period_navigation_instruction: 7,
 };
 
 export const getGuidedOnboardingTotalSteps = (options: {
   showHabitSteps: boolean;
-}) => (options.showHabitSteps ? 7 : 6);
+}) => (options.showHabitSteps ? 8 : 7);
 
 export const getGuidedOnboardingProgress = (
   step: GuidedOnboardingStep,
@@ -879,6 +934,56 @@ export const getGuidedOnboardingProgress = (
   const current = GUIDED_ONBOARDING_STEP_POSITION[step] ?? total;
   return { current, total };
 };
+
+export type WrapUpCategorySuggestion = {
+  id: string;
+  name: string;
+  color: string;
+};
+
+// Exemplos variados de propósito, pensados para que a pessoa se identifique
+// com pelo menos um. Aparecem no resumo final do guia (wrap_up_instruction)
+// para adotar como categoria de verdade.
+const WRAP_UP_SUGGESTIONS_PERSONAL: WrapUpCategorySuggestion[] = [
+  { id: "wrap-up-saude", name: "Saúde", color: CATEGORY_COLOR_BASE_CORAL },
+  { id: "wrap-up-estudos", name: "Estudos", color: CATEGORY_COLOR_BASE_INDIGO },
+  { id: "wrap-up-casa", name: "Casa", color: CATEGORY_COLOR_BASE_SAND },
+  { id: "wrap-up-financas", name: "Finanças", color: CATEGORY_COLOR_BASE_GREEN },
+  { id: "wrap-up-pets", name: "Pets", color: CATEGORY_COLOR_BASE_VIOLET },
+  { id: "wrap-up-familia", name: "Família", color: CATEGORY_COLOR_BASE_ROSE },
+  { id: "wrap-up-amigos", name: "Amigos", color: CATEGORY_COLOR_BASE_CYAN },
+  { id: "wrap-up-esportes", name: "Esportes", color: CATEGORY_COLOR_BASE_LIME },
+  { id: "wrap-up-leitura", name: "Leitura", color: CATEGORY_COLOR_BASE_AMBER },
+  { id: "wrap-up-culinaria", name: "Culinária", color: CATEGORY_COLOR_BASE_ORANGE },
+  { id: "wrap-up-bem-estar", name: "Bem-estar", color: CATEGORY_COLOR_BASE_MINT },
+  { id: "wrap-up-compras", name: "Compras", color: CATEGORY_COLOR_BASE_PINK },
+  { id: "wrap-up-hobbies", name: "Hobbies", color: CATEGORY_COLOR_BASE_TEAL },
+  { id: "wrap-up-voluntariado", name: "Voluntariado", color: CATEGORY_COLOR_BASE_EMERALD },
+  { id: "wrap-up-beleza", name: "Beleza", color: CATEGORY_COLOR_BASE_PURPLE },
+];
+
+const WRAP_UP_SUGGESTIONS_WORK: WrapUpCategorySuggestion[] = [
+  { id: "wrap-up-reunioes", name: "Reuniões", color: CATEGORY_COLOR_BASE_TEAL },
+  { id: "wrap-up-metas", name: "Metas", color: CATEGORY_COLOR_BASE_ORANGE },
+  { id: "wrap-up-treinamentos", name: "Treinamentos", color: CATEGORY_COLOR_BASE_VIOLET },
+  { id: "wrap-up-projetos", name: "Projetos", color: CATEGORY_COLOR_BASE_INDIGO },
+  { id: "wrap-up-rede", name: "Rede de contatos", color: CATEGORY_COLOR_BASE_PINK },
+  { id: "wrap-up-clientes", name: "Clientes", color: CATEGORY_COLOR_BASE_CORAL },
+  { id: "wrap-up-vendas", name: "Vendas", color: CATEGORY_COLOR_BASE_GREEN },
+  { id: "wrap-up-financeiro", name: "Financeiro", color: CATEGORY_COLOR_BASE_SAND },
+  { id: "wrap-up-marketing", name: "Marketing", color: CATEGORY_COLOR_BASE_ROSE },
+  { id: "wrap-up-recrutamento", name: "Recrutamento", color: CATEGORY_COLOR_BASE_CYAN },
+  { id: "wrap-up-planejamento", name: "Planejamento", color: CATEGORY_COLOR_BASE_AMBER },
+  { id: "wrap-up-viagens", name: "Viagens", color: CATEGORY_COLOR_BASE_SKY },
+  { id: "wrap-up-relatorios", name: "Relatórios", color: CATEGORY_COLOR_BASE_GRAPHITE },
+  { id: "wrap-up-parcerias", name: "Parcerias", color: CATEGORY_COLOR_BASE_LIME },
+  { id: "wrap-up-lancamentos", name: "Lançamentos", color: CATEGORY_COLOR_BASE_MINT },
+];
+
+export const getWrapUpCategorySuggestions = (
+  context: OnboardingContext | undefined
+): WrapUpCategorySuggestion[] =>
+  context === "work" ? WRAP_UP_SUGGESTIONS_WORK : WRAP_UP_SUGGESTIONS_PERSONAL;
 
 export const isGuidedOnboardingInProgress = (state: GuidedOnboardingState) =>
   Boolean(state.startedAt) &&

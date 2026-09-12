@@ -1,19 +1,21 @@
 "use client";
 
 import * as React from "react";
-import { CalendarDays, CircleCheck } from "lucide-react";
+import { ArrowLeft, CalendarDays, CircleCheck } from "lucide-react";
 import { ProfileBar } from "@/components/profile-bar";
 import { CategoryBar } from "@/components/category-bar";
 import { HabitEditList } from "@/components/habits/habit-edit-list";
 import {
   HABIT_COLORS,
-  HabitEditorDialog,
+  HabitEditorFields,
 } from "@/components/habits/habit-editor-dialog";
 import { ProUpgradeDialog } from "@/components/billing/pro-upgrade-dialog";
 import {
   GuidedToolbarNoticeCard,
   type GuidedToolbarNotice,
 } from "@/components/onboarding/guided-toolbar-notice";
+import { WrapUpCategorySuggestions } from "@/components/onboarding/wrap-up-category-suggestions";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -23,7 +25,10 @@ import {
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { useFeedback } from "@/components/ui/feedback-provider";
 import { useHabitsStore } from "@/lib/habits-store";
-import { orderActiveHabits } from "@/lib/habits-prototype";
+import {
+  orderActiveHabits,
+  type OnboardingHabitShowcase,
+} from "@/lib/habits-prototype";
 import { useBilling } from "@/lib/use-billing";
 import type { AnchorPoint } from "@/lib/types";
 import type { ProductDestinationId } from "@/lib/product-navigation";
@@ -68,7 +73,22 @@ type FilterEditPanelProps = {
   highlightedCategoryEffect?: "focus" | "reveal";
   guidedToolbarNotice?: GuidedToolbarNotice | null;
   onDismissGuidedSelection?: () => void;
+  onGuidedWrapUpAction?: () => void;
+  onRemoveWrapUpCategory?: (categoryId: string) => boolean;
   onRequireAuth?: (anchorPoint?: AnchorPoint) => void;
+  // Vitrine de hábitos do ano de exemplo (ver app/page.tsx): mesmos dados
+  // que já aparecem no calendário durante o onboarding. `habitShowcaseLocked`
+  // reflete o passo em que ela ainda é só demonstrativa (nenhum hábito real
+  // criado ainda) — replica showcaseActive/displayShowcase de
+  // habits-prototype.tsx para a aba Hábitos deste painel também compor
+  // vitrine + reais, em vez de só os reais (hoje sempre vazios nesse passo).
+  habitShowcase?: OnboardingHabitShowcase | null;
+  habitShowcaseLocked?: boolean;
+  // Guia de onboarding ainda em andamento (não finalizado nem fechado) —
+  // trava criação e edição de categorias e hábitos aqui dentro, pra não
+  // divergir do que o guia está construindo passo a passo. Contextos ficam
+  // de fora de propósito.
+  guidedOnboardingActive?: boolean;
 };
 
 export function FilterEditPanel({
@@ -87,16 +107,37 @@ export function FilterEditPanel({
   highlightedCategoryEffect,
   guidedToolbarNotice,
   onDismissGuidedSelection,
+  onGuidedWrapUpAction,
+  onRemoveWrapUpCategory,
   onRequireAuth,
+  habitShowcase = null,
+  habitShowcaseLocked = false,
+  guidedOnboardingActive = false,
 }: FilterEditPanelProps) {
   const highlightCreate = guidedToolbarNotice?.target === "calendars";
+  const showWrapUpNotice =
+    guidedToolbarNotice?.target === "wrap-up" && Boolean(onGuidedWrapUpAction);
 
   const [section, setSection] = React.useState<ProductDestinationId>(
     activeDestination
   );
+  const wasOpenRef = React.useRef(false);
+  const wasWrapUpNoticeRef = React.useRef(false);
   React.useEffect(() => {
-    if (open) setSection(activeDestination);
-  }, [open, activeDestination]);
+    // Só re-sincroniza a aba (Anual/Hábitos) com o destino ativo no momento
+    // em que o painel abre, ou quando o aviso de "wrap up" liga (ele exige
+    // Anual) — não a cada mudança de activeDestination enquanto o painel já
+    // está aberto, senão uma navegação de fundo (como o guia de onboarding
+    // trocando de superfície) troca a aba escolhida pela pessoa sem que ela
+    // tenha pedido isso.
+    const justOpened = open && !wasOpenRef.current;
+    const wrapUpNoticeJustAppeared = showWrapUpNotice && !wasWrapUpNoticeRef.current;
+    if (open && (justOpened || wrapUpNoticeJustAppeared)) {
+      setSection(showWrapUpNotice ? "annual" : activeDestination);
+    }
+    wasOpenRef.current = open;
+    wasWrapUpNoticeRef.current = showWrapUpNotice;
+  }, [open, activeDestination, showWrapUpNotice]);
 
   const { notify } = useFeedback();
   const { limits, isPro, isLoading: isBillingLoading, error: billingError } =
@@ -117,15 +158,40 @@ export function FilterEditPanel({
     [activeHabits, selectedHabitId]
   );
 
+  // Mesma composição de habits-prototype.tsx: enquanto travada, a vitrine
+  // substitui a lista (ainda não existe hábito real); depois, soma aos
+  // reais em vez de sumir. Os ids da vitrine não existem no store, então
+  // ficam de fora de tudo que grava (seleção, reordenação).
+  const showcaseHabitIds = React.useMemo(
+    () => new Set((habitShowcase?.habits ?? []).map((habit) => habit.id)),
+    [habitShowcase]
+  );
+  const presentedHabits = React.useMemo(() => {
+    if (!habitShowcase) return activeHabits;
+    return habitShowcaseLocked
+      ? habitShowcase.habits
+      : [...habitShowcase.habits, ...activeHabits];
+  }, [activeHabits, habitShowcase, habitShowcaseLocked]);
+
   const [habitDialogOpen, setHabitDialogOpen] = React.useState(false);
   const [editingHabitId, setEditingHabitId] = React.useState<string | null>(null);
   const [draftName, setDraftName] = React.useState("");
   const [draftColor, setDraftColor] = React.useState<string>(HABIT_COLORS[0]);
   const [upgradeOpen, setUpgradeOpen] = React.useState(false);
 
+  React.useEffect(() => {
+    // Fechar o painel inteiro (Escape, clique fora) não deve deixar a
+    // próxima abertura caindo direto na edição de hábito.
+    if (!open) {
+      setHabitDialogOpen(false);
+      setEditingHabitId(null);
+    }
+  }, [open]);
+
   const creationUnavailable = isBillingLoading || Boolean(billingError);
   const reachedHabitLimit = activeHabits.length >= limits.maxHabits;
-  const habitCreationDisabled = creationUnavailable || (isPro && reachedHabitLimit);
+  const habitCreationDisabled =
+    habitShowcaseLocked || creationUnavailable || (isPro && reachedHabitLimit);
 
   const requestCreateHabit = () => {
     if (creationUnavailable) {
@@ -186,31 +252,74 @@ export function FilterEditPanel({
     setEditingHabitId(null);
   };
 
+  const selectHabit = (habitId: string) => {
+    if (showcaseHabitIds.has(habitId)) return;
+    toggleHabitVisibilityInStore(habitId);
+  };
+
+  const reorderHabits = (orderedIds: string[]) => {
+    reorderHabitsInStore(orderedIds.filter((id) => !showcaseHabitIds.has(id)));
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         data-filter-edit-panel
-        className="flex h-[min(28rem,86dvh)] w-[min(30rem,calc(100vw-3rem))] max-w-[30rem] flex-col overflow-hidden p-0"
+        // Piso igual ao tamanho de sempre; teto só como rede de segurança —
+        // o conteúdo cresce em vez de rolar, e só rola se ultrapassar o teto.
+        className="flex min-h-[min(28rem,86dvh)] max-h-[86dvh] w-[min(30rem,calc(100vw-3rem))] max-w-[30rem] flex-col overflow-hidden p-0"
       >
         <DialogDescription className="sr-only">
           Gerencie contextos, categorias e hábitos.
         </DialogDescription>
         <div className="flex h-full min-h-0 flex-col">
           <header className="grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-3 border-b border-border px-5 py-4">
-            <DialogTitle className="text-base font-semibold">
-              Organizar
-            </DialogTitle>
-            <SegmentedControl
-              value={section}
-              options={ORGANIZE_SECTION_OPTIONS}
-              onValueChange={setSection}
-              aria-label="Visão a organizar"
-              className="min-w-0 justify-self-center"
-            />
-            <span aria-hidden="true" />
+            {habitDialogOpen ? (
+              <div className="col-span-3 flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  className="-ml-1.5"
+                  aria-label="Voltar para Organizar"
+                  onClick={() => setHabitDialogOpen(false)}
+                >
+                  <ArrowLeft className="size-4" />
+                </Button>
+                <DialogTitle className="text-base font-semibold">
+                  {editingHabitId ? "Editar hábito" : "Novo hábito"}
+                </DialogTitle>
+              </div>
+            ) : (
+              <>
+                <DialogTitle className="text-base font-semibold">
+                  Organizar
+                </DialogTitle>
+                <SegmentedControl
+                  value={section}
+                  options={ORGANIZE_SECTION_OPTIONS}
+                  onValueChange={setSection}
+                  aria-label="Visão a organizar"
+                  className="min-w-0 justify-self-center"
+                />
+                <span aria-hidden="true" />
+              </>
+            )}
           </header>
           <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
-            {section === "annual" ? (
+            {habitDialogOpen ? (
+              <HabitEditorFields
+                dialogSemantics={false}
+                name={draftName}
+                color={draftColor}
+                onNameChange={setDraftName}
+                onColorChange={setDraftColor}
+                onSubmit={submitHabit}
+                editing={Boolean(editingHabitId)}
+                onDelete={editingHabitId ? deleteEditingHabit : undefined}
+                onCancel={() => setHabitDialogOpen(false)}
+              />
+            ) : section === "annual" ? (
               <>
                 <section>
                   <ProfileBar
@@ -224,15 +333,40 @@ export function FilterEditPanel({
                 </section>
 
                 <section className="relative mt-6 border-t border-border/55 pt-5">
-                  <CategoryBar
-                    isInlineEditMode
-                    editingProfileId={editingProfileId}
-                    onCreateCategory={onCreateCategory}
-                    onEditCategory={onEditCategory}
-                    highlightedCategoryId={highlightedCategoryId}
-                    highlightedCategoryEffect={highlightedCategoryEffect}
-                    highlightCreate={highlightCreate}
-                  />
+                  {showWrapUpNotice &&
+                  editingProfileId &&
+                  guidedToolbarNotice?.categorySuggestions?.length ? (
+                    <WrapUpCategorySuggestions
+                      profileId={editingProfileId}
+                      suggestions={guidedToolbarNotice.categorySuggestions}
+                      cap={limits.maxCategories}
+                      onRemoveCategory={onRemoveWrapUpCategory}
+                    >
+                      <CategoryBar
+                        isInlineEditMode
+                        editingProfileId={editingProfileId}
+                        onCreateCategory={onCreateCategory}
+                        onEditCategory={onEditCategory}
+                        highlightedCategoryId={highlightedCategoryId}
+                        highlightedCategoryEffect={highlightedCategoryEffect}
+                        locked={guidedOnboardingActive}
+                      />
+                    </WrapUpCategorySuggestions>
+                  ) : (
+                    <CategoryBar
+                      isInlineEditMode
+                      editingProfileId={editingProfileId}
+                      onCreateCategory={onCreateCategory}
+                      onEditCategory={onEditCategory}
+                      highlightedCategoryId={highlightedCategoryId}
+                      highlightedCategoryEffect={highlightedCategoryEffect}
+                      highlightCreate={highlightCreate}
+                      // Neste passo (calendar_instruction) o próprio guia
+                      // manda usar o "+" — travar aqui bloquearia a ação que
+                      // ele está pedindo.
+                      locked={guidedOnboardingActive && !highlightCreate}
+                    />
+                  )}
                   {highlightCreate && !categoryCreateOpen && onDismissGuidedSelection ? (
                     <GuidedToolbarNoticeCard
                       notice={guidedToolbarNotice!}
@@ -248,31 +382,37 @@ export function FilterEditPanel({
             ) : (
               <section>
                 <HabitEditList
-                  habits={activeHabits}
+                  habits={presentedHabits}
                   selectedHabit={selectedHabit}
                   creationDisabled={habitCreationDisabled}
-                  onSelectHabit={toggleHabitVisibilityInStore}
+                  locked={guidedOnboardingActive}
+                  onSelectHabit={selectHabit}
                   onRequestCreate={requestCreateHabit}
                   onEditHabit={requestEditHabit}
-                  onReorderHabits={reorderHabitsInStore}
+                  onReorderHabits={reorderHabits}
                 />
               </section>
             )}
+            {showWrapUpNotice ? (
+              // Fica fora das duas seções (Anual/Hábitos) de propósito: é o
+              // resumo do guia inteiro, não de uma aba só — trocar de aba
+              // não pode fazer o card sumir. No fluxo normal do documento
+              // (não flutuando por cima), o conteúdo cresce e empurra o
+              // card para baixo, em vez de arriscar sobrepor o que ele
+              // descreve.
+              <div className="mt-4">
+                <GuidedToolbarNoticeCard
+                  notice={guidedToolbarNotice!}
+                  onClose={() => onDismissGuidedSelection?.()}
+                  onAction={onGuidedWrapUpAction}
+                  inline
+                />
+              </div>
+            ) : null}
           </div>
         </div>
       </DialogContent>
 
-      <HabitEditorDialog
-        open={habitDialogOpen}
-        name={draftName}
-        color={draftColor}
-        onOpenChange={setHabitDialogOpen}
-        onNameChange={setDraftName}
-        onColorChange={setDraftColor}
-        onSubmit={submitHabit}
-        editing={Boolean(editingHabitId)}
-        onDelete={editingHabitId ? deleteEditingHabit : undefined}
-      />
       <ProUpgradeDialog
         open={upgradeOpen}
         onOpenChange={setUpgradeOpen}

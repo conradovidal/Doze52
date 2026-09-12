@@ -35,7 +35,7 @@ export default defineConfig({
   projects: [...mobileProjects, ...desktopProjects],
   webServer: {
     command:
-      "NEXT_PUBLIC_FEATURE_HABITS_PROTOTYPE=true VERCEL_ENV=preview NEXT_PUBLIC_APP_ENV=local npx next build --webpack && NEXT_PUBLIC_FEATURE_HABITS_PROTOTYPE=true VERCEL_ENV=preview NEXT_PUBLIC_APP_ENV=local npm run start -- --hostname 127.0.0.1 --port 3200",
+      "VERCEL_ENV=preview NEXT_PUBLIC_APP_ENV=local npx next build --webpack && VERCEL_ENV=preview NEXT_PUBLIC_APP_ENV=local npm run start -- --hostname 127.0.0.1 --port 3200",
     url: "http://127.0.0.1:3200",
     reuseExistingServer: false,
     timeout: 120_000,

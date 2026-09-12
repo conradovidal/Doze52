@@ -16,13 +16,58 @@ export type GuidedToolbarNotice = {
     | "habit-showcase"
     | "habit"
     | "habit-created"
+    | "visibility"
     | "profile"
     | "appearance"
-    | "theme";
+    | "theme"
+    | "wrap-up"
+    // Passos da jornada curta e própria do mobile (lib/mobile-habits-onboarding.ts).
+    // Não fazem parte do tour desktop.
+    | "mobile-intro"
+    | "mobile-goto-annual"
+    | "mobile-organize"
+    | "mobile-today";
   title: string;
   instruction: string;
   actionLabel?: string;
   stepLabel?: string;
+  // Só preenchido no passo de resumo (target "wrap-up"): categorias-exemplo
+  // que a pessoa pode arrastar para o ano dela.
+  categorySuggestions?: { id: string; name: string; color: string }[];
+};
+
+const OPEN_OVERLAY_SELECTOR = '[data-slot="dialog-overlay"][data-state="open"]';
+const OVERLAY_LAYER_SELECTOR =
+  '[data-slot="dialog-content"], [data-slot="popover-content"]';
+
+// O card do guia só fica acima do scrim quando aponta para algo dentro do
+// modal aberto. Nos outros casos ele escurece junto com a página, em vez de
+// flutuar iluminado sobre um conteúdo que já saiu de foco.
+const useLayeredAboveOverlay = (anchorSelector?: string) => {
+  const [aboveOverlay, setAboveOverlay] = React.useState(true);
+
+  React.useEffect(() => {
+    const update = () => {
+      if (!document.querySelector(OPEN_OVERLAY_SELECTOR)) {
+        setAboveOverlay(true);
+        return;
+      }
+      const anchor = anchorSelector
+        ? document.querySelector<HTMLElement>(anchorSelector)
+        : null;
+      setAboveOverlay(Boolean(anchor?.closest(OVERLAY_LAYER_SELECTOR)));
+    };
+    update();
+    const observer = new MutationObserver(update);
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributeFilter: ["data-state"],
+    });
+    return () => observer.disconnect();
+  }, [anchorSelector]);
+
+  return aboveOverlay;
 };
 
 type AnchorPlacement =
@@ -37,6 +82,8 @@ export function GuidedToolbarNoticeCard({
   notice,
   onClose,
   onAction,
+  secondaryLabel,
+  onSecondaryAction,
   align = "start",
   placement = "below",
   portaled = false,
@@ -44,10 +91,17 @@ export function GuidedToolbarNoticeCard({
   anchorMultiple = false,
   anchorPlacement = "below-center",
   portalTargetSelector,
+  inline = false,
+  mobilePlacement = "top",
 }: {
   notice: GuidedToolbarNotice;
   onClose: () => void;
   onAction?: () => void;
+  // Link de texto secundário, abaixo do botão principal — hoje só usado
+  // pelo passo de abertura do mobile, para oferecer "Entrar na minha conta"
+  // sem competir com o "Continuar".
+  secondaryLabel?: string;
+  onSecondaryAction?: () => void;
   align?: "start" | "end";
   placement?: "below" | "right" | "above" | "viewport" | "panel";
   portaled?: boolean;
@@ -55,10 +109,26 @@ export function GuidedToolbarNoticeCard({
   anchorMultiple?: boolean;
   anchorPlacement?: AnchorPlacement;
   portalTargetSelector?: string;
+  /**
+   * Renderiza o card no fluxo normal do documento em vez de `fixed` no topo
+   * da tela. Para quando o card precisa empurrar o conteúdo abaixo dele em
+   * vez de flutuar por cima do próprio contexto que descreve (ex.: os cards
+   * de onboarding de Hábitos no mobile, que ficavam cobrindo a vitrine de
+   * exemplo e o botão "+" que eles mesmos explicam).
+   */
+  inline?: boolean;
+  /**
+   * Onde o card `fixed` (não `inline`) fica no mobile: "top" (padrão, perto
+   * do topo) ou "bottom" (perto da navegação inferior) — para quando o alvo
+   * destacado é um botão de lá (ex.: o link Anual da nav), e deixar o card
+   * grudado no topo criaria distância entre a explicação e o que ela aponta.
+   */
+  mobilePlacement?: "top" | "bottom";
 }) {
   const [mounted, setMounted] = React.useState(false);
   const cardRef = React.useRef<HTMLElement | null>(null);
   const [anchorPosition, setAnchorPosition] = React.useState<React.CSSProperties | null>(null);
+  const aboveOverlay = useLayeredAboveOverlay(anchorSelector);
   React.useEffect(() => setMounted(true), []);
 
   React.useLayoutEffect(() => {
@@ -167,26 +237,39 @@ export function GuidedToolbarNoticeCard({
       aria-label="Instrução do guia inicial"
       aria-live="polite"
       className={cn(
-        "inverse-product-surface fixed top-[calc(env(safe-area-inset-top,0px)+4.6rem)] left-3 z-[90] w-[min(22rem,calc(100vw-1.5rem))] rounded-2xl border border-border bg-card p-3.5 text-left text-card-foreground shadow-[0_24px_60px_-20px_rgba(15,23,42,0.85)] md:absolute",
-        anchorSelector && portaled
-          ? cn(
-              portalTargetSelector ? "md:absolute" : "md:fixed",
-              "md:translate-x-0",
-              !anchorPosition && "md:opacity-0"
+        "inverse-product-surface w-full rounded-2xl border border-border bg-card p-3.5 text-left text-card-foreground shadow-[0_24px_60px_-20px_rgba(15,23,42,0.85)]",
+        inline
+          ? "relative"
+          : cn(
+              "fixed left-3 w-[min(22rem,calc(100vw-1.5rem))] md:absolute",
+              mobilePlacement === "bottom"
+                ? "bottom-[calc(env(safe-area-inset-bottom,0px)+4.5rem)]"
+                : "top-[calc(env(safe-area-inset-top,0px)+4.6rem)]",
+              aboveOverlay ? "z-[90]" : "z-40",
+              anchorSelector && portaled
+                ? cn(
+                    portalTargetSelector ? "md:absolute" : "md:fixed",
+                    "md:translate-x-0",
+                    !anchorPosition && "md:opacity-0"
+                  )
+                : placement === "viewport"
+                ? "md:fixed md:top-auto md:bottom-6 md:left-1/2 md:-translate-x-1/2"
+                : placement === "panel"
+                  ? "md:absolute md:top-auto md:right-6 md:bottom-6 md:left-auto md:translate-x-0"
+                : placement === "right"
+                ? "md:top-0 md:left-[calc(100%+0.75rem)]"
+                : placement === "above"
+                  ? "md:top-auto md:bottom-[calc(100%+0.6rem)] md:left-1/2 md:-translate-x-1/2"
+                  : "md:top-[calc(100%+0.6rem)]",
+              placement === "below" &&
+                (align === "start" ? "md:left-0" : "md:right-0 md:left-auto")
             )
-          : placement === "viewport"
-          ? "md:fixed md:top-auto md:bottom-6 md:left-1/2 md:-translate-x-1/2"
-          : placement === "panel"
-            ? "md:absolute md:top-auto md:right-6 md:bottom-6 md:left-auto md:translate-x-0"
-          : placement === "right"
-          ? "md:top-0 md:left-[calc(100%+0.75rem)]"
-          : placement === "above"
-            ? "md:top-auto md:bottom-[calc(100%+0.6rem)] md:left-1/2 md:-translate-x-1/2"
-            : "md:top-[calc(100%+0.6rem)]",
-        placement === "below" &&
-          (align === "start" ? "md:left-0" : "md:right-0 md:left-auto")
       )}
-      style={anchorSelector && portaled ? (anchorPosition ?? undefined) : undefined}
+      style={
+        !inline && anchorSelector && portaled
+          ? (anchorPosition ?? undefined)
+          : undefined
+      }
     >
       <div className="pr-7">
         <div
@@ -227,6 +310,15 @@ export function GuidedToolbarNoticeCard({
           <Check className="size-4" aria-hidden="true" />
           {notice.actionLabel}
         </Button>
+      ) : null}
+      {secondaryLabel && onSecondaryAction ? (
+        <button
+          type="button"
+          className="mt-2.5 block w-full text-center text-xs font-semibold text-primary underline underline-offset-2"
+          onClick={onSecondaryAction}
+        >
+          {secondaryLabel}
+        </button>
       ) : null}
     </aside>
   );

@@ -208,6 +208,9 @@ function AccountAvatar({
 }
 
 type AppUtilityPanelProps = {
+  onOpenAnnualHelp?: () => void;
+  continuityStatus?: string;
+  onRetryContinuity?: () => void;
   open: boolean;
   section: UtilityPanelSection;
   isMobile: boolean;
@@ -217,9 +220,19 @@ type AppUtilityPanelProps = {
   onOpenAuthDialog: () => void;
   onDismissGuidedNotice?: () => void;
   onGuidedAppearanceOpen?: () => void;
+  /**
+   * Força o formulário de conta a abrir em "Cadastro" em vez do padrão
+   * "Login" — usado pela jornada própria do mobile (goto_profile em
+   * lib/mobile-habits-onboarding.ts): quem chega até aqui por ela ainda não
+   * tem conta.
+   */
+  authInitialMode?: "login" | "signup";
 };
 
 export function AppUtilityPanel({
+  onOpenAnnualHelp,
+  continuityStatus,
+  onRetryContinuity,
   open,
   section,
   isMobile,
@@ -229,6 +242,7 @@ export function AppUtilityPanel({
   onOpenAuthDialog,
   onDismissGuidedNotice,
   onGuidedAppearanceOpen,
+  authInitialMode = "login",
 }: AppUtilityPanelProps) {
   const router = useRouter();
   const { notify } = useFeedback();
@@ -474,6 +488,7 @@ export function AppUtilityPanel({
               </div>
             )}
             <p className="mt-1 text-sm text-muted-foreground">{email}</p>
+            {continuityStatus ? <div role="status" aria-label="Sincronização de hábitos" className="mt-3 text-sm text-muted-foreground">{continuityStatus}{onRetryContinuity ? <Button variant="ghost" size="sm" onClick={onRetryContinuity}>Tentar novamente</Button> : null}</div> : null}
 
             {standalone ? (
               <button
@@ -510,7 +525,11 @@ export function AppUtilityPanel({
           </div>
         ) : (
           <div className="mx-auto max-w-sm text-left">
-            <AuthForm open={open} onSuccess={() => onOpenChange(false)} />
+            <AuthForm
+              open={open}
+              initialMode={authInitialMode}
+              onSuccess={() => onOpenChange(false)}
+            />
           </div>
         );
       case "plan":
@@ -554,6 +573,7 @@ export function AppUtilityPanel({
       case "help":
         return (
           <div className="max-w-xl rounded-2xl border border-border bg-card p-2">
+            {onOpenAnnualHelp ? <PanelAction icon={HelpCircle} onClick={onOpenAnnualHelp}>Introdução ao Anual</PanelAction> : null}
             {session ? <PanelAction icon={Bug} onClick={openFeedback}>Enviar feedback</PanelAction> : null}
             <a href={`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent("Dúvida: ")}`} className="flex h-11 w-full items-center gap-3 rounded-xl px-3 text-sm font-medium text-foreground hover:bg-muted/60">
               <CircleHelp className="size-4 shrink-0 text-muted-foreground" />
@@ -578,7 +598,7 @@ export function AppUtilityPanel({
         const Icon = topic.icon;
         const selected = activeSection === topic.id;
         return (
-          <button key={topic.id} type="button" aria-current={selected ? "page" : undefined} data-onboarding-appearance-topic={topic.id === "account" ? "true" : undefined} className={cn("flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60", selected ? "bg-foreground text-background" : "text-muted-foreground hover:bg-muted hover:text-foreground", guidedAppearanceNotice && topic.id === "account" && "guided-control-target")} onClick={() => { setActiveSection(topic.id); if (topic.id === "account") onGuidedAppearanceOpen?.(); }}>
+          <button key={topic.id} type="button" aria-current={selected ? "page" : undefined} data-onboarding-appearance-topic={topic.id === "account" ? "true" : undefined} className={cn("flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60", selected ? "bg-foreground text-background" : "text-muted-foreground hover:bg-muted hover:text-foreground", guidedAppearanceNotice && topic.id === "account" && "product-spotlight-target")} onClick={() => { setActiveSection(topic.id); if (topic.id === "account") onGuidedAppearanceOpen?.(); }}>
             <Icon className="size-4 shrink-0" /><span className="min-w-0 truncate text-sm font-semibold">{topic.label}</span>
           </button>
         );

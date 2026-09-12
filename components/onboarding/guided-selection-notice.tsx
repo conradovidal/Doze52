@@ -22,27 +22,23 @@ export function GuidedCalendarNotice({
       data-guided-selection-mode={notice.mode}
       aria-label="Instrução do guia inicial"
       aria-live="polite"
-      className="inverse-product-surface flex items-start gap-3.5 bg-card px-4 py-4 text-card-foreground sm:px-5"
+      className="inverse-product-surface flex h-10 items-center gap-2.5 bg-card px-3 text-card-foreground"
     >
-      <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/12 text-primary">
-        <CalendarDays className="size-5" aria-hidden="true" />
+      <div className="flex size-6 shrink-0 items-center justify-center rounded-lg bg-primary/12 text-primary">
+        <CalendarDays className="size-3.5" aria-hidden="true" />
       </div>
-      <div
-        key={`${notice.title}:${notice.instruction}`}
-        className="min-w-0 flex-1 animate-in fade-in slide-in-from-bottom-1 duration-300 motion-reduce:animate-none"
+      <p
+        key={notice.title}
+        className="min-w-0 flex-1 truncate text-sm font-semibold leading-5 animate-in fade-in slide-in-from-bottom-1 duration-300 motion-reduce:animate-none"
+        title={notice.title}
       >
-        <p className="max-w-[30rem] text-balance text-base font-semibold leading-5.5 sm:text-lg">
-          {notice.title}
-        </p>
-        <p className="mt-1 text-sm leading-5 text-muted-foreground">
-          {notice.instruction}
-        </p>
-      </div>
+        {notice.title}
+      </p>
       <Button
         type="button"
         variant="ghost"
         size="icon-xs"
-        className="-mt-0.5 -mr-1 rounded-full"
+        className="shrink-0 rounded-full"
         aria-label="Encerrar guia inicial"
         onClick={onClose}
       >

@@ -35,9 +35,14 @@ import {
   CATEGORY_COLOR_BASE_GREEN,
   CATEGORY_COLOR_BASE_ORANGE,
   CATEGORY_COLOR_BASE_RED,
+  CATEGORY_COLOR_BASE_TERRA,
   CATEGORY_COLOR_BASE_VIOLET,
 } from "@/lib/category-palette";
 
+// TERRA entra aqui porque é a cor padrão de "Datas importantes" (categoria
+// genérica de data — ver getOnboardingCategoryDefinition em lib/store.ts);
+// sem ela nesta lista, nenhuma amostra aparecia marcada como selecionada
+// para essa sugestão, mesmo já tendo uma cor atribuída.
 const ONBOARDING_QUICK_COLORS = [
   CATEGORY_COLOR_BASE_AMBER,
   CATEGORY_COLOR_BASE_ORANGE,
@@ -47,6 +52,7 @@ const ONBOARDING_QUICK_COLORS = [
   CATEGORY_COLOR_BASE_CYAN,
   CATEGORY_COLOR_BASE_GREEN,
   CATEGORY_COLOR_BASE_GRAPHITE,
+  CATEGORY_COLOR_BASE_TERRA,
 ] as const;
 
 const getDefaultChoiceColors = (
@@ -296,7 +302,7 @@ export const getGuidedSelectionNotice = ({
     return {
       mode: "period",
       title: copy.title,
-      instruction: `${formatDate(draft.startDate)} — ${formatDate(draft.endDate)}`,
+      instruction: `${formatDate(draft.startDate)} a ${formatDate(draft.endDate)}`,
     };
   }
   return null;
@@ -314,6 +320,74 @@ export function GuidedOnboardingPanel({
   onSaveDraft,
   onOpenLogin,
 }: GuidedOnboardingPanelProps) {
+  const panelRef = React.useRef<HTMLElement | null>(null);
+  const [desktopTop, setDesktopTop] = React.useState<number | null>(null);
+  const [desktopMaxHeight, setDesktopMaxHeight] = React.useState<number | null>(null);
+  React.useLayoutEffect(() => {
+    if (isMobile) return;
+    const panel = panelRef.current;
+    if (!panel) return;
+    let resizeObserver: ResizeObserver | null = null;
+    let observedGrid: HTMLElement | null = null;
+    const update = () => {
+      const grid = Array.from(
+        document.querySelectorAll<HTMLElement>("[data-year-grid-frame]")
+      ).find((element) => {
+        const rect = element.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+      });
+      if (!grid) return;
+      if (grid !== observedGrid) {
+        if (observedGrid) resizeObserver?.unobserve(observedGrid);
+        observedGrid = grid;
+        resizeObserver?.observe(grid);
+      }
+      const gridRect = grid.getBoundingClientRect();
+      const visibleTop = Math.max(12, gridRect.top);
+      const visibleBottom = Math.min(window.innerHeight - 12, gridRect.bottom);
+      const availableHeight = Math.max(240, visibleBottom - visibleTop);
+      const panelHeight = Math.min(panel.scrollHeight, availableHeight);
+      const center = Math.min(
+        Math.max((visibleTop + visibleBottom) / 2, visibleTop + panelHeight / 2),
+        visibleBottom - panelHeight / 2
+      );
+      setDesktopTop(center);
+      setDesktopMaxHeight(availableHeight);
+    };
+    let settleFrame = 0;
+    let settleCount = 0;
+    const settle = () => {
+      update();
+      settleCount += 1;
+      if (settleCount < 36) settleFrame = requestAnimationFrame(settle);
+    };
+    const scheduleSettle = () => {
+      cancelAnimationFrame(settleFrame);
+      settleCount = 0;
+      settleFrame = requestAnimationFrame(settle);
+    };
+    resizeObserver = new ResizeObserver(scheduleSettle);
+    resizeObserver.observe(panel);
+    scheduleSettle();
+    const mutationObserver = new MutationObserver(scheduleSettle);
+    mutationObserver.observe(document.querySelector("main") ?? document.body, {
+      childList: true,
+      subtree: true,
+    });
+    window.addEventListener('resize', scheduleSettle);
+    window.addEventListener('scroll', update, { capture: true, passive: true });
+    document.addEventListener('transitionend', update, true);
+    document.addEventListener('animationend', update, true);
+    return () => {
+      resizeObserver?.disconnect();
+      mutationObserver.disconnect();
+      cancelAnimationFrame(settleFrame);
+      window.removeEventListener('resize', scheduleSettle);
+      window.removeEventListener('scroll', update, true);
+      document.removeEventListener('transitionend', update, true);
+      document.removeEventListener('animationend', update, true);
+    };
+  }, [isMobile, state.step]);
   const [title, setTitle] = React.useState("");
   const [showExternalDates, setShowExternalDates] = React.useState(false);
   const [selectedCategoryChoice, setSelectedCategoryChoice] =
@@ -466,6 +540,7 @@ export function GuidedOnboardingPanel({
             compact
             value={selectedCategoryColor}
             colors={ONBOARDING_QUICK_COLORS}
+            columns={ONBOARDING_QUICK_COLORS.length}
             disabled={!selectedCategoryChoice}
             onChange={(color) => {
               if (!selectedCategoryChoice) return;
@@ -509,7 +584,7 @@ export function GuidedOnboardingPanel({
             Por qual contexto você quer começar?
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Escolha por onde começar — dá para alternar entre eles depois.
+            Dá para alternar entre eles depois.
           </p>
           <div className="mt-4 grid gap-2">
             {CONTEXT_OPTIONS.map((option) => {
@@ -605,7 +680,7 @@ export function GuidedOnboardingPanel({
             <p className="mt-1 text-xs font-medium text-primary">
               {draft.startDate === draft.endDate
                 ? formatDate(draft.startDate)
-                : `${formatDate(draft.startDate)} — ${formatDate(draft.endDate)}`}
+                : `${formatDate(draft.startDate)} a ${formatDate(draft.endDate)}`}
             </p>
           </div>
           <Input
@@ -684,10 +759,12 @@ export function GuidedOnboardingPanel({
   if (!content) return null;
   return (
     <section
+      ref={panelRef}
       data-onboarding-panel
       data-guided-onboarding-step={state.step}
       aria-label="Guia inicial do Doze 52"
       aria-live="polite"
+      style={!isMobile && desktopTop !== null ? { top: desktopTop, maxHeight: desktopMaxHeight ?? undefined } : undefined}
       className="inverse-product-surface fixed top-[calc(env(safe-area-inset-top,0px)+4.6rem)] left-1/2 z-50 max-h-[calc(100dvh-6rem)] w-[min(42rem,calc(100vw-.75rem))] -translate-x-1/2 overflow-y-auto rounded-[1.5rem] border border-border bg-card p-4 text-card-foreground shadow-[0_30px_95px_-20px_rgba(15,23,42,0.82)] animate-in fade-in-0 duration-200 motion-reduce:animate-none sm:p-5 md:top-1/2 md:w-[30rem] md:-translate-y-1/2"
     >
       {header}

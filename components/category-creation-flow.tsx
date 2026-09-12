@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ArrowRight, CalendarDays, Tags } from "lucide-react";
+import { ArrowLeft, ArrowRight, CalendarDays, Tags } from "lucide-react";
 import { CalendarPackLauncher } from "@/components/calendar-packs/calendar-pack-launcher";
 import { CategoryManager } from "@/components/category-manager";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import {
 import type { CalendarPack } from "@/lib/calendar-packs/types";
 import { getCalendarPackGroupId } from "@/lib/calendar-packs/import";
 import { useStore } from "@/lib/store";
+import { cn } from "@/lib/utils";
 
 type CategoryCreationStep = "choice" | "custom" | "calendar-packs";
 
@@ -30,6 +31,7 @@ export function CategoryCreationFlow({
   onCalendarOpen,
   onCalendarClose,
   onCalendarImported,
+  onBack,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -42,6 +44,7 @@ export function CategoryCreationFlow({
   onCalendarOpen?: () => void;
   onCalendarClose?: () => void;
   onCalendarImported?: (pack: CalendarPack) => void;
+  onBack?: () => void;
 }) {
   const profiles = useStore((state) => state.profiles);
   const [step, setStep] = React.useState<CategoryCreationStep>("choice");
@@ -79,13 +82,37 @@ export function CategoryCreationFlow({
           if (!nextOpen) closeFlow();
         }}
       >
-        <DialogContent className="p-5 sm:max-w-[480px] sm:p-6">
-          <DialogHeader className="text-left">
-            <DialogTitle>Adicionar categoria</DialogTitle>
-            <DialogDescription>Escolha o que deseja adicionar.</DialogDescription>
+        {/* Mesmo recorte do painel Organizar: daqui a pessoa vê o conteúdo do
+            painel ser substituído, não um segundo modal por cima do primeiro. */}
+        <DialogContent
+          showCloseButton={!onBack}
+          className="flex h-[min(28rem,86dvh)] w-[min(30rem,calc(100vw-3rem))] max-w-[30rem] flex-col overflow-hidden p-0"
+        >
+          <DialogHeader className="shrink-0 space-y-0 border-b border-border px-5 py-4 text-left">
+            <div className="flex items-center gap-2">
+              {onBack ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  className="-ml-1.5"
+                  aria-label="Voltar para Organizar"
+                  onClick={onBack}
+                >
+                  <ArrowLeft className="size-4" />
+                </Button>
+              ) : null}
+              <DialogTitle className="text-base font-semibold">
+                Adicionar categoria
+              </DialogTitle>
+            </div>
+            <DialogDescription className="sr-only">
+              Escolha o que deseja adicionar.
+            </DialogDescription>
           </DialogHeader>
 
-          <div className="grid gap-2 sm:grid-cols-2">
+          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
+            <div className="grid gap-2 sm:grid-cols-2">
             <Button
               type="button"
               variant="outline"
@@ -110,7 +137,13 @@ export function CategoryCreationFlow({
               data-onboarding-calendar-choice={
                 guidedCalendarSelection ? "true" : undefined
               }
-              className="grid h-auto min-h-24 grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1 rounded-xl p-4 text-left"
+              className={cn(
+                "grid h-auto min-h-24 grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1 rounded-xl p-4 text-left",
+                // O card mantém a aparência original (mesmo componente do
+                // vizinho) — só a borda fica um pouco mais grossa, para
+                // sugerir "é este" sem recorrer a fundo/anel.
+                guidedCalendarSelection && "border-2 border-foreground/30"
+              )}
               disabled={!profile}
               onClick={chooseCalendarPacks}
             >
@@ -120,19 +153,12 @@ export function CategoryCreationFlow({
                   Adicionar calendário pronto
                 </span>
                 <span className="mt-1 block whitespace-normal text-xs font-normal leading-4 text-muted-foreground">
-                  Assine ou gerencie calendários disponíveis no{" "}
-                  <span className="inline-flex items-center whitespace-nowrap">
-                    <span>Doze 52.</span>
-                    {guidedCalendarSelection ? (
-                      <span className="ml-1.5 inline-flex rounded-full bg-primary px-2 py-0.5 align-middle text-[9px] font-semibold uppercase leading-none tracking-[0.08em] text-primary-foreground">
-                        Clique aqui
-                      </span>
-                    ) : null}
-                  </span>
+                  Assine ou gerencie calendários disponíveis no Doze 52.
                 </span>
               </span>
               <ArrowRight className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
             </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

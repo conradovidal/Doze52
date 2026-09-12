@@ -35,7 +35,6 @@ import {
   GuidedToolbarNoticeCard,
   type GuidedToolbarNotice,
 } from "@/components/onboarding/guided-toolbar-notice";
-import { GuidedTargetOutline } from "@/components/onboarding/guided-target-outline";
 import { HabitEditList } from "@/components/habits/habit-edit-list";
 import { getCategoryColorToken } from "@/lib/category-palette";
 import {
@@ -54,10 +53,7 @@ import { useTheme } from "@/lib/theme";
 import type { Habit } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import {
-  DESKTOP_CONTROL_DIVIDER_CLASS,
-  DESKTOP_CONTROL_GRID_GAP_CLASS,
   DESKTOP_CONTROL_MAX_WIDTH_CLASS,
-  DESKTOP_CONTROL_REGION_TOP_GAP_CLASS,
   DESKTOP_CONTROL_ROW_GAP_CLASS,
 } from "@/lib/desktop-control-layout";
 
@@ -266,6 +262,11 @@ export function HabitControls({
     },
     []
   );
+  // Um card de onboarding apontando pro "+" ou pra vitrine não pode conviver
+  // com a lista recolhida — força aberto enquanto o guia (desktop ou a
+  // jornada própria do mobile) estiver instruindo algo aqui, mesmo que a
+  // pessoa tenha recolhido antes.
+  const effectiveExpanded = expanded || isEditing || Boolean(guidedNotice);
   const controlsId = React.useId();
   const [activeDrag, setActiveDrag] = React.useState<DragState | null>(null);
   const [draftOrderIds, setDraftOrderIds] = React.useState<string[] | null>(null);
@@ -339,6 +340,7 @@ export function HabitControls({
       className={cn(
         "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-border bg-card text-foreground shadow-none transition-all duration-[160ms] ease-[cubic-bezier(0.22,1,0.36,1)] hover:border-foreground/20 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45",
         mobile && "h-10 w-full rounded-[8px]",
+        guidedNotice?.target === "habit" && "product-spotlight-target",
       )}
       onClick={onRequestCreate}
     >
@@ -507,10 +509,7 @@ export function HabitControls({
           : cn(
               "mx-auto flex w-full flex-col items-center",
               DESKTOP_CONTROL_MAX_WIDTH_CLASS,
-              DESKTOP_CONTROL_DIVIDER_CLASS,
-              DESKTOP_CONTROL_ROW_GAP_CLASS,
-              DESKTOP_CONTROL_REGION_TOP_GAP_CLASS,
-              DESKTOP_CONTROL_GRID_GAP_CLASS
+              DESKTOP_CONTROL_ROW_GAP_CLASS
             )
       )}
     >
@@ -530,13 +529,16 @@ export function HabitControls({
             <button
               type="button"
               className="inline-flex h-8 w-8 items-center justify-center rounded-[10px] border border-border bg-card text-foreground/70 shadow-none transition-[background-color,border-color,color,box-shadow,transform] duration-150 ease-out hover:border-foreground/18 hover:bg-muted hover:text-foreground active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45"
-              aria-expanded={expanded}
+              aria-expanded={effectiveExpanded}
               aria-controls={controlsId}
-              aria-label={expanded ? "Recolher hábitos" : "Mostrar hábitos"}
+              aria-label={effectiveExpanded ? "Recolher hábitos" : "Mostrar hábitos"}
               onClick={() => setExpandedPersisted((current) => !current)}
             >
               <ChevronDown
-                className={cn("size-4 transition-transform duration-300", expanded && "rotate-180")}
+                className={cn(
+                  "size-4 transition-transform duration-300",
+                  effectiveExpanded && "rotate-180"
+                )}
               />
             </button>
           </span>
@@ -594,10 +596,10 @@ export function HabitControls({
       {mobile ? (
         <CollapsibleControlRegion
           id={controlsId}
-          expanded={expanded || isEditing}
+          expanded={effectiveExpanded}
           contentClassName={cn(
             "px-2",
-            expanded ? "border-t border-border/55 py-2" : "border-0 py-0"
+            effectiveExpanded ? "border-t border-border/55 py-2" : "border-0 py-0"
           )}
         >
           {isEditing ? (
@@ -618,24 +620,19 @@ export function HabitControls({
       ) : null}
 
       {guidedNotice && onDismissGuidedNotice ? (
-        <>
-          {guidedNotice.target === "habit" ? (
-            <GuidedTargetOutline selector="[data-onboarding-habit-create]" />
-          ) : null}
-          <GuidedToolbarNoticeCard
-            notice={guidedNotice}
-            onClose={onDismissGuidedNotice}
-            onAction={onGuidedNoticeAction}
-            placement="viewport"
-            portaled
-            anchorSelector={
-              guidedNotice.target === "habit"
-                ? "[data-onboarding-habit-create]"
-                : "[data-onboarding-habit-controls]"
-            }
-            anchorPlacement="below-center"
-          />
-        </>
+        <GuidedToolbarNoticeCard
+          notice={guidedNotice}
+          onClose={onDismissGuidedNotice}
+          onAction={onGuidedNoticeAction}
+          placement="viewport"
+          portaled
+          anchorSelector={
+            guidedNotice.target === "habit"
+              ? "[data-onboarding-habit-create]"
+              : "[data-onboarding-habit-controls]"
+          }
+          anchorPlacement="below-center"
+        />
       ) : null}
     </section>
   );

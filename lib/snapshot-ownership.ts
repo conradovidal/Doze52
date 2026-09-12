@@ -1,4 +1,5 @@
 import {
+  isOnboardingPersonalDemoGroup,
   getOnboardingDefaultCategories,
   getOnboardingDefaultProfiles,
   ONBOARDING_DEFAULT_CATEGORY_ID,
@@ -91,4 +92,11 @@ export const materializeUserOwnedSnapshot = (
       userId: undefined,
     })),
   };
+};
+
+// Example categories are presentation data, never part of the account snapshot.
+export const withoutOnboardingExamples = (snapshot: CalendarSnapshot): CalendarSnapshot => {
+  const categories = snapshot.categories.filter((c) => !isOnboardingPersonalDemoGroup(c.calendarPackGroupId));
+  const ids = new Set(categories.map((c) => c.id));
+  return { ...snapshot, categories, events: snapshot.events.filter((e) => ids.has(e.categoryId) && !isOnboardingPersonalDemoGroup(e.calendarPackGroupId)) };
 };

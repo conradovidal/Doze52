@@ -1,5 +1,7 @@
 "use client";
 
+import { trackContinuityMetric } from "@/lib/product-metrics";
+import { isAccountContinuityEnabled } from "@/lib/feature-flags";
 import * as React from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
@@ -9,6 +11,7 @@ import { DesktopHabitsPrototype } from "@/components/habits/desktop-habits-proto
 import { HabitControls } from "@/components/habits/habit-controls";
 import { HabitDayPicker } from "@/components/habits/habit-day-picker";
 import { HABIT_COLORS, HabitEditorDialog } from "@/components/habits/habit-editor-dialog";
+import { GuidedToolbarNoticeCard } from "@/components/onboarding/guided-toolbar-notice";
 import { useFeedback } from "@/components/ui/feedback-provider";
 import { CATEGORY_COLOR_BASE_BLUE } from "@/lib/category-palette";
 import {
@@ -21,6 +24,12 @@ import {
   type OnboardingHabitShowcase,
 } from "@/lib/habits-prototype";
 import { useHabitsStore } from "@/lib/habits-store";
+import {
+  getMobileHabitsOnboardingStepLabel,
+  readMobileHabitsOnboardingStep,
+  writeMobileHabitsOnboardingStep,
+  type MobileHabitsOnboardingStep,
+} from "@/lib/mobile-habits-onboarding";
 import type { Habit } from "@/lib/types";
 import { useBilling } from "@/lib/use-billing";
 import { cn } from "@/lib/utils";
@@ -57,6 +66,8 @@ export function HabitsPrototype({
   retrospectiveInteracted = false,
   scrollToTodayRequestKey = 0,
   headerMinimized = false,
+  onMobileOnboardingStepChange,
+  hasEstablishedAccountData = false,
 }: {
   year: number;
   todayIso: string;
@@ -76,6 +87,24 @@ export function HabitsPrototype({
   onHabitCheckIn?: () => void;
   retrospectiveInteracted?: boolean;
   scrollToTodayRequestKey?: number;
+  /**
+   * Jornada curta e própria do mobile (ver lib/mobile-habits-onboarding.ts):
+   * ela vive inteira dentro deste componente, salva no localStorage. Este
+   * callback só existe para app/page.tsx acompanhar o passo atual em tempo
+   * real, o suficiente para travar/liberar e destacar o botão Anual da
+   * navegação (que não é filho deste componente, então não dá pra travar
+   * sozinho a partir daqui).
+   */
+  onMobileOnboardingStepChange?: (step: MobileHabitsOnboardingStep) => void;
+  /**
+   * Conta autenticada com dados reais já confirmados pelo servidor (ano
+   * montado, categorias criadas) — calculado em app/page.tsx a partir de
+   * `remoteReady`. Hábitos não sincronizam entre aparelhos hoje (só o
+   * calendário sincroniza), então essa conta pode chegar aqui com zero
+   * hábitos NESTE dispositivo mesmo já tendo criado hábitos reais em outro.
+   * Isso muda a mensagem do "+": não é mais um convite para começar do zero.
+   */
+  hasEstablishedAccountData?: boolean;
 }) {
   const { notify } = useFeedback();
   const { limits, isPro, isLoading: isBillingLoading, error: billingError } =
@@ -119,6 +148,49 @@ export function HabitsPrototype({
     () => orderActiveHabits(habits),
     [habits]
   );
+
+  // Jornada curta e própria do mobile: só corre para quem chega anônimo,
+  // sem nenhum hábito ainda — a mesma população que já enxerga a vitrine de
+  // exemplo (Parte 1). Quem já tinha hábitos antes desta função existir, ou
+  // está autenticado, pula direto para "completed" e nunca vê os cards.
+  const [mobileOnboardingStep, setMobileOnboardingStepState] =
+    React.useState<MobileHabitsOnboardingStep>(() => {
+      const stored = readMobileHabitsOnboardingStep();
+      if (stored) return stored;
+      return habits.length === 0 ? "intro" : "completed";
+    });
+  const setMobileOnboardingStep = React.useCallback(
+    (step: MobileHabitsOnboardingStep) => {
+      writeMobileHabitsOnboardingStep(step);
+      setMobileOnboardingStepState(step);
+      onMobileOnboardingStepChange?.(step);
+    },
+    [onMobileOnboardingStepChange]
+  );
+  // app/page.tsx só sabe o passo inicial quando este componente monta pela
+  // primeira vez (ele lê o storage de novo por conta própria); espelha aqui
+  // pra cobrir esse primeiro instante também.
+  React.useEffect(() => {
+    onMobileOnboardingStepChange?.(mobileOnboardingStep);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // Alguém que já chega com hábitos (de antes desta função existir) pula
+  // direto para "completed" acima — mas isso existe só em memória até aqui.
+  // Grava uma vez para não reabrir a jornada caso a pessoa apague todos os
+  // hábitos depois.
+  const mobileOnboardingBackfilledRef = React.useRef(false);
+  React.useEffect(() => {
+    if (mobileOnboardingBackfilledRef.current) return;
+    mobileOnboardingBackfilledRef.current = true;
+    if (readMobileHabitsOnboardingStep()) return;
+    writeMobileHabitsOnboardingStep(mobileOnboardingStep);
+  }, [mobileOnboardingStep]);
+  const mobileOnboardingActive =
+    isMobile &&
+    !isAuthenticated &&
+    mobileOnboardingStep !== "completed" &&
+    mobileOnboardingStep !== "dismissed";
+
   const showcaseActive = Boolean(showcase);
   // A partir de habit_instruction a vitrine (showcaseDisplay) some do controle
   // de trava, mas continua na tela ao lado do hábito real que a pessoa cria —
@@ -165,6 +237,21 @@ export function HabitsPrototype({
       activeHabits[0] ??
       null,
     [activeHabits, selectedHabitId]
+  );
+  // O mobile desenha a grade a partir de um único hábito por vez, então ele
+  // precisa de um "selecionado" que também enxergue a vitrine — senão a tela
+  // abre em branco enquanto a pessoa ainda não criou nada. A preferência é:
+  // o que ela escolheu, depois um hábito real dela, e só então a vitrine.
+  const presentedSelectedHabit = React.useMemo(
+    () =>
+      presentedHabits.find((habit) => habit.id === selectedHabitId) ??
+      activeHabits[0] ??
+      presentedHabits[0] ??
+      null,
+    [activeHabits, presentedHabits, selectedHabitId]
+  );
+  const presentedSelectedIsShowcase = Boolean(
+    presentedSelectedHabit && showcaseHabitIds.has(presentedSelectedHabit.id)
   );
   const weeks = React.useMemo(
     () => (todayIso ? buildHabitPrototypeWeeks(year, todayIso) : []),
@@ -332,6 +419,9 @@ export function HabitsPrototype({
     }
     createHabitInStore({ name, color: draftColor });
     setCreateDialogOpen(false);
+    if (mobileOnboardingStep === "create_habit") {
+      setMobileOnboardingStep("mark_day");
+    }
     onHabitCreated?.();
   };
 
@@ -345,7 +435,9 @@ export function HabitsPrototype({
   };
 
   const reorderHabits = (orderedIds: string[]) => {
-    reorderHabitsInStore(orderedIds);
+    // A vitrine aparece na mesma lista dos hábitos reais; os ids dela não
+    // existem no store, então saem antes de chegar lá.
+    reorderHabitsInStore(orderedIds.filter((id) => !showcaseHabitIds.has(id)));
   };
 
   const deleteEditingHabit = () => {
@@ -358,6 +450,10 @@ export function HabitsPrototype({
   const toggleHabitDay = (habit: Habit | null, dateIso: string) => {
     if (!habit || showcaseActive || showcaseHabitIds.has(habit.id)) return;
     toggleHabitCheckInInStore(habit.id, dateIso);
+    if (mobileOnboardingStep === "mark_day") {
+      trackContinuityMetric("save_invited");
+      setMobileOnboardingStep("save_progress");
+    }
     onHabitCheckIn?.();
   };
 
@@ -374,6 +470,74 @@ export function HabitsPrototype({
     if (activeHabits.length === 1) return;
     toggleHabitVisibilityInStore(habitId);
   };
+
+  // Os quatro passos usam o mesmo card do tour desktop (GuidedToolbarNoticeCard),
+  // só o conteúdo muda. Só o de abertura ("intro") tem botão — os outros três
+  // avançam sozinhos: os dois seguintes quando a pessoa cria o hábito e marca
+  // o primeiro dia (ver createHabit/toggleHabitDay acima), o último quando
+  // toca no próprio botão Anual da navegação (ver app/page.tsx), não num
+  // botão do card.
+  const mobileOnboardingNotice = React.useMemo(():
+    | import("@/components/onboarding/guided-toolbar-notice").GuidedToolbarNotice
+    | null => {
+    if (!mobileOnboardingActive) return null;
+    if (mobileOnboardingStep === "intro") {
+      return {
+        // Sem alvo específico na tela — é a abertura, antes de qualquer
+        // ação. Continua com um toque no "Continuar" do próprio card.
+        target: "mobile-intro",
+        title: "Isto é o Doze 52 no celular.",
+        instruction:
+          "Aqui você foca nos seus hábitos, dia após dia. O ano completo, com todos os eventos e planos, vive no desktop — os dois se completam.",
+        actionLabel: "Continuar",
+        stepLabel: getMobileHabitsOnboardingStepLabel("intro"),
+      };
+    }
+    if (mobileOnboardingStep === "create_habit") {
+      return {
+        // Mesmo target do desktop: destaca o "+" via product-spotlight-target
+        // (guidedNotice repassado ao HabitControls). Sem botão: chega já
+        // convidando a criar, num só toque.
+        target: "habit",
+        title: "Assim funcionam os hábitos.",
+        instruction: "Estes dois são só exemplo. Toque no + e crie o seu.",
+        stepLabel: getMobileHabitsOnboardingStepLabel("create_habit"),
+      };
+    }
+    if (mobileOnboardingStep === "mark_day") {
+      return {
+        target: "habit-created",
+        title: "Agora é seu.",
+        instruction:
+          "Toque em um dia recente para marcar que você cumpriu. Esse é o gesto principal do app.",
+        stepLabel: getMobileHabitsOnboardingStepLabel("mark_day"),
+      };
+    }
+    if (mobileOnboardingStep === "goto_annual") {
+      return {
+        // Destaca o botão Anual da navegação (não fica dentro deste
+        // componente — app/page.tsx repassa highlightDestination="annual"
+        // ao AdaptiveNavigation quando este passo estiver ativo).
+        target: "mobile-goto-annual",
+        title: "Isto é Hábitos.",
+        instruction:
+          "A visão Anual, com seus eventos, complementa esta aqui. Toque em Anual para conhecer.",
+        stepLabel: getMobileHabitsOnboardingStepLabel("goto_annual"),
+      };
+    }
+    return null;
+  }, [mobileOnboardingActive, mobileOnboardingStep]);
+
+  const dismissMobileOnboarding = React.useCallback(() => {
+    setMobileOnboardingStep("dismissed");
+    // Dispensar o guia novo significa "sem dica nenhuma agora". Sem isso, a
+    // pessoa cairia de volta nas dicas antigas (visual diferente) pelo resto
+    // da criação do hábito. Se quiser ajuda de novo, o "+" e a grade
+    // continuam funcionando normalmente, só sem avisos.
+    setCreateHintDismissed(true);
+    setMarkHintDismissed(true);
+    dismissDesktopHint();
+  }, [dismissDesktopHint, setMobileOnboardingStep]);
 
   const createDialog = (
     <HabitEditorDialog
@@ -448,38 +612,53 @@ export function HabitsPrototype({
   const hasCompletedAnyCheckIn = Object.values(checkIns).some(
     (checkIn) => checkIn?.completed
   );
-  const onboardingBanner = showcaseActive
+  // Enquanto a jornada própria do mobile está no ar, ela já cobre as três
+  // mensagens abaixo (criar, marcar, continuar no desktop) com o card
+  // reutilizado do desktop — a dica antiga fica de fora para não duplicar.
+  const onboardingBanner = showcaseActive || mobileOnboardingActive
     ? null
-    : activeHabits.length === 0 && !createHintDismissed
+    : activeHabits.length === 0 &&
+        isAuthenticated &&
+        hasEstablishedAccountData &&
+        !createHintDismissed
       ? {
-          message: "Toque em + para criar seu primeiro hábito.",
+          // Hábitos não sincronizam entre aparelhos hoje — "crie seu
+          // primeiro hábito" seria enganoso para quem já tem hábitos reais
+          // no computador e só está vendo este aparelho vazio.
+          message:
+            isAccountContinuityEnabled ? "Seus hábitos acompanham sua conta. Toque no + para começar." : "Hábitos ainda não sincronizam entre aparelhos. Toque no + para acompanhar por aqui também.",
           onDismiss: () => setCreateHintDismissed(true),
         }
-      : activeHabits.length > 0 && !hasCompletedAnyCheckIn && !markHintDismissed
+      : activeHabits.length === 0 && !createHintDismissed
         ? {
-            message: "Toque num dia pra marcar.",
-            onDismiss: () => setMarkHintDismissed(true),
+            message: "Toque no + para criar seu primeiro hábito.",
+            onDismiss: () => setCreateHintDismissed(true),
           }
-        : hasCompletedAnyCheckIn && !desktopHintDismissed
+        : activeHabits.length > 0 && !hasCompletedAnyCheckIn && !markHintDismissed
           ? {
-              message:
-                "Isso é só o começo. O ano inteiro mora no computador — aqui, você continua o dia a dia.",
-              onDismiss: dismissDesktopHint,
-              anchoredToNav: true,
-              action:
-                !isAuthenticated && onRequestSignup
-                  ? {
-                      label: "Criar conta",
-                      onClick: () => {
-                        const trigger = document.querySelector<HTMLElement>(
-                          "[data-onboarding-auth-entry]"
-                        );
-                        if (trigger) onRequestSignup(trigger);
-                      },
-                    }
-                  : undefined,
+              message: "Toque num dia para marcar.",
+              onDismiss: () => setMarkHintDismissed(true),
             }
-          : null;
+          : hasCompletedAnyCheckIn && !desktopHintDismissed
+            ? {
+                message:
+                  "Isso é só o começo. O ano completo mora no computador. Aqui, você continua o dia a dia.",
+                onDismiss: dismissDesktopHint,
+                anchoredToNav: true,
+                action:
+                  !isAuthenticated && onRequestSignup
+                    ? {
+                        label: "Criar conta",
+                        onClick: () => {
+                          const trigger = document.querySelector<HTMLElement>(
+                            "[data-onboarding-auth-entry]"
+                          );
+                          if (trigger) onRequestSignup(trigger);
+                        },
+                      }
+                    : undefined,
+              }
+            : null;
 
   return (
     <section
@@ -487,8 +666,8 @@ export function HabitsPrototype({
       className="mx-auto flex min-h-0 w-full max-w-[31rem] flex-1 flex-col overflow-hidden pt-12"
     >
       <HabitControls
-        habits={activeHabits}
-        selectedHabit={selectedHabit}
+        habits={presentedHabits}
+        selectedHabit={presentedSelectedHabit}
         mobile
         creationDisabled={creationDisabled}
         onSelectHabit={setSelectedHabitId}
@@ -496,7 +675,69 @@ export function HabitsPrototype({
         isEditing={isEditing}
         onEditHabit={requestEditHabit}
         onReorderHabits={reorderHabits}
+        // Só para forçar a lista aberta e marcar o "+" com
+        // data-onboarding-habit-create quando o passo aponta pra ele — não
+        // passamos onDismissGuidedNotice/onGuidedNoticeAction de propósito,
+        // pra não duplicar o card (a jornada mobile renderiza o dela mesma,
+        // logo abaixo, em vez do card interno deste componente).
+        guidedNotice={mobileOnboardingNotice}
       />
+
+      {mobileOnboardingActive && mobileOnboardingStep === "save_progress" ? (
+        <section aria-label="Guardar progresso" className="inverse-product-surface mx-3 my-2 rounded-xl border bg-card p-4 text-card-foreground">
+          <p className="text-xs text-muted-foreground">
+            {getMobileHabitsOnboardingStepLabel("save_progress")}
+          </p>
+          <h2 className="font-semibold">Seu primeiro passo já está registrado.</h2>
+          <p className="mt-1 text-sm">Crie sua conta para guardar seu hábito e continuar em outro aparelho.</p>
+          <div className="mt-3 flex flex-wrap gap-3">
+            <button className="rounded-lg bg-primary px-3 py-2 text-primary-foreground" onClick={(event) => onRequestSignup?.(event.currentTarget)}>Criar conta e salvar</button>
+            <button
+              className="underline"
+              onClick={() => {
+                setMobileOnboardingStep("goto_annual");
+              }}
+            >
+              Continuar sem conta
+            </button>
+          </div>
+        </section>
+      ) : null}
+      {mobileOnboardingNotice ? (
+        mobileOnboardingNotice.target === "mobile-goto-annual" ? (
+          // Este passo aponta pro botão Anual da navegação, lá embaixo — o
+          // card fica perto dele, não grudado no topo como os dois de cima
+          // (cujo alvo, a vitrine e o "+", também fica no topo).
+          <GuidedToolbarNoticeCard
+            notice={mobileOnboardingNotice}
+            onClose={dismissMobileOnboarding}
+            mobilePlacement="bottom"
+          />
+        ) : (
+          <div className="mt-2">
+            <GuidedToolbarNoticeCard
+              notice={mobileOnboardingNotice}
+              onClose={dismissMobileOnboarding}
+              onAction={
+                mobileOnboardingNotice.target === "mobile-intro"
+                  ? () => setMobileOnboardingStep("create_habit")
+                  : undefined
+              }
+              secondaryLabel={
+                mobileOnboardingNotice.target === "mobile-intro" && onRequireAuth
+                  ? "Entrar na minha conta"
+                  : undefined
+              }
+              onSecondaryAction={
+                mobileOnboardingNotice.target === "mobile-intro"
+                  ? onRequireAuth
+                  : undefined
+              }
+              inline
+            />
+          </div>
+        )
+      ) : null}
 
       {onboardingBanner && !onboardingBanner.anchoredToNav ? (
         <div
@@ -595,9 +836,12 @@ export function HabitsPrototype({
               <div className="relative grid min-w-0 flex-1 grid-cols-7 overflow-hidden rounded-2xl border border-border/60 bg-card">
                 {weeks.map((week, weekIndex) => {
                   const completedFlags = week.days.map((day) => {
-                    if (!day.inYear || !selectedHabit) return false;
-                    const key = getHabitCheckInKey(selectedHabit.id, day.dateIso);
-                    return Boolean(checkIns[key]?.completed);
+                    if (!day.inYear || !presentedSelectedHabit) return false;
+                    const key = getHabitCheckInKey(
+                      presentedSelectedHabit.id,
+                      day.dateIso
+                    );
+                    return Boolean(presentedCheckIns[key]?.completed);
                   });
                   const isFirstWeek = weekIndex === 0;
                   const isLastWeek = weekIndex === weeks.length - 1;
@@ -646,13 +890,18 @@ export function HabitsPrototype({
                         const dayAction = getHabitDayAction({
                           inYear: day.inYear,
                           isFuture: day.isFuture,
-                          hasSelectedHabit: Boolean(selectedHabit),
+                          hasSelectedHabit: Boolean(presentedSelectedHabit),
                         });
-                        const disabled = dayAction === "blocked" || isEditing;
+                        // A vitrine é ilustrativa: os dias dela ficam visíveis
+                        // (é o que mostra o gesto do produto) mas não marcáveis.
+                        const disabled =
+                          dayAction === "blocked" ||
+                          isEditing ||
+                          presentedSelectedIsShowcase;
                         const dateLabel = formatAccessibleDate(day.dateIso);
                         const actionLabel = completed ? "Desmarcar" : "Marcar";
                         const markerColor =
-                          selectedHabit?.color ?? CATEGORY_COLOR_BASE_BLUE;
+                          presentedSelectedHabit?.color ?? CATEGORY_COLOR_BASE_BLUE;
                         const cellToneVar = isPast
                           ? "--cal-cell-weekday-past"
                           : "--cal-cell-weekday";
@@ -668,9 +917,11 @@ export function HabitsPrototype({
                                 ? `${dateLabel}: finalize a edição para registrar hábitos`
                                 : disabled
                                 ? `${dateLabel}: data futura, indisponível`
-                                : selectedHabit
-                                  ? `${actionLabel} ${selectedHabit.name} em ${dateLabel}`
-                                  : `Criar um hábito para ${dateLabel}`
+                                : presentedSelectedIsShowcase
+                                  ? `${dateLabel}: exemplo, não editável`
+                                  : presentedSelectedHabit
+                                    ? `${actionLabel} ${presentedSelectedHabit.name} em ${dateLabel}`
+                                    : `Criar um hábito para ${dateLabel}`
                             }
                             title={dateLabel}
                             disabled={disabled}
@@ -685,8 +936,8 @@ export function HabitsPrototype({
                             style={{ backgroundColor: `hsl(var(${cellToneVar}))` }}
                             onClick={() => {
                               if (isEditing) return;
-                              if (dayAction === "toggle" && selectedHabit) {
-                                toggleHabitDay(selectedHabit, day.dateIso);
+                              if (dayAction === "toggle" && presentedSelectedHabit) {
+                                toggleHabitDay(presentedSelectedHabit, day.dateIso);
                               } else if (dayAction === "create") {
                                 requestCreateHabit();
                               }
