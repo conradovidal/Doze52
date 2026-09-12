@@ -3099,6 +3099,7 @@ export default function HomePage() {
             accountNudgeVisible && !session?.user.id
           }
           onboardingActive={categoriesForceExpandActive}
+          guidedOnboardingActive={showGuidedOnboarding}
           onboardingLayoutLocked={false}
           onboardingLayoutReserved={
             isCalendarSurfaceActive && Boolean(guidedSelectionNotice)

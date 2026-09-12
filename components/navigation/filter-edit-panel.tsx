@@ -84,6 +84,11 @@ type FilterEditPanelProps = {
   // vitrine + reais, em vez de só os reais (hoje sempre vazios nesse passo).
   habitShowcase?: OnboardingHabitShowcase | null;
   habitShowcaseLocked?: boolean;
+  // Guia de onboarding ainda em andamento (não finalizado nem fechado) —
+  // trava criação e edição de categorias e hábitos aqui dentro, pra não
+  // divergir do que o guia está construindo passo a passo. Contextos ficam
+  // de fora de propósito.
+  guidedOnboardingActive?: boolean;
 };
 
 export function FilterEditPanel({
@@ -107,6 +112,7 @@ export function FilterEditPanel({
   onRequireAuth,
   habitShowcase = null,
   habitShowcaseLocked = false,
+  guidedOnboardingActive = false,
 }: FilterEditPanelProps) {
   const highlightCreate = guidedToolbarNotice?.target === "calendars";
   const showWrapUpNotice =
@@ -343,6 +349,7 @@ export function FilterEditPanel({
                         onEditCategory={onEditCategory}
                         highlightedCategoryId={highlightedCategoryId}
                         highlightedCategoryEffect={highlightedCategoryEffect}
+                        locked={guidedOnboardingActive}
                       />
                     </WrapUpCategorySuggestions>
                   ) : (
@@ -354,6 +361,10 @@ export function FilterEditPanel({
                       highlightedCategoryId={highlightedCategoryId}
                       highlightedCategoryEffect={highlightedCategoryEffect}
                       highlightCreate={highlightCreate}
+                      // Neste passo (calendar_instruction) o próprio guia
+                      // manda usar o "+" — travar aqui bloquearia a ação que
+                      // ele está pedindo.
+                      locked={guidedOnboardingActive && !highlightCreate}
                     />
                   )}
                   {highlightCreate && !categoryCreateOpen && onDismissGuidedSelection ? (
@@ -374,6 +385,7 @@ export function FilterEditPanel({
                   habits={presentedHabits}
                   selectedHabit={selectedHabit}
                   creationDisabled={habitCreationDisabled}
+                  locked={guidedOnboardingActive}
                   onSelectHabit={selectHabit}
                   onRequestCreate={requestCreateHabit}
                   onEditHabit={requestEditHabit}

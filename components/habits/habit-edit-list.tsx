@@ -51,6 +51,7 @@ function EditHabitChip({
   setHandleRef,
   isPlaceholder,
   isOverlay,
+  editLocked,
   style,
   chipRef,
   onSelect,
@@ -64,6 +65,7 @@ function EditHabitChip({
   setHandleRef?: (node: HTMLElement | null) => void;
   isPlaceholder?: boolean;
   isOverlay?: boolean;
+  editLocked?: boolean;
   style?: React.CSSProperties;
   chipRef?: (node: HTMLElement | null) => void;
   onSelect?: () => void;
@@ -120,10 +122,16 @@ function EditHabitChip({
       <button
         type="button"
         aria-label={`Editar hábito ${habit.name}`}
-        title={`Editar hábito ${habit.name}`}
+        title={
+          editLocked
+            ? "Disponível quando o guia terminar"
+            : `Editar hábito ${habit.name}`
+        }
+        disabled={editLocked}
         className={cn(
           "grid h-full w-8 shrink-0 cursor-pointer place-items-center text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/45",
-          isPlaceholder && "invisible"
+          isPlaceholder && "invisible",
+          editLocked && "cursor-not-allowed text-muted-foreground/45"
         )}
         onClick={onEdit}
       >
@@ -138,6 +146,7 @@ function SortableHabitChip({
   selected,
   mobile,
   dragEnabled,
+  editLocked,
   onSelect,
   onEdit,
 }: {
@@ -145,6 +154,7 @@ function SortableHabitChip({
   selected: boolean;
   mobile: boolean;
   dragEnabled: boolean;
+  editLocked?: boolean;
   onSelect: () => void;
   onEdit: () => void;
 }) {
@@ -171,6 +181,7 @@ function SortableHabitChip({
       handleProps={{ ...attributes, ...listeners }}
       setHandleRef={setActivatorNodeRef}
       isPlaceholder={dragEnabled && isDragging}
+      editLocked={editLocked}
       style={
         dragEnabled && !isDragging
           ? { transform: CSS.Transform.toString(transform), transition }
@@ -188,6 +199,7 @@ export function HabitEditList({
   selectedHabit,
   mobile = false,
   creationDisabled,
+  locked = false,
   onSelectHabit,
   onRequestCreate,
   onEditHabit,
@@ -197,6 +209,10 @@ export function HabitEditList({
   selectedHabit: Habit | null;
   mobile?: boolean;
   creationDisabled: boolean;
+  // Trava criação, edição e reordenação (ex.: guia de onboarding ainda
+  // ativo) sem esconder nada — os hábitos continuam visíveis normalmente,
+  // só a interação fica bloqueada até o guia terminar ou ser fechado.
+  locked?: boolean;
   onSelectHabit: (habitId: string) => void;
   onRequestCreate: () => void;
   onEditHabit?: (habitId: string) => void;
@@ -284,12 +300,26 @@ export function HabitEditList({
               habit={habit}
               selected={selectedHabit?.id === habit.id}
               mobile={mobile}
-              dragEnabled={orderedHabits.length > 1}
+              dragEnabled={orderedHabits.length > 1 && !locked}
+              editLocked={locked}
               onSelect={() => onSelectHabit(habit.id)}
               onEdit={() => onEditHabit?.(habit.id)}
             />
           ))}
-          {!creationDisabled ? (
+          {locked ? (
+            <button
+              type="button"
+              aria-label="Criar novo hábito"
+              title="Disponível quando o guia terminar"
+              disabled
+              className={cn(
+                "inline-flex h-8 w-8 cursor-not-allowed items-center justify-center rounded-[10px] border border-border bg-card text-muted-foreground/45",
+                mobile && "h-10 w-full rounded-[8px]"
+              )}
+            >
+              <Plus className="size-3.5" />
+            </button>
+          ) : !creationDisabled ? (
             <button
               type="button"
               aria-label="Criar novo hábito"

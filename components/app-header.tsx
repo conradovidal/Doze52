@@ -90,6 +90,11 @@ type AppHeaderProps = {
   // categorias de exemplo.
   habitShowcase?: OnboardingHabitShowcase | null;
   habitShowcaseLocked?: boolean;
+  // Guia de onboarding ainda em andamento (não finalizado nem fechado) —
+  // diferente de `onboardingActive` (que só força a faixa de categorias
+  // expandida): repassado ao "Organizar" para travar criação/edição de
+  // categorias e hábitos até o guia terminar ou ser fechado.
+  guidedOnboardingActive?: boolean;
   onOpenAuthDialog: (anchorPoint?: AnchorPoint) => void;
   onCalendarPackFocusYear: (year: number) => void;
   onboardingFocusTarget?: OnboardingFocusTarget;
@@ -148,6 +153,7 @@ export function AppHeader({
   habitsOrganizeDisabled = false,
   habitShowcase = null,
   habitShowcaseLocked = false,
+  guidedOnboardingActive = false,
   onOpenAuthDialog,
   onCalendarPackFocusYear,
   onboardingFocusTarget = null,
@@ -1440,6 +1446,7 @@ export function AppHeader({
           onRequireAuth={() => onOpenAuthDialog()}
           habitShowcase={habitShowcase}
           habitShowcaseLocked={habitShowcaseLocked}
+          guidedOnboardingActive={guidedOnboardingActive}
         />
       ) : null}
 
