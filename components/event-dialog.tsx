@@ -43,6 +43,7 @@ import type { GuidedCreationIntent } from "@/lib/onboarding";
 import { logDevError, logProdError } from "@/lib/safe-log";
 import { ValidationError, validateEventInput } from "@/lib/validation";
 import { MOTION_SPRING } from "@/lib/motion";
+import { cn } from "@/lib/utils";
 
 const FIELD_LABEL_CLASS =
   "text-[12px] font-semibold tracking-[-0.01em] text-foreground/78";
@@ -582,7 +583,11 @@ export function EventDialog({
               startDate={startDate}
               endDate={endDate}
               disabled={isManagedEvent}
-              className="min-w-0 flex-1 justify-center"
+              // min-w-0 deixava esse pill encolher até truncar o texto de
+              // forma ilegível quando o espaço ao lado dos outros dois
+              // (que não encolhem) fica curto, como no mobile. Com um piso
+              // de largura, ele quebra pra própria linha em vez de espremer.
+              className="min-w-[9.25rem] flex-1 justify-center"
               onChange={({ startDate: nextStart, endDate: nextEnd }) => {
                 changedFieldsRef.current.add("startDate");
                 changedFieldsRef.current.add("endDate");
@@ -592,16 +597,31 @@ export function EventDialog({
             />
           </div>
 
-          <details
-            open={advancedOpen}
-            onToggle={(event) => setAdvancedOpen(event.currentTarget.open)}
-            className="group"
-          >
-            <summary className="flex cursor-pointer list-none items-center gap-1.5 py-1 text-[12px] font-semibold text-foreground/78 outline-none focus-visible:ring-2 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
+          <div className="group" data-state={advancedOpen ? "open" : "closed"}>
+            <button
+              type="button"
+              aria-expanded={advancedOpen}
+              onClick={() => setAdvancedOpen((current) => !current)}
+              className="flex cursor-pointer items-center gap-1.5 py-1 text-[12px] font-semibold text-foreground/78 outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+            >
               Mais opções
-              <ChevronDown className="size-3.5 text-muted-foreground transition-transform group-open:rotate-180" />
-            </summary>
-            <div className="space-y-5 pt-3">
+              <ChevronDown className="size-3.5 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+            </button>
+            {/* Grid de uma linha com altura animável (0fr → 1fr): a mesma
+                curva do chevron acima, em vez do "pop" instantâneo de um
+                <details> nativo — o gesto de abrir some visualmente coerente
+                do início ao fim. */}
+            <div
+              className="grid transition-[grid-template-rows] duration-[220ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
+              style={{ gridTemplateRows: advancedOpen ? "1fr" : "0fr" }}
+            >
+              <div className="overflow-hidden">
+                <div
+                  className={cn(
+                    "space-y-5 pt-3 transition-opacity duration-[220ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
+                    advancedOpen ? "opacity-100" : "opacity-0"
+                  )}
+                >
 
           <div className="space-y-1">
             <label htmlFor="event-notes" className={FIELD_LABEL_CLASS}>
@@ -676,8 +696,10 @@ export function EventDialog({
               </div>
             ) : null}
           </div>
+                </div>
+              </div>
             </div>
-          </details>
+          </div>
       </div>
 
         <DialogFooter className="gap-2 sm:justify-between">
@@ -813,6 +835,7 @@ export function EventDialog({
           align="start"
           sideOffset={12}
           collisionPadding={12}
+          animateEnter={false}
           className="max-h-[calc(100dvh-1.5rem)] w-[min(440px,calc(100vw-1.5rem))] overflow-y-auto p-0"
           onKeyDown={handleContentKeyDown}
           onOpenAutoFocus={handleOpenAutoFocus}
