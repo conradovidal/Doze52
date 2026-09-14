@@ -472,7 +472,11 @@ export function EventDialog({
         </Button>
       </div>
 
-      <div className="space-y-5">
+      {/* min-w-0: o Dialog/Popover ao redor é display:grid, então sem isto
+          este item herda um mínimo automático igual ao min-content dos
+          descendentes (os 3 pills com texto sem quebra) — ele estoura a
+          largura do card em vez dos pills encolherem. */}
+      <div className="min-w-0 space-y-5">
           <div className="space-y-1.5">
             <label htmlFor="event-title" className={FIELD_LABEL_CLASS}>
               Título do evento
@@ -498,6 +502,11 @@ export function EventDialog({
             ) : null}
           </div>
 
+          {/* Contexto e categoria têm flex-auto: encolhem proporcionalmente
+              ao próprio tamanho quando o espaço aperta, em vez de ficarem
+              fixos e forçarem a data a absorver todo o aperto sozinha. No
+              mobile (abaixo do md), a data ainda assim quebra pra própria
+              linha — ver comentário no DateRangeQuickPicker abaixo. */}
           <div className="flex flex-wrap items-center gap-2">
             <Select
               value={profileId}
@@ -506,7 +515,7 @@ export function EventDialog({
             >
               <SelectTrigger
                 size="sm"
-                className="h-8 w-auto min-w-0 shrink-0 gap-1.5 rounded-full border-primary bg-primary px-3 text-[12.5px] font-semibold text-primary-foreground shadow-none hover:bg-primary/90 dark:bg-primary dark:hover:bg-primary/90"
+                className="h-8 min-w-0 flex-auto gap-1.5 rounded-full border-primary bg-primary px-3 text-[12.5px] font-semibold text-primary-foreground shadow-none hover:bg-primary/90 dark:bg-primary dark:hover:bg-primary/90"
               >
                 <span className="inline-flex min-w-0 items-center gap-1.5">
                   {currentProfile ? <ProfileIcon icon={currentProfile.icon} size={12} /> : null}
@@ -535,7 +544,7 @@ export function EventDialog({
             >
               <SelectTrigger
                 size="sm"
-                className="h-8 w-auto min-w-0 shrink-0 gap-1.5 rounded-full px-3 text-[12.5px] font-semibold shadow-none"
+                className="h-8 min-w-0 flex-auto gap-1.5 rounded-full px-3 text-[12.5px] font-semibold shadow-none"
                 style={
                   currentCategoryToken
                     ? {
@@ -583,11 +592,13 @@ export function EventDialog({
               startDate={startDate}
               endDate={endDate}
               disabled={isManagedEvent}
-              // min-w-0 deixava esse pill encolher até truncar o texto de
-              // forma ilegível quando o espaço ao lado dos outros dois
-              // (que não encolhem) fica curto, como no mobile. Com um piso
-              // de largura, ele quebra pra própria linha em vez de espremer.
-              className="min-w-[9.25rem] flex-1 justify-center"
+              // Abaixo do breakpoint em que o editor vira popover ancorado
+              // (md, o mesmo usado por isDesktopViewport), o card fica
+              // estreito demais para os 3 pills lado a lado sem espremer os
+              // outros dois. basis-full força a data pra própria linha só
+              // nesse caso; a partir do md volta a dividir a linha com os
+              // outros dois normalmente.
+              className="min-w-0 grow shrink basis-full justify-center md:basis-auto"
               onChange={({ startDate: nextStart, endDate: nextEnd }) => {
                 changedFieldsRef.current.add("startDate");
                 changedFieldsRef.current.add("endDate");
