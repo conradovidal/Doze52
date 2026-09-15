@@ -82,6 +82,7 @@ export function WrapUpCategorySuggestions({
   suggestions,
   cap,
   onRemoveCategory,
+  noticeSlot,
   children,
 }: {
   profileId?: string;
@@ -93,6 +94,10 @@ export function WrapUpCategorySuggestions({
   // de calendário. Sem isso, cai no `deleteCategory` comum (não remove
   // calendários prontos).
   onRemoveCategory?: (categoryId: string) => boolean;
+  // Card do guia, renderizado entre as categorias do ano e as sugestões: é
+  // o que torna o "arraste as sugestões abaixo" literal — elas ficam mesmo
+  // abaixo dele, e o caminho do arrasto passa por cima do card até o ano.
+  noticeSlot?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const categories = useStore((s) => s.categories);
@@ -268,14 +273,23 @@ export function WrapUpCategorySuggestions({
         {childWithPreview}
       </div>
 
-      <div className="mt-4 border-t border-border/55 pt-4">
-        <p className="text-[12px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/75">
-          Sugestões
-        </p>
-        <p className="mt-1 text-xs leading-4 text-muted-foreground">
-          Arraste para cima as que fizerem mais sentido pra você.
-        </p>
-        <div className="mt-2.5 flex flex-wrap gap-2">
+      {noticeSlot ? <div className="mt-4">{noticeSlot}</div> : null}
+
+      <div
+        className={cn(
+          "mt-4",
+          noticeSlot ? "pt-0.5" : "border-t border-border/55 pt-4"
+        )}
+      >
+        {/* Sem o card do guia acima, as sugestões precisam se apresentar
+            sozinhas. Com ele, esta linha só repetiria o "arraste" que ele
+            acabou de dizer. */}
+        {noticeSlot ? null : (
+          <p className="text-xs font-medium leading-4">
+            Arraste para cima as sugestões que fizerem sentido.
+          </p>
+        )}
+        <div className={cn("flex flex-wrap gap-2", noticeSlot ? "mt-0" : "mt-2.5")}>
           {suggestions.map((suggestion) => (
             <SuggestionChip
               key={suggestion.id}

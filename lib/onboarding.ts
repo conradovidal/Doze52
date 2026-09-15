@@ -2,21 +2,15 @@
 
 import type { CalendarEvent } from "@/lib/types";
 import {
-  CATEGORY_COLOR_BASE_AMBER,
   CATEGORY_COLOR_BASE_CORAL,
   CATEGORY_COLOR_BASE_CYAN,
-  CATEGORY_COLOR_BASE_EMERALD,
-  CATEGORY_COLOR_BASE_GRAPHITE,
   CATEGORY_COLOR_BASE_GREEN,
   CATEGORY_COLOR_BASE_INDIGO,
   CATEGORY_COLOR_BASE_LIME,
-  CATEGORY_COLOR_BASE_MINT,
   CATEGORY_COLOR_BASE_ORANGE,
   CATEGORY_COLOR_BASE_PINK,
-  CATEGORY_COLOR_BASE_PURPLE,
   CATEGORY_COLOR_BASE_ROSE,
   CATEGORY_COLOR_BASE_SAND,
-  CATEGORY_COLOR_BASE_SKY,
   CATEGORY_COLOR_BASE_TEAL,
   CATEGORY_COLOR_BASE_VIOLET,
 } from "@/lib/category-palette";
@@ -953,13 +947,6 @@ const WRAP_UP_SUGGESTIONS_PERSONAL: WrapUpCategorySuggestion[] = [
   { id: "wrap-up-familia", name: "Família", color: CATEGORY_COLOR_BASE_ROSE },
   { id: "wrap-up-amigos", name: "Amigos", color: CATEGORY_COLOR_BASE_CYAN },
   { id: "wrap-up-esportes", name: "Esportes", color: CATEGORY_COLOR_BASE_LIME },
-  { id: "wrap-up-leitura", name: "Leitura", color: CATEGORY_COLOR_BASE_AMBER },
-  { id: "wrap-up-culinaria", name: "Culinária", color: CATEGORY_COLOR_BASE_ORANGE },
-  { id: "wrap-up-bem-estar", name: "Bem-estar", color: CATEGORY_COLOR_BASE_MINT },
-  { id: "wrap-up-compras", name: "Compras", color: CATEGORY_COLOR_BASE_PINK },
-  { id: "wrap-up-hobbies", name: "Hobbies", color: CATEGORY_COLOR_BASE_TEAL },
-  { id: "wrap-up-voluntariado", name: "Voluntariado", color: CATEGORY_COLOR_BASE_EMERALD },
-  { id: "wrap-up-beleza", name: "Beleza", color: CATEGORY_COLOR_BASE_PURPLE },
 ];
 
 const WRAP_UP_SUGGESTIONS_WORK: WrapUpCategorySuggestion[] = [
@@ -971,13 +958,6 @@ const WRAP_UP_SUGGESTIONS_WORK: WrapUpCategorySuggestion[] = [
   { id: "wrap-up-clientes", name: "Clientes", color: CATEGORY_COLOR_BASE_CORAL },
   { id: "wrap-up-vendas", name: "Vendas", color: CATEGORY_COLOR_BASE_GREEN },
   { id: "wrap-up-financeiro", name: "Financeiro", color: CATEGORY_COLOR_BASE_SAND },
-  { id: "wrap-up-marketing", name: "Marketing", color: CATEGORY_COLOR_BASE_ROSE },
-  { id: "wrap-up-recrutamento", name: "Recrutamento", color: CATEGORY_COLOR_BASE_CYAN },
-  { id: "wrap-up-planejamento", name: "Planejamento", color: CATEGORY_COLOR_BASE_AMBER },
-  { id: "wrap-up-viagens", name: "Viagens", color: CATEGORY_COLOR_BASE_SKY },
-  { id: "wrap-up-relatorios", name: "Relatórios", color: CATEGORY_COLOR_BASE_GRAPHITE },
-  { id: "wrap-up-parcerias", name: "Parcerias", color: CATEGORY_COLOR_BASE_LIME },
-  { id: "wrap-up-lancamentos", name: "Lançamentos", color: CATEGORY_COLOR_BASE_MINT },
 ];
 
 export const getWrapUpCategorySuggestions = (

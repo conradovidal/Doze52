@@ -486,9 +486,8 @@ export function HabitsPrototype({
         // Sem alvo específico na tela — é a abertura, antes de qualquer
         // ação. Continua com um toque no "Continuar" do próprio card.
         target: "mobile-intro",
-        title: "Isto é o Doze 52 no celular.",
         instruction:
-          "Aqui você foca nos seus hábitos, dia após dia. O ano completo, com todos os eventos e planos, vive no desktop — os dois se completam.",
+          "No celular, foque nos hábitos, dia após dia. O ano completo, com eventos e planos, vive no desktop.",
         actionLabel: "Continuar",
         stepLabel: getMobileHabitsOnboardingStepLabel("intro"),
       };
@@ -499,17 +498,14 @@ export function HabitsPrototype({
         // (guidedNotice repassado ao HabitControls). Sem botão: chega já
         // convidando a criar, num só toque.
         target: "habit",
-        title: "Assim funcionam os hábitos.",
-        instruction: "Estes dois são só exemplo. Toque no + e crie o seu.",
+        instruction: "Estes dois hábitos são exemplo. Toque no + e crie o seu.",
         stepLabel: getMobileHabitsOnboardingStepLabel("create_habit"),
       };
     }
     if (mobileOnboardingStep === "mark_day") {
       return {
         target: "habit-created",
-        title: "Agora é seu.",
-        instruction:
-          "Toque em um dia recente para marcar que você cumpriu. Esse é o gesto principal do app.",
+        instruction: "Toque num dia recente para marcar que você cumpriu.",
         stepLabel: getMobileHabitsOnboardingStepLabel("mark_day"),
       };
     }
@@ -519,9 +515,7 @@ export function HabitsPrototype({
         // componente — app/page.tsx repassa highlightDestination="annual"
         // ao AdaptiveNavigation quando este passo estiver ativo).
         target: "mobile-goto-annual",
-        title: "Isto é Hábitos.",
-        instruction:
-          "A visão Anual, com seus eventos, complementa esta aqui. Toque em Anual para conhecer.",
+        instruction: "Toque em Anual para conhecer a visão com seus eventos.",
         stepLabel: getMobileHabitsOnboardingStepLabel("goto_annual"),
       };
     }
@@ -688,8 +682,7 @@ export function HabitsPrototype({
           <p className="text-xs text-muted-foreground">
             {getMobileHabitsOnboardingStepLabel("save_progress")}
           </p>
-          <h2 className="font-semibold">Seu primeiro passo já está registrado.</h2>
-          <p className="mt-1 text-sm">Crie sua conta para guardar seu hábito e continuar em outro aparelho.</p>
+          <p className="mt-1 text-sm font-medium">Crie sua conta para guardar seu hábito e continuar em outro aparelho.</p>
           <div className="mt-3 flex flex-wrap gap-3">
             <button className="rounded-lg bg-primary px-3 py-2 text-primary-foreground" onClick={(event) => onRequestSignup?.(event.currentTarget)}>Criar conta e salvar</button>
             <button

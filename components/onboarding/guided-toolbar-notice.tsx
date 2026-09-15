@@ -27,7 +27,8 @@ export type GuidedToolbarNotice = {
     | "mobile-goto-annual"
     | "mobile-organize"
     | "mobile-today";
-  title: string;
+  // Texto único do passo: sem título separado de "subtexto" — toda a
+  // condução do guia usa um só bloco de texto, mesmo peso visual.
   instruction: string;
   actionLabel?: string;
   stepLabel?: string;
@@ -93,6 +94,7 @@ export function GuidedToolbarNoticeCard({
   portalTargetSelector,
   inline = false,
   mobilePlacement = "top",
+  surface = "inverse",
 }: {
   notice: GuidedToolbarNotice;
   onClose: () => void;
@@ -124,6 +126,15 @@ export function GuidedToolbarNoticeCard({
    * grudado no topo criaria distância entre a explicação e o que ela aponta.
    */
   mobilePlacement?: "top" | "bottom";
+  /**
+   * "inverse" (padrão): o card inverte claro/escuro em relação à página —
+   * pensado para flutuar sobre o próprio produto (a grade do ano, a lista de
+   * hábitos) e se destacar dele. "plain": card normal, na mesma superfície
+   * clara/escura ao redor — para quando ele já vive dentro de um painel
+   * (ex.: o resumo entre categorias e sugestões, dentro de "Organizar"), onde
+   * a inversão lia como uma caixa preta fora de lugar.
+   */
+  surface?: "inverse" | "plain";
 }) {
   const [mounted, setMounted] = React.useState(false);
   const cardRef = React.useRef<HTMLElement | null>(null);
@@ -237,7 +248,10 @@ export function GuidedToolbarNoticeCard({
       aria-label="Instrução do guia inicial"
       aria-live="polite"
       className={cn(
-        "inverse-product-surface w-full rounded-2xl border border-border bg-card p-3.5 text-left text-card-foreground shadow-[0_24px_60px_-20px_rgba(15,23,42,0.85)]",
+        "w-full rounded-2xl border p-4 text-left",
+        surface === "inverse"
+          ? "inverse-product-surface border-border bg-card text-card-foreground shadow-[0_24px_60px_-20px_rgba(15,23,42,0.85)]"
+          : "border-border/70 bg-muted/40 text-foreground shadow-none",
         inline
           ? "relative"
           : cn(
@@ -273,18 +287,15 @@ export function GuidedToolbarNoticeCard({
     >
       <div className="pr-7">
         <div
-          key={`${notice.target}:${notice.title}`}
+          key={`${notice.target}:${notice.instruction}`}
           className="min-w-0 animate-in fade-in slide-in-from-bottom-1 duration-300 motion-reduce:animate-none"
         >
           {notice.stepLabel ? (
-            <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-primary">
+            <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-primary">
               {notice.stepLabel}
             </p>
           ) : null}
-          <p className="text-base font-semibold leading-5">
-            {notice.title}
-          </p>
-          <p className="mt-1 text-sm leading-5 text-muted-foreground">
+          <p className="text-[15px] font-medium leading-6 tracking-[-0.005em]">
             {notice.instruction}
           </p>
         </div>
@@ -304,7 +315,7 @@ export function GuidedToolbarNoticeCard({
           type="button"
           variant="premium"
           size="sm"
-          className="mt-3 w-full"
+          className="mt-3.5 w-full"
           onClick={onAction}
         >
           <Check className="size-4" aria-hidden="true" />

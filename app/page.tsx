@@ -2476,39 +2476,35 @@ export default function HomePage() {
     if (guidedOnboarding.step === "edit_instruction") {
       return {
         target: "edit",
-        title: "Organize contextos e categorias.",
         instruction:
           isMobileCalendarUi === true
-            ? "Toque no lápis para abrir o modo de edição."
-            : "Clique em Organizar para abrir o modo de edição.",
+            ? "Toque no lápis para editar contextos e categorias."
+            : "Clique em Organizar para editar contextos e categorias.",
         stepLabel,
       };
     }
     if (guidedOnboarding.step === "edit_preview") {
       return {
         target: "edit",
-        title: "Este é o modo de edição.",
         instruction:
           isMobileCalendarUi === true
-            ? "Aqui você poderá ajustar nomes, cores e organização. Toque em Finalizar para continuar."
-            : "Aqui você poderá ajustar nomes, cores e organização. Clique em Finalizar para continuar.",
+            ? "Ajuste nomes, cores e organização. Toque em Finalizar para continuar."
+            : "Ajuste nomes, cores e organização. Clique em Finalizar para continuar.",
         stepLabel,
       };
     }
     if (guidedOnboarding.step === "calendar_instruction") {
       return {
         target: "calendars",
-        title: "Complemente seu ano com calendários prontos.",
-        instruction: "Use o + para abrir as opções e escolher um calendário.",
+        instruction: "Use o + para adicionar um calendário pronto.",
         stepLabel,
       };
     }
     if (guidedOnboarding.step === "year_instruction") {
       return {
         target: "year",
-        title: "Aqui você troca o ano.",
         instruction:
-          "Use as setas para ver o ano anterior ou o próximo. Clique no número no centro para voltar para hoje.",
+          "Use as setas para trocar de ano. Clique no número central para voltar a hoje.",
         actionLabel: "Continuar",
         stepLabel,
       };
@@ -2519,9 +2515,8 @@ export default function HomePage() {
     ) {
       return {
         target: "period-navigation",
-        title: "Veja um recorte do seu ano.",
         instruction:
-          "Clique nos rótulos Q1-Q4 e JAN-DEZ para ir direto a trimestres e meses.",
+          "Clique em Q1-Q4 ou JAN-DEZ para ir direto a um trimestre ou mês.",
         actionLabel: "Continuar",
         stepLabel,
       };
@@ -2532,8 +2527,7 @@ export default function HomePage() {
     ) {
       return {
         target: "habit-surface",
-        title: "Conheça seus hábitos.",
-        instruction: "Clique em Hábitos no topo para mudar de tela.",
+        instruction: "Clique em Hábitos, no topo, para conhecer essa tela.",
         stepLabel,
       };
     }
@@ -2543,9 +2537,7 @@ export default function HomePage() {
     ) {
       return {
         target: "habit",
-        title: "Crie seu primeiro hábito.",
-        instruction:
-          "Viagens, férias e noites especiais já mudam o ritmo de Exercício e Ler 20 minutos. Abra o + e crie o seu.",
+        instruction: "Abra o + e crie seu primeiro hábito.",
         stepLabel,
       };
     }
@@ -2555,9 +2547,8 @@ export default function HomePage() {
     ) {
       return {
         target: "habit-created",
-        title: "Seu primeiro hábito está pronto.",
         instruction:
-          "Antes de continuar, marque os dias das duas últimas semanas que conseguir lembrar.",
+          "Marque os dias das duas últimas semanas que você lembrar.",
         actionLabel: "Continuar",
         stepLabel,
       };
@@ -2565,9 +2556,8 @@ export default function HomePage() {
     if (guidedOnboarding.step === "theme_instruction") {
       return {
         target: "theme",
-        title: "Escolha o clima do seu ano.",
         instruction:
-          "Teste o tema claro e escuro e fique com o que combina mais com você.",
+          "Teste os temas claro e escuro e escolha o que combina com você.",
         actionLabel: guidedOnboarding.themeConfirmedAt ? "Continuar" : undefined,
         stepLabel,
       };
@@ -2575,9 +2565,8 @@ export default function HomePage() {
     if (guidedOnboarding.step === "visibility_instruction") {
       return {
         target: "visibility",
-        title: "Esconda o que não precisa agora.",
         instruction:
-          "Clique numa categoria para ocultá-la do seu ano. Ela continua guardada e volta quando você quiser.",
+          "Clique numa categoria para ocultá-la. Ela continua guardada e volta quando quiser.",
         actionLabel: "Continuar",
         stepLabel,
       };
@@ -2585,10 +2574,9 @@ export default function HomePage() {
     if (guidedOnboarding.step === "wrap_up_instruction") {
       return {
         target: "wrap-up",
-        title: "Veja o que você já construiu.",
         instruction: inlineEditModeActive
-          ? "Sua categoria, seu calendário e seu hábito já estão aqui. Arraste até três sugestões abaixo que fizerem mais sentido pra você. E no dia a dia, marcar seus hábitos também funciona direto pelo celular."
-          : "Abra o Organizar para ver o que você já construiu e escolher mais algumas categorias. E no dia a dia, marcar seus hábitos também funciona direto pelo celular.",
+          ? "Sua categoria, calendário e hábito já estão aqui. Arraste até três sugestões abaixo. Marcar hábitos também funciona pelo celular."
+          : "Abra o Organizar para ver o que você construiu e escolher mais categorias. Marcar hábitos também funciona pelo celular.",
         actionLabel: inlineEditModeActive ? "Finalizar guia" : undefined,
         stepLabel,
         categorySuggestions: getWrapUpCategorySuggestions(
@@ -2901,9 +2889,8 @@ export default function HomePage() {
     if (mobileHabitsOnboardingStep === "annual_year") {
       return {
         target: "year",
-        title: "Aqui você troca o ano.",
         instruction:
-          "Use estas setas para consultar o ano anterior ou o próximo. Toque no ano a qualquer momento para voltar direto a hoje.",
+          "Use estas setas para trocar de ano. Toque no ano para voltar a hoje.",
         actionLabel: "Continuar",
         stepLabel: getMobileHabitsOnboardingStepLabel("annual_year"),
       };
@@ -2911,9 +2898,8 @@ export default function HomePage() {
     if (mobileHabitsOnboardingStep === "annual_theme") {
       return {
         target: "theme",
-        title: "Escolha o clima do seu ano.",
         instruction:
-          "Teste o tema claro e escuro e fique com o que combina mais com você.",
+          "Teste os temas claro e escuro e escolha o que combina com você.",
         actionLabel: "Continuar",
         stepLabel: getMobileHabitsOnboardingStepLabel("annual_theme"),
       };
@@ -2921,8 +2907,7 @@ export default function HomePage() {
     if (mobileHabitsOnboardingStep === "annual_organize") {
       return {
         target: "mobile-organize",
-        title: "Organize contextos e categorias.",
-        instruction: "Toque em Organizar para abrir o modo de edição.",
+        instruction: "Toque em Organizar para editar contextos e categorias.",
         actionLabel: "Continuar",
         stepLabel: getMobileHabitsOnboardingStepLabel("annual_organize"),
       };
@@ -2930,7 +2915,6 @@ export default function HomePage() {
     if (mobileHabitsOnboardingStep === "goto_profile") {
       return {
         target: "profile",
-        title: "Guarde esse ano com você.",
         instruction: "Toque em Perfil para criar sua conta e acessar de qualquer aparelho.",
         stepLabel: getMobileHabitsOnboardingStepLabel("goto_profile"),
       };

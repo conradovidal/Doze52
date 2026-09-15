@@ -9,6 +9,10 @@ export type AnimatedProgressProps = {
   value: number;
   label: string;
   statusText?: string;
+  // Para quando o contexto ao redor já diz o que a barra mede: o texto sai
+  // da tela, mas `label`/`statusText` seguem descrevendo a barra para
+  // leitores de tela.
+  hideLabel?: boolean;
   className?: string;
 };
 
@@ -16,18 +20,21 @@ export function AnimatedProgress({
   value,
   label,
   statusText,
+  hideLabel = false,
   className,
 }: AnimatedProgressProps) {
   const normalizedValue = Math.min(100, Math.max(0, value));
 
   return (
-    <div className={cn("space-y-2", className)}>
-      <div className="flex items-center justify-between gap-4 text-xs">
-        <span className="font-medium text-foreground">{label}</span>
-        {statusText ? (
-          <span className="text-muted-foreground">{statusText}</span>
-        ) : null}
-      </div>
+    <div className={cn(!hideLabel && "space-y-2", className)}>
+      {hideLabel ? null : (
+        <div className="flex items-center justify-between gap-4 text-xs">
+          <span className="font-medium text-foreground">{label}</span>
+          {statusText ? (
+            <span className="text-muted-foreground">{statusText}</span>
+          ) : null}
+        </div>
+      )}
       <div
         role="progressbar"
         aria-label={label}
