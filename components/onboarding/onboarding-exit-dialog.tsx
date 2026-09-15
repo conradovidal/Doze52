@@ -27,12 +27,12 @@ export function OnboardingExitDialog({
         showCloseButton={false}
       >
         <DialogHeader>
-          <DialogTitle className="text-card-foreground">
-            Quer encerrar a montagem guiada?
+          <DialogTitle className="text-card-foreground text-base font-medium">
+            Encerrar o guia? O que você criou continua no seu ano, e ele não
+            volta a aparecer.
           </DialogTitle>
-          <DialogDescription>
-            O que você já criou continuará no seu ano. O guia não voltará a
-            aparecer.
+          <DialogDescription className="sr-only">
+            Confirme para encerrar a montagem guiada.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>

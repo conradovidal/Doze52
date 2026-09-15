@@ -5,10 +5,14 @@ import {
   BriefcaseBusiness,
   CalendarDays,
   Check,
+  Dumbbell,
   Flag,
   Gift,
+  Heart,
   Layers3,
   Plane,
+  Target,
+  TrendingUp,
   UserRound,
   X,
 } from "lucide-react";
@@ -30,13 +34,20 @@ import {
 import {
   CATEGORY_COLOR_BASE_AMBER,
   CATEGORY_COLOR_BASE_BLUE,
+  CATEGORY_COLOR_BASE_CORAL,
   CATEGORY_COLOR_BASE_CYAN,
   CATEGORY_COLOR_BASE_GRAPHITE,
   CATEGORY_COLOR_BASE_GREEN,
+  CATEGORY_COLOR_BASE_INDIGO,
+  CATEGORY_COLOR_BASE_LIME,
   CATEGORY_COLOR_BASE_ORANGE,
   CATEGORY_COLOR_BASE_RED,
+  CATEGORY_COLOR_BASE_ROSE,
+  CATEGORY_COLOR_BASE_SAND,
+  CATEGORY_COLOR_BASE_TEAL,
   CATEGORY_COLOR_BASE_TERRA,
   CATEGORY_COLOR_BASE_VIOLET,
+  getCategoryColorToken,
 } from "@/lib/category-palette";
 
 // TERRA entra aqui porque é a cor padrão de "Datas importantes" (categoria
@@ -85,18 +96,30 @@ type GuidedOnboardingPanelProps = {
   onOpenLogin: () => void;
 };
 
+// Cada contexto se apresenta por uma pilha de ícones em vez de um símbolo
+// único: o propósito do caminho (relações, rotina, corpo / entregas, metas,
+// resultado) fica legível antes de qualquer texto, e as cores saem da mesma
+// paleta das categorias do produto.
 const CONTEXT_OPTIONS = [
   {
     value: "personal" as const,
     title: "Pessoal",
-    description: "Para cuidar de relações, planos e momentos da sua vida.",
-    icon: UserRound,
+    description: "Relações, planos e momentos da sua vida.",
+    icons: [
+      { Icon: UserRound, color: CATEGORY_COLOR_BASE_INDIGO },
+      { Icon: Heart, color: CATEGORY_COLOR_BASE_ROSE },
+      { Icon: Dumbbell, color: CATEGORY_COLOR_BASE_LIME },
+    ],
   },
   {
     value: "work" as const,
     title: "Profissional",
-    description: "Para acompanhar projetos, compromissos e conquistas.",
-    icon: BriefcaseBusiness,
+    description: "Projetos, compromissos e conquistas.",
+    icons: [
+      { Icon: BriefcaseBusiness, color: CATEGORY_COLOR_BASE_SAND },
+      { Icon: TrendingUp, color: CATEGORY_COLOR_BASE_TEAL },
+      { Icon: Target, color: CATEGORY_COLOR_BASE_CORAL },
+    ],
   },
 ];
 
@@ -422,25 +445,26 @@ export function GuidedOnboardingPanel({
     }
   }, [context, state.step]);
 
+  // Identidade à esquerda, progresso à direita, barra embaixo: a contagem
+  // aparece uma vez só (antes ela se repetia no subtítulo, no rótulo da
+  // barra e no status dela).
   const header = (
     <div className="space-y-3">
-      <div className="flex items-start gap-3">
+      <div className="flex items-center gap-3">
         <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
           <CalendarDays className="size-4" aria-hidden="true" />
         </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">
-            Monte o seu ano
-          </p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            Passo {progressStep} de {progressTotal}
-          </p>
-        </div>
+        <p className="min-w-0 flex-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">
+          Monte o seu ano
+        </p>
+        <span className="shrink-0 text-xs text-muted-foreground">
+          Passo {progressStep} de {progressTotal}
+        </span>
         <Button
           type="button"
           variant="ghost"
           size="icon-xs"
-          className="rounded-full"
+          className="-mr-1 rounded-full"
           aria-label="Encerrar guia inicial"
           onClick={onClose}
         >
@@ -448,9 +472,10 @@ export function GuidedOnboardingPanel({
         </Button>
       </div>
       <AnimatedProgress
+        hideLabel
         value={(progressStep / progressTotal) * 100}
         label="Progresso do guia inicial"
-        statusText={`${progressStep} de ${progressTotal}`}
+        statusText={`Passo ${progressStep} de ${progressTotal}`}
       />
     </div>
   );
@@ -530,11 +555,9 @@ export function GuidedOnboardingPanel({
             </button>
           );
         })}
-        <div className="mt-2 rounded-2xl border border-border/70 bg-background/65 p-3">
-          <p className="mb-2.5 text-sm font-semibold">
-            {selectedOption
-              ? `Cor de ${selectedOption.definition.name}`
-              : "Escolha uma categoria e uma cor"}
+        <div className="mt-2.5 rounded-2xl border border-border/70 bg-background/65 p-3.5">
+          <p className="mb-3 text-[13px] font-medium text-muted-foreground">
+            {selectedOption ? `Cor de ${selectedOption.definition.name}` : "Cor"}
           </p>
           <CategoryColorPicker
             compact
@@ -580,36 +603,47 @@ export function GuidedOnboardingPanel({
     if (state.step === "context_selection") {
       return (
         <>
-          <h2 className="mt-4 whitespace-nowrap text-[clamp(1rem,4.4vw,1.25rem)] font-semibold tracking-[-0.025em]">
-            Por qual contexto você quer começar?
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Dá para alternar entre eles depois.
+          <p className="mt-4 text-[15px] font-medium leading-6 tracking-[-0.005em]">
+            Escolha um contexto para começar. Dá para trocar depois.
           </p>
-          <div className="mt-4 grid gap-2">
-            {CONTEXT_OPTIONS.map((option) => {
-              const Icon = option.icon;
-              return (
-                <button
-                  key={option.value}
-                  type="button"
-                  className="flex items-center gap-3 rounded-2xl border border-border bg-background/80 p-3 text-left transition hover:border-primary/35 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
-                  onClick={() => onConfigureContext(option.value)}
-                >
-                  <span className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-primary/8 text-primary">
-                    <Icon className="size-4" aria-hidden="true" />
+          <div className="mt-4 grid gap-2.5">
+            {CONTEXT_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className="group flex items-center gap-3.5 rounded-2xl border border-border bg-background p-3.5 text-left transition hover:border-primary/35 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                onClick={() => onConfigureContext(option.value)}
+              >
+                <span className="flex shrink-0 -space-x-2.5">
+                  {option.icons.map(({ Icon, color }, index) => {
+                    const token = getCategoryColorToken(color);
+                    return (
+                      <span
+                        key={color}
+                        aria-hidden="true"
+                        style={{
+                          backgroundColor: token.soft,
+                          borderColor: token.border,
+                          color: token.text,
+                          zIndex: option.icons.length - index,
+                        }}
+                        className="relative grid size-9 place-items-center rounded-full border ring-2 ring-background transition-transform duration-200 ease-out group-hover:translate-y-[-1px]"
+                      >
+                        <Icon className="size-4" />
+                      </span>
+                    );
+                  })}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-semibold leading-5">
+                    {option.title}
                   </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-semibold">
-                      {option.title}
-                    </span>
-                    <span className="mt-0.5 block text-[11px] leading-4 text-muted-foreground">
-                      {option.description}
-                    </span>
+                  <span className="mt-0.5 block text-balance text-[13px] leading-[1.35] text-muted-foreground">
+                    {option.description}
                   </span>
-                </button>
-              );
-            })}
+                </span>
+              </button>
+            ))}
             <Button
               type="button"
               variant="ghost"
@@ -626,13 +660,10 @@ export function GuidedOnboardingPanel({
     if (state.step === "date_category_selection") {
       return (
         <>
-          <h2 className="mt-4 max-w-[30rem] text-balance text-lg font-semibold tracking-[-0.02em]">
-            O que você quer tornar visível primeiro?
-          </h2>
-          <p className="mt-1 text-sm leading-5 text-muted-foreground">
+          <p className="mt-4 max-w-[30rem] text-balance text-[15px] font-medium leading-6 tracking-[-0.005em]">
             {context === "personal"
-              ? "Seu contexto Pessoal está pronto. Comece pelo aniversário de alguém importante ou por uma data que você quer lembrar."
-              : "Seu contexto Profissional está pronto. Comece por uma entrega ou por uma data importante do seu trabalho."}
+              ? "Comece pelo aniversário de alguém, ou por uma data importante para você, e escolha a cor."
+              : "Comece por uma entrega ou data importante do trabalho, e escolha a cor."}
           </p>
           {renderCategoryChoices("date")}
         </>

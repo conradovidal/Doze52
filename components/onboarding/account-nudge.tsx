@@ -27,11 +27,9 @@ export function AccountNudge({
           />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold">Seu ano começou a tomar forma.</p>
-          <p className="mt-0.5 text-xs leading-4 text-muted-foreground">
-            Crie sua conta para guardar essa visão, acessá-la em qualquer
-            dispositivo e usar seu ano como apoio para planejar o que vem pela
-            frente.
+          <p className="text-sm font-medium leading-4">
+            Crie sua conta para guardar seu ano e acessá-lo em qualquer
+            aparelho.
           </p>
         </div>
         <Button

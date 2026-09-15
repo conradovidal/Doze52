@@ -139,6 +139,25 @@ export function FilterEditPanel({
     wasWrapUpNoticeRef.current = showWrapUpNotice;
   }, [open, activeDestination, showWrapUpNotice]);
 
+  const wrapUpSuggestionsVisible = Boolean(
+    showWrapUpNotice &&
+      section === "annual" &&
+      editingProfileId &&
+      guidedToolbarNotice?.categorySuggestions?.length
+  );
+  const wrapUpCard = showWrapUpNotice ? (
+    <GuidedToolbarNoticeCard
+      notice={guidedToolbarNotice!}
+      onClose={() => onDismissGuidedSelection?.()}
+      onAction={onGuidedWrapUpAction}
+      inline
+      // Este card vive dentro do próprio painel "Organizar" (claro), não
+      // flutuando sobre a grade do ano — a inversão padrão lia como uma
+      // caixa escura fora de lugar aqui.
+      surface="plain"
+    />
+  ) : null;
+
   const { notify } = useFeedback();
   const { limits, isPro, isLoading: isBillingLoading, error: billingError } =
     useBilling();
@@ -307,6 +326,13 @@ export function FilterEditPanel({
             )}
           </header>
           <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
+            {/* key troca a cada alvo (edição de hábito vs. aba Anual/Hábitos)
+                para a entrada reanimar a cada troca, em vez de saltar
+                instantaneamente de um conteúdo para o outro. */}
+            <div
+              key={habitDialogOpen ? "habit-editor" : section}
+              className="animate-in fade-in slide-in-from-bottom-1 duration-200 motion-reduce:animate-none"
+            >
             {habitDialogOpen ? (
               <HabitEditorFields
                 dialogSemantics={false}
@@ -333,14 +359,13 @@ export function FilterEditPanel({
                 </section>
 
                 <section className="relative mt-6 border-t border-border/55 pt-5">
-                  {showWrapUpNotice &&
-                  editingProfileId &&
-                  guidedToolbarNotice?.categorySuggestions?.length ? (
+                  {wrapUpSuggestionsVisible ? (
                     <WrapUpCategorySuggestions
-                      profileId={editingProfileId}
-                      suggestions={guidedToolbarNotice.categorySuggestions}
+                      profileId={editingProfileId!}
+                      suggestions={guidedToolbarNotice!.categorySuggestions!}
                       cap={limits.maxCategories}
                       onRemoveCategory={onRemoveWrapUpCategory}
+                      noticeSlot={wrapUpCard}
                     >
                       <CategoryBar
                         isInlineEditMode
@@ -393,21 +418,14 @@ export function FilterEditPanel({
                 />
               </section>
             )}
-            {showWrapUpNotice ? (
-              // Fica fora das duas seções (Anual/Hábitos) de propósito: é o
-              // resumo do guia inteiro, não de uma aba só — trocar de aba
-              // não pode fazer o card sumir. No fluxo normal do documento
-              // (não flutuando por cima), o conteúdo cresce e empurra o
-              // card para baixo, em vez de arriscar sobrepor o que ele
-              // descreve.
-              <div className="mt-4">
-                <GuidedToolbarNoticeCard
-                  notice={guidedToolbarNotice!}
-                  onClose={() => onDismissGuidedSelection?.()}
-                  onAction={onGuidedWrapUpAction}
-                  inline
-                />
-              </div>
+            </div>
+            {wrapUpCard && !wrapUpSuggestionsVisible ? (
+              // Com as sugestões na tela o card vive entre elas e o ano (ver
+              // wrapUpSuggestionsVisible acima). Fora disso — na aba Hábitos,
+              // por exemplo — ele continua aqui, no fim do painel: é o resumo
+              // do guia inteiro, não de uma aba só, e trocar de aba não pode
+              // fazer o card sumir.
+              <div className="mt-4">{wrapUpCard}</div>
             ) : null}
           </div>
         </div>

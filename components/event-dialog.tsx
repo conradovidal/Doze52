@@ -477,13 +477,13 @@ export function EventDialog({
           descendentes (os 3 pills com texto sem quebra) — ele estoura a
           largura do card em vez dos pills encolherem. */}
       <div className="min-w-0 space-y-5">
-          <div className="space-y-1.5">
-            <label htmlFor="event-title" className={FIELD_LABEL_CLASS}>
-              Título do evento
-            </label>
+          {/* Sem rótulo visível: o título do editor e o placeholder já dizem
+              o que é este campo. O nome acessível continua no aria-label. */}
+          <div className="space-y-2">
             <Input
               id="event-title"
               ref={titleInputRef}
+              aria-label="Título do evento"
               className="h-10 rounded-xl text-[15px]"
               placeholder={titlePlaceholder}
               value={title}
@@ -634,12 +634,10 @@ export function EventDialog({
                   )}
                 >
 
-          <div className="space-y-1">
-            <label htmlFor="event-notes" className={FIELD_LABEL_CLASS}>
-              Descrição
-            </label>
+          <div>
             <textarea
               id="event-notes"
+              aria-label="Descrição"
               rows={3}
               className="min-h-[4.5rem] w-full resize-y rounded-xl border border-border/80 bg-background px-3 py-2 text-sm outline-none transition focus:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
               placeholder="Adicione detalhes úteis para você se lembrar depois"
@@ -654,12 +652,7 @@ export function EventDialog({
 
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-3">
-              <div className="space-y-0.5">
-                <p className={FIELD_LABEL_CLASS}>Recorrência</p>
-                <p className="text-xs text-muted-foreground">
-                  Use apenas quando esse evento se repetir ao longo do ano.
-                </p>
-              </div>
+              <p className={FIELD_LABEL_CLASS}>Recorrência</p>
               <Select
                 value={recurrenceType}
                 onValueChange={(value) => {
@@ -672,7 +665,7 @@ export function EventDialog({
                 <SelectTrigger className="h-9 w-auto shrink-0 rounded-xl border-border/80 bg-background shadow-sm">
                   <span>
                     {recurrenceType === "none"
-                      ? "Sem recorrencia"
+                      ? "Sem recorrência"
                       : recurrenceType === "weekly"
                         ? "Semanal"
                         : recurrenceType === "biweekly"
@@ -683,7 +676,7 @@ export function EventDialog({
                   </span>
                 </SelectTrigger>
                 <SelectContent position="popper" side="bottom" align="end">
-                  <SelectItem value="none">Sem recorrencia</SelectItem>
+                  <SelectItem value="none">Sem recorrência</SelectItem>
                   <SelectItem value="weekly">Semanal</SelectItem>
                   <SelectItem value="biweekly">A cada 2 semanas</SelectItem>
                   <SelectItem value="monthly">Mensal</SelectItem>
