@@ -62,7 +62,7 @@ export function MobileDesktopFirstNotice({
       </span>
 
       <div className="min-w-0 flex-1">
-        <p className="text-[13px] leading-5 text-card-foreground">
+        <p className="text-[13px] font-medium leading-5 text-card-foreground">
           {text}{" "}
           <button
             type="button"

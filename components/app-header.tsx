@@ -22,6 +22,7 @@ import {
 import { CategoryBar } from "@/components/category-bar";
 import { CategoryCreationFlow } from "@/components/category-creation-flow";
 import { CategoryManager } from "@/components/category-manager";
+import { WrapUpCategorySuggestions } from "@/components/onboarding/wrap-up-category-suggestions";
 import { CalendarPackLauncher } from "@/components/calendar-packs/calendar-pack-launcher";
 import {
   DesktopProductNavigation,
@@ -50,7 +51,12 @@ import { useScrollEdgeFade } from "@/lib/use-scroll-edge-fade";
 import { useCalendarCatalog } from "@/lib/calendar-catalog/runtime";
 import { removeCalendarPackByCategory } from "@/lib/calendar-packs/import";
 import type { OnboardingHabitShowcase } from "@/lib/habits-prototype";
-import type { OnboardingFocusTarget } from "@/lib/onboarding";
+import {
+  getWrapUpCategorySuggestions,
+  type OnboardingFocusTarget,
+} from "@/lib/onboarding";
+import { getMobileHabitsOnboardingStepLabel } from "@/lib/mobile-habits-onboarding";
+import { useBilling } from "@/lib/use-billing";
 import type { CalendarPack } from "@/lib/calendar-packs/types";
 import type { ProductDestinationId } from "@/lib/product-navigation";
 import type { AnchorPoint } from "@/lib/types";
@@ -105,6 +111,11 @@ type AppHeaderProps = {
   // guidedToolbarNotice acima, mas mira os mesmos botões (tema, organizar),
   // então só precisa somar mais uma condição ao destaque de cada um.
   mobileContinuationHighlightTarget?: string | null;
+  // X do card de sugestões dentro do "Organizar" mobile (ver
+  // mobileWrapUpActive abaixo) — mesmo dismissMobileAnnualOnboarding que os
+  // outros cards da continuação usam, por consistência ("X" sempre significa
+  // "sem mais dicas", não só "pular este card").
+  onDismissMobileWrapUp?: () => void;
   onDismissGuidedSelection?: () => void;
   onGuidedToolbarAction?: (target: GuidedToolbarNotice["target"]) => void;
   onGuidedCalendarOpen?: () => void;
@@ -160,6 +171,7 @@ export function AppHeader({
   guidedSelectionNotice = null,
   guidedToolbarNotice = null,
   mobileContinuationHighlightTarget = null,
+  onDismissMobileWrapUp,
   onDismissGuidedSelection,
   onGuidedToolbarAction,
   onGuidedCalendarOpen,
@@ -195,6 +207,14 @@ export function AppHeader({
   const deleteCategory = useStore((s) => s.deleteCategory);
   const replaceAllData = useStore((s) => s.replaceAllData);
   const { calendarPacks } = useCalendarCatalog();
+  const { limits } = useBilling();
+  // Sugestões pra jornada própria do mobile (lib/mobile-habits-onboarding.ts)
+  // — sempre "personal": essa jornada não passa por seleção de contexto como
+  // o tour desktop, é pessoal por padrão do início ao fim.
+  const mobileWrapUpSuggestions = React.useMemo(
+    () => getWrapUpCategorySuggestions("personal"),
+    []
+  );
   // Passado ao resumo final do onboarding (WrapUpCategorySuggestions): a
   // 3a posição pode ser um calendário pronto (ex.: Feriados), que
   // `deleteCategory` recusa por design — passa pelo caminho de remoção de
@@ -266,6 +286,13 @@ export function AppHeader({
   const effectiveInlineEditMode = onboardingLayoutLocked
     ? guidedEditPreviewActive
     : controlledInlineEditMode ?? isInlineEditMode;
+  // Passo próprio do mobile (ver mobileAnnualOnboardingNotice em
+  // app/page.tsx): "annual_organize" chegou e a pessoa já abriu o
+  // "Organizar" — mostra as sugestões de categoria no lugar da barra comum,
+  // em vez de só o destaque neutro no ícone (que só cobre até abrir).
+  const mobileWrapUpActive =
+    mobileContinuationHighlightTarget === "mobile-organize" &&
+    effectiveInlineEditMode;
 
   const pendingProfileCreateRestoreRef = React.useRef<{
     knownProfileIds: string[];
@@ -311,9 +338,23 @@ export function AppHeader({
     onboardingLayoutLocked && guidedToolbarNotice?.target !== "theme";
   const isMobileMode = isMobileCalendarUi === true;
   const filterPanelId = React.useId();
+  // Passo "annual_organize" antes de abrir o Organizar: aponta pro botão,
+  // mas a fileira de contextos/categorias ainda não deve aparecer sozinha —
+  // só quando o toque em Organizar liga o effectiveInlineEditMode abaixo.
+  // Sem isso, uma preferência antiga salva (painel não recolhido) abria a
+  // fileira antes da hora, competindo com o card do passo.
+  const mobileOrganizePending =
+    mobileContinuationHighlightTarget === "mobile-organize" &&
+    !effectiveInlineEditMode;
+  // Passo "annual_explore": a pessoa está olhando o ano de exemplo já
+  // populado — a fileira de contextos/categorias precisa estar aberta pra
+  // ela ver o que tem lá, independente da preferência salva de recolher.
+  const mobileExploreActive =
+    mobileContinuationHighlightTarget === "mobile-explore";
   const showMobileFilterPanel =
     !isMobileMode ||
-    !areMobileFiltersCollapsed ||
+    mobileExploreActive ||
+    (!areMobileFiltersCollapsed && !mobileOrganizePending) ||
     effectiveInlineEditMode ||
     highlightedCategoryEffect === "reveal";
   const selectedProfile = React.useMemo(
@@ -722,10 +763,7 @@ export function AppHeader({
                 >
                   <ThemeToggle
                     variant="bare"
-                    highlighted={
-                      guidedToolbarNotice?.target === "theme" ||
-                      mobileContinuationHighlightTarget === "theme"
-                    }
+                    highlighted={guidedToolbarNotice?.target === "theme"}
                     disabled={themeToggleDisabled}
                     onThemeChange={onGuidedThemeChange}
                   />
@@ -861,15 +899,13 @@ export function AppHeader({
                     <div
                       data-onboarding-year-control
                       data-onboarding-highlighted={
-                        guidedToolbarNotice?.target === "year" ||
-                        mobileContinuationHighlightTarget === "year"
+                        guidedToolbarNotice?.target === "year"
                           ? "true"
                           : undefined
                       }
                       className={cn(
                         "inline-flex h-9 items-center rounded-xl border border-border bg-card",
-                        (guidedToolbarNotice?.target === "year" ||
-                          mobileContinuationHighlightTarget === "year") &&
+                        guidedToolbarNotice?.target === "year" &&
                           "product-spotlight-target"
                       )}
                     >
@@ -1149,40 +1185,93 @@ export function AppHeader({
                     : "border-0 py-0"
                 )}
               >
-                  <div className="grid w-full grid-cols-1 gap-1.5">
-                    <ProfileBar
-                      compact
-                      mobileDense
-                      className="w-full"
-                      isInlineEditMode={effectiveInlineEditMode}
-                      editingProfileId={editingProfileId}
-                      onEditingProfileChange={setEditingProfileId}
-                      onCreateProfile={openCreateProfile}
-                      onEditProfile={openEditProfile}
-                      highlightedProfileId={highlightedProfileId}
-                    />
-                  </div>
-
-                  <div className="relative mt-2 border-t border-border/55 pt-2">
-                    <CategoryBar
-                      compact
-                      mobileDense
-                      isInlineEditMode={effectiveInlineEditMode}
-                      editingProfileId={editingProfileId}
-                      onCreateCategory={openCreateCategory}
-                      onEditCategory={openEditCategory}
-                      highlightedCategoryId={highlightedCategoryId}
-                      highlightedCategoryEffect={highlightedCategoryEffect}
-                      highlightCreate={guidedToolbarNotice?.target === "calendars"}
-                    />
-                    {guidedToolbarNotice?.target === "calendars" &&
-                    !categoryCreateOpen &&
-                    onDismissGuidedSelection ? (
-                      <GuidedToolbarNoticeCard
-                        notice={guidedToolbarNotice}
-                        onClose={onDismissGuidedSelection}
+                  {mobileWrapUpActive ? null : (
+                    <div className="grid w-full grid-cols-1 gap-1.5">
+                      <ProfileBar
+                        compact
+                        mobileDense
+                        className="w-full"
+                        isInlineEditMode={effectiveInlineEditMode}
+                        editingProfileId={editingProfileId}
+                        onEditingProfileChange={setEditingProfileId}
+                        onCreateProfile={openCreateProfile}
+                        onEditProfile={openEditProfile}
+                        highlightedProfileId={highlightedProfileId}
                       />
-                    ) : null}
+                    </div>
+                  )}
+
+                  <div
+                    className={
+                      mobileWrapUpActive
+                        ? "relative"
+                        : "relative mt-2 border-t border-border/55 pt-2"
+                    }
+                  >
+                    {mobileWrapUpActive ? (
+                      <WrapUpCategorySuggestions
+                        profileId={editingProfileId ?? undefined}
+                        suggestions={mobileWrapUpSuggestions}
+                        cap={limits.maxCategories}
+                        onRemoveCategory={handleRemoveWrapUpCategory}
+                        hideExistingCategories
+                        noticeSlot={
+                          onDismissMobileWrapUp ? (
+                            <GuidedToolbarNoticeCard
+                              notice={{
+                                target: "mobile-organize",
+                                instruction:
+                                  "Defina 3 categorias para começar! Avalie as sugestões e os calendários prontos.",
+                                actionLabel: "Finalizar",
+                                stepLabel: getMobileHabitsOnboardingStepLabel(
+                                  "annual_organize"
+                                ),
+                              }}
+                              onClose={onDismissMobileWrapUp}
+                              // Mesmo botão que fecha o Organizar de verdade
+                              // (o do cabeçalho) — antes só existia lá em
+                              // cima, longe de quem está com o dedo no meio
+                              // das sugestões sem saber como terminar.
+                              onAction={handleToggleOrganize}
+                              inline
+                            />
+                          ) : undefined
+                        }
+                      >
+                        <CategoryBar
+                          compact
+                          mobileDense
+                          isInlineEditMode={effectiveInlineEditMode}
+                          editingProfileId={editingProfileId}
+                          onCreateCategory={openCreateCategory}
+                          onEditCategory={openEditCategory}
+                          highlightedCategoryId={highlightedCategoryId}
+                          highlightedCategoryEffect={highlightedCategoryEffect}
+                        />
+                      </WrapUpCategorySuggestions>
+                    ) : (
+                      <>
+                        <CategoryBar
+                          compact
+                          mobileDense
+                          isInlineEditMode={effectiveInlineEditMode}
+                          editingProfileId={editingProfileId}
+                          onCreateCategory={openCreateCategory}
+                          onEditCategory={openEditCategory}
+                          highlightedCategoryId={highlightedCategoryId}
+                          highlightedCategoryEffect={highlightedCategoryEffect}
+                          highlightCreate={guidedToolbarNotice?.target === "calendars"}
+                        />
+                        {guidedToolbarNotice?.target === "calendars" &&
+                        !categoryCreateOpen &&
+                        onDismissGuidedSelection ? (
+                          <GuidedToolbarNoticeCard
+                            notice={guidedToolbarNotice}
+                            onClose={onDismissGuidedSelection}
+                          />
+                        ) : null}
+                      </>
+                    )}
                   </div>
               </CollapsibleControlRegion>
               </div>

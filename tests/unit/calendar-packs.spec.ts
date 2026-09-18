@@ -244,7 +244,7 @@ test("recria Feriados ausente usando somente impressões semânticas estritas", 
     (category) => category.calendarPackGroupId === "holidays-by-state"
   );
 
-  expect(managedCategory?.name).toBe("Feriados");
+  expect(managedCategory?.name).toBe("Feriados RS");
   expect(
     result.snapshot.events.find((event) => event.title === "Evento autoral")
       ?.categoryId

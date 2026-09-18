@@ -842,11 +842,11 @@ test("demonstração monta dois contextos e categorias pessoais e profissionais"
     ])
   );
   expect(isOnboardingPersonalDemoSnapshot(snapshot)).toBe(true);
-  // Feriados e Corridas F1 não fazem mais parte do ano de exemplo: só
+  // Feriados e Etapas F1 não fazem mais parte do ano de exemplo: só
   // categorias criadas manualmente (sem calendário pronto por trás) sobram.
   expect(
     snapshot.categories.some(
-      (category) => category.name === "Feriados" || category.name === "Corridas F1"
+      (category) => category.name === "Feriados" || category.name === "Etapas F1"
     )
   ).toBe(false);
   expect(
@@ -920,7 +920,7 @@ test("demonstração monta dois contextos e categorias pessoais e profissionais"
     personalCategories
       .filter(
         (category) =>
-          category.name !== "Feriados" && category.name !== "Corridas F1"
+          category.name !== "Feriados" && category.name !== "Etapas F1"
       )
       .map((category) => category.id)
   );
@@ -1089,7 +1089,7 @@ test("reconhece demonstração antiga parcialmente reconciliada", () => {
     categories: snapshot.categories.map((category) => ({
       ...category,
       calendarPackGroupId:
-        category.name === "Corridas F1"
+        category.name === "Etapas F1"
           ? formula12026Pack.id
           : "onboarding-personal-demo-v3",
     })),
@@ -1239,7 +1239,7 @@ test("sandbox libera criação, edição e exclusão sem preservar a origem demo
     sandbox.categories
       .filter(
         (category) =>
-          category.name !== "Feriados" && category.name !== "Corridas F1"
+          category.name !== "Feriados RS" && category.name !== "Etapas F1"
       )
       .every((category) => !category.calendarPackGroupId)
   ).toBe(true);

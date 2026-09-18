@@ -284,7 +284,7 @@ test("empilha apenas hábitos concluídos preservando a ordem visível", () => {
 
 test("dimensiona a linha pelo total de hábitos visíveis", () => {
   expect([0, 1, 2, 3, 4, 5].map(getDesktopHabitRowMinHeight)).toEqual([
-    54, 54, 74, 94, 114, 114,
+    60, 60, 80, 100, 120, 120,
   ]);
 });
 

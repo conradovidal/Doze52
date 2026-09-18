@@ -365,6 +365,7 @@ export function FilterEditPanel({
                       suggestions={guidedToolbarNotice!.categorySuggestions!}
                       cap={limits.maxCategories}
                       onRemoveCategory={onRemoveWrapUpCategory}
+                      onRequireAuth={onRequireAuth ? () => onRequireAuth() : undefined}
                       noticeSlot={wrapUpCard}
                     >
                       <CategoryBar
@@ -374,7 +375,11 @@ export function FilterEditPanel({
                         onEditCategory={onEditCategory}
                         highlightedCategoryId={highlightedCategoryId}
                         highlightedCategoryEffect={highlightedCategoryEffect}
-                        locked={guidedOnboardingActive}
+                        // Este bloco só existe durante o resumo do guia
+                        // (wrapUpSuggestionsVisible) — é o passo que pede
+                        // pra arrastar categorias, travar aqui bloquearia a
+                        // própria ação que o card está ensinando.
+                        locked={false}
                       />
                     </WrapUpCategorySuggestions>
                   ) : (

@@ -1212,7 +1212,7 @@ test("onboarding mantém a edição aberta até importar o calendário", async (
   const gallery = page.getByRole("dialog", { name: "Calendários" });
   const nationalStateCard = gallery
     .locator("[data-calendar-pack-group]")
-    .filter({ hasText: "Feriados nacionais + estaduais" });
+    .filter({ hasText: "Feriados SP" });
   await expect(nationalStateCard).toBeVisible();
   await nationalStateCard
     .getByRole("button", { name: "Adicionar feriados" })

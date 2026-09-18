@@ -24,7 +24,9 @@ export type GuidedToolbarNotice = {
     // Passos da jornada curta e própria do mobile (lib/mobile-habits-onboarding.ts).
     // Não fazem parte do tour desktop.
     | "mobile-intro"
+    | "mobile-save-progress"
     | "mobile-goto-annual"
+    | "mobile-explore"
     | "mobile-organize"
     | "mobile-today";
   // Texto único do passo: sem título separado de "subtexto" — toda a
@@ -98,7 +100,10 @@ export function GuidedToolbarNoticeCard({
 }: {
   notice: GuidedToolbarNotice;
   onClose: () => void;
-  onAction?: () => void;
+  // Recebe o evento do clique (opcional: quase ninguém usa) para quem
+  // precisa de um elemento-âncora — ex.: abrir o cadastro perto do próprio
+  // botão que disparou a ação, como no passo de salvar progresso do mobile.
+  onAction?: (event?: React.MouseEvent<HTMLButtonElement>) => void;
   // Link de texto secundário, abaixo do botão principal — hoje só usado
   // pelo passo de abertura do mobile, para oferecer "Entrar na minha conta"
   // sem competir com o "Continuar".
@@ -255,7 +260,11 @@ export function GuidedToolbarNoticeCard({
         inline
           ? "relative"
           : cn(
-              "fixed left-3 w-[min(22rem,calc(100vw-1.5rem))] md:absolute",
+              // Passo "criar hábito" pede um card mais estreito (texto curto
+              // em duas linhas) — os demais mantêm a largura padrão.
+              notice.target === "habit"
+                ? "fixed left-3 w-[min(18rem,calc(100vw-1.5rem))] md:absolute"
+                : "fixed left-3 w-[min(22rem,calc(100vw-1.5rem))] md:absolute",
               mobilePlacement === "bottom"
                 ? "bottom-[calc(env(safe-area-inset-bottom,0px)+4.5rem)]"
                 : "top-[calc(env(safe-area-inset-top,0px)+4.6rem)]",
@@ -295,7 +304,11 @@ export function GuidedToolbarNoticeCard({
               {notice.stepLabel}
             </p>
           ) : null}
-          <p className="text-[15px] font-medium leading-6 tracking-[-0.005em]">
+          {/* font-semibold, não font-medium: texto claro em peso médio sobre
+              o card escuro (inverse-product-surface) lê como "apagado" mesmo
+              com contraste correto — um efeito óptico conhecido de texto
+              claro sobre fundo escuro, não um problema de cor. */}
+          <p className="whitespace-pre-line text-[15px] font-semibold leading-6 tracking-[-0.005em]">
             {notice.instruction}
           </p>
         </div>

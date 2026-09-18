@@ -27,7 +27,7 @@ export function OnboardingExitDialog({
         showCloseButton={false}
       >
         <DialogHeader>
-          <DialogTitle className="text-card-foreground text-base font-medium">
+          <DialogTitle className="text-card-foreground text-base font-semibold">
             Encerrar o guia? O que você criou continua no seu ano, e ele não
             volta a aparecer.
           </DialogTitle>

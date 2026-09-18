@@ -225,19 +225,28 @@
 
 /*
  * Realce do onboarding: em vez de uma caixa nova por cima (anel, halo,
- * contorno), liga o mesmo fundo que o próprio alvo já usa no hover — sem
- * elemento extra, sem raio de borda descasado, sem "vazar" do formato do
- * botão. O padrão é só fundo: qualquer borda/contorno/anel de foco que o
- * alvo já tivesse (inclusive o anel nativo de foco do teclado) é anulado
- * enquanto o destaque está ativo, para nunca virar "fundo + contorno".
- * O `!important` garante que ganha das classes já presentes (ex.:
- * `bg-card`, `border-border`), do mesmo jeito que um `:hover` real ganharia.
+ * contorno), liga um fundo sobre o próprio alvo — sem elemento extra, sem
+ * raio de borda descasado, sem "vazar" do formato do botão. O padrão é só
+ * fundo: qualquer borda/contorno/anel de foco que o alvo já tivesse
+ * (inclusive o anel nativo de foco do teclado) é anulado enquanto o
+ * destaque está ativo, para nunca virar "fundo + contorno". O `!important`
+ * garante que ganha das classes já presentes (ex.: `bg-card`,
+ * `border-border`), do mesmo jeito que um `:hover` real ganharia.
+ *
+ * Sempre o tema OPOSTO ao da página, não `var(--muted)`/`var(--foreground)`
+ * do tema atual — os mesmos valores fixos do claro/escuro que os cards do
+ * guia usam (`.inverse-product-surface` acima), para o destaque ler como a
+ * mesma linguagem visual do guia, não como um hover comum um pouco mais
+ * forte. Vale só para um alvo único e neutro (ícone, link, rótulo) — não
+ * para o grupo de categorias (ver `.product-spotlight-group` abaixo, que
+ * fica de fora desta inversão) nem para o destaque de uma categoria
+ * específica, que usa a cor da própria categoria, não o tema.
  */
 .product-spotlight-target {
   position: relative;
   z-index: 61;
-  background-color: var(--muted) !important;
-  color: var(--foreground) !important;
+  background-color: #404040 !important;
+  color: #fafafa !important;
   border-color: transparent !important;
   outline: none !important;
   box-shadow: none !important;
@@ -245,9 +254,41 @@
 }
 
 /*
+ * Alguns alvos são compostos (ex.: o controle de ano, três botões — seta,
+ * número, seta —, cada um com sua própria classe `text-foreground`/
+ * `text-muted-foreground`, e `hover:bg-muted`/`hover:text-foreground` no
+ * hover). Cor e fundo definidos diretamente num elemento vencem a herança
+ * do pai, `!important` incluído, MESMO em `:hover` — sem isto, o filho
+ * ficava na cor/fundo do TEMA NORMAL (parado ou no hover) por cima do
+ * destaque já invertido: às vezes texto invisível (mesma cor do fundo),
+ * às vezes um retângulo de fundo errado aparecendo só ao passar o mouse
+ * (ex.: a seta de voltar um ano ficava ilegível no hover).
+ *
+ * Exceção: o próprio card do guia (`GuidedToolbarNoticeCard`), quando não
+ * portalado, nasce como filho JSX do alvo destacado só por conveniência de
+ * posicionamento (`position: fixed`/`absolute` o tira do fluxo visualmente,
+ * mas no DOM ele continua descendente) — ex.: o card do passo do ano é
+ * filho do próprio controle de ano. Sem excluí-lo aqui, o card herdava a
+ * cor do destaque e seu botão "Continuar" (bg-primary/text-primary-
+ * foreground) virava texto branco sobre fundo branco.
+ */
+.product-spotlight-target *:not([data-guided-toolbar-notice]):not([data-guided-toolbar-notice] *) {
+  color: inherit !important;
+  background-color: transparent !important;
+}
+
+.dark .product-spotlight-target {
+  background-color: #f5f5f5 !important;
+  color: #404040 !important;
+}
+
+/*
  * Só o grupo de categorias (mostrar/esconder) não é um único botão com
- * hover próprio para reaproveitar — é vários chips juntos. Aqui sim um
- * fundo à parte faz sentido: `::before` cresce só na vertical (inset
+ * hover próprio para reaproveitar — é vários chips juntos, cada um com sua
+ * própria cor. Aqui um fundo do tema oposto por trás brigaria com as cores
+ * das categorias (um bloco escuro atrás de chips pastel, por exemplo) — por
+ * isso este continua no MESMO tema da página (`var(--muted)`), diferente do
+ * `.product-spotlight-target` acima. `::before` cresce só na vertical (inset
  * horizontal em 0, para nunca encostar nos botões ao lado) via
  * `position: absolute`, que não afeta o layout dos vizinhos.
  */

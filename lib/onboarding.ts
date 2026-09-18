@@ -4,6 +4,7 @@ import type { CalendarEvent } from "@/lib/types";
 import {
   CATEGORY_COLOR_BASE_CORAL,
   CATEGORY_COLOR_BASE_CYAN,
+  CATEGORY_COLOR_BASE_GRAPHITE,
   CATEGORY_COLOR_BASE_GREEN,
   CATEGORY_COLOR_BASE_INDIGO,
   CATEGORY_COLOR_BASE_LIME,
@@ -113,6 +114,12 @@ export type GuidedOnboardingAction =
       showPeriodNavigation?: boolean;
       at?: string;
     }
+  // Pula direto de "edit"/"calendar" pros hábitos: esses passos deixaram de
+  // ser instrução obrigatória do guia (viraram descobríveis sozinhos, ou —
+  // calendário pronto — uma sugestão no resumo final). O guia ainda passa
+  // pelo estado internamente (histórico/analytics de versões antigas
+  // continuam válidos), só não pausa mais pra explicar.
+  | { type: "skip_calendar"; at?: string }
   | { type: "continue_from_year"; at?: string }
   | { type: "continue_from_period_navigation"; showHabit?: boolean; at?: string }
   | { type: "interact_with_period_navigation"; at?: string }
@@ -681,6 +688,11 @@ export const reduceGuidedOnboardingState = (
       return state.step === "year_instruction"
         ? { ...state, step: "edit_instruction" }
         : state;
+    case "skip_calendar":
+      return state.step === "calendar_instruction" ||
+        state.step === "calendar_selection"
+        ? { ...state, step: "habit_surface_instruction" }
+        : state;
     case "continue_from_period_navigation":
       if (state.step !== "period_navigation_instruction") return state;
       return {
@@ -899,33 +911,43 @@ export const dispatchGuidedOnboarding = (
   return next;
 };
 
+// Só os passos que ainda pausam o guia pra explicar algo entram aqui —
+// "editar categoria", "trocar de ano", "Q1-Q4/meses", "tema" e "esconder
+// categoria" saíram do guia (viraram descobríveis sozinhos, ver
+// skip_calendar/os efeitos de pular em app/page.tsx) e não contam mais.
+// "Calendário pronto" também saiu como passo próprio — agora é uma
+// sugestão dentro do resumo final, junto das categorias.
 const GUIDED_ONBOARDING_STEP_POSITION: Partial<
   Record<GuidedOnboardingStep, number>
 > = {
   context_selection: 1,
   date_category_selection: 2,
   date_category_reveal: 2,
-  date_instruction: 2,
-  date_details: 2,
-  visibility_instruction: 3,
-  year_instruction: 4,
-  edit_instruction: 5,
-  edit_preview: 5,
-  calendar_instruction: 6,
-  calendar_selection: 6,
-  period_navigation_instruction: 7,
+  date_instruction: 3,
+  date_details: 3,
+  habit_surface_instruction: 4,
+  habit_instruction: 5,
+  habit_created_confirmation: 6,
+  wrap_up_instruction: 7,
 };
 
 export const getGuidedOnboardingTotalSteps = (options: {
   showHabitSteps: boolean;
-}) => (options.showHabitSteps ? 8 : 7);
+}) => (options.showHabitSteps ? 8 : 4);
 
 export const getGuidedOnboardingProgress = (
   step: GuidedOnboardingStep,
-  options: { showHabitSteps: boolean }
+  // wrapUpOrganizerOpen distingue as duas telas do resumo final: "abra o
+  // Organizar" (passo 7) e, já dentro dele, "escolha as sugestões" (passo
+  // 8) — mesmo passo do reducer, duas paradas do guia.
+  options: { showHabitSteps: boolean; wrapUpOrganizerOpen?: boolean }
 ): { current: number; total: number } => {
   const total = getGuidedOnboardingTotalSteps(options);
-  const current = GUIDED_ONBOARDING_STEP_POSITION[step] ?? total;
+  const base = GUIDED_ONBOARDING_STEP_POSITION[step] ?? total;
+  const current =
+    step === "wrap_up_instruction" && options.wrapUpOrganizerOpen
+      ? base + 1
+      : base;
   return { current, total };
 };
 
@@ -939,6 +961,7 @@ export type WrapUpCategorySuggestion = {
 // com pelo menos um. Aparecem no resumo final do guia (wrap_up_instruction)
 // para adotar como categoria de verdade.
 const WRAP_UP_SUGGESTIONS_PERSONAL: WrapUpCategorySuggestion[] = [
+  { id: "wrap-up-eventos", name: "Eventos", color: CATEGORY_COLOR_BASE_GRAPHITE },
   { id: "wrap-up-saude", name: "Saúde", color: CATEGORY_COLOR_BASE_CORAL },
   { id: "wrap-up-estudos", name: "Estudos", color: CATEGORY_COLOR_BASE_INDIGO },
   { id: "wrap-up-casa", name: "Casa", color: CATEGORY_COLOR_BASE_SAND },
@@ -950,6 +973,7 @@ const WRAP_UP_SUGGESTIONS_PERSONAL: WrapUpCategorySuggestion[] = [
 ];
 
 const WRAP_UP_SUGGESTIONS_WORK: WrapUpCategorySuggestion[] = [
+  { id: "wrap-up-eventos-work", name: "Eventos", color: CATEGORY_COLOR_BASE_GRAPHITE },
   { id: "wrap-up-reunioes", name: "Reuniões", color: CATEGORY_COLOR_BASE_TEAL },
   { id: "wrap-up-metas", name: "Metas", color: CATEGORY_COLOR_BASE_ORANGE },
   { id: "wrap-up-treinamentos", name: "Treinamentos", color: CATEGORY_COLOR_BASE_VIOLET },
