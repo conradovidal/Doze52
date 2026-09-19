@@ -77,7 +77,11 @@ export function DesktopHabitsPrototype({
         '[data-onboarding-retrospective-date="true"]'
       ) ?? []
     ).at(-1);
-    target?.scrollIntoView({ block: "center", inline: "center" });
+    // "hoje" está perto do fim do ano visível (só falta out/nov/dez depois
+    // dele) — "center" força rolagem até o fundo tentando compensar o que
+    // não existe, empurrando dezembro pra tela e deixando um vão vazio
+    // depois dele. "nearest" só ajusta se "hoje" já não estiver visível.
+    target?.scrollIntoView({ block: "nearest", inline: "center" });
   }, [retrospectiveDates]);
 
   const controlsNotice =

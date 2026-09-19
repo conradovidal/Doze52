@@ -46,7 +46,11 @@ const toEvent = (match: SeedMatch): CalendarPackEvent => ({
 const createPack = (teamId: string, teamName: string): CalendarPack => ({
   id: `brasileirao-2026-${slug(teamName)}`,
   version: seed.packVersions[teamId as keyof typeof seed.packVersions] ?? (teamId === GREMIO_ID ? 6 : 2),
-  name: `Jogos ${teamName}`,
+  // Nome genérico no seletor de calendários prontos — o nome específico do
+  // time só aparece na categoria depois de adicionada (ver categories abaixo
+  // e calendar-pack-launcher.tsx, que já mostra "Jogos do seu time
+  // favorito" antes da escolha).
+  name: "Jogos do seu time",
   eyebrow: teamName,
   icon: "soccer-ball",
   description: "Jogos oficialmente confirmados nas competições nacionais e continentais cobertas.",

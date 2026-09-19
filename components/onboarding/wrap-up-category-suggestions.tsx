@@ -584,7 +584,14 @@ export function WrapUpCategorySuggestions({
                   {
                     groupId,
                     categoryId: createdCategory?.id,
-                    name: pack.name,
+                    // O nome do pack ("Feriados") é genérico no seletor —
+                    // a categoria de verdade que acabou de nascer já tem o
+                    // nome específico da variante (ex.: "Feriados SP"), que
+                    // é o que precisa aparecer aqui.
+                    name:
+                      createdCategory?.name ??
+                      pack.categories[0]?.name ??
+                      pack.name,
                     color: pack.categories[0]?.color,
                   },
                 ]

@@ -4,7 +4,9 @@ import type { CalendarPack } from "./types";
 export const formula12026Pack = {
   ...(packData as CalendarPack),
   version: 3,
-  name: "Etapas F1",
+  // Nome genérico no seletor — o nome específico da categoria criada é
+  // "Etapas F1" (ver categories abaixo).
+  name: "Corridas F1",
   icon: "racing-helmet",
   description: "Todas as etapas da temporada 2026 em um calendário.",
   eyebrow: "Temporada 2026",

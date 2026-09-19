@@ -486,8 +486,10 @@ const createStateHolidayEvents = (
 };
 
 // Mesmo id/key em todo estado — é o que permite "Trocar estado" substituir
-// os eventos sem criar uma categoria nova. Só o nome muda por variante,
-// para refletir no app o mesmo nome que aparece no seletor do pack.
+// os eventos sem criar uma categoria nova. O nome muda por variante (ex.:
+// "Feriados SP"), diferente do nome genérico do pack no seletor
+// ("Feriados") — é o nome que fica na categoria depois de adicionado que
+// segue a convenção por estado, não o título do card de seleção.
 const holidayCategoryForState = (uf: string) => ({
   id: HOLIDAY_CATEGORY_ID,
   key: HOLIDAY_CATEGORY_KEY,
@@ -503,7 +505,7 @@ export const holidays2026Packs = stateDefinitions.map((definition, stateIndex): 
     id: `holidays-${definition.slug}`,
     regionCode: definition.uf,
     version: 1,
-    name: `Feriados ${definition.uf}`,
+    name: "Feriados",
     eyebrow: definition.label,
     icon: "calendar",
     description:

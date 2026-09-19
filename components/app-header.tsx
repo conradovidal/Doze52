@@ -140,6 +140,10 @@ type AppHeaderProps = {
   onGuidedThemeChange?: () => void;
   headerMinimized?: boolean;
   onboardingActive?: boolean;
+  // Passos do guia focados em hábito (ver app/page.tsx) — a fileira de
+  // categorias recolhe enquanto eles estiverem em cena, independente da
+  // preferência salva ou de `onboardingActive`.
+  guidedHabitStepActive?: boolean;
   onToggleHeaderMinimized?: () => void;
 };
 
@@ -196,6 +200,7 @@ export function AppHeader({
   onGuidedThemeChange,
   headerMinimized = false,
   onboardingActive = false,
+  guidedHabitStepActive = false,
   onToggleHeaderMinimized,
 }: AppHeaderProps) {
   const profiles = useStore((s) => s.profiles);
@@ -378,9 +383,10 @@ export function AppHeader({
   // categorias recolhem — sem isso, o card precisaria cobrir uma faixa maior
   // (ou deixaria chips escapando pelas bordas) e o header oscilaria de altura
   // entre passos. Contextos (Pessoal/Profissional) continuam visíveis.
-  const effectiveCategoriesRowExpanded = guidedSelectionNotice
-    ? false
-    : onboardingActive || categoriesRowExpanded;
+  const effectiveCategoriesRowExpanded =
+    guidedSelectionNotice || guidedHabitStepActive
+      ? false
+      : onboardingActive || categoriesRowExpanded;
   const categoriesRowManuallySetRef = React.useRef(false);
 
   React.useLayoutEffect(() => {

@@ -671,6 +671,16 @@ export default function HomePage() {
     );
     return () => window.clearTimeout(timer);
   }, [guidedOnboardingContextChosen, headerMinimized]);
+  // Passos focados em hábito (ainda na Anual apontando pro botão, ou já na
+  // superfície de Hábitos criando/confirmando o primeiro) não têm nada a ver
+  // com a fileira de categorias — mantê-la à mostra só disputa espaço com o
+  // que o passo está pedindo pra pessoa fazer.
+  const guidedHabitStepActive = Boolean(
+    showGuidedOnboarding &&
+      (guidedOnboarding?.step === "habit_surface_instruction" ||
+        guidedOnboarding?.step === "habit_instruction" ||
+        guidedOnboarding?.step === "habit_created_confirmation")
+  );
 
   const habitShowcaseDataEligible = Boolean(
     // Only ever show the demo/example habits while the guided tour is
@@ -2759,8 +2769,7 @@ export default function HomePage() {
     if (mobileHabitsOnboardingStep === "annual_explore") {
       return {
         target: "mobile-explore",
-        instruction:
-          "Este é um ano de exemplo, já com categorias e eventos. Dê uma olhada e depois vamos montar o seu.",
+        instruction: "Este é um ano de exemplo. Dê uma olhada e vamos montar o seu.",
         actionLabel: "Continuar",
         stepLabel: getMobileHabitsOnboardingStepLabel("annual_explore"),
       };
@@ -2967,6 +2976,7 @@ export default function HomePage() {
             accountNudgeVisible && !session?.user.id
           }
           onboardingActive={categoriesForceExpandActive}
+          guidedHabitStepActive={guidedHabitStepActive}
           guidedOnboardingActive={showGuidedOnboarding}
           onboardingLayoutLocked={false}
           onboardingLayoutReserved={
@@ -3287,10 +3297,16 @@ export default function HomePage() {
           notice={mobileAnnualOnboardingNotice}
           onClose={dismissMobileAnnualOnboarding}
           onAction={advanceMobileAnnualOnboarding}
-          // O alvo ("Perfil") vive na nav inferior — grudar o card no topo
-          // afastaria a explicação do botão que ela aponta.
+          // "Perfil" vive na nav inferior — grudar o card no topo afastaria
+          // a explicação do botão que ela aponta. "mobile-explore" também
+          // desce: o que importa nesse passo é o painel de contextos e
+          // categorias logo abaixo do cabeçalho, que o card cobriria se
+          // ficasse no topo.
           mobilePlacement={
-            mobileAnnualOnboardingNotice.target === "profile" ? "bottom" : "top"
+            mobileAnnualOnboardingNotice.target === "profile" ||
+            mobileAnnualOnboardingNotice.target === "mobile-explore"
+              ? "bottom"
+              : "top"
           }
         />
       ) : null}

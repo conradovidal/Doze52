@@ -41,7 +41,9 @@ export const worldCup2026BrazilPack: CalendarPack = {
   ...baseWorldCup2026Pack,
   ...sharedPackProperties,
   id: "world-cup-2026-brazil",
-  name: "Brasil Copa 2026",
+  // Nome genérico no seletor — o nome específico da cobertura só aparece na
+  // categoria depois de adicionada (ver copaCategoryWithName abaixo).
+  name: "Copa do Mundo 2026",
   categories: [copaCategoryWithName("Brasil Copa 2026")],
   variantGroup: {
     ...sharedPackProperties.variantGroup,
@@ -56,7 +58,7 @@ export const worldCup2026AllPack: CalendarPack = {
   ...baseWorldCup2026Pack,
   ...sharedPackProperties,
   id: "world-cup-2026",
-  name: "Copa 2026",
+  name: "Copa do Mundo 2026",
   categories: [copaCategoryWithName("Copa 2026")],
   variantGroup: {
     ...sharedPackProperties.variantGroup,
