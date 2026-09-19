@@ -10,6 +10,7 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DragMoveEvent,
   type DragOverEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
@@ -110,7 +111,17 @@ type CategoryBarProps = {
   // ativo) sem esconder nada — as categorias continuam visíveis normalmente,
   // só a interação fica bloqueada até o guia terminar ou ser fechado.
   locked?: boolean;
+  // Arrastar uma categoria pra fora da fileira (pra baixo, além de
+  // DRAG_OUT_THRESHOLD_PX) remove em vez de reordenar — só usado no resumo
+  // do guia (WrapUpCategorySuggestions), pra abrir espaço pra uma sugestão
+  // sem depender só da troca automática da última posição.
+  onDragCategoryOut?: (categoryId: string) => void;
 };
+
+// Distância mínima pra baixo pra contar como "arrastou pra fora", não um
+// reordenamento comum — maior que a altura de um chip (h-8/h-10), pra não
+// disparar com o gesto normal de trocar duas categorias adjacentes de lugar.
+const DRAG_OUT_THRESHOLD_PX = 56;
 
 type DragState = {
   id: string;
@@ -133,6 +144,7 @@ function EditCategoryChip({
   isOverlay = false,
   isEvicting = false,
   isEntering = false,
+  isRemoving = false,
   editLocked = false,
   style,
   chipRef,
@@ -148,6 +160,10 @@ function EditCategoryChip({
   isOverlay?: boolean;
   isEvicting?: boolean;
   isEntering?: boolean;
+  // Só o overlay que segue o cursor usa isto: arrastada para fora da fileira
+  // (ver DRAG_OUT_THRESHOLD_PX) além do fim das sugestões, sinaliza que
+  // soltar ali remove a categoria em vez de reordenar.
+  isRemoving?: boolean;
   editLocked?: boolean;
   style?: React.CSSProperties;
   chipRef?: (node: HTMLElement | null) => void;
@@ -188,6 +204,7 @@ function EditCategoryChip({
         `transition-[opacity,transform] ${MOTION_CLASS}`,
         mobileDense && "h-10 w-full rounded-[8px]",
         isOverlay && CHIP_OVERLAY_CLASS,
+        isRemoving && "opacity-60 ring-2 ring-destructive",
         isPlaceholder && "bg-background/80",
         isEvicting && "scale-90 opacity-0 translate-y-1",
         entering && "scale-90 opacity-0 -translate-y-1"
@@ -459,6 +476,7 @@ export function CategoryBar({
   previewGhostSuggestion,
   nowrap = false,
   locked = false,
+  onDragCategoryOut,
 }: CategoryBarProps) {
   const { mode: themeMode } = useTheme();
   const selectedProfileIds = useStore((s) => s.selectedProfileIds);
@@ -469,7 +487,9 @@ export function CategoryBar({
 
   const [activeDrag, setActiveDrag] = React.useState<DragState | null>(null);
   const [draftOrderIds, setDraftOrderIds] = React.useState<string[] | null>(null);
+  const [dragOutArmed, setDragOutArmed] = React.useState(false);
   const draftOrderIdsRef = React.useRef<string[] | null>(null);
+  const dragOutArmedRef = React.useRef(false);
   const lastOverIdRef = React.useRef<string | null>(null);
   const overlayPortalTarget = typeof document !== "undefined" ? document.body : null;
 
@@ -531,7 +551,9 @@ export function CategoryBar({
   const resetDragState = React.useCallback(() => {
     setActiveDrag(null);
     setDraftOrderIds(null);
+    setDragOutArmed(false);
     draftOrderIdsRef.current = null;
+    dragOutArmedRef.current = false;
     lastOverIdRef.current = null;
   }, []);
 
@@ -553,9 +575,24 @@ export function CategoryBar({
     [orderedCategoriesForEditingProfile]
   );
 
+  const handleDragMove = React.useCallback(
+    (event: DragMoveEvent) => {
+      if (!onDragCategoryOut) return;
+      const armed = event.delta.y > DRAG_OUT_THRESHOLD_PX;
+      if (armed !== dragOutArmedRef.current) {
+        dragOutArmedRef.current = armed;
+        setDragOutArmed(armed);
+      }
+    },
+    [onDragCategoryOut]
+  );
+
   const handleDragOver = React.useCallback(
     (event: DragOverEvent) => {
       const { active, over } = event;
+      // Armado pra remover: a fileira fica parada (sem prévia de reordenar)
+      // enquanto o chip arrastado mostra o anel vermelho no overlay.
+      if (dragOutArmedRef.current) return;
       if (!over || active.id === over.id) return;
 
       lastOverIdRef.current = String(over.id);
@@ -577,6 +614,12 @@ export function CategoryBar({
     (event: DragEndEvent) => {
       const { active, over } = event;
       if (!editingProfileId) {
+        resetDragState();
+        return;
+      }
+
+      if (onDragCategoryOut && dragOutArmedRef.current) {
+        onDragCategoryOut(String(active.id));
         resetDragState();
         return;
       }
@@ -610,6 +653,7 @@ export function CategoryBar({
       categories,
       categoriesForEditingProfile,
       editingProfileId,
+      onDragCategoryOut,
       resetDragState,
       setCategoriesOrder,
     ]
@@ -757,6 +801,7 @@ export function CategoryBar({
       collisionDetection={pointerAwareCollisionDetection}
       measuring={INLINE_SORTABLE_MEASURING}
       onDragStart={handleDragStart}
+      onDragMove={handleDragMove}
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
       onDragCancel={resetDragState}
@@ -819,6 +864,7 @@ export function CategoryBar({
                   category={activeCategory}
                   mobileDense={mobileDense}
                   isOverlay
+                  isRemoving={dragOutArmed}
                   style={{ width: activeDrag?.width ?? undefined }}
                 />
               ) : null}

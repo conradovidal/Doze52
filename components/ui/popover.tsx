@@ -21,8 +21,16 @@ function PopoverContent({
   className,
   align = "center",
   sideOffset = 4,
+  // Alguns consumidores (ex.: o popover ancorado do EventDialog no desktop)
+  // já animam a entrada do próprio conteúdo com framer-motion; empilhar a
+  // entrada CSS do Radix por cima daquilo produz um "duplo movimento". A
+  // saída continua sempre animada por CSS, já que o Presence do Radix
+  // depende dela para adiar o unmount.
+  animateEnter = true,
   ...props
-}: React.ComponentProps<typeof PopoverPrimitive.Content>) {
+}: React.ComponentProps<typeof PopoverPrimitive.Content> & {
+  animateEnter?: boolean;
+}) {
   return (
     <PopoverPrimitive.Portal>
       <PopoverPrimitive.Content
@@ -30,7 +38,9 @@ function PopoverContent({
         align={align}
         sideOffset={sideOffset}
         className={cn(
-          "bg-popover/98 text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-50 w-72 origin-(--radix-popover-content-transform-origin) rounded-2xl border border-border/80 p-4 shadow-[0_20px_45px_-30px_rgba(15,23,42,0.38)] outline-hidden backdrop-blur",
+          "bg-popover/98 text-popover-foreground data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 z-50 w-72 origin-(--radix-popover-content-transform-origin) rounded-2xl border border-border/80 p-4 shadow-[0_20px_45px_-30px_rgba(15,23,42,0.38)] outline-hidden backdrop-blur",
+          animateEnter &&
+            "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
           className
         )}
         {...props}

@@ -74,6 +74,11 @@ type HabitControlsProps = {
   guidedNotice?: GuidedToolbarNotice | null;
   onDismissGuidedNotice?: () => void;
   onGuidedNoticeAction?: () => void;
+  // Passo "intro" da jornada mobile: a tela deve abrir limpa, só com o
+  // card de boas-vindas — sem isto, "expanded" já nasce true por padrão
+  // (ver seu useState abaixo) e a lista aparece atrás do card de qualquer
+  // jeito. Sobrepõe até o próprio guidedNotice; ninguém mais passa isto.
+  forceCollapsed?: boolean;
 };
 
 type DragState = { id: string; width: number | null };
@@ -234,6 +239,7 @@ export function HabitControls({
   guidedNotice = null,
   onDismissGuidedNotice,
   onGuidedNoticeAction,
+  forceCollapsed = false,
 }: HabitControlsProps) {
   const { mode: themeMode } = useTheme();
   const [expanded, setExpanded] = React.useState(() => {
@@ -266,7 +272,8 @@ export function HabitControls({
   // com a lista recolhida — força aberto enquanto o guia (desktop ou a
   // jornada própria do mobile) estiver instruindo algo aqui, mesmo que a
   // pessoa tenha recolhido antes.
-  const effectiveExpanded = expanded || isEditing || Boolean(guidedNotice);
+  const effectiveExpanded =
+    !forceCollapsed && (expanded || isEditing || Boolean(guidedNotice));
   const controlsId = React.useId();
   const [activeDrag, setActiveDrag] = React.useState<DragState | null>(null);
   const [draftOrderIds, setDraftOrderIds] = React.useState<string[] | null>(null);

@@ -24,10 +24,13 @@ export type GuidedToolbarNotice = {
     // Passos da jornada curta e própria do mobile (lib/mobile-habits-onboarding.ts).
     // Não fazem parte do tour desktop.
     | "mobile-intro"
+    | "mobile-save-progress"
     | "mobile-goto-annual"
+    | "mobile-explore"
     | "mobile-organize"
     | "mobile-today";
-  title: string;
+  // Texto único do passo: sem título separado de "subtexto" — toda a
+  // condução do guia usa um só bloco de texto, mesmo peso visual.
   instruction: string;
   actionLabel?: string;
   stepLabel?: string;
@@ -93,10 +96,14 @@ export function GuidedToolbarNoticeCard({
   portalTargetSelector,
   inline = false,
   mobilePlacement = "top",
+  surface = "inverse",
 }: {
   notice: GuidedToolbarNotice;
   onClose: () => void;
-  onAction?: () => void;
+  // Recebe o evento do clique (opcional: quase ninguém usa) para quem
+  // precisa de um elemento-âncora — ex.: abrir o cadastro perto do próprio
+  // botão que disparou a ação, como no passo de salvar progresso do mobile.
+  onAction?: (event?: React.MouseEvent<HTMLButtonElement>) => void;
   // Link de texto secundário, abaixo do botão principal — hoje só usado
   // pelo passo de abertura do mobile, para oferecer "Entrar na minha conta"
   // sem competir com o "Continuar".
@@ -124,6 +131,15 @@ export function GuidedToolbarNoticeCard({
    * grudado no topo criaria distância entre a explicação e o que ela aponta.
    */
   mobilePlacement?: "top" | "bottom";
+  /**
+   * "inverse" (padrão): o card inverte claro/escuro em relação à página —
+   * pensado para flutuar sobre o próprio produto (a grade do ano, a lista de
+   * hábitos) e se destacar dele. "plain": card normal, na mesma superfície
+   * clara/escura ao redor — para quando ele já vive dentro de um painel
+   * (ex.: o resumo entre categorias e sugestões, dentro de "Organizar"), onde
+   * a inversão lia como uma caixa preta fora de lugar.
+   */
+  surface?: "inverse" | "plain";
 }) {
   const [mounted, setMounted] = React.useState(false);
   const cardRef = React.useRef<HTMLElement | null>(null);
@@ -237,11 +253,18 @@ export function GuidedToolbarNoticeCard({
       aria-label="Instrução do guia inicial"
       aria-live="polite"
       className={cn(
-        "inverse-product-surface w-full rounded-2xl border border-border bg-card p-3.5 text-left text-card-foreground shadow-[0_24px_60px_-20px_rgba(15,23,42,0.85)]",
+        "w-full rounded-2xl border p-4 text-left",
+        surface === "inverse"
+          ? "inverse-product-surface border-border bg-card text-card-foreground shadow-[0_24px_60px_-20px_rgba(15,23,42,0.85)]"
+          : "border-border/70 bg-muted/40 text-foreground shadow-none",
         inline
           ? "relative"
           : cn(
-              "fixed left-3 w-[min(22rem,calc(100vw-1.5rem))] md:absolute",
+              // Passo "criar hábito" pede um card mais estreito (texto curto
+              // em duas linhas) — os demais mantêm a largura padrão.
+              notice.target === "habit"
+                ? "fixed left-3 w-[min(18rem,calc(100vw-1.5rem))] md:absolute"
+                : "fixed left-3 w-[min(22rem,calc(100vw-1.5rem))] md:absolute",
               mobilePlacement === "bottom"
                 ? "bottom-[calc(env(safe-area-inset-bottom,0px)+4.5rem)]"
                 : "top-[calc(env(safe-area-inset-top,0px)+4.6rem)]",
@@ -273,18 +296,19 @@ export function GuidedToolbarNoticeCard({
     >
       <div className="pr-7">
         <div
-          key={`${notice.target}:${notice.title}`}
+          key={`${notice.target}:${notice.instruction}`}
           className="min-w-0 animate-in fade-in slide-in-from-bottom-1 duration-300 motion-reduce:animate-none"
         >
           {notice.stepLabel ? (
-            <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-primary">
+            <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-primary">
               {notice.stepLabel}
             </p>
           ) : null}
-          <p className="text-base font-semibold leading-5">
-            {notice.title}
-          </p>
-          <p className="mt-1 text-sm leading-5 text-muted-foreground">
+          {/* font-semibold, não font-medium: texto claro em peso médio sobre
+              o card escuro (inverse-product-surface) lê como "apagado" mesmo
+              com contraste correto — um efeito óptico conhecido de texto
+              claro sobre fundo escuro, não um problema de cor. */}
+          <p className="whitespace-pre-line text-[15px] font-semibold leading-6 tracking-[-0.005em]">
             {notice.instruction}
           </p>
         </div>
@@ -304,7 +328,7 @@ export function GuidedToolbarNoticeCard({
           type="button"
           variant="premium"
           size="sm"
-          className="mt-3 w-full"
+          className="mt-3.5 w-full"
           onClick={onAction}
         >
           <Check className="size-4" aria-hidden="true" />

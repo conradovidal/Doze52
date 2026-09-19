@@ -76,12 +76,12 @@ export function HabitEditorFields({
       ) : null}
 
       <div className="mt-5 space-y-4">
-        <div className="space-y-1.5">
-          <label htmlFor="habit-prototype-name" className="text-sm font-medium">
-            Nome do hábito
-          </label>
+        <div>
+          {/* Mesmo princípio do editor de evento: o título do diálogo e o
+              placeholder já identificam o campo. */}
           <Input
             id="habit-prototype-name"
+            aria-label="Nome do hábito"
             value={name}
             maxLength={80}
             autoFocus

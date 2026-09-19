@@ -20,9 +20,9 @@ test("modal de calendarios permanece alinhado no mobile", async ({ page }) => {
   const cards = dialog.getByRole("article");
   await expect(cards).toHaveCount(4);
   await expect(cards.getByRole("heading")).toHaveText([
-    "Feriados nacionais + estaduais",
+    "Feriados",
     "Jogos do seu time",
-    "Copa do Mundo de 2026",
+    "Copa do Mundo 2026",
     "Corridas F1",
   ]);
 

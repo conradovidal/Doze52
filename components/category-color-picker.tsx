@@ -37,9 +37,11 @@ export function CategoryColorPicker({
   const normalizedValue = value
     ? getNearestCategoryColor(value).toLowerCase()
     : null;
-  const colorSets = colors
-    ? [{ id: "custom", label: "Cores", colors }]
-    : CATEGORY_COLOR_SETS;
+  // Lista única (quem chama já passou as cores): sem legenda — "Cores"
+  // acima de uma fileira de cores não informa nada. Os conjuntos nomeados
+  // do seletor completo mantêm a sua.
+  const colorSets: { id: string; label: string | null; colors: readonly string[] }[] =
+    colors ? [{ id: "custom", label: null, colors }] : [...CATEGORY_COLOR_SETS];
 
   return (
     <div
@@ -58,9 +60,11 @@ export function CategoryColorPicker({
             index > 0 && "border-t border-border/50 pt-3"
           )}
         >
-          <legend className="text-[11px] font-medium tracking-wide text-muted-foreground">
-            {set.label}
-          </legend>
+          {set.label ? (
+            <legend className="text-[11px] font-medium tracking-wide text-muted-foreground">
+              {set.label}
+            </legend>
+          ) : null}
           <div
             className={cn(!columns && "grid-cols-8", "grid gap-2 sm:gap-2.5")}
             style={

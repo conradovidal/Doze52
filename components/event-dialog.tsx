@@ -43,6 +43,7 @@ import type { GuidedCreationIntent } from "@/lib/onboarding";
 import { logDevError, logProdError } from "@/lib/safe-log";
 import { ValidationError, validateEventInput } from "@/lib/validation";
 import { MOTION_SPRING } from "@/lib/motion";
+import { cn } from "@/lib/utils";
 
 const FIELD_LABEL_CLASS =
   "text-[12px] font-semibold tracking-[-0.01em] text-foreground/78";
@@ -471,14 +472,18 @@ export function EventDialog({
         </Button>
       </div>
 
-      <div className="space-y-5">
-          <div className="space-y-1.5">
-            <label htmlFor="event-title" className={FIELD_LABEL_CLASS}>
-              Título do evento
-            </label>
+      {/* min-w-0: o Dialog/Popover ao redor é display:grid, então sem isto
+          este item herda um mínimo automático igual ao min-content dos
+          descendentes (os 3 pills com texto sem quebra) — ele estoura a
+          largura do card em vez dos pills encolherem. */}
+      <div className="min-w-0 space-y-5">
+          {/* Sem rótulo visível: o título do editor e o placeholder já dizem
+              o que é este campo. O nome acessível continua no aria-label. */}
+          <div className="space-y-2">
             <Input
               id="event-title"
               ref={titleInputRef}
+              aria-label="Título do evento"
               className="h-10 rounded-xl text-[15px]"
               placeholder={titlePlaceholder}
               value={title}
@@ -497,6 +502,11 @@ export function EventDialog({
             ) : null}
           </div>
 
+          {/* Contexto e categoria têm flex-auto: encolhem proporcionalmente
+              ao próprio tamanho quando o espaço aperta, em vez de ficarem
+              fixos e forçarem a data a absorver todo o aperto sozinha. No
+              mobile (abaixo do md), a data ainda assim quebra pra própria
+              linha — ver comentário no DateRangeQuickPicker abaixo. */}
           <div className="flex flex-wrap items-center gap-2">
             <Select
               value={profileId}
@@ -505,7 +515,7 @@ export function EventDialog({
             >
               <SelectTrigger
                 size="sm"
-                className="h-8 w-auto min-w-0 shrink-0 gap-1.5 rounded-full border-primary bg-primary px-3 text-[12.5px] font-semibold text-primary-foreground shadow-none hover:bg-primary/90 dark:bg-primary dark:hover:bg-primary/90"
+                className="h-8 min-w-0 flex-auto gap-1.5 rounded-full border-primary bg-primary px-3 text-[12.5px] font-semibold text-primary-foreground shadow-none hover:bg-primary/90 dark:bg-primary dark:hover:bg-primary/90"
               >
                 <span className="inline-flex min-w-0 items-center gap-1.5">
                   {currentProfile ? <ProfileIcon icon={currentProfile.icon} size={12} /> : null}
@@ -534,7 +544,7 @@ export function EventDialog({
             >
               <SelectTrigger
                 size="sm"
-                className="h-8 w-auto min-w-0 shrink-0 gap-1.5 rounded-full px-3 text-[12.5px] font-semibold shadow-none"
+                className="h-8 min-w-0 flex-auto gap-1.5 rounded-full px-3 text-[12.5px] font-semibold shadow-none"
                 style={
                   currentCategoryToken
                     ? {
@@ -582,7 +592,13 @@ export function EventDialog({
               startDate={startDate}
               endDate={endDate}
               disabled={isManagedEvent}
-              className="min-w-0 flex-1 justify-center"
+              // Abaixo do breakpoint em que o editor vira popover ancorado
+              // (md, o mesmo usado por isDesktopViewport), o card fica
+              // estreito demais para os 3 pills lado a lado sem espremer os
+              // outros dois. basis-full força a data pra própria linha só
+              // nesse caso; a partir do md volta a dividir a linha com os
+              // outros dois normalmente.
+              className="min-w-0 grow shrink basis-full justify-center md:basis-auto"
               onChange={({ startDate: nextStart, endDate: nextEnd }) => {
                 changedFieldsRef.current.add("startDate");
                 changedFieldsRef.current.add("endDate");
@@ -592,23 +608,36 @@ export function EventDialog({
             />
           </div>
 
-          <details
-            open={advancedOpen}
-            onToggle={(event) => setAdvancedOpen(event.currentTarget.open)}
-            className="group"
-          >
-            <summary className="flex cursor-pointer list-none items-center gap-1.5 py-1 text-[12px] font-semibold text-foreground/78 outline-none focus-visible:ring-2 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
+          <div className="group" data-state={advancedOpen ? "open" : "closed"}>
+            <button
+              type="button"
+              aria-expanded={advancedOpen}
+              onClick={() => setAdvancedOpen((current) => !current)}
+              className="flex cursor-pointer items-center gap-1.5 py-1 text-[12px] font-semibold text-foreground/78 outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+            >
               Mais opções
-              <ChevronDown className="size-3.5 text-muted-foreground transition-transform group-open:rotate-180" />
-            </summary>
-            <div className="space-y-5 pt-3">
+              <ChevronDown className="size-3.5 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+            </button>
+            {/* Grid de uma linha com altura animável (0fr → 1fr): a mesma
+                curva do chevron acima, em vez do "pop" instantâneo de um
+                <details> nativo — o gesto de abrir some visualmente coerente
+                do início ao fim. */}
+            <div
+              className="grid transition-[grid-template-rows] duration-[220ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
+              style={{ gridTemplateRows: advancedOpen ? "1fr" : "0fr" }}
+            >
+              <div className="overflow-hidden">
+                <div
+                  className={cn(
+                    "space-y-5 pt-3 transition-opacity duration-[220ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
+                    advancedOpen ? "opacity-100" : "opacity-0"
+                  )}
+                >
 
-          <div className="space-y-1">
-            <label htmlFor="event-notes" className={FIELD_LABEL_CLASS}>
-              Descrição
-            </label>
+          <div>
             <textarea
               id="event-notes"
+              aria-label="Descrição"
               rows={3}
               className="min-h-[4.5rem] w-full resize-y rounded-xl border border-border/80 bg-background px-3 py-2 text-sm outline-none transition focus:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
               placeholder="Adicione detalhes úteis para você se lembrar depois"
@@ -623,12 +652,7 @@ export function EventDialog({
 
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-3">
-              <div className="space-y-0.5">
-                <p className={FIELD_LABEL_CLASS}>Recorrência</p>
-                <p className="text-xs text-muted-foreground">
-                  Use apenas quando esse evento se repetir ao longo do ano.
-                </p>
-              </div>
+              <p className={FIELD_LABEL_CLASS}>Recorrência</p>
               <Select
                 value={recurrenceType}
                 onValueChange={(value) => {
@@ -641,7 +665,7 @@ export function EventDialog({
                 <SelectTrigger className="h-9 w-auto shrink-0 rounded-xl border-border/80 bg-background shadow-sm">
                   <span>
                     {recurrenceType === "none"
-                      ? "Sem recorrencia"
+                      ? "Sem recorrência"
                       : recurrenceType === "weekly"
                         ? "Semanal"
                         : recurrenceType === "biweekly"
@@ -652,7 +676,7 @@ export function EventDialog({
                   </span>
                 </SelectTrigger>
                 <SelectContent position="popper" side="bottom" align="end">
-                  <SelectItem value="none">Sem recorrencia</SelectItem>
+                  <SelectItem value="none">Sem recorrência</SelectItem>
                   <SelectItem value="weekly">Semanal</SelectItem>
                   <SelectItem value="biweekly">A cada 2 semanas</SelectItem>
                   <SelectItem value="monthly">Mensal</SelectItem>
@@ -676,8 +700,10 @@ export function EventDialog({
               </div>
             ) : null}
           </div>
+                </div>
+              </div>
             </div>
-          </details>
+          </div>
       </div>
 
         <DialogFooter className="gap-2 sm:justify-between">
@@ -813,6 +839,7 @@ export function EventDialog({
           align="start"
           sideOffset={12}
           collisionPadding={12}
+          animateEnter={false}
           className="max-h-[calc(100dvh-1.5rem)] w-[min(440px,calc(100vw-1.5rem))] overflow-y-auto p-0"
           onKeyDown={handleContentKeyDown}
           onOpenAutoFocus={handleOpenAutoFocus}

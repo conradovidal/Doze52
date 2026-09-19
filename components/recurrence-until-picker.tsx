@@ -55,14 +55,25 @@ export function RecurrenceUntilPicker({
   const [visibleMonth, setVisibleMonth] = React.useState(() =>
     startOfMonth(value ? parseIsoLocal(value) : minDate ? parseIsoLocal(minDate) : new Date())
   );
+  const [monthDirection, setMonthDirection] = React.useState<1 | -1>(1);
+  // Mesmo critério do DateRangeQuickPicker: não anima a troca de mês que
+  // acontece só por abrir o popover, apenas as trocas explícitas via seta.
+  const skipMonthAnimRef = React.useRef(true);
 
   const openPicker = (nextOpen: boolean) => {
     setOpen(nextOpen);
     if (nextOpen) {
+      skipMonthAnimRef.current = true;
       setVisibleMonth(
         startOfMonth(value ? parseIsoLocal(value) : minDate ? parseIsoLocal(minDate) : new Date())
       );
     }
+  };
+
+  const goToMonth = (direction: 1 | -1) => {
+    skipMonthAnimRef.current = false;
+    setMonthDirection(direction);
+    setVisibleMonth((month) => addMonths(month, direction));
   };
 
   const monthDays = getMonthDaysWithLeading(
@@ -98,7 +109,7 @@ export function RecurrenceUntilPicker({
             type="button"
             aria-label="Mês anterior"
             className="grid size-7 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
-            onClick={() => setVisibleMonth((month) => addMonths(month, -1))}
+            onClick={() => goToMonth(-1)}
           >
             <ChevronLeft className="size-4" />
           </button>
@@ -109,7 +120,7 @@ export function RecurrenceUntilPicker({
             type="button"
             aria-label="Próximo mês"
             className="grid size-7 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
-            onClick={() => setVisibleMonth((month) => addMonths(month, 1))}
+            onClick={() => goToMonth(1)}
           >
             <ChevronRight className="size-4" />
           </button>
@@ -124,36 +135,47 @@ export function RecurrenceUntilPicker({
             </div>
           ))}
         </div>
-        <div className="grid grid-cols-7 gap-1">
-          {monthDays.map((d, index) => {
-            if (isPlaceholder(d)) {
-              return <div key={`blank-${index}`} />;
-            }
-            const dayIso = fmtIsoDate(d);
-            const isSelected = dayIso === value;
-            const isDisabled = Boolean(minDate) && dayIso < (minDate as string);
-            return (
-              <button
-                key={dayIso}
-                type="button"
-                disabled={isDisabled}
-                onClick={() => {
-                  onChange(dayIso);
-                  setOpen(false);
-                }}
-                className={cn(
-                  "grid h-7 place-items-center rounded-lg text-[12px] transition-colors",
-                  isSelected
-                    ? "bg-foreground text-background font-semibold"
-                    : isDisabled
-                      ? "text-foreground/28 cursor-not-allowed"
-                      : "text-foreground/78 hover:bg-muted/70"
-                )}
-              >
-                {d.getDate()}
-              </button>
-            );
-          })}
+        <div className="overflow-hidden">
+          <div
+            key={`${visibleMonth.getFullYear()}-${visibleMonth.getMonth()}`}
+            className={cn(
+              "grid grid-cols-7 gap-1",
+              !skipMonthAnimRef.current &&
+                (monthDirection === 1
+                  ? "animate-in fade-in-0 slide-in-from-right-2 duration-[220ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
+                  : "animate-in fade-in-0 slide-in-from-left-2 duration-[220ms] ease-[cubic-bezier(0.22,1,0.36,1)]")
+            )}
+          >
+            {monthDays.map((d, index) => {
+              if (isPlaceholder(d)) {
+                return <div key={`blank-${index}`} />;
+              }
+              const dayIso = fmtIsoDate(d);
+              const isSelected = dayIso === value;
+              const isDisabled = Boolean(minDate) && dayIso < (minDate as string);
+              return (
+                <button
+                  key={dayIso}
+                  type="button"
+                  disabled={isDisabled}
+                  onClick={() => {
+                    onChange(dayIso);
+                    setOpen(false);
+                  }}
+                  className={cn(
+                    "grid h-7 place-items-center rounded-lg text-[12px] transition-colors",
+                    isSelected
+                      ? "bg-foreground text-background font-semibold"
+                      : isDisabled
+                        ? "text-foreground/28 cursor-not-allowed"
+                        : "text-foreground/78 hover:bg-muted/70"
+                  )}
+                >
+                  {d.getDate()}
+                </button>
+              );
+            })}
+          </div>
         </div>
         {value ? (
           <button

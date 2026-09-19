@@ -182,10 +182,6 @@ const isDetailedSyncDiagnosticsEnabled =
   process.env.NEXT_PUBLIC_APP_ENV === "dev";
 
 const MOBILE_CALENDAR_UI_MAX_WIDTH_PX = 767;
-// Categorias sempre ocultadas na demonstração de "esconder categoria" do
-// onboarding guiado — fazem parte do conjunto de categorias-seed
-// (lib/store.ts) presente em todo onboarding.
-const VISIBILITY_DEMO_CATEGORY_NAMES = new Set(["Família", "Viagens"]);
 const HabitsPrototype = dynamic(() =>
   import("@/components/habits/habits-prototype").then(
     (module) => module.HabitsPrototype
@@ -372,7 +368,6 @@ export default function HomePage() {
   const profiles = useStore((s) => s.profiles);
   const events = useStore((s) => s.events);
   const categories = useStore((s) => s.categories);
-  const setCategoriesVisibility = useStore((s) => s.setCategoriesVisibility);
   const ensureEventMetadata = useStore((s) => s.ensureEventMetadata);
   const replaceAllData = useStore((s) => s.replaceAllData);
   const resetToOnboardingData = useStore((s) => s.resetToOnboardingData);
@@ -500,8 +495,7 @@ export default function HomePage() {
   const mobileHabitsOnboardingNavLocked =
     (mobileHabitsOnboardingStep === "intro" ||
       mobileHabitsOnboardingStep === "create_habit" ||
-      mobileHabitsOnboardingStep === "mark_day" ||
-      mobileHabitsOnboardingStep === "save_progress") &&
+      mobileHabitsOnboardingStep === "mark_day") &&
     !(guidedOnboarding && isGuidedOnboardingInProgress(guidedOnboarding));
   const [activeDestination, setActiveDestination] =
     React.useState<ProductDestinationId>("annual");
@@ -677,6 +671,16 @@ export default function HomePage() {
     );
     return () => window.clearTimeout(timer);
   }, [guidedOnboardingContextChosen, headerMinimized]);
+  // Passos focados em hábito (ainda na Anual apontando pro botão, ou já na
+  // superfície de Hábitos criando/confirmando o primeiro) não têm nada a ver
+  // com a fileira de categorias — mantê-la à mostra só disputa espaço com o
+  // que o passo está pedindo pra pessoa fazer.
+  const guidedHabitStepActive = Boolean(
+    showGuidedOnboarding &&
+      (guidedOnboarding?.step === "habit_surface_instruction" ||
+        guidedOnboarding?.step === "habit_instruction" ||
+        guidedOnboarding?.step === "habit_created_confirmation")
+  );
 
   const habitShowcaseDataEligible = Boolean(
     // Only ever show the demo/example habits while the guided tour is
@@ -1592,32 +1596,6 @@ export default function HomePage() {
     []
   );
 
-  React.useEffect(() => {
-    if (
-      guidedOnboarding?.step === "edit_instruction" &&
-      inlineEditModeActive
-    ) {
-      updateGuidedOnboarding({
-        type: "open_edit_preview",
-        continueToCalendar: showHabitSteps,
-      });
-    }
-  }, [
-    guidedOnboarding?.step,
-    inlineEditModeActive,
-    showHabitSteps,
-    updateGuidedOnboarding,
-  ]);
-
-  React.useEffect(() => {
-    if (
-      guidedOnboarding?.step !== "calendar_instruction" &&
-      guidedOnboarding?.step !== "calendar_selection"
-    ) {
-      return;
-    }
-    if (!inlineEditModeActive) setWorkspaceEditMode("calendar");
-  }, [guidedOnboarding?.step, inlineEditModeActive]);
 
   const recordDemoInteraction = React.useCallback(
     (key: string) => {
@@ -1855,6 +1833,45 @@ export default function HomePage() {
     },
     [replaceAllData, unlockOnboardingPersonalDemo]
   );
+
+  // "Editar categoria", "calendário pronto" (como passo isolado), "trocar
+  // de ano", "Q1-Q4/meses" e "tema" deixaram de pausar o guia pra explicar
+  // — cada um é descobrível sozinho (ícone de lápis, setas, sol/lua), e
+  // "calendário pronto" virou uma sugestão dentro do resumo final em vez de
+  // passo próprio (ver wrap_up_instruction). O estado interno de cada um
+  // continua existindo no tipo (sessões antigas salvas ainda migram sem
+  // quebrar), só não pausa mais — este efeito passa direto por qualquer um
+  // deles assim que aparecem, sem esperar clique.
+  React.useEffect(() => {
+    const step = guidedOnboarding?.step;
+    if (!step) return;
+    if (step === "edit_instruction") {
+      updateGuidedOnboarding({
+        type: "open_edit_preview",
+        continueToCalendar: true,
+      });
+      return;
+    }
+    if (step === "calendar_instruction" || step === "calendar_selection") {
+      updateGuidedOnboarding({ type: "skip_calendar" });
+      return;
+    }
+    if (step === "year_instruction") {
+      updateGuidedOnboarding({ type: "continue_from_year" });
+      return;
+    }
+    if (step === "visibility_instruction") {
+      updateGuidedOnboarding({ type: "continue_from_visibility" });
+      return;
+    }
+    if (step === "theme_instruction") {
+      const next = updateGuidedOnboarding({
+        type: "confirm_theme",
+        complete: true,
+      });
+      if (next.step === "wrap_up_instruction") trimToRealCategories(next);
+    }
+  }, [guidedOnboarding?.step, trimToRealCategories, updateGuidedOnboarding]);
 
   const finalizeGuidedOnboarding = React.useCallback(
     (next: GuidedOnboardingState) => {
@@ -2470,70 +2487,16 @@ export default function HomePage() {
     if (!showGuidedOnboarding || !guidedOnboarding) return null;
     const { current, total } = getGuidedOnboardingProgress(
       guidedOnboarding.step,
-      { showHabitSteps }
+      { showHabitSteps, wrapUpOrganizerOpen: inlineEditModeActive }
     );
     const stepLabel = `Passo ${current} de ${total}`;
-    if (guidedOnboarding.step === "edit_instruction") {
-      return {
-        target: "edit",
-        title: "Organize contextos e categorias.",
-        instruction:
-          isMobileCalendarUi === true
-            ? "Toque no lápis para abrir o modo de edição."
-            : "Clique em Organizar para abrir o modo de edição.",
-        stepLabel,
-      };
-    }
-    if (guidedOnboarding.step === "edit_preview") {
-      return {
-        target: "edit",
-        title: "Este é o modo de edição.",
-        instruction:
-          isMobileCalendarUi === true
-            ? "Aqui você poderá ajustar nomes, cores e organização. Toque em Finalizar para continuar."
-            : "Aqui você poderá ajustar nomes, cores e organização. Clique em Finalizar para continuar.",
-        stepLabel,
-      };
-    }
-    if (guidedOnboarding.step === "calendar_instruction") {
-      return {
-        target: "calendars",
-        title: "Complemente seu ano com calendários prontos.",
-        instruction: "Use o + para abrir as opções e escolher um calendário.",
-        stepLabel,
-      };
-    }
-    if (guidedOnboarding.step === "year_instruction") {
-      return {
-        target: "year",
-        title: "Aqui você troca o ano.",
-        instruction:
-          "Use as setas para ver o ano anterior ou o próximo. Clique no número no centro para voltar para hoje.",
-        actionLabel: "Continuar",
-        stepLabel,
-      };
-    }
-    if (
-      guidedOnboarding.step === "period_navigation_instruction" &&
-      isMobileCalendarUi !== true
-    ) {
-      return {
-        target: "period-navigation",
-        title: "Veja um recorte do seu ano.",
-        instruction:
-          "Clique nos rótulos Q1-Q4 e JAN-DEZ para ir direto a trimestres e meses.",
-        actionLabel: "Continuar",
-        stepLabel,
-      };
-    }
     if (
       guidedOnboarding.step === "habit_surface_instruction" &&
       isMobileCalendarUi !== true
     ) {
       return {
         target: "habit-surface",
-        title: "Conheça seus hábitos.",
-        instruction: "Clique em Hábitos no topo para mudar de tela.",
+        instruction: "Clique aqui para visualizar seus hábitos.",
         stepLabel,
       };
     }
@@ -2543,9 +2506,7 @@ export default function HomePage() {
     ) {
       return {
         target: "habit",
-        title: "Crie seu primeiro hábito.",
-        instruction:
-          "Viagens, férias e noites especiais já mudam o ritmo de Exercício e Ler 20 minutos. Abra o + e crie o seu.",
+        instruction: "Clique em + para criar o seu\nprimeiro hábito.",
         stepLabel,
       };
     }
@@ -2555,29 +2516,7 @@ export default function HomePage() {
     ) {
       return {
         target: "habit-created",
-        title: "Seu primeiro hábito está pronto.",
-        instruction:
-          "Antes de continuar, marque os dias das duas últimas semanas que conseguir lembrar.",
-        actionLabel: "Continuar",
-        stepLabel,
-      };
-    }
-    if (guidedOnboarding.step === "theme_instruction") {
-      return {
-        target: "theme",
-        title: "Escolha o clima do seu ano.",
-        instruction:
-          "Teste o tema claro e escuro e fique com o que combina mais com você.",
-        actionLabel: guidedOnboarding.themeConfirmedAt ? "Continuar" : undefined,
-        stepLabel,
-      };
-    }
-    if (guidedOnboarding.step === "visibility_instruction") {
-      return {
-        target: "visibility",
-        title: "Esconda o que não precisa agora.",
-        instruction:
-          "Clique numa categoria para ocultá-la do seu ano. Ela continua guardada e volta quando você quiser.",
+        instruction: "Registre as últimas vezes que você realizou este hábito.",
         actionLabel: "Continuar",
         stepLabel,
       };
@@ -2585,10 +2524,9 @@ export default function HomePage() {
     if (guidedOnboarding.step === "wrap_up_instruction") {
       return {
         target: "wrap-up",
-        title: "Veja o que você já construiu.",
         instruction: inlineEditModeActive
-          ? "Sua categoria, seu calendário e seu hábito já estão aqui. Arraste até três sugestões abaixo que fizerem mais sentido pra você. E no dia a dia, marcar seus hábitos também funciona direto pelo celular."
-          : "Abra o Organizar para ver o que você já construiu e escolher mais algumas categorias. E no dia a dia, marcar seus hábitos também funciona direto pelo celular.",
+          ? "Defina 3 categorias para começar! Avalie as sugestões, os calendários prontos e fique à vontade para editá-los."
+          : "Aqui você organiza os seus contextos, categorias de eventos e hábitos. Olhe como está ficando!",
         actionLabel: inlineEditModeActive ? "Finalizar guia" : undefined,
         stepLabel,
         categorySuggestions: getWrapUpCategorySuggestions(
@@ -2605,81 +2543,14 @@ export default function HomePage() {
     showHabitSteps,
   ]);
 
-  // Demonstra a funcionalidade de esconder categoria: ao entrar neste
-  // passo, oculta "Família" e "Viagens" automaticamente, para o resultado
-  // ("categoria escondida") já aparecer junto com a instrução, em vez de
-  // depender só do texto. São sempre as mesmas duas — não as recém-criadas
-  // pela própria pessoa nem uma seleção genérica.
-  const visibilityDemoAppliedRef = React.useRef(false);
-  React.useEffect(() => {
-    if (guidedOnboarding?.step !== "visibility_instruction") {
-      visibilityDemoAppliedRef.current = false;
-      return;
-    }
-    if (visibilityDemoAppliedRef.current) return;
-    visibilityDemoAppliedRef.current = true;
-    const idsToHide = categories
-      .filter(
-        (category) =>
-          category.visible && VISIBILITY_DEMO_CATEGORY_NAMES.has(category.name)
-      )
-      .map((category) => category.id);
-    if (idsToHide.length > 0) {
-      setCategoriesVisibility(idsToHide, false);
-    }
-  }, [guidedOnboarding?.step, categories, setCategoriesVisibility]);
-
   const handleGuidedToolbarAction = React.useCallback((
     target: GuidedToolbarNotice["target"]
   ) => {
+    // "edit"/"year"/"period-navigation"/"theme"/"visibility" saíram do guia
+    // (ver o efeito de pular logo acima de trimToRealCategories) — o card
+    // nunca mais retorna esses targets, então não há mais o que despachar
+    // pra eles aqui.
     const current = readGuidedOnboardingState();
-    if (target === "edit" && current.step === "edit_instruction") {
-      updateGuidedOnboarding({
-        type: "open_edit_preview",
-        continueToCalendar: showHabitSteps,
-      });
-      return;
-    }
-    if (target === "edit" && current.step === "edit_preview") {
-      updateGuidedOnboarding({ type: "finish_edit_preview" });
-      return;
-    }
-    if (target === "year" && current.step === "year_instruction") {
-      const todayYear = todayIso ? Number(todayIso.slice(0, 4)) : year;
-      if (year !== todayYear) {
-        handleYearChange(todayYear);
-      }
-      const next = updateGuidedOnboarding({ type: "continue_from_year" });
-      finalizeGuidedOnboarding(next);
-      return;
-    }
-    if (
-      target === "period-navigation" &&
-      current.step === "period_navigation_instruction"
-    ) {
-      resetCalendarFocusOnYearChange();
-      const next = updateGuidedOnboarding({
-        type: "continue_from_period_navigation",
-        showHabit: showHabitSteps,
-      });
-      if (next.step === "wrap_up_instruction") trimToRealCategories(next);
-      return;
-    }
-    if (target === "theme" && current.step === "theme_instruction") {
-      const next = updateGuidedOnboarding({
-        type: "confirm_theme",
-        complete: true,
-      });
-      if (next.step === "wrap_up_instruction") trimToRealCategories(next);
-      return;
-    }
-    if (
-      target === "visibility" &&
-      current.step === "visibility_instruction"
-    ) {
-      updateGuidedOnboarding({ type: "continue_from_visibility" });
-      return;
-    }
     if (target === "wrap-up" && current.step === "wrap_up_instruction") {
       const next = updateGuidedOnboarding({ type: "continue_from_wrap_up" });
       setWorkspaceEditMode(null);
@@ -2692,14 +2563,8 @@ export default function HomePage() {
     }
   }, [
     finalizeGuidedOnboarding,
-    handleYearChange,
-    resetCalendarFocusOnYearChange,
     setWorkspaceEditMode,
-    showHabitSteps,
-    todayIso,
-    trimToRealCategories,
     updateGuidedOnboarding,
-    year,
   ]);
 
   const handleGuidedCalendarOpen = React.useCallback(() => {
@@ -2776,16 +2641,20 @@ export default function HomePage() {
           !desktopTourInProgress &&
           (mobileStep === "intro" ||
             mobileStep === "create_habit" ||
-            mobileStep === "mark_day" ||
-            mobileStep === "save_progress")
+            mobileStep === "mark_day")
         ) {
           return;
         }
         if (mobileStep === "goto_annual") {
           // Chegou na Anual: a jornada continua aqui, pelo cabeçalho, antes
           // de terminar no Perfil (ver mobileAnnualOnboardingNotice abaixo).
-          writeMobileHabitsOnboardingStep("annual_year");
-          setMobileHabitsOnboardingStep("annual_year");
+          // "trocar de ano" e "tema" saíram do guia, mas antes de ir direto
+          // organizar, mostra o ano de exemplo já populado (annual_explore)
+          // — dá pra ela ver a aplicação em uso antes de montar a dela. O
+          // trim das categorias de exemplo só acontece depois, ao sair
+          // desse passo (ver advanceMobileAnnualOnboarding).
+          writeMobileHabitsOnboardingStep("annual_explore");
+          setMobileHabitsOnboardingStep("annual_explore");
         }
       }
       const currentGuidedState = readGuidedOnboardingState();
@@ -2835,11 +2704,10 @@ export default function HomePage() {
         });
         finalizeGuidedOnboarding(next);
       }
-      if (readMobileHabitsOnboardingStep() === "goto_profile" || readMobileHabitsOnboardingStep() === "save_progress") {
-        // Abrir o Perfil a partir daqui (seja no convite antecipado de
-        // save_progress ou no passo final goto_profile) já encerra a
-        // jornada própria do mobile, do mesmo jeito que o tour desktop faz
-        // acima.
+      if (readMobileHabitsOnboardingStep() === "goto_profile") {
+        // Abrir o Perfil a partir daqui (o passo final, depois de escolher
+        // categorias em annual_organize) já encerra a jornada própria do
+        // mobile, do mesmo jeito que o tour desktop faz acima.
         writeMobileHabitsOnboardingStep("completed");
         setMobileHabitsOnboardingStep("completed");
         setUtilityPanelAuthMode("signup");
@@ -2885,11 +2753,11 @@ export default function HomePage() {
       : guidedToolbarNotice;
 
   // Continuação da jornada própria do mobile depois da Anual (ver
-  // lib/mobile-habits-onboarding.ts): ano, tema, organizar e o atalho do ano
-  // para hoje — cada um aponta pro controle real do cabeçalho, sem duplicar
-  // nada de app-header.tsx (que outra frente edita agora). O card e o
-  // destaque são só nossos, buscando o elemento por seletor, exatamente como
-  // já fizemos com o "+" e o botão Anual da navegação.
+  // lib/mobile-habits-onboarding.ts): organizar e o Perfil — cada um aponta
+  // pro controle real do cabeçalho, sem duplicar nada de app-header.tsx (que
+  // outra frente edita agora). O card e o destaque são só nossos, buscando o
+  // elemento por seletor, exatamente como já fizemos com o "+" e o botão
+  // Anual da navegação.
   const mobileAnnualOnboardingNotice = React.useMemo<GuidedToolbarNotice | null>(() => {
     if (
       !isCalendarSurfaceActive ||
@@ -2898,39 +2766,33 @@ export default function HomePage() {
     ) {
       return null;
     }
-    if (mobileHabitsOnboardingStep === "annual_year") {
+    if (mobileHabitsOnboardingStep === "annual_explore") {
       return {
-        target: "year",
-        title: "Aqui você troca o ano.",
-        instruction:
-          "Use estas setas para consultar o ano anterior ou o próximo. Toque no ano a qualquer momento para voltar direto a hoje.",
+        target: "mobile-explore",
+        instruction: "Este é um ano de exemplo. Dê uma olhada e vamos montar o seu.",
         actionLabel: "Continuar",
-        stepLabel: getMobileHabitsOnboardingStepLabel("annual_year"),
-      };
-    }
-    if (mobileHabitsOnboardingStep === "annual_theme") {
-      return {
-        target: "theme",
-        title: "Escolha o clima do seu ano.",
-        instruction:
-          "Teste o tema claro e escuro e fique com o que combina mais com você.",
-        actionLabel: "Continuar",
-        stepLabel: getMobileHabitsOnboardingStepLabel("annual_theme"),
+        stepLabel: getMobileHabitsOnboardingStepLabel("annual_explore"),
       };
     }
     if (mobileHabitsOnboardingStep === "annual_organize") {
+      // O target segue "mobile-organize" mesmo com o Organizar já aberto —
+      // é o que aciona mobileWrapUpActive em app-header.tsx (sugestões de
+      // categoria no lugar da barra comum). O card em si (mais abaixo) que
+      // some nesse momento, para não duplicar com o próprio card do
+      // WrapUpCategorySuggestions.
+      //
+      // Sem "Continuar": esse passo só avança tocando em Organizar de
+      // verdade e escolhendo categorias lá dentro — um atalho pra pular
+      // isso deixaria a etapa que mais importa (categorias) opcional.
       return {
         target: "mobile-organize",
-        title: "Organize contextos e categorias.",
-        instruction: "Toque em Organizar para abrir o modo de edição.",
-        actionLabel: "Continuar",
+        instruction: "Aqui você organiza contextos e categorias.",
         stepLabel: getMobileHabitsOnboardingStepLabel("annual_organize"),
       };
     }
     if (mobileHabitsOnboardingStep === "goto_profile") {
       return {
         target: "profile",
-        title: "Guarde esse ano com você.",
         instruction: "Toque em Perfil para criar sua conta e acessar de qualquer aparelho.",
         stepLabel: getMobileHabitsOnboardingStepLabel("goto_profile"),
       };
@@ -2950,24 +2812,38 @@ export default function HomePage() {
 
   const advanceMobileAnnualOnboarding = React.useCallback(() => {
     const sequence: MobileHabitsOnboardingStep[] = [
-      "annual_year",
-      "annual_theme",
+      "annual_explore",
       "annual_organize",
       "goto_profile",
     ];
-    if (mobileHabitsOnboardingStep === "annual_year") {
-      // O passo explica o atalho "toque no ano pra voltar a hoje" — "Continuar"
-      // já demonstra na hora, em vez de só descrever.
-      setScrollToTodayRequestKey((key) => key + 1);
-    }
     const currentIndex = sequence.indexOf(
       mobileHabitsOnboardingStep as MobileHabitsOnboardingStep
     );
     const next = sequence[currentIndex + 1];
     if (!next) return;
+    if (mobileHabitsOnboardingStep === "annual_explore") {
+      // Saindo da exploração do ano de exemplo: mesmo objetivo do
+      // trimToRealCategories do desktop (mas mais simples — o mobile não
+      // cria categoria própria antes daqui, só hábitos). Sem isto, as
+      // categorias de exemplo (Eventos, Família, Amigos, Viagens) já
+      // ocupavam o teto de categorias antes mesmo da pessoa escolher a
+      // primeira sugestão em annual_organize, e a troca (evict) na
+      // categoria seguinte falhava silenciosamente.
+      const current = useStore.getState();
+      const categories = current.categories.filter(
+        (category) => !isOnboardingPersonalDemoGroup(category.calendarPackGroupId)
+      );
+      if (categories.length !== current.categories.length) {
+        const keepCategoryIds = new Set(categories.map((category) => category.id));
+        const events = current.events.filter((event) =>
+          keepCategoryIds.has(event.categoryId)
+        );
+        replaceAllData({ profiles: current.profiles, categories, events });
+      }
+    }
     writeMobileHabitsOnboardingStep(next);
     setMobileHabitsOnboardingStep(next);
-  }, [mobileHabitsOnboardingStep]);
+  }, [mobileHabitsOnboardingStep, replaceAllData]);
 
   if (windowContext === "popup") {
     return (
@@ -3083,6 +2959,7 @@ export default function HomePage() {
               ? mobileAnnualOnboardingNotice?.target ?? null
               : null
           }
+          onDismissMobileWrapUp={dismissMobileAnnualOnboarding}
           onDismissGuidedSelection={dismissGuidedOnboarding}
           onGuidedToolbarAction={handleGuidedToolbarAction}
           onGuidedCalendarOpen={handleGuidedCalendarOpen}
@@ -3099,14 +2976,21 @@ export default function HomePage() {
             accountNudgeVisible && !session?.user.id
           }
           onboardingActive={categoriesForceExpandActive}
+          guidedHabitStepActive={guidedHabitStepActive}
           guidedOnboardingActive={showGuidedOnboarding}
           onboardingLayoutLocked={false}
           onboardingLayoutReserved={
             isCalendarSurfaceActive && Boolean(guidedSelectionNotice)
           }
-          onInlineEditModeChange={(active) =>
-            setWorkspaceEditMode(active ? "calendar" : null)
-          }
+          onInlineEditModeChange={(active) => {
+            setWorkspaceEditMode(active ? "calendar" : null);
+            // Fechar o "Organizar" é o gesto que salva as escolhas deste
+            // passo (categorias adotadas) e avança pro próximo — ver
+            // mobileWrapUpActive em app-header.tsx.
+            if (!active && mobileHabitsOnboardingStep === "annual_organize") {
+              advanceMobileAnnualOnboarding();
+            }
+          }}
           controlledInlineEditMode={inlineEditModeActive}
           exitInlineEditRequestKey={exitInlineEditRequestKey}
           expandCategoriesRequestKey={expandCategoriesRequestKey}
@@ -3400,15 +3284,29 @@ export default function HomePage() {
         />
       ) : null}
 
-      {mobileAnnualOnboardingNotice ? (
+      {mobileAnnualOnboardingNotice &&
+      // Uma vez que o Organizar já está aberto, o card próprio dele (ver
+      // mobileWrapUpActive/WrapUpCategorySuggestions em app-header.tsx)
+      // assume a instrução — sem essa checagem os dois ficavam visíveis ao
+      // mesmo tempo, um flutuando por cima do outro.
+      !(
+        mobileAnnualOnboardingNotice.target === "mobile-organize" &&
+        inlineEditModeActive
+      ) ? (
         <GuidedToolbarNoticeCard
           notice={mobileAnnualOnboardingNotice}
           onClose={dismissMobileAnnualOnboarding}
           onAction={advanceMobileAnnualOnboarding}
-          // O alvo ("Perfil") vive na nav inferior — grudar o card no topo
-          // afastaria a explicação do botão que ela aponta.
+          // "Perfil" vive na nav inferior — grudar o card no topo afastaria
+          // a explicação do botão que ela aponta. "mobile-explore" também
+          // desce: o que importa nesse passo é o painel de contextos e
+          // categorias logo abaixo do cabeçalho, que o card cobriria se
+          // ficasse no topo.
           mobilePlacement={
-            mobileAnnualOnboardingNotice.target === "profile" ? "bottom" : "top"
+            mobileAnnualOnboardingNotice.target === "profile" ||
+            mobileAnnualOnboardingNotice.target === "mobile-explore"
+              ? "bottom"
+              : "top"
           }
         />
       ) : null}

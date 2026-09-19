@@ -20,22 +20,15 @@ type MobileDesktopFirstNoticeProps = {
   className?: string;
 };
 
-const COPY: Record<
-  MobileDesktopFirstNoticeVariant,
-  { lead: string; body: string }
-> = {
-  example: {
-    lead: "Comece pelo desktop.",
-    body: "O ano completo cabe numa tela maior. Aqui, você acompanha o dia a dia.",
-  },
-  resuming: {
-    lead: "Continue no desktop.",
-    body: "Seu ano já montado aparece completo por lá. Aqui, você acompanha o dia a dia.",
-  },
-  onboarding: {
-    lead: "Um gostinho do Anual.",
-    body: "Esta visão foi pensada para o desktop, onde ela nasceu. Aqui, você já sente como ela funciona.",
-  },
+// Texto único por variante: sem trecho em destaque e trecho em cinza — a
+// condução inteira tem o mesmo peso visual.
+const COPY: Record<MobileDesktopFirstNoticeVariant, string> = {
+  example:
+    "O ano completo cabe melhor no desktop. Aqui, acompanhe o dia a dia.",
+  resuming:
+    "Seu ano já montado aparece completo no desktop. Aqui, acompanhe o dia a dia.",
+  onboarding:
+    "Esta visão nasceu no desktop. Aqui, você já sente como ela funciona.",
 };
 
 /**
@@ -54,7 +47,7 @@ export function MobileDesktopFirstNotice({
   onDismiss,
   className,
 }: MobileDesktopFirstNoticeProps) {
-  const copy = COPY[variant];
+  const text = COPY[variant];
   return (
     <div
       data-mobile-desktop-first-notice
@@ -69,9 +62,8 @@ export function MobileDesktopFirstNotice({
       </span>
 
       <div className="min-w-0 flex-1">
-        <p className="text-[13px] leading-5 text-card-foreground">
-          <span className="font-semibold">{copy.lead} </span>
-          <span className="text-muted-foreground">{copy.body}</span>{" "}
+        <p className="text-[13px] font-medium leading-5 text-card-foreground">
+          {text}{" "}
           <button
             type="button"
             className="font-semibold text-primary underline underline-offset-2"
