@@ -16,10 +16,13 @@ export function AccountNudge({
     <aside
       data-onboarding-account-nudge
       aria-label="Convite para guardar o ano"
-      className="inverse-product-surface fixed top-[5.25rem] right-3 z-40 w-[min(20rem,calc(100vw-1.5rem))] rounded-2xl border border-border bg-card p-3.5 text-card-foreground shadow-[0_22px_65px_-24px_rgba(15,23,42,0.78)] animate-in fade-in-0 slide-in-from-top-2 duration-200 motion-reduce:animate-none sm:right-4"
+      // Mesma linguagem visual do card de abertura do guia (guided-onboarding-panel):
+      // raio 1.5rem, sombra profunda, selo com ícone em rounded-xl e um rótulo
+      // discreto acima do título — antes era um toast raso e batia com o resto.
+      className="inverse-product-surface fixed top-[5.25rem] right-3 z-40 w-[min(21rem,calc(100vw-1.5rem))] rounded-[1.5rem] border border-border bg-card p-4 text-card-foreground shadow-[0_30px_95px_-20px_rgba(15,23,42,0.82)] animate-in fade-in-0 slide-in-from-top-2 duration-200 motion-reduce:animate-none sm:right-4"
     >
-      <div className="flex items-start gap-2.5">
-        <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+      <div className="flex items-start gap-3">
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
           <CalendarDays
             data-account-nudge-icon="calendar"
             className="size-4"
@@ -27,9 +30,11 @@ export function AccountNudge({
           />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium leading-4">
-            Crie sua conta para guardar seu ano e acessá-lo em qualquer
-            aparelho.
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">
+            Guarde seu ano
+          </p>
+          <p className="mt-1 text-sm font-semibold leading-5">
+            Crie sua conta para acessá-lo em qualquer aparelho.
           </p>
         </div>
         <Button
@@ -45,9 +50,9 @@ export function AccountNudge({
       </div>
       <Button
         type="button"
-        variant="outline"
+        variant="premium"
         size="sm"
-        className="mt-3 w-full"
+        className="mt-3.5 w-full"
         onClick={onCreateAccount}
       >
         Guardar meu ano

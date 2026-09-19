@@ -173,7 +173,7 @@ const getDateCopy = (
 
   if (isBirthday) {
     return {
-      title: "Boa! Agora registre o aniversário de mais alguém especial.",
+      title: "Boa! Agora, o aniversário de outra pessoa especial.",
       prompt: "De quem é esse aniversário?",
       placeholder: "Ex.: Aniversário do pai",
     };
@@ -603,8 +603,8 @@ export function GuidedOnboardingPanel({
     if (state.step === "context_selection") {
       return (
         <>
-          <p className="mt-4 text-[15px] font-medium leading-6 tracking-[-0.005em]">
-            Escolha um contexto para começar. Dá para trocar depois.
+          <p className="mt-4 text-[15px] font-semibold leading-6 tracking-[-0.005em]">
+            Escolha um contexto para começar.
           </p>
           <div className="mt-4 grid gap-2.5">
             {CONTEXT_OPTIONS.map((option) => (
@@ -660,10 +660,10 @@ export function GuidedOnboardingPanel({
     if (state.step === "date_category_selection") {
       return (
         <>
-          <p className="mt-4 max-w-[30rem] text-balance text-[15px] font-medium leading-6 tracking-[-0.005em]">
+          <p className="mt-4 max-w-[30rem] text-balance text-[15px] font-semibold leading-6 tracking-[-0.005em]">
             {context === "personal"
-              ? "Comece pelo aniversário de alguém, ou por uma data importante para você, e escolha a cor."
-              : "Comece por uma entrega ou data importante do trabalho, e escolha a cor."}
+              ? "Comece pelo aniversário das suas pessoas favoritas, ou por datas importantes para você."
+              : "Comece por uma entrega ou data importante do trabalho."}
           </p>
           {renderCategoryChoices("date")}
         </>

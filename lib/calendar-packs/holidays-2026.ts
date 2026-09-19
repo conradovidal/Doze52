@@ -485,12 +485,17 @@ const createStateHolidayEvents = (
   return [...fixedEvents, ...movableEvents].sort((a, b) => a.date.localeCompare(b.date));
 };
 
-const HOLIDAY_CATEGORY = {
+// Mesmo id/key em todo estado — é o que permite "Trocar estado" substituir
+// os eventos sem criar uma categoria nova. O nome muda por variante (ex.:
+// "Feriados SP"), diferente do nome genérico do pack no seletor
+// ("Feriados") — é o nome que fica na categoria depois de adicionado que
+// segue a convenção por estado, não o título do card de seleção.
+const holidayCategoryForState = (uf: string) => ({
   id: HOLIDAY_CATEGORY_ID,
   key: HOLIDAY_CATEGORY_KEY,
-  name: "Feriados",
+  name: `Feriados ${uf}`,
   color: "#2563EB",
-};
+});
 
 export const holidays2026Packs = stateDefinitions.map((definition, stateIndex): CalendarPack => {
   const source = definition.source ?? stateSource(definition.slug, definition.label);
@@ -500,7 +505,7 @@ export const holidays2026Packs = stateDefinitions.map((definition, stateIndex): 
     id: `holidays-${definition.slug}`,
     regionCode: definition.uf,
     version: 1,
-    name: "Feriados nacionais + estaduais",
+    name: "Feriados",
     eyebrow: definition.label,
     icon: "calendar",
     description:
@@ -521,7 +526,7 @@ export const holidays2026Packs = stateDefinitions.map((definition, stateIndex): 
       name: "Feriados",
       icon: "calendar-days",
     },
-    categories: [HOLIDAY_CATEGORY],
+    categories: [holidayCategoryForState(definition.uf)],
     legacyCategoryIds: LEGACY_STATE_CATEGORY_IDS,
     events: [...nationalHolidayEvents, ...stateEvents],
   };

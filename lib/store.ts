@@ -436,7 +436,7 @@ const getPersonalDemoCategories = (): CategoryItem[] => [
   demoCategory(
     DEMO_CATEGORY_IDS.formula1,
     ONBOARDING_PROFILE_IDS.personal,
-    "Corridas F1",
+    "Etapas F1",
     CATEGORY_COLOR_BASE_ORANGE
   ),
   demoCategory(
@@ -1270,7 +1270,7 @@ export const getOnboardingPersonalDemoSnapshot = (
   // O aniversário (pessoal) e a entrega (profissional) ficam de fora do ano
   // de exemplo desde o início: são exatamente as categorias que o tour guiado
   // pede para a pessoa criar por conta própria (ver getOnboardingCategoryDefinition,
-  // intent "date"). Feriados e Corridas F1 também ficam de fora: são só
+  // intent "date"). Feriados e Etapas F1 também ficam de fora: são só
   // calendários prontos de demonstração, não fazem parte do ano que
   // efetivamente sobrevive ao onboarding.
   const excludedCategoryIds = new Set<string>([

@@ -94,29 +94,26 @@ async function finishAnnual(page: Page) {
     .toBe("completed");
 }
 for (const width of [320, 393, 430])
-  test(`mobile ${width}: save invitation follows first check-in`, async ({
+  test(`mobile ${width}: first check-in leads straight to the Anual invite`, async ({
     page,
   }) => {
     await page.setViewportSize({ width, height: 852 });
     await openHome(page);
     await createHabit(page);
-    const invite = page.getByRole("region", { name: "Guardar progresso" });
+    // O convite de conta saiu daqui — antes ficava logo após o primeiro
+    // check-in ("save_progress"), agora só existe uma vez, no fechamento
+    // (depois de escolher categorias em annual_organize). O primeiro
+    // check-in leva direto ao convite para conhecer a Anual.
+    const invite = page.locator(
+      '[data-guided-toolbar-notice][data-guided-toolbar-target="mobile-goto-annual"]',
+    );
     await expect(invite).toBeVisible();
-    await expect(page.locator("[data-guided-toolbar-notice]")).toHaveCount(0);
+    await expect(page.locator("[data-guided-toolbar-notice]")).toHaveCount(1);
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth,
       ),
     ).toBe(true);
-    await invite.getByRole("button", { name: "Criar conta e salvar" }).click();
-    await expect(
-      page.getByRole("button", { name: "Cadastro", exact: true }),
-    ).toBeVisible();
-    await page.getByRole("button", { name: "Close", exact: true }).click();
-    await page.reload();
-    await expect(invite).toBeVisible();
-    await invite.getByRole("button", { name: "Continuar sem conta" }).click();
-    await expect(invite).toHaveCount(0);
   });
 for (const viewport of [
   { width: 1280, height: 720 },

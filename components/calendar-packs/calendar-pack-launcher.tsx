@@ -184,6 +184,8 @@ export function CalendarPackLauncher({
   hideTrigger = false,
   fixedTargetProfileId,
   onBack,
+  autoCloseOnImport = false,
+  compactList = false,
 }: {
   onFocusYear?: (year: number) => void;
   className?: string;
@@ -202,6 +204,12 @@ export function CalendarPackLauncher({
   hideTrigger?: boolean;
   fixedTargetProfileId?: string;
   onBack?: () => void;
+  autoCloseOnImport?: boolean;
+  // Lista de cartões mais estreita (mobile): título e descrição em coluna
+  // cheia, botão embaixo em vez de espremido ao lado — sem isto, o texto
+  // quebrava em 3-4 linhas curtíssimas disputando espaço com o botão na
+  // mesma linha.
+  compactList?: boolean;
 }) {
   const { calendarPacks } = useCalendarCatalog();
   const calendarPackCards = React.useMemo(
@@ -362,7 +370,7 @@ export function CalendarPackLauncher({
 
         if (result.status === "already-exists") {
           setPackFlow(pack.id, "exists");
-          if (guidedVariantGroupId === getCalendarPackGroupId(pack)) {
+          if (autoCloseOnImport || guidedVariantGroupId === getCalendarPackGroupId(pack)) {
             handleOpenChange(false);
           }
           onImported?.(pack);
@@ -375,7 +383,7 @@ export function CalendarPackLauncher({
         }
 
         setPackFlow(pack.id, "added");
-        if (guidedVariantGroupId === getCalendarPackGroupId(pack)) {
+        if (autoCloseOnImport || guidedVariantGroupId === getCalendarPackGroupId(pack)) {
           handleOpenChange(false);
         }
         onImported?.(pack);
@@ -399,6 +407,7 @@ export function CalendarPackLauncher({
       }
     },
     [
+      autoCloseOnImport,
       availabilityByPack,
       focusPack,
       guidedVariantGroupId,
@@ -570,7 +579,14 @@ export function CalendarPackLauncher({
                       "border-foreground/16 bg-background shadow-[0_12px_24px_-24px_rgba(15,23,42,0.28)]"
                   )}
                 >
-                  <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
+                  <div
+                    className={cn(
+                      "grid items-center gap-3",
+                      compactList
+                        ? "grid-cols-1 gap-y-2.5"
+                        : "grid-cols-[minmax(0,1fr)_auto]"
+                    )}
+                  >
                     <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-x-2.5">
                       <CalendarPackIcon
                         icon={pack.icon}
@@ -578,11 +594,21 @@ export function CalendarPackLauncher({
                       />
                       <div className="min-w-0">
                         <h4 className="text-sm font-medium text-foreground">
-                          {isTeamGroup
+                          {/* "pack" sempre resolve a alguma variante (o
+                              padrão interno de getDefaultVariant) mesmo
+                              antes de uma escolha real — sem o
+                              "!effectiveVariant", mostraria "Jogos Grêmio"
+                              como se já fosse a seleção da pessoa. */}
+                          {isTeamGroup && !effectiveVariant
                             ? "Jogos do seu time favorito"
                             : pack.name}
                         </h4>
-                        <p className="mt-1.5 text-xs leading-5 text-muted-foreground">
+                        <p
+                          className={cn(
+                            "mt-1.5 text-xs leading-5 text-muted-foreground",
+                            compactList && "line-clamp-2"
+                          )}
+                        >
                           {pack.description}
                         </p>
                         {variantGroup && variants.length > 1 ? (
@@ -604,7 +630,10 @@ export function CalendarPackLauncher({
                             >
                               <SelectTrigger
                                 size="sm"
-                                className="h-7 w-40 max-w-full rounded-[8px] border-border bg-card px-2.5 text-xs shadow-none hover:border-foreground/18 hover:bg-muted sm:w-72"
+                                className={cn(
+                                  "h-7 max-w-full rounded-[8px] border-border bg-card px-2.5 text-xs shadow-none hover:border-foreground/18 hover:bg-muted",
+                                  compactList ? "w-full" : "w-40 sm:w-72"
+                                )}
                                 aria-label={`${variantGroup.label} para ${pack.name}`}
                               >
                                 <SelectValue
@@ -628,7 +657,14 @@ export function CalendarPackLauncher({
                       </div>
                     </div>
 
-                    <div className="flex shrink-0 flex-col items-end gap-1.5 sm:flex-row sm:flex-wrap sm:justify-end sm:gap-2">
+                    <div
+                      className={cn(
+                        "flex flex-col items-end gap-1.5",
+                        compactList
+                          ? "w-full flex-row flex-wrap justify-end gap-2"
+                          : "shrink-0 sm:flex-row sm:flex-wrap sm:justify-end sm:gap-2"
+                      )}
+                    >
                       {isPresent ? (
                         <>
                           {isSwitchingVariant ? (
@@ -693,7 +729,7 @@ export function CalendarPackLauncher({
                             errorLabel="Tentar adicionar"
                           >
                             <Check className="size-3.5" />
-                            {isGuidedCard ? "Adicionar feriados" : "Adicionar calendário"}
+                            Adicionar
                           </AsyncStateButton>
                         ) : (
                         <div className="flex min-w-0 items-center justify-end gap-1.5">
@@ -775,8 +811,7 @@ export function CalendarPackLauncher({
                           }}
                         >
                           <Plus className="size-3.5" />
-                          <span className="sm:hidden">Adicionar</span>
-                          <span className="hidden sm:inline">Adicionar calendário</span>
+                          Adicionar
                         </Button>
                       )}
                     </div>

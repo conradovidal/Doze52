@@ -1,6 +1,5 @@
 "use client";
 
-import { trackContinuityMetric } from "@/lib/product-metrics";
 import { isAccountContinuityEnabled } from "@/lib/feature-flags";
 import * as React from "react";
 import { createPortal } from "react-dom";
@@ -12,6 +11,7 @@ import { HabitControls } from "@/components/habits/habit-controls";
 import { HabitDayPicker } from "@/components/habits/habit-day-picker";
 import { HABIT_COLORS, HabitEditorDialog } from "@/components/habits/habit-editor-dialog";
 import { GuidedToolbarNoticeCard } from "@/components/onboarding/guided-toolbar-notice";
+import { MobileOnboardingWelcomeCard } from "@/components/onboarding/mobile-onboarding-welcome-card";
 import { useFeedback } from "@/components/ui/feedback-provider";
 import { CATEGORY_COLOR_BASE_BLUE } from "@/lib/category-palette";
 import {
@@ -137,6 +137,13 @@ export function HabitsPrototype({
   const [draftColor, setDraftColor] = React.useState<string>(HABIT_COLORS[0]);
   const scrollRegionRef = React.useRef<HTMLDivElement | null>(null);
   const currentWeekRef = React.useRef<HTMLButtonElement | null>(null);
+  // Passos 2/3 (create_habit/mark_day) desenham o card do guia inline, no
+  // fluxo normal — empurra a grade pra baixo. O passo 4 (goto_annual) é
+  // flutuante (mobilePlacement="bottom"), sem ocupar espaço nenhum. Sem
+  // compensar, a altura que o card inline liberava ao sumir fazia a grade
+  // (flex-1) crescer por baixo e todo o conteúdo visível pulava pra cima.
+  const inlineOnboardingNoticeRef = React.useRef<HTMLDivElement | null>(null);
+  const lastInlineOnboardingNoticeHeightRef = React.useRef(0);
   const closeDayPicker = React.useCallback(() => {
     setDayPicker((current) => {
       current?.anchor.focus();
@@ -312,13 +319,47 @@ export function HabitsPrototype({
 
     const regionRect = region.getBoundingClientRect();
     const targetRect = currentWeek.getBoundingClientRect();
+    // /2 (não /3): a semana atual fica de fato centralizada verticalmente —
+    // importante sobretudo na abertura do onboarding mobile, quando "hoje"
+    // é o primeiro ponto de referência que a pessoa vê.
     region.scrollTop = Math.max(
       0,
       region.scrollTop +
         (targetRect.top - regionRect.top) -
-        region.clientHeight / 3
+        region.clientHeight / 2
     );
   }, [selectedHabit, showcaseActive, year]);
+
+  // Remede a cada render (o card inline pode mudar de altura a qualquer
+  // momento) e guarda a última altura conhecida — quando o card some
+  // (ref vira null), o valor anterior continua disponível para o efeito
+  // de compensação abaixo.
+  React.useLayoutEffect(() => {
+    if (inlineOnboardingNoticeRef.current) {
+      lastInlineOnboardingNoticeHeightRef.current =
+        inlineOnboardingNoticeRef.current.offsetHeight;
+    }
+  });
+
+  const previousMobileOnboardingStepRef = React.useRef(mobileOnboardingStep);
+  React.useLayoutEffect(() => {
+    const previousStep = previousMobileOnboardingStepRef.current;
+    previousMobileOnboardingStepRef.current = mobileOnboardingStep;
+    if (
+      previousStep === mobileOnboardingStep ||
+      mobileOnboardingStep !== "goto_annual" ||
+      !scrollRegionRef.current
+    ) {
+      return;
+    }
+    // O card inline some e os irmãos abaixo dele (inclusive esta grade)
+    // sobem no flex-col pela altura que ele ocupava — sem isto, o topo do
+    // scroll region se desloca pra cima na tela e todo o conteúdo visível
+    // parece "pular". Reduzir o scrollTop pela mesma altura cancela esse
+    // deslocamento.
+    scrollRegionRef.current.scrollTop -=
+      lastInlineOnboardingNoticeHeightRef.current;
+  }, [mobileOnboardingStep]);
 
   const scrollToToday = React.useCallback(() => {
     if (!todayIso) return;
@@ -336,7 +377,7 @@ export function HabitsPrototype({
     const targetRect = currentWeek.getBoundingClientRect();
     const targetTop = Math.max(
       0,
-      region.scrollTop + (targetRect.top - regionRect.top) - region.clientHeight / 3
+      region.scrollTop + (targetRect.top - regionRect.top) - region.clientHeight / 2
     );
     region.scrollTo({ top: targetTop, behavior: "smooth" });
   }, [todayIso, year, onYearChange]);
@@ -451,8 +492,10 @@ export function HabitsPrototype({
     if (!habit || showcaseActive || showcaseHabitIds.has(habit.id)) return;
     toggleHabitCheckInInStore(habit.id, dateIso);
     if (mobileOnboardingStep === "mark_day") {
-      trackContinuityMetric("save_invited");
-      setMobileOnboardingStep("save_progress");
+      // O convite de conta saiu daqui — agora só aparece no fechamento
+      // (goto_profile), depois de escolher categorias. Ver
+      // advanceMobileAnnualOnboarding em app/page.tsx.
+      setMobileOnboardingStep("goto_annual");
     }
     onHabitCheckIn?.();
   };
@@ -515,7 +558,7 @@ export function HabitsPrototype({
         // componente — app/page.tsx repassa highlightDestination="annual"
         // ao AdaptiveNavigation quando este passo estiver ativo).
         target: "mobile-goto-annual",
-        instruction: "Toque em Anual para conhecer a visão com seus eventos.",
+        instruction: "Toque aqui para conhecer sua agenda de eventos.",
         stepLabel: getMobileHabitsOnboardingStepLabel("goto_annual"),
       };
     }
@@ -673,31 +716,28 @@ export function HabitsPrototype({
         // data-onboarding-habit-create quando o passo aponta pra ele — não
         // passamos onDismissGuidedNotice/onGuidedNoticeAction de propósito,
         // pra não duplicar o card (a jornada mobile renderiza o dela mesma,
-        // logo abaixo, em vez do card interno deste componente).
-        guidedNotice={mobileOnboardingNotice}
+        // logo abaixo, em vez do card interno deste componente). No
+        // "intro" a lista fica recolhida (a tela abre limpa, só com o
+        // card de boas-vindas) — abre sozinha ao avançar para
+        // "create_habit", quando o "+" precisa ficar visível e destacado.
+        guidedNotice={
+          mobileOnboardingStep === "intro" ? null : mobileOnboardingNotice
+        }
+        forceCollapsed={mobileOnboardingStep === "intro"}
       />
 
-      {mobileOnboardingActive && mobileOnboardingStep === "save_progress" ? (
-        <section aria-label="Guardar progresso" className="inverse-product-surface mx-3 my-2 rounded-xl border bg-card p-4 text-card-foreground">
-          <p className="text-xs text-muted-foreground">
-            {getMobileHabitsOnboardingStepLabel("save_progress")}
-          </p>
-          <p className="mt-1 text-sm font-medium">Crie sua conta para guardar seu hábito e continuar em outro aparelho.</p>
-          <div className="mt-3 flex flex-wrap gap-3">
-            <button className="rounded-lg bg-primary px-3 py-2 text-primary-foreground" onClick={(event) => onRequestSignup?.(event.currentTarget)}>Criar conta e salvar</button>
-            <button
-              className="underline"
-              onClick={() => {
-                setMobileOnboardingStep("goto_annual");
-              }}
-            >
-              Continuar sem conta
-            </button>
-          </div>
-        </section>
-      ) : null}
       {mobileOnboardingNotice ? (
-        mobileOnboardingNotice.target === "mobile-goto-annual" ? (
+        mobileOnboardingNotice.target === "mobile-intro" ? (
+          // Passo de abertura: card próprio, com o mesmo carinho visual do
+          // card de abertura do tour desktop (selo, progresso, pilha de
+          // ícones) em vez do GuidedToolbarNoticeCard genérico que os demais
+          // passos usam.
+          <MobileOnboardingWelcomeCard
+            onContinue={() => setMobileOnboardingStep("create_habit")}
+            onRequireAuth={onRequireAuth}
+            onClose={dismissMobileOnboarding}
+          />
+        ) : mobileOnboardingNotice.target === "mobile-goto-annual" ? (
           // Este passo aponta pro botão Anual da navegação, lá embaixo — o
           // card fica perto dele, não grudado no topo como os dois de cima
           // (cujo alvo, a vitrine e o "+", também fica no topo).
@@ -707,25 +747,12 @@ export function HabitsPrototype({
             mobilePlacement="bottom"
           />
         ) : (
-          <div className="mt-2">
+          // "habit"/"habit-created" (create_habit/mark_day): avançam
+          // sozinhos ao criar o hábito/marcar o dia — sem botão no card.
+          <div className="mt-2" ref={inlineOnboardingNoticeRef}>
             <GuidedToolbarNoticeCard
               notice={mobileOnboardingNotice}
               onClose={dismissMobileOnboarding}
-              onAction={
-                mobileOnboardingNotice.target === "mobile-intro"
-                  ? () => setMobileOnboardingStep("create_habit")
-                  : undefined
-              }
-              secondaryLabel={
-                mobileOnboardingNotice.target === "mobile-intro" && onRequireAuth
-                  ? "Entrar na minha conta"
-                  : undefined
-              }
-              onSecondaryAction={
-                mobileOnboardingNotice.target === "mobile-intro"
-                  ? onRequireAuth
-                  : undefined
-              }
               inline
             />
           </div>

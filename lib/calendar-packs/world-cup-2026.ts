@@ -10,17 +10,19 @@ if (!otherCategory) {
   throw new Error("World Cup 2026 pack categories are incomplete.");
 }
 
-const copaCategory = {
+// Mesmo id/key nas duas coberturas — é o que permite "Trocar cobertura"
+// substituir os eventos sem criar uma categoria nova. Só o nome muda por
+// variante, para refletir no app o mesmo nome que aparece no pack.
+const copaCategoryWithName = (name: string) => ({
   ...otherCategory,
   key: "world-cup-2026",
-  name: "Copa do Mundo de 2026",
+  name,
   color: "#0F766E",
-  legacyNames: ["Copa de 2026", "Jogos do Brasil"],
-};
+  legacyNames: ["Copa do Mundo de 2026", "Copa de 2026", "Jogos do Brasil"],
+});
 
 const sharedPackProperties = {
   version: 2,
-  name: "Copa do Mundo de 2026",
   icon: "trophy" as const,
   eyebrow: undefined,
   description: "Acompanhe apenas o Brasil ou o torneio completo. Escolha a cobertura abaixo.",
@@ -29,7 +31,6 @@ const sharedPackProperties = {
     label: "Cobertura",
     selectionMode: "replace" as const,
   },
-  categories: [copaCategory],
   legacyCategoryIds: [
     "20265200-0000-4000-8000-000000000002",
     "20265200-0000-4000-8000-000000000004",
@@ -40,26 +41,32 @@ export const worldCup2026BrazilPack: CalendarPack = {
   ...baseWorldCup2026Pack,
   ...sharedPackProperties,
   id: "world-cup-2026-brazil",
+  // Nome genérico no seletor — o nome específico da cobertura só aparece na
+  // categoria depois de adicionada (ver copaCategoryWithName abaixo).
+  name: "Copa do Mundo 2026",
+  categories: [copaCategoryWithName("Brasil Copa 2026")],
   variantGroup: {
     ...sharedPackProperties.variantGroup,
     optionLabel: "Apenas jogos do Brasil",
   },
   events: baseWorldCup2026Pack.events
     .filter((event) => event.isBrazilMatch)
-    .map((event) => ({ ...event, suggestedCategoryKey: copaCategory.key })),
+    .map((event) => ({ ...event, suggestedCategoryKey: "world-cup-2026" })),
 };
 
 export const worldCup2026AllPack: CalendarPack = {
   ...baseWorldCup2026Pack,
   ...sharedPackProperties,
   id: "world-cup-2026",
+  name: "Copa do Mundo 2026",
+  categories: [copaCategoryWithName("Copa 2026")],
   variantGroup: {
     ...sharedPackProperties.variantGroup,
     optionLabel: "Copa do Mundo inteira",
   },
   events: baseWorldCup2026Pack.events.map((event) => ({
     ...event,
-    suggestedCategoryKey: copaCategory.key,
+    suggestedCategoryKey: "world-cup-2026",
   })),
 };
 

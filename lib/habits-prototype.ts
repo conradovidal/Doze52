@@ -305,8 +305,29 @@ export const getCompletedHabitsForDate = (
     Boolean(checkIns[getHabitCheckInKey(habit.id, dateIso)]?.completed)
   );
 
-export const getDesktopHabitRowMinHeight = (visibleHabitCount: number) =>
-  54 + Math.max(0, Math.min(4, visibleHabitCount) - 1) * 20;
+// Geometria da pilha de bolinhas de hábito em components/calendar/day-cell.tsx
+// (top-[30px], bottom-1, size-[clamp(12px,1.1vw,18px)], gap-0.5): se um desses
+// valores mudar lá, atualize as constantes abaixo junto — é o que essa altura
+// mínima precisa caber.
+const HABIT_DOT_MAX_PX = 18;
+const HABIT_DOT_GAP_PX = 2;
+const HABIT_STACK_TOP_OFFSET_PX = 30;
+const HABIT_STACK_BOTTOM_OFFSET_PX = 4;
+// Folga real para absorver arredondamento do clamp em vw e variações de
+// zoom/DPI — sem isso a pilha de bolinhas cabia raspando e podia transbordar.
+const HABIT_STACK_SAFETY_BUFFER_PX = 8;
+
+export const getDesktopHabitRowMinHeight = (visibleHabitCount: number) => {
+  const count = Math.max(1, Math.min(4, visibleHabitCount));
+  const stackHeightPx =
+    count * HABIT_DOT_MAX_PX + (count - 1) * HABIT_DOT_GAP_PX;
+  return (
+    HABIT_STACK_TOP_OFFSET_PX +
+    HABIT_STACK_BOTTOM_OFFSET_PX +
+    stackHeightPx +
+    HABIT_STACK_SAFETY_BUFFER_PX
+  );
+};
 
 export type HabitDayAction = "blocked" | "create" | "toggle";
 
