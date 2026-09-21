@@ -1,7 +1,7 @@
 export type ThemeMode = "light" | "dark";
 
 export const THEME_STORAGE_KEY = "doze52-theme";
-export const THEME_ASSET_VERSION = "20260625a";
+export const THEME_ASSET_VERSION = "20260921a";
 export const FAVICON_LIGHT_URL = `/doze52-favicon-light.svg?v=${THEME_ASSET_VERSION}`;
 export const FAVICON_DARK_URL = `/doze52-favicon-dark.svg?v=${THEME_ASSET_VERSION}`;
 export const FAVICON_URL = FAVICON_LIGHT_URL;
