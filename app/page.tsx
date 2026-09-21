@@ -63,6 +63,10 @@ import {
   SyncError,
   type CalendarSnapshot,
 } from "@/lib/sync";
+import {
+  isPendingSnapshotCurrent,
+  snapshotContentKey,
+} from "@/lib/snapshot-content-key";
 import { getTodayIsoInTimeZone } from "@/lib/date";
 import {
   GUIDED_ONBOARDING_CHANGE_EVENT,
@@ -139,7 +143,13 @@ type SyncUiError = {
 type PendingSyncPayload = {
   savedAt: string;
   snapshot: CalendarSnapshot;
+  // Content key of the server state this snapshot was based on. Without it the
+  // snapshot cannot be told apart from a stale one and is never replayed.
+  baseKey?: string;
 };
+
+// Minimum gap between refetches triggered by focus/visibility/online events.
+const REMOTE_PULL_MIN_INTERVAL_MS = 10_000;
 
 type RawSyncState =
   | { state: "hidden" }
@@ -233,7 +243,9 @@ const isCalendarSnapshotLike = (value: unknown): value is CalendarSnapshot => {
   );
 };
 
-const readPendingSyncSnapshot = (userId: string): CalendarSnapshot | null => {
+const readPendingSyncSnapshot = (
+  userId: string
+): { snapshot: CalendarSnapshot; baseKey?: string } | null => {
   if (typeof window === "undefined") return null;
 
   const key = getPendingSyncStorageKey(userId);
@@ -251,25 +263,48 @@ const readPendingSyncSnapshot = (userId: string): CalendarSnapshot | null => {
       return null;
     }
 
-    return ensureSnapshotCoverage(snapshot);
+    return {
+      snapshot: ensureSnapshotCoverage(snapshot),
+      baseKey: typeof payload?.baseKey === "string" ? payload.baseKey : undefined,
+    };
   } catch {
     window.localStorage.removeItem(key);
     return null;
   }
 };
 
-const writePendingSyncSnapshot = (userId: string, snapshot: CalendarSnapshot) => {
+const writePendingSyncSnapshot = (
+  userId: string,
+  snapshot: CalendarSnapshot,
+  baseKey?: string
+) => {
   if (typeof window === "undefined") return;
 
   const payload: PendingSyncPayload = {
     savedAt: new Date().toISOString(),
     snapshot: cloneSnapshot(snapshot),
+    baseKey,
   };
 
   window.localStorage.setItem(
     getPendingSyncStorageKey(userId),
     JSON.stringify(payload)
   );
+};
+
+// Keeps a copy of a local draft that could not be imported, so it is never
+// silently lost when the account's own calendar takes its place.
+const backupDiscardedDraft = (userId: string, snapshot: CalendarSnapshot) => {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.setItem(
+      `doze52:discarded-draft:${userId}`,
+      JSON.stringify({ savedAt: new Date().toISOString(), snapshot })
+    );
+  } catch {
+    // Storage full or unavailable: the draft is dropped, the sync must not fail.
+  }
 };
 
 const clearPendingSyncSnapshot = (userId: string) => {
@@ -560,6 +595,11 @@ export default function HomePage() {
 
   const [todayIso, setTodayIso] = React.useState<string>("");
   const lastSyncedHashRef = React.useRef<string>("");
+  // Content key of the calendar as last confirmed with the server (see
+  // snapshotContentKey); null until the first bootstrap/save completes.
+  const lastSyncedKeyRef = React.useRef<string | null>(null);
+  const isSavingRef = React.useRef(false);
+  const lastRemotePullAtRef = React.useRef(0);
   const saveTimerRef = React.useRef<number | null>(null);
   const syncOverlayTimerRef = React.useRef<number | null>(null);
   const previousSessionUserIdRef = React.useRef<string | null>(null);
@@ -1179,6 +1219,7 @@ export default function HomePage() {
       setSyncBlocked(false);
       setSyncError(null);
       lastSyncedHashRef.current = "";
+      lastSyncedKeyRef.current = null;
       previousSessionUserIdRef.current = null;
       return;
     }
@@ -1287,6 +1328,7 @@ export default function HomePage() {
       setSyncError(null);
 
       let snapshotToPersistOnFailure: CalendarSnapshot | null = null;
+      let baseKeyOnFailure: string | undefined;
 
       try {
         const currentGuidedStep = readGuidedOnboardingState().step;
@@ -1300,13 +1342,30 @@ export default function HomePage() {
             currentGuidedStep === "context_selection"
         );
 
-        const pendingSnapshot = readPendingSyncSnapshot(userId);
+        const pendingSaved = readPendingSyncSnapshot(userId);
         const alreadyImported = isLocalImported(userId);
         const localDraftIsRelevant =
           !alreadyImported && hasRelevantLocalDraft(localSnapshot);
         const remoteSnapshot = await loadRemoteData();
 
         if (cancelled) return;
+
+        const remoteKey = snapshotContentKey(remoteSnapshot);
+        baseKeyOnFailure = remoteKey;
+
+        // A snapshot left behind by a failed save only wins while the server is
+        // unchanged; otherwise another device edited the calendar and replaying
+        // it would bring deleted events back.
+        const pendingSnapshot =
+          pendingSaved &&
+          isPendingSnapshotCurrent(pendingSaved.baseKey, remoteSnapshot)
+            ? pendingSaved.snapshot
+            : null;
+        const discardedStalePending =
+          pendingSaved !== null &&
+          pendingSnapshot === null &&
+          snapshotContentKey(pendingSaved.snapshot) !== remoteKey;
+        if (pendingSaved && !pendingSnapshot) clearPendingSyncSnapshot(userId);
 
         const remoteIsEmpty =
           remoteSnapshot.profiles.length === 0 &&
@@ -1337,12 +1396,42 @@ export default function HomePage() {
         nextSnapshot = reconciliation.snapshot;
         snapshotToPersistOnFailure = nextSnapshot;
 
-        const nextHash = toSnapshotHash(nextSnapshot);
+        let nextHash = toSnapshotHash(nextSnapshot);
+        let discardedDraft = false;
+        const isDraftMerge = localDraftIsRelevant && !pendingSnapshot;
 
         replaceAllData(nextSnapshot);
 
         if (shouldForceSave || nextHash !== remoteHash) {
-          await saveSnapshot(nextSnapshot);
+          try {
+            await saveSnapshot(nextSnapshot);
+          } catch (saveError) {
+            // A local draft the server refuses (plan limits, invalid data) can
+            // never sync, and retrying it would block this device for good
+            // while it shows data the account does not have. The account's own
+            // calendar wins; the draft is kept aside. Network/auth failures and
+            // edits already made on this account are not handled here.
+            if (
+              !isDraftMerge ||
+              !(saveError instanceof SyncError) ||
+              saveError.kind !== "unknown" ||
+              saveError.retryable
+            ) {
+              throw saveError;
+            }
+
+            logDevError("app.page.bootstrap-draft-discarded", {
+              kind: saveError.kind,
+              message: saveError.userMessage,
+              code: saveError.code,
+              status: saveError.status,
+            });
+            backupDiscardedDraft(userId, localSnapshot);
+            nextSnapshot = remoteSnapshot;
+            nextHash = remoteHash;
+            discardedDraft = true;
+            replaceAllData(remoteSnapshot);
+          }
 
           if (cancelled) return;
         }
@@ -1350,8 +1439,25 @@ export default function HomePage() {
         clearPendingSyncSnapshot(userId);
         markLocalImported(userId);
         lastSyncedHashRef.current = nextHash;
+        lastSyncedKeyRef.current = snapshotContentKey(nextSnapshot);
         setRemoteReady(true);
         setSyncBlocked(false);
+        if (discardedDraft) {
+          notify({
+            tone: "info",
+            title: "Calendário da conta carregado",
+            description:
+              "O calendário local deste aparelho não pôde ser importado (limite do plano ou dados inválidos). Mostrando o calendário da sua conta.",
+          });
+        }
+        if (discardedStalePending) {
+          notify({
+            tone: "info",
+            title: "Calendário atualizado",
+            description:
+              "Alterações não sincronizadas deste aparelho foram descartadas porque o calendário mudou em outro aparelho.",
+          });
+        }
         if (reconciliation.updatedPackCount > 0) {
           notify({
             tone: "success",
@@ -1378,7 +1484,11 @@ export default function HomePage() {
         logProdError("Falha ao carregar dados remotos.");
 
         if (snapshotToPersistOnFailure) {
-          writePendingSyncSnapshot(userId, snapshotToPersistOnFailure);
+          writePendingSyncSnapshot(
+            userId,
+            snapshotToPersistOnFailure,
+            baseKeyOnFailure
+          );
           replaceAllData(snapshotToPersistOnFailure);
         }
 
@@ -1439,6 +1549,7 @@ export default function HomePage() {
       saveTimerRef.current = null;
       setHasQueuedSave(false);
       setIsSyncing(true);
+      isSavingRef.current = true;
       setSyncError(null);
 
       try {
@@ -1446,6 +1557,7 @@ export default function HomePage() {
         void recordProductActivityDay(session.user.id);
         clearPendingSyncSnapshot(session.user.id);
         lastSyncedHashRef.current = nextHash;
+        lastSyncedKeyRef.current = snapshotContentKey(nextSnapshot);
       } catch (error) {
         const syncError =
           error instanceof SyncError
@@ -1465,7 +1577,11 @@ export default function HomePage() {
 
         logProdError("Falha ao salvar dados.");
 
-        writePendingSyncSnapshot(session.user.id, nextSnapshot);
+        writePendingSyncSnapshot(
+          session.user.id,
+          nextSnapshot,
+          lastSyncedKeyRef.current ?? undefined
+        );
 
         setSyncError({
           message: syncError.userMessage,
@@ -1478,6 +1594,7 @@ export default function HomePage() {
         setSyncBlocked(true);
         setRemoteReady(false);
       } finally {
+        isSavingRef.current = false;
         setIsSyncing(false);
       }
     }, 800);
@@ -1493,6 +1610,90 @@ export default function HomePage() {
     events,
     profiles,
     remoteReady,
+    session?.user.id,
+    syncBlocked,
+    syncError,
+    windowContext,
+  ]);
+
+  // The calendar is only loaded from the server at bootstrap, so a device that
+  // stays open (an installed mobile app, a background tab) keeps showing stale
+  // data — and its next edit would overwrite the server with it, bringing back
+  // events deleted elsewhere. Pull again whenever the app comes back to the
+  // foreground, but only while this device has nothing unsaved of its own.
+  React.useEffect(() => {
+    if (windowContext !== "main") return;
+    if (!session?.user.id || !remoteReady || syncBlocked || syncError) return;
+
+    let disposed = false;
+    let inFlight = false;
+
+    const isIdle = () => {
+      if (saveTimerRef.current !== null || isSavingRef.current) return false;
+      const step = readGuidedOnboardingState().step;
+      if (step === "demo_exploration" || step === "context_selection") {
+        return false;
+      }
+      const syncedKey = lastSyncedKeyRef.current;
+      if (syncedKey === null) return false;
+      return (
+        snapshotContentKey({
+          profiles: profilesRef.current,
+          categories: categoriesRef.current,
+          events: eventsRef.current,
+        }) === syncedKey
+      );
+    };
+
+    const pullRemote = async () => {
+      if (disposed || inFlight || document.visibilityState !== "visible") return;
+      if (Date.now() - lastRemotePullAtRef.current < REMOTE_PULL_MIN_INTERVAL_MS) {
+        return;
+      }
+      if (!isIdle()) return;
+
+      inFlight = true;
+      lastRemotePullAtRef.current = Date.now();
+
+      try {
+        const remoteSnapshot = await loadRemoteData();
+        // Re-check after the round trip: the user may have edited meanwhile.
+        if (disposed || !isIdle()) return;
+
+        const remoteKey = snapshotContentKey(remoteSnapshot);
+        if (remoteKey === lastSyncedKeyRef.current) return;
+
+        replaceAllData(remoteSnapshot);
+        lastSyncedHashRef.current = toSnapshotHash(remoteSnapshot);
+        lastSyncedKeyRef.current = remoteKey;
+      } catch {
+        // Transient (offline, expired session): the next trigger retries, and
+        // loadRemoteData already logged the failure.
+      } finally {
+        inFlight = false;
+      }
+    };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") void pullRemote();
+    };
+    const onFocus = () => void pullRemote();
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("focus", onFocus);
+    window.addEventListener("pageshow", onFocus);
+    window.addEventListener("online", onFocus);
+
+    return () => {
+      disposed = true;
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("pageshow", onFocus);
+      window.removeEventListener("online", onFocus);
+    };
+  }, [
+    remoteReady,
+    replaceAllData,
     session?.user.id,
     syncBlocked,
     syncError,
