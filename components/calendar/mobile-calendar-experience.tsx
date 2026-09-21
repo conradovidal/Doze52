@@ -547,7 +547,10 @@ export function MobileCalendarExperience({
                                 {day.getDate()}
                               </span>
                               <span
-                                className="mt-0.5 text-[10px] font-semibold uppercase leading-3 tracking-[0.08em] text-muted-foreground"
+                                className={cn(
+                                  "mt-0.5 text-[10px] font-semibold uppercase leading-3 tracking-[0.08em]",
+                                  today ? "text-white" : "text-muted-foreground"
+                                )}
                               >
                                 {weekday}
                               </span>
