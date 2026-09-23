@@ -13,6 +13,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { useFeedback } from "@/components/ui/feedback-provider";
+import { cn } from "@/lib/utils";
 import {
   Select,
   SelectContent,
@@ -58,6 +60,11 @@ export function ProfileManager({
   const createProfile = useStore((s) => s.createProfile);
   const updateProfile = useStore((s) => s.updateProfile);
   const deleteProfile = useStore((s) => s.deleteProfile);
+  const restoreDeleted = useStore((s) => s.restoreDeleted);
+  const categories = useStore((s) => s.categories);
+  const events = useStore((s) => s.events);
+  const { notify } = useFeedback();
+  const [deleteMode, setDeleteMode] = React.useState<"move" | "delete-all">("move");
 
   const [name, setName] = React.useState("");
   const [icon, setIcon] = React.useState<ProfileIconId>(DEFAULT_PROFILE_ICON);
@@ -174,10 +181,30 @@ export function ProfileManager({
     }
   };
 
+  const contentCounts = React.useMemo(() => {
+    if (!editingProfile) return { categories: 0, events: 0 };
+    const ids = new Set(
+      categories
+        .filter((category) => category.profileId === editingProfile.id)
+        .map((category) => category.id)
+    );
+    return {
+      categories: ids.size,
+      events: events.filter((event) => ids.has(event.categoryId)).length,
+    };
+  }, [categories, editingProfile, events]);
+  const hasContents = contentCounts.categories > 0;
+  const pluralize = (count: number, one: string, many: string) =>
+    `${count} ${count === 1 ? one : many}`;
+
   const handleDelete = async () => {
     if (!editingProfile) return;
     if (profiles.length <= 1) return;
-    if (!deleteTargetProfileId || deleteTargetProfileId === editingProfile.id) {
+    const deletingAll = deleteMode === "delete-all" || !hasContents;
+    if (
+      !deletingAll &&
+      (!deleteTargetProfileId || deleteTargetProfileId === editingProfile.id)
+    ) {
       setSaveError("Selecione um contexto de destino para reatribuir as categorias.");
       return;
     }
@@ -190,9 +217,40 @@ export function ProfileManager({
     try {
       setIsSaving(true);
       setSaveError(null);
-      deleteProfile({ profileId: editingProfile.id, reassignToProfileId: target });
+      const deletedProfile = editingProfile;
+      const affectedCategories = categories.filter(
+        (category) => category.profileId === deletedProfile.id
+      );
+      const affectedCategoryIds = new Set(affectedCategories.map((category) => category.id));
+      const affectedEvents = events.filter((event) =>
+        affectedCategoryIds.has(event.categoryId)
+      );
+      deleteProfile({
+        profileId: deletedProfile.id,
+        reassignToProfileId: target,
+        deleteContents: deletingAll,
+      });
       setConfirmDeleteOpen(false);
       onOpenChange(false);
+      notify({
+        tone: "success",
+        title: `Contexto "${deletedProfile.name}" excluído`,
+        description: !hasContents
+          ? undefined
+          : deletingAll
+            ? `${pluralize(contentCounts.categories, "categoria removida", "categorias removidas")} e ${pluralize(contentCounts.events, "evento removido", "eventos removidos")}.`
+            : `${pluralize(contentCounts.categories, "categoria movida", "categorias movidas")} para outro contexto.`,
+        durationMs: 8000,
+        action: {
+          label: "Desfazer",
+          onClick: () =>
+            restoreDeleted({
+              profiles: [deletedProfile],
+              categories: affectedCategories,
+              events: affectedEvents,
+            }),
+        },
+      });
     } catch (error) {
       setSaveError(
         error instanceof Error
@@ -210,6 +268,7 @@ export function ProfileManager({
     setDeleteTargetProfileId((current) =>
       current && current !== editingProfile.id ? current : (fallbackTarget ?? "")
     );
+    setDeleteMode("move");
     setConfirmDeleteOpen(true);
   };
 
@@ -317,29 +376,86 @@ export function ProfileManager({
         <DialogHeader>
           <DialogTitle>Excluir contexto</DialogTitle>
           <DialogDescription>
-            As categorias deste contexto serão reatribuídas para outro contexto
-            antes da exclusão.
+            {hasContents
+              ? `Este contexto tem ${pluralize(contentCounts.categories, "categoria", "categorias")} e ${pluralize(contentCounts.events, "evento", "eventos")}. Escolha o que fazer com esse conteúdo.`
+              : "Este contexto está vazio e será excluído."}
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-            As categorias deste contexto serão reatribuídas para:
+        {hasContents ? (
+          <div className="space-y-3" role="radiogroup" aria-label="Destino do conteúdo do contexto">
+            <div
+              className={cn(
+                "w-full rounded-xl border px-4 py-3 text-left transition-colors",
+                deleteMode === "move"
+                  ? "border-primary/45 bg-primary/5"
+                  : "border-border hover:bg-muted/45"
+              )}
+            >
+              <label className="block cursor-pointer">
+                <input
+                  type="radio"
+                  name="profile-delete-mode"
+                  value="move"
+                  checked={deleteMode === "move"}
+                  onChange={() => setDeleteMode("move")}
+                  className="sr-only"
+                />
+                <span className="block text-sm font-semibold text-foreground">
+                  Mover para outro contexto
+                </span>
+                <span className="mt-1 block text-xs leading-5 text-muted-foreground">
+                  As categorias e seus eventos passam para o contexto escolhido.
+                </span>
+              </label>
+              {deleteMode === "move" ? (
+                <Select value={deleteTargetProfileId} onValueChange={setDeleteTargetProfileId}>
+                  <SelectTrigger
+                    aria-label="Contexto de destino"
+                    className="mt-3 h-10 rounded-xl border-border/80 bg-background shadow-sm"
+                  >
+                    <SelectValue placeholder="Selecione o contexto de destino" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {profiles
+                      .filter((profile) => profile.id !== editingProfile?.id)
+                      .map((profile) => (
+                        <SelectItem key={profile.id} value={profile.id}>
+                          {profile.name}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              ) : null}
+            </div>
+            <label
+              className={cn(
+                "block w-full cursor-pointer rounded-xl border px-4 py-3 text-left transition-colors",
+                deleteMode === "delete-all"
+                  ? "border-destructive/45 bg-destructive/5"
+                  : "border-border hover:bg-muted/45"
+              )}
+            >
+              <input
+                type="radio"
+                name="profile-delete-mode"
+                value="delete-all"
+                checked={deleteMode === "delete-all"}
+                onChange={() => setDeleteMode("delete-all")}
+                className="sr-only"
+              />
+              <span className="block text-sm font-semibold text-destructive">
+                Excluir tudo: {pluralize(contentCounts.categories, "categoria", "categorias")} e{" "}
+                {pluralize(contentCounts.events, "evento", "eventos")}
+              </span>
+              <span className="mt-1 block text-xs leading-5 text-muted-foreground">
+                Remove o contexto com todo o conteúdo. Dá para desfazer logo depois, por alguns segundos.
+              </span>
+            </label>
+            <p className="text-xs text-muted-foreground">
+              Prefere guardar sem perder nada? Arquive as categorias em vez de excluir o contexto.
             </p>
-          <Select value={deleteTargetProfileId} onValueChange={setDeleteTargetProfileId}>
-            <SelectTrigger className="h-10 rounded-xl border-border/80 bg-background shadow-sm">
-              <SelectValue placeholder="Selecione o contexto de destino" />
-            </SelectTrigger>
-            <SelectContent>
-              {profiles
-                .filter((profile) => profile.id !== editingProfile?.id)
-                .map((profile) => (
-                  <SelectItem key={profile.id} value={profile.id}>
-                    {profile.name}
-                  </SelectItem>
-                ))}
-            </SelectContent>
-          </Select>
-        </div>
+          </div>
+        ) : null}
         <DialogFooter>
           <Button
             variant="ghost"
@@ -351,9 +467,13 @@ export function ProfileManager({
           <Button
             variant="dangerSoft"
             onClick={handleDelete}
-            disabled={!deleteTargetProfileId || isSaving}
+            disabled={
+              isSaving || (hasContents && deleteMode === "move" && !deleteTargetProfileId)
+            }
           >
-            Confirmar exclusao
+            {hasContents && deleteMode === "delete-all"
+              ? "Excluir contexto e conteúdo"
+              : "Confirmar exclusão"}
           </Button>
         </DialogFooter>
       </DialogContent>

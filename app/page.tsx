@@ -8,6 +8,7 @@ import { format, parseISO } from "date-fns";
 import { Plus } from "lucide-react";
 import dynamic from "next/dynamic";
 import { MobileCalendarExperience } from "@/components/calendar/mobile-calendar-experience";
+import { MobileWeekCalendar } from "@/components/calendar/mobile-week-calendar";
 import { YearGrid } from "@/components/calendar/year-grid";
 import {
   EventDialog,
@@ -114,6 +115,24 @@ import {
   resolveInitialProductDestination,
   type ProductDestinationId,
 } from "@/lib/product-navigation";
+
+/**
+ * PROTOTIPO (branch prototype/eventos-mobile-semana-linha): o Anual mobile usa
+ * a grade "semana = linha" dos Hábitos. `?classica=1` volta a lista por dia
+ * para comparar lado a lado.
+ */
+function MobileCalendarComponent(
+  props: React.ComponentProps<typeof MobileWeekCalendar>
+) {
+  const classic =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("classica") === "1";
+  return classic ? (
+    <MobileCalendarExperience {...props} />
+  ) : (
+    <MobileWeekCalendar {...props} />
+  );
+}
 
 const toSnapshotHash = (snapshot: CalendarSnapshot) => JSON.stringify(snapshot);
 
@@ -3114,7 +3133,7 @@ export default function HomePage() {
           }}
         />
       ) : isMobileCalendarUi === true ? (
-        <MobileCalendarExperience
+        <MobileCalendarComponent
           year={year}
           todayIso={todayIso}
           events={renderEvents}

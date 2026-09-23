@@ -38,6 +38,8 @@ type DbCategory = {
   name: string;
   color: string;
   visible: boolean;
+  archived_at: string | null;
+  archive_display: "show" | "hide" | null;
   calendar_pack_group_id: string | null;
   calendar_pack_variant_id: string | null;
   calendar_pack_category_key: string | null;
@@ -459,6 +461,8 @@ const toLocalCategory = (row: DbCategory): CategoryItem => ({
   name: row.name,
   color: row.color,
   visible: row.visible,
+  archivedAt: row.archived_at ?? undefined,
+  archiveDisplay: row.archived_at ? (row.archive_display ?? "hide") : undefined,
   calendarPackGroupId: row.calendar_pack_group_id ?? undefined,
   calendarPackVariantId: row.calendar_pack_variant_id ?? undefined,
   calendarPackCategoryKey: row.calendar_pack_category_key ?? undefined,
@@ -656,6 +660,8 @@ const saveSnapshotInternal = async (snapshot: CalendarSnapshot): Promise<void> =
         name: category.name.trim(),
         color: category.color,
         visible: category.visible,
+        archived_at: category.archivedAt ?? null,
+        archive_display: category.archivedAt ? (category.archiveDisplay ?? "hide") : null,
         calendar_pack_group_id: category.calendarPackGroupId ?? null,
         calendar_pack_variant_id: category.calendarPackVariantId ?? null,
         calendar_pack_category_key: category.calendarPackCategoryKey ?? null,

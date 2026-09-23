@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { isCategoryShownInCalendar } from "@/lib/category-archive";
 import { AnimatePresence, m } from "motion/react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import {
@@ -205,6 +206,8 @@ export function YearGrid({
   const viewMode = useStore((s) => s.viewMode);
   const focusedQuarter = useStore((s) => s.focusedQuarter);
   const focusedMonth = useStore((s) => s.focusedMonth);
+  const focusedMonthRange = useStore((s) => s.focusedMonthRange);
+  const focusMonthRange = useStore((s) => s.focusMonthRange);
   const calendarZoomPercent = useStore((s) => s.calendarZoomPercent);
   const setCalendarViewMode = useStore((s) => s.setCalendarViewMode);
   const focusQuarter = useStore((s) => s.focusQuarter);
@@ -225,7 +228,10 @@ export function YearGrid({
     () => {
       const selectedProfiles = new Set(selectedProfileIds);
       return categories
-        .filter((category) => category.visible && selectedProfiles.has(category.profileId))
+        .filter(
+          (category) =>
+            isCategoryShownInCalendar(category) && selectedProfiles.has(category.profileId)
+        )
         .map((category) => category.id);
     },
     [categories, selectedProfileIds]
@@ -279,6 +285,9 @@ export function YearGrid({
   const didDropRef = React.useRef(false);
   const zoomViewportRef = React.useRef<HTMLDivElement | null>(null);
   const pendingViewportRatioRef = React.useRef<number | null>(null);
+  // Onde a célula de hoje estava na viewport antes do zoom (null se ela não
+  // está renderizada no recorte atual) — o zoom se ancora nela.
+  const pendingTodayAnchorRef = React.useRef<{ x: number; y: number } | null>(null);
   React.useImperativeHandle(
     scrollViewportRef,
     () => zoomViewportRef.current as HTMLDivElement
@@ -323,9 +332,21 @@ export function YearGrid({
     };
 
     measure();
-    const resizeObserver = new ResizeObserver(measure);
+    // Recolher/expandir contextos e categorias anima a altura do viewport por
+    // ~300ms, disparando o observer a cada quadro. Medir a cada quadro
+    // re-renderiza a grade inteira (365 dias) e mexe no padding de todas as
+    // linhas em pleno movimento — é isso que deixa a animação arrastada
+    // com dados reais. Espera o redimensionamento assentar e mede uma vez.
+    let settleTimer: number | undefined;
+    const resizeObserver = new ResizeObserver(() => {
+      window.clearTimeout(settleTimer);
+      settleTimer = window.setTimeout(measure, 90);
+    });
     resizeObserver.observe(viewport);
-    return () => resizeObserver.disconnect();
+    return () => {
+      window.clearTimeout(settleTimer);
+      resizeObserver.disconnect();
+    };
   }, [canCompactYearDensity, yearRowBottomPaddingPx, year, events, habitPresentation]);
 
   const visibleEvents = React.useMemo(
@@ -596,42 +617,13 @@ export function YearGrid({
     [focusMonth, focusQuarter, guidedPeriodNotice?.target, onGuidedPeriodInteraction, resolvedMonth, resolvedQuarter, viewMode]
   );
 
-  // Arrastar de um rótulo de mês/trimestre a outro forma um período com
-  // esses meses/trimestres inteiros (a mesma lógica de arrastar dias para
-  // criar um período, só que em granularidade maior). Um clique simples (sem
-  // cruzar para outro rótulo) continua navegando como antes — só entra em
-  // modo de seleção quando o ponteiro realmente sai do rótulo de origem.
+  // Arrastar de um rótulo de mês/trimestre a outro recorta a visualização
+  // nesses meses (Q vale seus 3 meses). Um clique simples (sem cruzar para
+  // outro rótulo) continua navegando como antes.
   const labelDragOriginRef = React.useRef<LabelRangeOrigin | null>(null);
   const labelDragActiveRef = React.useRef(false);
   const lastLabelRangeKeyRef = React.useRef<string | null>(null);
 
-  const getMonthRangeIso = React.useCallback(
-    (monthIndex: MonthIndex) => ({
-      firstIso: format(new Date(year, monthIndex, 1), "yyyy-MM-dd"),
-      lastIso: format(new Date(year, monthIndex + 1, 0), "yyyy-MM-dd"),
-    }),
-    [year]
-  );
-  const getQuarterRangeIso = React.useCallback(
-    (quarterIndex: QuarterIndex) => {
-      const months = QUARTER_MONTH_GROUPS[quarterIndex];
-      return {
-        firstIso: format(new Date(year, months[0], 1), "yyyy-MM-dd"),
-        lastIso: format(
-          new Date(year, months[months.length - 1] + 1, 0),
-          "yyyy-MM-dd"
-        ),
-      };
-    },
-    [year]
-  );
-  const getLabelRangeIso = React.useCallback(
-    (origin: LabelRangeOrigin) =>
-      origin.type === "month"
-        ? getMonthRangeIso(origin.monthIndex)
-        : getQuarterRangeIso(origin.quarterIndex),
-    [getMonthRangeIso, getQuarterRangeIso]
-  );
   const resolveLabelOriginFromPoint = React.useCallback(
     (clientX: number, clientY: number): LabelRangeOrigin | null => {
       if (typeof document === "undefined") return null;
@@ -658,10 +650,26 @@ export function YearGrid({
     []
   );
 
+  const [labelDragPreview, setLabelDragPreview] = React.useState<{
+    start: MonthIndex;
+    end: MonthIndex;
+  } | null>(null);
+  const labelDragRangeRef = React.useRef<{ start: MonthIndex; end: MonthIndex } | null>(null);
+
+  const getLabelMonthSpan = React.useCallback(
+    (origin: LabelRangeOrigin): [MonthIndex, MonthIndex] => {
+      if (origin.type === "month") return [origin.monthIndex, origin.monthIndex];
+      const months = QUARTER_MONTH_GROUPS[origin.quarterIndex];
+      return [months[0], months[2]];
+    },
+    []
+  );
+
   const handleLabelDragStart = React.useCallback((origin: LabelRangeOrigin) => {
     labelDragOriginRef.current = origin;
     labelDragActiveRef.current = false;
     lastLabelRangeKeyRef.current = null;
+    labelDragRangeRef.current = null;
   }, []);
 
   const handleLabelDragMove = React.useCallback(
@@ -674,23 +682,38 @@ export function YearGrid({
       if (!labelDragActiveRef.current) {
         if (targetKey === getLabelKey(origin)) return;
         labelDragActiveRef.current = true;
-        onStartCreateRange(getLabelRangeIso(origin).firstIso);
       }
       if (lastLabelRangeKeyRef.current === targetKey) return;
       lastLabelRangeKeyRef.current = targetKey;
-      onHoverCreateRange(getLabelRangeIso(target).lastIso);
+      const [originStart, originEnd] = getLabelMonthSpan(origin);
+      const [targetStart, targetEnd] = getLabelMonthSpan(target);
+      const range = {
+        start: Math.min(originStart, targetStart) as MonthIndex,
+        end: Math.max(originEnd, targetEnd) as MonthIndex,
+      };
+      labelDragRangeRef.current = range;
+      setLabelDragPreview(range);
     },
-    [getLabelRangeIso, onHoverCreateRange, onStartCreateRange, resolveLabelOriginFromPoint]
+    [getLabelMonthSpan, resolveLabelOriginFromPoint]
   );
 
   const handleLabelDragEnd = React.useCallback(() => {
     if (labelDragActiveRef.current) {
       justDraggedLabelRef.current = true;
+      // O click só dispara se soltar no mesmo rótulo; senão a flag ficaria
+      // presa e engoliria o próximo clique legítimo.
+      window.setTimeout(() => {
+        justDraggedLabelRef.current = false;
+      }, 0);
+      const range = labelDragRangeRef.current;
+      if (range) focusMonthRange(range.start, range.end);
     }
     labelDragOriginRef.current = null;
     labelDragActiveRef.current = false;
     lastLabelRangeKeyRef.current = null;
-  }, []);
+    labelDragRangeRef.current = null;
+    setLabelDragPreview(null);
+  }, [focusMonthRange]);
 
   React.useEffect(() => {
     const onMouseMove = (event: MouseEvent) =>
@@ -721,6 +744,16 @@ export function YearGrid({
       }));
     }
 
+    if (viewMode === "quarter" && focusedMonthRange) {
+      return QUARTER_MONTH_GROUPS.map((months, quarterIndex) => ({
+        key: `quarter-range-${quarterIndex}`,
+        quarterIndex: quarterIndex as QuarterIndex,
+        monthIndices: months.filter(
+          (month) => month >= focusedMonthRange.start && month <= focusedMonthRange.end
+        ) as MonthIndex[],
+      })).filter((group) => group.monthIndices.length > 0);
+    }
+
     if (viewMode === "quarter") {
       return [
         {
@@ -738,7 +771,7 @@ export function YearGrid({
         monthIndices: [resolvedMonth],
       },
     ];
-  }, [resolvedMonth, resolvedQuarter, viewMode]);
+  }, [focusedMonthRange, resolvedMonth, resolvedQuarter, viewMode]);
 
   const density = "year";
   const canvasWidthClass = "min-w-[49rem] min-[420px]:min-w-[55rem] md:min-w-0";
@@ -764,10 +797,26 @@ export function YearGrid({
         const maxScrollLeft = Math.max(0, viewport.scrollWidth - viewport.clientWidth);
         pendingViewportRatioRef.current =
           maxScrollLeft > 0 ? viewport.scrollLeft / maxScrollLeft : 0;
+        const todayCell = viewport.querySelector<HTMLElement>(
+          `[data-day-cell][data-day-iso="${todayIso}"]`
+        );
+        if (todayCell) {
+          const viewportRect = viewport.getBoundingClientRect();
+          const cellRect = todayCell.getBoundingClientRect();
+          const centerX = cellRect.left + cellRect.width / 2 - viewportRect.left;
+          const centerY = cellRect.top + cellRect.height / 2 - viewportRect.top;
+          // Hoje visível: mantém onde está. Fora da tela: traz para o centro.
+          pendingTodayAnchorRef.current = {
+            x: centerX >= 0 && centerX <= viewport.clientWidth ? centerX : viewport.clientWidth / 2,
+            y: centerY >= 0 && centerY <= viewport.clientHeight ? centerY : viewport.clientHeight / 2,
+          };
+        } else {
+          pendingTodayAnchorRef.current = null;
+        }
       }
       setCalendarZoomPercent(nextPercent);
     },
-    [setCalendarZoomPercent]
+    [setCalendarZoomPercent, todayIso]
   );
 
   const handleViewModeChange = React.useCallback(
@@ -788,13 +837,29 @@ export function YearGrid({
     if (!viewport || pendingRatio === null) return;
 
     const rafId = window.requestAnimationFrame(() => {
+      const anchor = pendingTodayAnchorRef.current;
+      const todayCell = anchor
+        ? viewport.querySelector<HTMLElement>(`[data-day-cell][data-day-iso="${todayIso}"]`)
+        : null;
+      if (anchor && todayCell) {
+        const viewportRect = viewport.getBoundingClientRect();
+        const cellRect = todayCell.getBoundingClientRect();
+        const contentX = cellRect.left + cellRect.width / 2 - viewportRect.left + viewport.scrollLeft;
+        const contentY = cellRect.top + cellRect.height / 2 - viewportRect.top + viewport.scrollTop;
+        viewport.scrollLeft = contentX - anchor.x;
+        viewport.scrollTop = contentY - anchor.y;
+        pendingViewportRatioRef.current = null;
+        pendingTodayAnchorRef.current = null;
+        return;
+      }
+      pendingTodayAnchorRef.current = null;
       const maxScrollLeft = Math.max(0, viewport.scrollWidth - viewport.clientWidth);
       viewport.scrollLeft = maxScrollLeft > 0 ? maxScrollLeft * pendingRatio : 0;
       pendingViewportRatioRef.current = null;
     });
 
     return () => window.cancelAnimationFrame(rafId);
-  }, [effectiveZoomPercent]);
+  }, [effectiveZoomPercent, todayIso]);
 
   const handleViewportWheel = React.useCallback(
     (event: React.WheelEvent<HTMLDivElement>) => {
@@ -841,14 +906,22 @@ export function YearGrid({
         />
       ) : null}
       <m.div
-        key={`${viewMode}:${viewMode === "year" ? "" : viewMode === "quarter" ? resolvedQuarter : resolvedMonth}`}
+        key={`${viewMode}:${viewMode === "year" ? "" : viewMode === "quarter" ? (focusedMonthRange ? `${focusedMonthRange.start}-${focusedMonthRange.end}` : resolvedQuarter) : resolvedMonth}`}
         initial={{ opacity: 0, scale: 0.98 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
       >
       {quarterGroups.map((group, groupIndex) => {
-        const isActiveQuarter = viewMode !== "year" && group.quarterIndex === resolvedQuarter;
-        const isQuarterSelected = isActiveQuarter;
+        const isRangeView = viewMode === "quarter" && focusedMonthRange !== null;
+        const isActiveQuarter =
+          viewMode !== "year" && !isRangeView && group.quarterIndex === resolvedQuarter;
+        const isPreviewQuarter =
+          labelDragPreview !== null &&
+          QUARTER_MONTH_GROUPS[group.quarterIndex].every(
+            (month) => month >= labelDragPreview.start && month <= labelDragPreview.end
+          );
+        const isQuarterSelected = isActiveQuarter || isPreviewQuarter;
+        const isBrokenQuarter = isRangeView && group.monthIndices.length === 1;
         const isFirstVisibleGroup = groupIndex === 0;
         const isLastVisibleGroup = groupIndex === quarterGroups.length - 1;
         const quarterRailShapeClass =
@@ -892,7 +965,10 @@ export function YearGrid({
               }
             >
               <span
-                className="block -rotate-90 whitespace-nowrap text-[10px] font-medium uppercase tracking-[0.04em] min-[420px]:text-[10.5px] md:text-[11px]"
+                className={cn(
+                  "block whitespace-nowrap text-[10px] font-medium uppercase tracking-[0.04em] min-[420px]:text-[10.5px] md:text-[11px]",
+                  isBrokenQuarter ? "text-[9px] md:text-[9.5px]" : "-rotate-90"
+                )}
               >
                 {QUARTER_SHORT_LABELS[group.quarterIndex]}
               </span>
@@ -914,6 +990,10 @@ export function YearGrid({
             <div className="min-w-0 flex-1">
               {group.monthIndices.map((monthIndex) => {
                 const isActiveMonth = viewMode === "month" && monthIndex === resolvedMonth;
+                const isPreviewMonth =
+                  labelDragPreview !== null &&
+                  monthIndex >= labelDragPreview.start &&
+                  monthIndex <= labelDragPreview.end;
                 return (
                   <MonthRow
                     key={monthIndex}
@@ -952,7 +1032,7 @@ export function YearGrid({
                         ? `Voltar para ${QUARTER_LABELS[group.quarterIndex]}`
                         : `Abrir ${MONTH_TITLE_LABELS[monthIndex]}`
                     }
-                    monthLabelActive={isActiveMonth}
+                    monthLabelActive={isActiveMonth || isPreviewMonth}
                     monthLabelHighlighted={false}
                     isMobileInteractionMode={isMobileInteractionMode}
                     onDayCellActivate={
