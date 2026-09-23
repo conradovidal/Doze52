@@ -1,10 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { ArrowLeft, CalendarDays, CircleCheck } from "lucide-react";
+import { Archive, ArrowLeft, CalendarDays, ChevronDown, CircleCheck } from "lucide-react";
 import { ProfileBar } from "@/components/profile-bar";
 import { CategoryBar } from "@/components/category-bar";
+import { ArchivedItemsSection } from "@/components/archived-items-section";
 import { HabitEditList } from "@/components/habits/habit-edit-list";
+import { useHabitCheckInCount, useHabitRemoval } from "@/components/habits/use-habit-removal";
 import {
   HABIT_COLORS,
   HabitEditorFields,
@@ -25,6 +27,7 @@ import {
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { useFeedback } from "@/components/ui/feedback-provider";
 import { useHabitsStore } from "@/lib/habits-store";
+import { useStore } from "@/lib/store";
 import {
   orderActiveHabits,
   type OnboardingHabitShowcase,
@@ -165,7 +168,7 @@ export function FilterEditPanel({
   const selectedHabitId = useHabitsStore((s) => s.selectedHabitId);
   const createHabitInStore = useHabitsStore((s) => s.createHabit);
   const updateHabitInStore = useHabitsStore((s) => s.updateHabit);
-  const deleteHabitInStore = useHabitsStore((s) => s.deleteHabit);
+  const habitRemoval = useHabitRemoval();
   const reorderHabitsInStore = useHabitsStore((s) => s.reorderHabits);
   const toggleHabitVisibilityInStore = useHabitsStore(
     (s) => s.toggleHabitVisibility
@@ -193,7 +196,14 @@ export function FilterEditPanel({
   }, [activeHabits, habitShowcase, habitShowcaseLocked]);
 
   const [habitDialogOpen, setHabitDialogOpen] = React.useState(false);
+  const [archivedOpen, setArchivedOpen] = React.useState(false);
+  const archivedCategoryCount = useStore(
+    (s) => s.categories.filter((category) => category.archivedAt).length
+  );
+  const archivedCount =
+    archivedCategoryCount + habits.filter((habit) => habit.archivedAt).length;
   const [editingHabitId, setEditingHabitId] = React.useState<string | null>(null);
+  const editingHabitCheckIns = useHabitCheckInCount(editingHabitId);
   const [draftName, setDraftName] = React.useState("");
   const [draftColor, setDraftColor] = React.useState<string>(HABIT_COLORS[0]);
   const [upgradeOpen, setUpgradeOpen] = React.useState(false);
@@ -266,7 +276,14 @@ export function FilterEditPanel({
 
   const deleteEditingHabit = () => {
     if (!editingHabitId) return;
-    deleteHabitInStore(editingHabitId);
+    habitRemoval.remove(editingHabitId);
+    setHabitDialogOpen(false);
+    setEditingHabitId(null);
+  };
+
+  const archiveEditingHabit = () => {
+    if (!editingHabitId) return;
+    habitRemoval.archive(editingHabitId);
     setHabitDialogOpen(false);
     setEditingHabitId(null);
   };
@@ -343,6 +360,8 @@ export function FilterEditPanel({
                 onSubmit={submitHabit}
                 editing={Boolean(editingHabitId)}
                 onDelete={editingHabitId ? deleteEditingHabit : undefined}
+                onArchive={editingHabitId ? archiveEditingHabit : undefined}
+                checkInCount={editingHabitCheckIns}
                 onCancel={() => setHabitDialogOpen(false)}
               />
             ) : section === "annual" ? (
@@ -424,6 +443,33 @@ export function FilterEditPanel({
               </section>
             )}
             </div>
+            {!habitDialogOpen && archivedCount > 0 ? (
+              <section className="mt-6 border-t border-border/55 pt-3">
+                <button
+                  type="button"
+                  aria-expanded={archivedOpen}
+                  onClick={() => setArchivedOpen((current) => !current)}
+                  className="flex w-full items-center justify-between gap-2 rounded-lg px-1 py-2 text-left text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  <span className="inline-flex items-center gap-2">
+                    <Archive className="size-4" aria-hidden="true" />
+                    Arquivados
+                    <span className="rounded-full bg-muted px-1.5 py-0.5 text-xs tabular-nums">
+                      {archivedCount}
+                    </span>
+                  </span>
+                  <ChevronDown
+                    className={`size-4 transition-transform ${archivedOpen ? "rotate-180" : ""}`}
+                    aria-hidden="true"
+                  />
+                </button>
+                {archivedOpen ? (
+                  <div className="mt-2">
+                    <ArchivedItemsSection />
+                  </div>
+                ) : null}
+              </section>
+            ) : null}
             {wrapUpCard && !wrapUpSuggestionsVisible ? (
               // Com as sugestões na tela o card vive entre elas e o ano (ver
               // wrapUpSuggestionsVisible acima). Fora disso — na aba Hábitos,

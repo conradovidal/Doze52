@@ -505,8 +505,8 @@ export function CategoryBar({
   const activeProfileIds = React.useMemo(() => new Set(selectedProfileIds), [selectedProfileIds]);
   const displayedCategories = React.useMemo(
     () =>
-      categories.filter((category) =>
-        activeProfileIds.has(category.profileId)
+      categories.filter(
+        (category) => !category.archivedAt && activeProfileIds.has(category.profileId)
       ),
     [categories, activeProfileIds]
   );
@@ -522,7 +522,9 @@ export function CategoryBar({
   const categoriesForEditingProfile = React.useMemo(
     () =>
       editingProfileId
-        ? categories.filter((category) => category.profileId === editingProfileId)
+        ? categories.filter(
+            (category) => !category.archivedAt && category.profileId === editingProfileId
+          )
         : [],
     [categories, editingProfileId]
   );

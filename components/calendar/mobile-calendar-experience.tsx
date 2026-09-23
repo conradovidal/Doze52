@@ -1,5 +1,6 @@
 "use client";
 
+import { isCategoryShownInCalendar } from "@/lib/category-archive";
 import * as React from "react";
 import {
   addDays,
@@ -169,7 +170,7 @@ export function MobileCalendarExperience({
         categories
           .filter(
             (category) =>
-              category.visible && selectedProfiles.has(category.profileId)
+              isCategoryShownInCalendar(category) && selectedProfiles.has(category.profileId)
           )
           .map((category) => category.id)
       ),
@@ -547,7 +548,10 @@ export function MobileCalendarExperience({
                                 {day.getDate()}
                               </span>
                               <span
-                                className="mt-0.5 text-[10px] font-semibold uppercase leading-3 tracking-[0.08em] text-muted-foreground"
+                                className={cn(
+                                  "mt-0.5 text-[10px] font-semibold uppercase leading-3 tracking-[0.08em]",
+                                  today ? "text-white" : "text-muted-foreground"
+                                )}
                               >
                                 {weekday}
                               </span>

@@ -38,6 +38,10 @@ type HabitEditorFieldsProps = {
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
   editing: boolean;
   onDelete?: () => void;
+  /** Guarda o hábito (e o histórico) fora do acompanhamento, sem apagar. */
+  onArchive?: () => void;
+  /** Check-ins marcados; aparecem no resumo da exclusão. */
+  checkInCount?: number;
   onCancel: () => void;
   // Quando embutido num Dialog que já tem seu próprio título/scrim (ex.: o
   // painel Organizar), usa cabeçalho simples em vez de duplicar o semântico
@@ -53,6 +57,8 @@ export function HabitEditorFields({
   onSubmit,
   editing,
   onDelete,
+  onArchive,
+  checkInCount = 0,
   onCancel,
   dialogSemantics = true,
 }: HabitEditorFieldsProps) {
@@ -122,19 +128,39 @@ export function HabitEditorFields({
         </fieldset>
       </div>
 
+      {editing && onDelete && confirmingDelete ? (
+        <p
+          role="alert"
+          className="mt-5 rounded-xl border border-destructive/25 bg-destructive/5 px-3 py-2.5 text-sm text-foreground"
+        >
+          {checkInCount > 0
+            ? `Excluir apaga também ${checkInCount} ${checkInCount === 1 ? "check-in" : "check-ins"}.`
+            : "Este hábito ainda não tem check-ins."}
+          {onArchive ? " Prefere guardar o histórico? Arquive em vez de excluir." : null}
+        </p>
+      ) : null}
+
       <DialogFooter className="mt-6">
-        {editing && onDelete ? (
-          <Button
-            type="button"
-            variant="dangerSoft"
-            className="sm:mr-auto"
-            onClick={() => {
-              if (confirmingDelete) onDelete();
-              else setConfirmingDelete(true);
-            }}
-          >
-            {confirmingDelete ? "Confirmar exclusão" : "Excluir hábito"}
-          </Button>
+        {editing && (onArchive || onDelete) ? (
+          <div className="flex flex-wrap gap-2 sm:mr-auto">
+            {onArchive ? (
+              <Button type="button" variant="outline" onClick={onArchive}>
+                Arquivar
+              </Button>
+            ) : null}
+            {onDelete ? (
+              <Button
+                type="button"
+                variant="dangerSoft"
+                onClick={() => {
+                  if (confirmingDelete) onDelete();
+                  else setConfirmingDelete(true);
+                }}
+              >
+                {confirmingDelete ? "Confirmar exclusão" : "Excluir hábito"}
+              </Button>
+            ) : null}
+          </div>
         ) : null}
         <Button type="button" variant="ghost" onClick={onCancel}>
           Cancelar
@@ -157,6 +183,8 @@ export function HabitEditorDialog({
   onSubmit,
   editing,
   onDelete,
+  onArchive,
+  checkInCount,
 }: {
   open: boolean;
   name: string;
@@ -167,6 +195,8 @@ export function HabitEditorDialog({
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
   editing: boolean;
   onDelete?: () => void;
+  onArchive?: () => void;
+  checkInCount?: number;
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -180,6 +210,8 @@ export function HabitEditorDialog({
             onSubmit={onSubmit}
             editing={editing}
             onDelete={onDelete}
+            onArchive={onArchive}
+            checkInCount={checkInCount}
             onCancel={() => onOpenChange(false)}
           />
         ) : null}

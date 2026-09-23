@@ -17,6 +17,8 @@ type FeedbackInput = {
   description?: string;
   tone?: FeedbackTone;
   durationMs?: number;
+  /** Botão de ação no aviso (ex.: Desfazer). Fecha o aviso ao clicar. */
+  action?: { label: string; onClick: () => void };
 };
 
 type FeedbackToast = FeedbackInput & {
@@ -72,7 +74,7 @@ export function FeedbackProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const notify = React.useCallback(
-    ({ title, description, tone = "info", durationMs }: FeedbackInput) => {
+    ({ title, description, tone = "info", durationMs, action }: FeedbackInput) => {
       const id =
         typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
           ? crypto.randomUUID()
@@ -83,6 +85,7 @@ export function FeedbackProvider({ children }: { children: React.ReactNode }) {
         description,
         tone,
         durationMs,
+        action,
       };
 
       setToasts((current) => [...current.filter((toast) => toast.title !== title), nextToast].slice(-4));
@@ -165,6 +168,18 @@ export function FeedbackProvider({ children }: { children: React.ReactNode }) {
                     </p>
                   ) : null}
                 </div>
+                {toast.action ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      toast.action?.onClick();
+                      dismiss(toast.id);
+                    }}
+                    className="shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold underline-offset-2 transition-colors hover:bg-black/5 hover:underline dark:hover:bg-white/8"
+                  >
+                    {toast.action.label}
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   onClick={() => dismiss(toast.id)}

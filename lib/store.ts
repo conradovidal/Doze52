@@ -64,6 +64,7 @@ type StoreState = {
   viewMode: CalendarViewMode;
   focusedQuarter: 0 | 1 | 2 | 3 | null;
   focusedMonth: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | null;
+  focusedMonthRange: { start: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11; end: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 } | null;
   calendarZoomPercent: number;
   replaceAllData: (payload: {
     profiles: CalendarProfile[];
@@ -94,7 +95,20 @@ type StoreState = {
     id: string,
     patch: Partial<Pick<CalendarProfile, "name" | "icon">>
   ) => void;
-  deleteProfile: (input: { profileId: string; reassignToProfileId: string }) => void;
+  deleteProfile: (input: {
+    profileId: string;
+    reassignToProfileId: string;
+    /** Apaga também as categorias do contexto e os eventos delas. */
+    deleteContents?: boolean;
+  }) => void;
+  archiveCategory: (id: string, display: "show" | "hide") => void;
+  unarchiveCategory: (id: string) => void;
+  /** Desfaz uma exclusão: reinsere (ou sobrescreve) itens pelo id. */
+  restoreDeleted: (items: {
+    profiles?: CalendarProfile[];
+    categories?: CategoryItem[];
+    events?: CalendarEvent[];
+  }) => void;
   setProfilesOrder: (orderedIds: string[]) => void;
   addEvent: (input: EventInput) => string | null;
   updateEvent: (id: string, patch: EventUpdatePatch) => void;
@@ -106,6 +120,7 @@ type StoreState = {
   setCalendarViewMode: (mode: CalendarViewMode) => void;
   focusQuarter: (quarter: 0 | 1 | 2 | 3) => void;
   focusMonth: (month: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11) => void;
+  focusMonthRange: (start: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11, end: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11) => void;
   setCalendarZoomPercent: (percent: number) => void;
   resetCalendarFocusOnYearChange: () => void;
   createCategory: (input: { name: string; color: string; profileId: string }) => string;
@@ -1645,6 +1660,7 @@ export const useStore = create<StoreState>()(
       viewMode: "year",
       focusedQuarter: null,
       focusedMonth: null,
+      focusedMonthRange: null,
       calendarZoomPercent: CALENDAR_ZOOM_MIN_PERCENT,
       replaceAllData: ({ profiles, categories, events }) =>
         set((state) => {
@@ -1884,7 +1900,7 @@ export const useStore = create<StoreState>()(
             };
           }),
         })),
-      deleteProfile: ({ profileId, reassignToProfileId }) =>
+      deleteProfile: ({ profileId, reassignToProfileId, deleteContents }) =>
         set((state) => {
           if (state.profiles.length <= 1) return state;
           if (!state.profiles.some((profile) => profile.id === profileId)) return state;
@@ -1899,6 +1915,32 @@ export const useStore = create<StoreState>()(
           const nextProfiles = state.profiles
             .filter((profile) => profile.id !== profileId)
             .map((profile, index) => ({ ...profile, position: index }));
+
+          if (deleteContents) {
+            const removedCategoryIds = new Set(
+              state.categories
+                .filter((category) => category.profileId === profileId)
+                .map((category) => category.id)
+            );
+            const remainingCategories = state.categories.filter(
+              (category) => !removedCategoryIds.has(category.id)
+            );
+            // Nunca deixa o app sem nenhuma categoria comum.
+            if (remainingCategories.every((category) => category.calendarPackGroupId)) {
+              return state;
+            }
+            return {
+              profiles: nextProfiles,
+              selectedProfileIds: ensureSelectedProfileIds(
+                state.selectedProfileIds.filter((id) => id !== profileId),
+                nextProfiles
+              ),
+              categories: remainingCategories,
+              events: state.events.filter(
+                (event) => !removedCategoryIds.has(event.categoryId)
+              ),
+            };
+          }
 
           return {
             profiles: nextProfiles,
@@ -2158,18 +2200,28 @@ export const useStore = create<StoreState>()(
       setCalendarViewMode: (mode) =>
         set(() => ({
           viewMode: mode,
+          focusedMonthRange: null,
         })),
       focusQuarter: (quarter) =>
         set(() => ({
           viewMode: "quarter",
           focusedQuarter: quarter,
           focusedMonth: null,
+          focusedMonthRange: null,
         })),
       focusMonth: (month) =>
         set(() => ({
           viewMode: "month",
           focusedMonth: month,
           focusedQuarter: getQuarterFromMonth(month),
+          focusedMonthRange: null,
+        })),
+      focusMonthRange: (start, end) =>
+        set(() => ({
+          viewMode: "quarter",
+          focusedQuarter: null,
+          focusedMonth: null,
+          focusedMonthRange: { start: Math.min(start, end) as typeof start, end: Math.max(start, end) as typeof end },
         })),
       setCalendarZoomPercent: (percent) =>
         set(() => ({
@@ -2180,6 +2232,7 @@ export const useStore = create<StoreState>()(
           viewMode: "year",
           focusedQuarter: null,
           focusedMonth: null,
+          focusedMonthRange: null,
         })),
       createCategory: (input) => {
         const name = input.name.trim();
@@ -2245,6 +2298,11 @@ export const useStore = create<StoreState>()(
             (candidate) => !candidate.calendarPackGroupId
           );
           if (ordinaryCategories.length <= 1) return state;
+          const activeOrdinaryCount = ordinaryCategories.filter(
+            (candidate) => !candidate.archivedAt
+          ).length;
+          // Excluir a última categoria ativa deixaria só arquivadas.
+          if (!category.archivedAt && activeOrdinaryCount <= 1) return state;
 
           const nextCategories = state.categories.filter(
             (candidate) => candidate.id !== categoryId
@@ -2262,7 +2320,8 @@ export const useStore = create<StoreState>()(
           const destination = nextCategories.find(
             (candidate) =>
               candidate.id === strategy.targetCategoryId &&
-              !candidate.calendarPackGroupId
+              !candidate.calendarPackGroupId &&
+              !candidate.archivedAt
           );
           if (!destination) return state;
 
@@ -2282,6 +2341,48 @@ export const useStore = create<StoreState>()(
         });
         return didDelete;
       },
+      archiveCategory: (id, display) =>
+        set((state) => ({
+          categories: state.categories.map((category) =>
+            category.id === id && !category.calendarPackGroupId
+              ? {
+                  ...category,
+                  archivedAt: category.archivedAt ?? new Date().toISOString(),
+                  archiveDisplay: display,
+                }
+              : category
+          ),
+        })),
+      unarchiveCategory: (id) =>
+        set((state) => ({
+          categories: state.categories.map((category) =>
+            category.id === id
+              ? { ...category, archivedAt: undefined, archiveDisplay: undefined }
+              : category
+          ),
+        })),
+      restoreDeleted: ({ profiles, categories, events }) =>
+        set((state) => {
+          const upsert = <T extends { id: string }>(current: T[], incoming?: T[]) => {
+            if (!incoming?.length) return current;
+            const byId = new Map(incoming.map((item) => [item.id, item]));
+            const merged = current.map((item) => byId.get(item.id) ?? item);
+            const known = new Set(current.map((item) => item.id));
+            return [...merged, ...incoming.filter((item) => !known.has(item.id))];
+          };
+          const nextProfiles = upsert(state.profiles, profiles)
+            .toSorted((a, b) => (a.position ?? 0) - (b.position ?? 0))
+            .map((profile, index) => ({ ...profile, position: index }));
+          return {
+            profiles: nextProfiles,
+            categories: upsert(state.categories, categories),
+            events: upsert(state.events, events),
+            selectedProfileIds: ensureSelectedProfileIds(
+              state.selectedProfileIds,
+              nextProfiles
+            ),
+          };
+        }),
       toggleCategoryVisibility: (id) =>
         set((state) => ({
           categories: state.categories.map((c) =>

@@ -7,6 +7,7 @@ import {
   applyActiveHabitOrder,
   getHabitCheckInKey,
   orderActiveHabits,
+  setHabitArchived,
 } from "./habits-prototype";
 import type { Habit, HabitCheckIn } from "./types";
 
@@ -19,6 +20,10 @@ type HabitsStoreState = {
   updateHabit: (id: string, patch: { name: string; color: string }) => void;
   reorderHabits: (orderedIds: string[]) => void;
   deleteHabit: (id: string) => void;
+  archiveHabit: (id: string) => void;
+  unarchiveHabit: (id: string) => void;
+  /** Desfaz uma exclusão: reinsere o hábito e seus check-ins. */
+  restoreHabit: (habit: Habit, checkIns: HabitCheckIn[]) => void;
   toggleHabitCheckIn: (habitId: string, dateIso: string) => void;
   toggleHabitVisibility: (habitId: string) => void;
   setSelectedHabitId: (id: string | null) => void;
@@ -84,6 +89,57 @@ export const useHabitsStore = create<HabitsStoreState>()(
                 ? (nextActive[0]?.id ?? null)
                 : state.selectedHabitId,
             visibleHabitIds: state.visibleHabitIds.filter((habitId) => habitId !== id),
+          };
+        });
+      },
+
+      archiveHabit: (id) => {
+        const timestamp = new Date().toISOString();
+        set((state) => {
+          const nextActive = orderActiveHabits(state.habits).filter(
+            (habit) => habit.id !== id
+          );
+          return {
+            habits: setHabitArchived(state.habits, id, timestamp, timestamp),
+            selectedHabitId:
+              state.selectedHabitId === id
+                ? (nextActive[0]?.id ?? null)
+                : state.selectedHabitId,
+            visibleHabitIds: state.visibleHabitIds.filter((habitId) => habitId !== id),
+          };
+        });
+      },
+
+      unarchiveHabit: (id) => {
+        const timestamp = new Date().toISOString();
+        set((state) => {
+          const position = orderActiveHabits(state.habits).length;
+          return {
+            habits: setHabitArchived(state.habits, id, undefined, timestamp, position),
+            selectedHabitId: state.selectedHabitId ?? id,
+            visibleHabitIds: [...new Set([...state.visibleHabitIds, id])],
+          };
+        });
+      },
+
+      restoreHabit: (habit, checkIns) => {
+        set((state) => {
+          if (state.habits.some((candidate) => candidate.id === habit.id)) return state;
+          return {
+            habits: [...state.habits, habit],
+            checkIns: {
+              ...state.checkIns,
+              ...Object.fromEntries(
+                checkIns.map((checkIn) => [
+                  getHabitCheckInKey(checkIn.habitId, checkIn.date),
+                  checkIn,
+                ])
+              ),
+            },
+            selectedHabitId: state.selectedHabitId ?? habit.id,
+            visibleHabitIds: habit.archivedAt
+              ? state.visibleHabitIds
+              : [...new Set([...state.visibleHabitIds, habit.id])],
           };
         });
       },

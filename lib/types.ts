@@ -16,6 +16,10 @@ export type CategoryItem = {
   name: string;
   color: string;
   visible: boolean;
+  /** Quando arquivada, a categoria sai dos seletores e filtros; guarda os eventos. */
+  archivedAt?: string;
+  /** Arquivada: 'show' mantém os eventos no calendário, 'hide' os esconde. */
+  archiveDisplay?: "show" | "hide";
   calendarPackGroupId?: string;
   calendarPackVariantId?: string;
   calendarPackCategoryKey?: string;
