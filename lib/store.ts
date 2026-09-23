@@ -2344,7 +2344,7 @@ export const useStore = create<StoreState>()(
       archiveCategory: (id, display) =>
         set((state) => ({
           categories: state.categories.map((category) =>
-            category.id === id && !category.calendarPackGroupId
+            category.id === id
               ? {
                   ...category,
                   archivedAt: category.archivedAt ?? new Date().toISOString(),

@@ -39,6 +39,8 @@ export type ProfileManagerIntent =
   | { mode: "edit"; profileId: string };
 
 type ProfileManagerProps = {
+  /** Só o formulário, sem Dialog — para viver dentro do painel Organizar. */
+  embedded?: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   intent: ProfileManagerIntent | null;
@@ -48,6 +50,7 @@ type ProfileManagerProps = {
 };
 
 export function ProfileManager({
+  embedded = false,
   open,
   onOpenChange,
   intent,
@@ -108,7 +111,8 @@ export function ProfileManager({
     setSaveError(message);
   }, []);
 
-  React.useEffect(() => {
+  // Layout effect pelo mesmo motivo do editor de categoria: sem quadro vazio.
+  React.useLayoutEffect(() => {
     if (!open) return;
 
     if (intent?.mode === "create") {
@@ -283,27 +287,8 @@ export function ProfileManager({
     );
   }
 
-  return (
+  const profileBody = (
     <>
-    <Dialog
-      open={open}
-      onOpenChange={(nextOpen) => {
-        if (!nextOpen) {
-          setConfirmDeleteOpen(false);
-        }
-        onOpenChange(nextOpen);
-      }}
-    >
-      <DialogContent className="sm:max-w-[480px] p-5 sm:p-6">
-        <DialogHeader>
-          <DialogTitle>{isEditMode ? "Editar contexto" : "Novo contexto"}</DialogTitle>
-          <DialogDescription className="sr-only">
-            {isEditMode
-              ? "Ajuste o nome e o ícone deste contexto."
-              : "Defina o nome e o ícone do novo contexto."}
-          </DialogDescription>
-        </DialogHeader>
-
         <div className="space-y-5">
           <div className="flex items-center gap-3">
             <div className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border/75 bg-muted/35 text-foreground shadow-sm">
@@ -369,8 +354,37 @@ export function ProfileManager({
             {saveError}
           </p>
         ) : null}
+    </>
+  );
+
+  return (
+    <>
+    {embedded ? (
+      <div className="flex flex-col gap-6">{profileBody}</div>
+    ) : (
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) {
+          setConfirmDeleteOpen(false);
+        }
+        onOpenChange(nextOpen);
+      }}
+    >
+      <DialogContent className="sm:max-w-[480px] p-5 sm:p-6">
+        <DialogHeader>
+          <DialogTitle>{isEditMode ? "Editar contexto" : "Novo contexto"}</DialogTitle>
+          <DialogDescription className="sr-only">
+            {isEditMode
+              ? "Ajuste o nome e o ícone deste contexto."
+              : "Defina o nome e o ícone do novo contexto."}
+          </DialogDescription>
+        </DialogHeader>
+
+        {profileBody}
       </DialogContent>
     </Dialog>
+    )}
     <Dialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
       <DialogContent className="sm:max-w-[460px]">
         <DialogHeader>

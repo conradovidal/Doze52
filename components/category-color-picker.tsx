@@ -21,6 +21,9 @@ type CategoryColorPickerProps = {
   // caber numa única linha — o conjunto padrão (24 cores) continua fixo em
   // 8 colunas/3 linhas independente disso.
   columns?: number;
+  // Os círculos crescem para ocupar toda a largura disponível (formulários
+  // que têm a paleta como elemento principal, como o editor de categoria).
+  fill?: boolean;
 };
 
 export function CategoryColorPicker({
@@ -32,6 +35,7 @@ export function CategoryColorPicker({
   className,
   ariaLabel = "Cor da categoria",
   columns,
+  fill = false,
 }: CategoryColorPickerProps) {
   const { mode } = useTheme();
   const normalizedValue = value
@@ -60,7 +64,7 @@ export function CategoryColorPicker({
             index > 0 && "border-t border-border/50 pt-3"
           )}
         >
-          {set.label ? (
+          {set.label && colorSets.length > 1 ? (
             <legend className="text-[11px] font-medium tracking-wide text-muted-foreground">
               {set.label}
             </legend>
@@ -92,7 +96,11 @@ export function CategoryColorPicker({
                     "grid place-items-center rounded-full border border-black/8 transition-[transform,opacity,box-shadow] hover:scale-105 hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
                     disabled &&
                       "cursor-not-allowed opacity-45 hover:scale-100 hover:opacity-45",
-                    compact ? "size-7" : "size-[30px] sm:size-8"
+                    fill
+                      ? "aspect-square w-full"
+                      : compact
+                        ? "size-7"
+                        : "size-[30px] sm:size-8"
                   )}
                   style={{
                     backgroundColor: token.indicator,
