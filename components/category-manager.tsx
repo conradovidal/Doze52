@@ -82,6 +82,9 @@ export function CategoryManager({
   const createCategory = useStore((s) => s.createCategory);
   const updateCategory = useStore((s) => s.updateCategory);
   const deleteCategory = useStore((s) => s.deleteCategory);
+  const archiveCategory = useStore((s) => s.archiveCategory);
+  const unarchiveCategory = useStore((s) => s.unarchiveCategory);
+  const restoreDeleted = useStore((s) => s.restoreDeleted);
   const replaceAllData = useStore((s) => s.replaceAllData);
 
   const category = React.useMemo(
@@ -96,8 +99,9 @@ export function CategoryManager({
   const [saveError, setSaveError] = React.useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
   const [deleteStrategy, setDeleteStrategy] = React.useState<
-    "move" | "delete-events"
-  >("move");
+    "archive" | "move" | "delete-events"
+  >("archive");
+  const [archiveDisplay, setArchiveDisplay] = React.useState<"show" | "hide">("hide");
   const [deleteTargetCategoryId, setDeleteTargetCategoryId] = React.useState("");
   const [deleteError, setDeleteError] = React.useState<string | null>(null);
   const currentProfile = React.useMemo(
@@ -136,6 +140,7 @@ export function CategoryManager({
       .filter(
         (candidate) =>
           candidate.id !== category.id &&
+          !candidate.archivedAt &&
           !candidate.calendarPackGroupId &&
           !calendarPackCategoryIds.has(candidate.id)
       )
@@ -284,7 +289,8 @@ export function CategoryManager({
         });
         onOpenChange(false);
       } else {
-        setDeleteStrategy(categoryEventCount > 0 ? "move" : "delete-events");
+        setDeleteStrategy(categoryEventCount > 0 ? "archive" : "delete-events");
+        setArchiveDisplay("hide");
         setDeleteTargetCategoryId(deletionDestinations[0]?.id ?? "");
         setDeleteError(null);
         setDeleteDialogOpen(true);
@@ -310,6 +316,25 @@ export function CategoryManager({
     try {
       setIsSaving(true);
       setDeleteError(null);
+
+      if (deleteStrategy === "archive") {
+        archiveCategory(categoryId, archiveDisplay);
+        setDeleteDialogOpen(false);
+        onOpenChange(false);
+        notify({
+          tone: "success",
+          title: `Categoria "${category.name}" arquivada`,
+          description:
+            archiveDisplay === "show"
+              ? "Os eventos continuam aparecendo no calendário."
+              : "Os eventos ficam guardados e escondidos. Veja em Organizar › Arquivados.",
+          durationMs: 7000,
+          action: { label: "Desfazer", onClick: () => unarchiveCategory(categoryId) },
+        });
+        return;
+      }
+
+      const affectedEvents = events.filter((event) => event.categoryId === categoryId);
       const didDelete = deleteCategory({
         categoryId,
         strategy:
@@ -332,6 +357,12 @@ export function CategoryManager({
             : categoryEventCount > 0
               ? `${categoryEventCount} ${categoryEventCount === 1 ? "evento foi excluído" : "eventos foram excluídos"}.`
               : "A categoria vazia foi excluída.",
+        durationMs: 7000,
+        action: {
+          label: "Desfazer",
+          onClick: () =>
+            restoreDeleted({ categories: [category], events: affectedEvents }),
+        },
       });
     } catch (error) {
       setDeleteError(
@@ -499,7 +530,9 @@ export function CategoryManager({
     <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
       <DialogContent className="sm:max-w-[520px]">
         <DialogHeader>
-          <DialogTitle>Excluir categoria</DialogTitle>
+          <DialogTitle>
+            {categoryEventCount > 0 ? "Arquivar ou excluir categoria" : "Excluir categoria"}
+          </DialogTitle>
           <DialogDescription>
             {categoryEventCount > 0
               ? `Esta categoria contém ${categoryEventCount} ${categoryEventCount === 1 ? "evento" : "eventos"}. Escolha o que deve acontecer com esse conteúdo.`
@@ -509,6 +542,64 @@ export function CategoryManager({
 
         {categoryEventCount > 0 ? (
           <div className="space-y-3" role="radiogroup" aria-label="Destino dos eventos">
+            <div
+              className={cn(
+                "w-full rounded-xl border px-4 py-3 text-left transition-colors",
+                deleteStrategy === "archive"
+                  ? "border-primary/45 bg-primary/5"
+                  : "border-border hover:bg-muted/45"
+              )}
+            >
+              <label className="block cursor-pointer">
+                <input
+                  type="radio"
+                  name="category-delete-strategy"
+                  value="archive"
+                  checked={deleteStrategy === "archive"}
+                  onChange={() => {
+                    setDeleteStrategy("archive");
+                    setDeleteError(null);
+                  }}
+                  className="sr-only"
+                />
+                <span className="block text-sm font-semibold text-foreground">
+                  Arquivar categoria
+                </span>
+                <span className="mt-1 block text-xs leading-5 text-muted-foreground">
+                  Guarda a categoria e os eventos para o futuro. Você pode desarquivar quando quiser.
+                </span>
+              </label>
+              {deleteStrategy === "archive" ? (
+                <div
+                  role="group"
+                  aria-label="Eventos da categoria arquivada"
+                  className="mt-3 inline-flex rounded-full border border-border/70 bg-muted/35 p-0.5"
+                >
+                  {(
+                    [
+                      { value: "hide", label: "Esconder eventos" },
+                      { value: "show", label: "Manter no calendário" },
+                    ] as const
+                  ).map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      aria-pressed={archiveDisplay === option.value}
+                      onClick={() => setArchiveDisplay(option.value)}
+                      className={cn(
+                        "rounded-full px-3 py-1 text-xs font-medium transition-colors",
+                        archiveDisplay === option.value
+                          ? "bg-background text-foreground ring-1 ring-border/70"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+
             <div
               className={cn(
                 "grid w-full grid-cols-1 items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors sm:grid-cols-[minmax(0,1fr)_minmax(10rem,14rem)]",
@@ -589,7 +680,7 @@ export function CategoryManager({
                 Excluir categoria e {categoryEventCount} {categoryEventCount === 1 ? "evento" : "eventos"}
               </span>
               <span className="mt-1 block text-xs leading-5 text-muted-foreground">
-                Essa ação não pode ser desfeita.
+                Remove tudo de vez. Dá para desfazer logo depois, por alguns segundos.
               </span>
             </label>
           </div>
@@ -619,8 +710,10 @@ export function CategoryManager({
           >
             {isSaving
               ? "Excluindo..."
-              : deleteStrategy === "move"
-                ? "Mover e excluir categoria"
+              : deleteStrategy === "archive"
+                ? "Arquivar categoria"
+                : deleteStrategy === "move"
+                  ? "Mover e excluir categoria"
                 : categoryEventCount > 0
                   ? "Excluir categoria e eventos"
                   : "Excluir categoria"}

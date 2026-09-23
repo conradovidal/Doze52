@@ -178,6 +178,7 @@ export function EventDialog({
           categories.some(
             (category) =>
               category.profileId === profile.id &&
+              (!category.archivedAt || category.id === initialEvent?.categoryId) &&
               (!category.calendarPackGroupId ||
                 isOnboardingPersonalDemoGroup(category.calendarPackGroupId) ||
                 (!isManagedEvent &&
@@ -193,6 +194,7 @@ export function EventDialog({
     return categories.filter(
       (category) =>
         category.profileId === profileId &&
+        (!category.archivedAt || category.id === initialEvent?.categoryId) &&
         (!category.calendarPackGroupId ||
           isOnboardingPersonalDemoGroup(category.calendarPackGroupId) ||
           category.id === initialEvent?.categoryId)
@@ -213,6 +215,7 @@ export function EventDialog({
       const nextCategories = categories.filter(
         (category) =>
           category.profileId === nextProfileId &&
+          (!category.archivedAt || category.id === initialEvent?.categoryId) &&
           (!category.calendarPackGroupId ||
             category.id === initialEvent?.categoryId)
       );

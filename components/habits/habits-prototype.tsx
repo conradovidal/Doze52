@@ -10,6 +10,7 @@ import { DesktopHabitsPrototype } from "@/components/habits/desktop-habits-proto
 import { HabitControls } from "@/components/habits/habit-controls";
 import { HabitDayPicker } from "@/components/habits/habit-day-picker";
 import { HABIT_COLORS, HabitEditorDialog } from "@/components/habits/habit-editor-dialog";
+import { useHabitCheckInCount, useHabitRemoval } from "@/components/habits/use-habit-removal";
 import { GuidedToolbarNoticeCard } from "@/components/onboarding/guided-toolbar-notice";
 import { MobileOnboardingWelcomeCard } from "@/components/onboarding/mobile-onboarding-welcome-card";
 import { useFeedback } from "@/components/ui/feedback-provider";
@@ -117,7 +118,7 @@ export function HabitsPrototype({
   const createHabitInStore = useHabitsStore((s) => s.createHabit);
   const updateHabitInStore = useHabitsStore((s) => s.updateHabit);
   const reorderHabitsInStore = useHabitsStore((s) => s.reorderHabits);
-  const deleteHabitInStore = useHabitsStore((s) => s.deleteHabit);
+  const habitRemoval = useHabitRemoval();
   const toggleHabitCheckInInStore = useHabitsStore((s) => s.toggleHabitCheckIn);
   const toggleHabitVisibilityInStore = useHabitsStore((s) => s.toggleHabitVisibility);
   const [showcaseVisibleHabitIds, setShowcaseVisibleHabitIds] = React.useState<
@@ -129,6 +130,7 @@ export function HabitsPrototype({
   } | null>(null);
   const [createDialogOpen, setCreateDialogOpen] = React.useState(false);
   const [editingHabitId, setEditingHabitId] = React.useState<string | null>(null);
+  const editingHabitCheckIns = useHabitCheckInCount(editingHabitId);
   const [upgradeOpen, setUpgradeOpen] = React.useState(false);
   const [createHintDismissed, setCreateHintDismissed] = React.useState(false);
   const [markHintDismissed, setMarkHintDismissed] = React.useState(false);
@@ -483,7 +485,14 @@ export function HabitsPrototype({
 
   const deleteEditingHabit = () => {
     if (!editingHabitId) return;
-    deleteHabitInStore(editingHabitId);
+    habitRemoval.remove(editingHabitId);
+    setCreateDialogOpen(false);
+    setEditingHabitId(null);
+  };
+
+  const archiveEditingHabit = () => {
+    if (!editingHabitId) return;
+    habitRemoval.archive(editingHabitId);
     setCreateDialogOpen(false);
     setEditingHabitId(null);
   };
@@ -587,6 +596,8 @@ export function HabitsPrototype({
       onSubmit={createHabit}
       editing={Boolean(editingHabitId)}
       onDelete={editingHabitId ? deleteEditingHabit : undefined}
+      onArchive={editingHabitId ? archiveEditingHabit : undefined}
+      checkInCount={editingHabitCheckIns}
     />
   );
 

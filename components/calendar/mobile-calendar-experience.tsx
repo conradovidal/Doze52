@@ -1,5 +1,6 @@
 "use client";
 
+import { isCategoryShownInCalendar } from "@/lib/category-archive";
 import * as React from "react";
 import {
   addDays,
@@ -169,7 +170,7 @@ export function MobileCalendarExperience({
         categories
           .filter(
             (category) =>
-              category.visible && selectedProfiles.has(category.profileId)
+              isCategoryShownInCalendar(category) && selectedProfiles.has(category.profileId)
           )
           .map((category) => category.id)
       ),
