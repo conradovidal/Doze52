@@ -25,6 +25,7 @@ import {
   type SyncOverlayStatus,
 } from "@/components/sync-status-overlay";
 import { AuthDialog } from "@/components/auth/auth-dialog";
+import { GlobalProUpgradeDialog } from "@/components/billing/pro-upgrade-dialog";
 import {
   GuidedOnboardingPanel,
   getGuidedSelectionNotice,
@@ -3612,6 +3613,14 @@ export default function HomePage() {
           isOnboardingPersonalDemoGroup(editingEvent?.calendarPackGroupId) &&
           !session?.user.id
         }
+      />
+
+      <GlobalProUpgradeDialog
+        onRequireAuth={() => {
+          setAuthDialogInitialMode("signup");
+          setAuthDialogAnchorPoint(undefined);
+          setAuthDialogOpen(true);
+        }}
       />
 
       <AuthDialog

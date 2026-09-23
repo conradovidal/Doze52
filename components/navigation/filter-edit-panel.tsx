@@ -4,6 +4,9 @@ import * as React from "react";
 import { Archive, ArrowLeft, CalendarDays, ChevronDown, CircleCheck } from "lucide-react";
 import { ProfileBar } from "@/components/profile-bar";
 import { CategoryBar } from "@/components/category-bar";
+import { CategoryManager } from "@/components/category-manager";
+import { CategoryCreationChoice } from "@/components/category-creation-flow";
+import { ProfileManager } from "@/components/profile-manager";
 import { ArchivedItemsSection } from "@/components/archived-items-section";
 import { HabitEditList } from "@/components/habits/habit-edit-list";
 import { useHabitCheckInCount, useHabitRemoval } from "@/components/habits/use-habit-removal";
@@ -24,7 +27,6 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { SegmentedControl } from "@/components/ui/segmented-control";
 import { useFeedback } from "@/components/ui/feedback-provider";
 import { useHabitsStore } from "@/lib/habits-store";
 import { useStore } from "@/lib/store";
@@ -33,32 +35,27 @@ import {
   type OnboardingHabitShowcase,
 } from "@/lib/habits-prototype";
 import { useBilling } from "@/lib/use-billing";
+import { cn } from "@/lib/utils";
+import { nudgeProAtLastFreeSlot } from "@/lib/pro-upgrade-nudge";
 import type { AnchorPoint } from "@/lib/types";
 import type { ProductDestinationId } from "@/lib/product-navigation";
 
 const ORGANIZE_SECTION_OPTIONS = [
-  {
-    value: "annual",
-    label: (
-      <span className="inline-flex items-center gap-1.5">
-        <CalendarDays className="size-3.5" aria-hidden="true" />
-        Anual
-      </span>
-    ),
-  },
-  {
-    value: "habits",
-    label: (
-      <span className="inline-flex items-center gap-1.5">
-        <CircleCheck className="size-3.5" aria-hidden="true" />
-        Hábitos
-      </span>
-    ),
-  },
+  { value: "annual", label: "Anual", icon: CalendarDays },
+  { value: "habits", label: "Hábitos", icon: CircleCheck },
 ] as const satisfies ReadonlyArray<{
   value: ProductDestinationId;
-  label: React.ReactNode;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
 }>;
+
+const DETAIL_TITLES = {
+  category: "Editar categoria",
+  profile: "Editar contexto",
+  "category-choice": "Adicionar categoria",
+  "category-new": "Nova categoria",
+  "profile-new": "Novo contexto",
+} as const;
 
 type FilterEditPanelProps = {
   open: boolean;
@@ -66,10 +63,10 @@ type FilterEditPanelProps = {
   activeDestination?: ProductDestinationId;
   editingProfileId: string | null;
   onEditingProfileChange: (profileId: string) => void;
-  onCreateProfile: () => void;
-  onEditProfile: (profileId: string) => void;
-  onCreateCategory: () => void;
-  onEditCategory: (categoryId: string) => void;
+  onProfileCreated?: (profileId: string) => void;
+  /** Abre o fluxo de criação de categoria fora do painel (calendário pronto e passo guiado). */
+  onCreateCategory: (step?: "calendar-packs") => void;
+  onCategoryCreated?: (categoryId: string) => void;
   categoryCreateOpen?: boolean;
   highlightedProfileId?: string | null;
   highlightedCategoryId?: string | null;
@@ -92,6 +89,8 @@ type FilterEditPanelProps = {
   // divergir do que o guia está construindo passo a passo. Contextos ficam
   // de fora de propósito.
   guidedOnboardingActive?: boolean;
+  // Modo demonstração: edição de categoria/contexto ignora os limites do plano.
+  bypassLimits?: boolean;
 };
 
 export function FilterEditPanel({
@@ -100,10 +99,9 @@ export function FilterEditPanel({
   activeDestination = "annual",
   editingProfileId,
   onEditingProfileChange,
-  onCreateProfile,
-  onEditProfile,
+  onProfileCreated,
   onCreateCategory,
-  onEditCategory,
+  onCategoryCreated,
   categoryCreateOpen = false,
   highlightedProfileId,
   highlightedCategoryId,
@@ -116,6 +114,7 @@ export function FilterEditPanel({
   habitShowcase = null,
   habitShowcaseLocked = false,
   guidedOnboardingActive = false,
+  bypassLimits = false,
 }: FilterEditPanelProps) {
   const highlightCreate = guidedToolbarNotice?.target === "calendars";
   const showWrapUpNotice =
@@ -196,6 +195,28 @@ export function FilterEditPanel({
   }, [activeHabits, habitShowcase, habitShowcaseLocked]);
 
   const [habitDialogOpen, setHabitDialogOpen] = React.useState(false);
+  // Editar/criar categoria e contexto troca a tela dentro do próprio painel
+  // (mesmo padrão da edição de hábito) em vez de empilhar outro pop-up.
+  const [detail, setDetail] = React.useState<
+    | { kind: "category"; id: string }
+    | { kind: "profile"; id: string }
+    | { kind: "category-choice" }
+    | { kind: "category-new" }
+    | { kind: "profile-new"; previousSelectedProfileIds: string[] }
+    | null
+  >(null);
+  const detailId = detail && "id" in detail ? detail.id : null;
+  const profileIntent = React.useMemo(
+    () =>
+      detail?.kind === "profile" && detailId
+        ? ({ mode: "edit", profileId: detailId } as const)
+        : detail?.kind === "profile-new"
+          ? ({ mode: "create" } as const)
+          : null,
+    // Estável por identidade: um objeto novo a cada render faria o
+    // formulário reiniciar enquanto a pessoa digita.
+    [detail?.kind, detailId]
+  );
   const [archivedOpen, setArchivedOpen] = React.useState(false);
   const archivedCategoryCount = useStore(
     (s) => s.categories.filter((category) => category.archivedAt).length
@@ -214,6 +235,7 @@ export function FilterEditPanel({
     if (!open) {
       setHabitDialogOpen(false);
       setEditingHabitId(null);
+      setDetail(null);
     }
   }, [open]);
 
@@ -272,6 +294,15 @@ export function FilterEditPanel({
     }
     createHabitInStore({ name, color: draftColor });
     setHabitDialogOpen(false);
+    if (!guidedOnboardingActive) {
+      nudgeProAtLastFreeSlot({
+        reason: "habits",
+        countAfter: activeHabits.length + 1,
+        limit: limits.maxHabits,
+        isPro,
+        notify,
+      });
+    }
   };
 
   const deleteEditingHabit = () => {
@@ -297,33 +328,72 @@ export function FilterEditPanel({
     reorderHabitsInStore(orderedIds.filter((id) => !showcaseHabitIds.has(id)));
   };
 
+  const view = habitDialogOpen
+    ? "habit"
+    : detail
+      ? `detail-${detail.kind}-${detailId ?? ""}`
+      : section;
+  const viewIsDetail = habitDialogOpen || Boolean(detail);
+  // Entrar numa tela de edição desliza para a esquerda (a nova vem da
+  // direita); voltar faz o caminho inverso. Trocar de aba só faz fade.
+  const viewDepth = !viewIsDetail ? 0 : detail?.kind === "category-new" ? 2 : 1;
+  const [viewMotion, setViewMotion] = React.useState<{
+    view: string;
+    depth: number;
+    direction: "forward" | "back" | "none";
+  }>({ view, depth: viewDepth, direction: "none" });
+  if (viewMotion.view !== view) {
+    setViewMotion({
+      view,
+      depth: viewDepth,
+      direction:
+        viewDepth === viewMotion.depth
+          ? "none"
+          : viewDepth > viewMotion.depth
+            ? "forward"
+            : "back",
+    });
+  }
+  const closeDetail = () => setDetail(null);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         data-filter-edit-panel
-        // Piso igual ao tamanho de sempre; teto só como rede de segurança —
-        // o conteúdo cresce em vez de rolar, e só rola se ultrapassar o teto.
-        className="flex min-h-[min(28rem,86dvh)] max-h-[86dvh] w-[min(30rem,calc(100vw-3rem))] max-w-[30rem] flex-col overflow-hidden p-0"
+        // Ancorado pelo topo: o cabeçalho e a linha abaixo dele ficam no mesmo
+        // lugar em todas as telas; só a parte de baixo cresce ou encolhe.
+        className="flex min-h-[min(28rem,80dvh)] max-h-[80dvh] sm:max-h-[80dvh] w-[min(30rem,calc(100vw-3rem))] max-w-[30rem] flex-col gap-0 overflow-hidden p-0"
       >
         <DialogDescription className="sr-only">
           Gerencie contextos, categorias e hábitos.
         </DialogDescription>
         <div className="flex h-full min-h-0 flex-col">
-          <header className="grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-3 border-b border-border px-5 py-4">
-            {habitDialogOpen ? (
+          <header className="grid h-16 shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-3 border-b border-border px-5">
+            {viewIsDetail ? (
               <div className="col-span-3 flex items-center gap-2">
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon-sm"
                   className="-ml-1.5"
-                  aria-label="Voltar para Organizar"
-                  onClick={() => setHabitDialogOpen(false)}
+                  aria-label="Voltar"
+                  onClick={() => {
+                    if (habitDialogOpen) setHabitDialogOpen(false);
+                    else if (detail?.kind === "category-new")
+                      setDetail({ kind: "category-choice" });
+                    else closeDetail();
+                  }}
                 >
                   <ArrowLeft className="size-4" />
                 </Button>
                 <DialogTitle className="text-base font-semibold">
-                  {editingHabitId ? "Editar hábito" : "Novo hábito"}
+                  {habitDialogOpen
+                    ? editingHabitId
+                      ? "Editar hábito"
+                      : "Novo hábito"
+                    : detail
+                      ? DETAIL_TITLES[detail.kind]
+                      : null}
                 </DialogTitle>
               </div>
             ) : (
@@ -331,26 +401,115 @@ export function FilterEditPanel({
                 <DialogTitle className="text-base font-semibold">
                   Organizar
                 </DialogTitle>
-                <SegmentedControl
-                  value={section}
-                  options={ORGANIZE_SECTION_OPTIONS}
-                  onValueChange={setSection}
+                {/* Mesmo padrão da navegação do topo do app (ícone, ativo em
+                    primeiro plano, inativo esmaecido), em vez de um controle
+                    segmentado que não aparece em nenhum outro lugar. */}
+                <div
+                  role="tablist"
                   aria-label="Visão a organizar"
-                  className="min-w-0 justify-self-center"
-                />
+                  className="flex items-center gap-1 justify-self-center"
+                >
+                  {ORGANIZE_SECTION_OPTIONS.map((option) => {
+                    const Icon = option.icon;
+                    const active = section === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        role="tab"
+                        aria-selected={active}
+                        onClick={() => setSection(option.value)}
+                        className={cn(
+                          "inline-flex h-9 items-center gap-1.5 rounded-xl px-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
+                          active
+                            ? "text-foreground"
+                            : "text-muted-foreground/55 hover:bg-muted/45 hover:text-foreground/80"
+                        )}
+                      >
+                        <Icon className="size-[18px]" aria-hidden="true" />
+                        {option.label}
+                      </button>
+                    );
+                  })}
+                </div>
                 <span aria-hidden="true" />
               </>
             )}
           </header>
-          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
+          <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-5 py-5">
             {/* key troca a cada alvo (edição de hábito vs. aba Anual/Hábitos)
                 para a entrada reanimar a cada troca, em vez de saltar
                 instantaneamente de um conteúdo para o outro. */}
             <div
-              key={habitDialogOpen ? "habit-editor" : section}
-              className="animate-in fade-in slide-in-from-bottom-1 duration-200 motion-reduce:animate-none"
+              key={view}
+              className={cn(
+                "animate-in fade-in motion-reduce:animate-none",
+                viewMotion.direction === "forward"
+                  ? "slide-in-from-right-6 duration-300"
+                  : viewMotion.direction === "back"
+                    ? "slide-in-from-left-6 duration-300"
+                    : "duration-200"
+              )}
             >
-            {habitDialogOpen ? (
+            {detail?.kind === "category" ? (
+              <CategoryManager
+                embedded
+                mode="edit"
+                open
+                onOpenChange={(next) => {
+                  if (!next) closeDetail();
+                }}
+                categoryId={detail.id}
+                bypassLimits={bypassLimits}
+              />
+            ) : detail?.kind === "category-new" ? (
+              <CategoryManager
+                embedded
+                mode="create"
+                open
+                onOpenChange={(next) => {
+                  if (!next) closeDetail();
+                }}
+                profileId={editingProfileId ?? undefined}
+                lockProfile
+                onCreated={(categoryId) => {
+                  const state = useStore.getState();
+                  if (editingProfileId) state.setSelectedProfiles([editingProfileId]);
+                  state.setCategoriesVisibility([categoryId], true);
+                  onCategoryCreated?.(categoryId);
+                }}
+                onRequireAuth={onRequireAuth ? () => onRequireAuth() : undefined}
+                bypassLimits={bypassLimits}
+              />
+            ) : detail?.kind === "category-choice" ? (
+              <CategoryCreationChoice
+                disabled={!editingProfileId}
+                onCustom={() => setDetail({ kind: "category-new" })}
+                onCalendarPacks={() => onCreateCategory("calendar-packs")}
+              />
+            ) : detail?.kind === "profile" || detail?.kind === "profile-new" ? (
+              <ProfileManager
+                embedded
+                open
+                onOpenChange={(next) => {
+                  if (!next) closeDetail();
+                }}
+                intent={profileIntent}
+                onRequireAuth={onRequireAuth ? () => onRequireAuth() : undefined}
+                bypassLimits={bypassLimits}
+                onCreated={(profileId) => {
+                  // Criar um contexto não muda o filtro do calendário; o novo
+                  // contexto só passa a ser o que está sendo organizado.
+                  if (detail.kind === "profile-new") {
+                    useStore
+                      .getState()
+                      .setSelectedProfiles(detail.previousSelectedProfileIds);
+                  }
+                  onEditingProfileChange(profileId);
+                  onProfileCreated?.(profileId);
+                }}
+              />
+            ) : habitDialogOpen ? (
               <HabitEditorFields
                 dialogSemantics={false}
                 name={draftName}
@@ -371,8 +530,15 @@ export function FilterEditPanel({
                     isInlineEditMode
                     editingProfileId={editingProfileId}
                     onEditingProfileChange={onEditingProfileChange}
-                    onCreateProfile={onCreateProfile}
-                    onEditProfile={onEditProfile}
+                    onCreateProfile={() =>
+                      setDetail({
+                        kind: "profile-new",
+                        previousSelectedProfileIds: [
+                          ...useStore.getState().selectedProfileIds,
+                        ],
+                      })
+                    }
+                    onEditProfile={(profileId) => setDetail({ kind: "profile", id: profileId })}
                     highlightedProfileId={highlightedProfileId}
                   />
                 </section>
@@ -390,8 +556,14 @@ export function FilterEditPanel({
                       <CategoryBar
                         isInlineEditMode
                         editingProfileId={editingProfileId}
-                        onCreateCategory={onCreateCategory}
-                        onEditCategory={onEditCategory}
+                        onCreateCategory={
+                        // No passo guiado de calendários segue o fluxo antigo:
+                        // o card do guia e os ganchos do onboarding dependem dele.
+                        highlightCreate
+                          ? () => onCreateCategory()
+                          : () => setDetail({ kind: "category-choice" })
+                      }
+                        onEditCategory={(categoryId) => setDetail({ kind: "category", id: categoryId })}
                         highlightedCategoryId={highlightedCategoryId}
                         highlightedCategoryEffect={highlightedCategoryEffect}
                         // Este bloco só existe durante o resumo do guia
@@ -405,8 +577,14 @@ export function FilterEditPanel({
                     <CategoryBar
                       isInlineEditMode
                       editingProfileId={editingProfileId}
-                      onCreateCategory={onCreateCategory}
-                      onEditCategory={onEditCategory}
+                      onCreateCategory={
+                        // No passo guiado de calendários segue o fluxo antigo:
+                        // o card do guia e os ganchos do onboarding dependem dele.
+                        highlightCreate
+                          ? () => onCreateCategory()
+                          : () => setDetail({ kind: "category-choice" })
+                      }
+                      onEditCategory={(categoryId) => setDetail({ kind: "category", id: categoryId })}
                       highlightedCategoryId={highlightedCategoryId}
                       highlightedCategoryEffect={highlightedCategoryEffect}
                       highlightCreate={highlightCreate}
@@ -443,7 +621,7 @@ export function FilterEditPanel({
               </section>
             )}
             </div>
-            {!habitDialogOpen && archivedCount > 0 ? (
+            {!viewIsDetail && archivedCount > 0 ? (
               <section className="mt-6 border-t border-border/55 pt-3">
                 <button
                   type="button"

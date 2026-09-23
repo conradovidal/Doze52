@@ -611,7 +611,7 @@ export function AppUtilityPanel({
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent
           data-app-utility-panel
-          className={cn("overflow-hidden p-0", isMobile ? "inset-x-0 top-auto bottom-0 h-[min(34rem,58dvh)] w-screen max-w-none translate-x-0 translate-y-0 rounded-none rounded-t-[1.75rem] border-0 border-t border-border/70 data-[state=open]:slide-in-from-bottom-2 data-[state=closed]:slide-out-to-bottom-2 sm:max-w-none" : "h-[min(600px,86dvh)] w-[min(720px,calc(100vw-5rem))] max-w-[720px] sm:max-w-[720px]")}
+          className={cn("overflow-hidden p-0", isMobile ? "inset-x-0 top-auto bottom-0 h-[min(34rem,58dvh)] w-screen max-w-none translate-x-0 translate-y-0 rounded-none rounded-t-[1.75rem] border-0 border-t border-border/70 data-[state=open]:slide-in-from-bottom-2 data-[state=closed]:slide-out-to-bottom-2 sm:max-w-none" : "h-[min(600px,80dvh)] w-[min(720px,calc(100vw-5rem))] max-w-[720px] sm:max-w-[720px]")}
           onCloseAutoFocus={(event) => { event.preventDefault(); returnFocusRef.current?.focus(); }}
         >
           <DialogDescription className="sr-only">Gerencie sua conta, plano, dados e canais do Doze 52.</DialogDescription>
@@ -648,7 +648,7 @@ export function AppUtilityPanel({
             <div className="grid h-full min-h-0 grid-cols-[180px_minmax(0,1fr)]">
               <aside className="min-h-0 border-r border-border bg-muted/24 p-3 pt-4"><DialogTitle className="sr-only">Configurações</DialogTitle>{topicButtons}</aside>
               <section className="flex min-h-0 flex-col">
-                <header className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-6 py-4">
+                <header className="flex h-16 shrink-0 items-center justify-between gap-3 border-b border-border px-6">
                   <div className="flex items-center gap-2">
                     <BrandLogo className="h-6 w-[68px]" />
                   </div>

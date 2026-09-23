@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Check } from "lucide-react";
+import { CategoryColorPicker } from "@/components/category-color-picker";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -96,36 +96,14 @@ export function HabitEditorFields({
           />
         </div>
 
-        <fieldset>
-          <legend className="text-sm font-medium">Cor</legend>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {HABIT_COLORS.map((habitColor) => (
-              <button
-                key={habitColor}
-                type="button"
-                aria-label={`Usar cor ${habitColor}`}
-                aria-pressed={color === habitColor}
-                className="grid size-9 place-items-center rounded-full border border-black/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 aria-pressed:ring-2 aria-pressed:ring-foreground/65 aria-pressed:ring-offset-2"
-                style={{ backgroundColor: habitColor }}
-                onClick={() => onColorChange(habitColor)}
-              >
-                {color === habitColor ? (
-                  <Check className="size-4 text-neutral-950" strokeWidth={2.6} />
-                ) : null}
-              </button>
-            ))}
-            <label className="relative grid size-9 cursor-pointer place-items-center overflow-hidden rounded-full border border-border bg-background text-[10px] font-semibold text-muted-foreground focus-within:ring-2 focus-within:ring-ring/60 focus-within:ring-offset-2">
-              <span aria-hidden="true">+</span>
-              <span className="sr-only">Escolher outra cor</span>
-              <input
-                type="color"
-                value={color}
-                className="absolute inset-0 cursor-pointer opacity-0"
-                onChange={(event) => onColorChange(event.target.value)}
-              />
-            </label>
-          </div>
-        </fieldset>
+        {/* Mesma paleta completa da categoria: o hábito aparece no mesmo
+            ano que as categorias, então as cores precisam conversar. */}
+        <CategoryColorPicker
+          value={color}
+          onChange={onColorChange}
+          ariaLabel="Cor do hábito"
+          fill
+        />
       </div>
 
       {editing && onDelete && confirmingDelete ? (

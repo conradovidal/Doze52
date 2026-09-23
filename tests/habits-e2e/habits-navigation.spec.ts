@@ -161,7 +161,7 @@ test("mobile abre em Hábitos e preserva a sessão entre superfícies", async ({
 
   await habits.getByRole("button", { name: "Criar novo hábito" }).click();
   await expect(
-    page.getByRole("dialog", { name: "Mais hábitos fazem parte do Doze 52 Pro." })
+    page.getByRole("dialog", { name: "Acompanhe mais de uma rotina" })
   ).toBeVisible();
   await page.getByRole("button", { name: "Agora não" }).click();
   await expect(habits.getByRole("button", { name: "Ler", exact: true })).toHaveCount(0);

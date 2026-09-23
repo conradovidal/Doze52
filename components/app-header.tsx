@@ -20,7 +20,10 @@ import {
   type GuidedToolbarNotice,
 } from "@/components/onboarding/guided-toolbar-notice";
 import { CategoryBar } from "@/components/category-bar";
-import { CategoryCreationFlow } from "@/components/category-creation-flow";
+import {
+  CategoryCreationFlow,
+  type CategoryCreationStep,
+} from "@/components/category-creation-flow";
 import { CategoryManager } from "@/components/category-manager";
 import { WrapUpCategorySuggestions } from "@/components/onboarding/wrap-up-category-suggestions";
 import { CalendarPackLauncher } from "@/components/calendar-packs/calendar-pack-launcher";
@@ -253,6 +256,8 @@ export function AppHeader({
   const [profileManagerIntent, setProfileManagerIntent] =
     React.useState<ProfileManagerIntent | null>(null);
   const [categoryCreateOpen, setCategoryCreateOpen] = React.useState(false);
+  const [categoryCreateStep, setCategoryCreateStep] =
+    React.useState<CategoryCreationStep>("choice");
   const [categoryEditOpen, setCategoryEditOpen] = React.useState(false);
   const [editingCategoryId, setEditingCategoryId] = React.useState<string | null>(null);
   const [categoriesExpanded, setCategoriesExpanded] = React.useState(true);
@@ -596,6 +601,7 @@ export function AppHeader({
 
   const openCreateCategory = React.useCallback(() => {
     if (!editingProfileId) return;
+    setCategoryCreateStep("choice");
     setCategoryCreateOpen(true);
   }, [editingProfileId]);
 
@@ -1526,10 +1532,13 @@ export function AppHeader({
           }}
           editingProfileId={editingProfileId}
           onEditingProfileChange={setEditingProfileId}
-          onCreateProfile={openCreateProfile}
-          onEditProfile={openEditProfile}
-          onCreateCategory={openCreateCategory}
-          onEditCategory={openEditCategory}
+          onProfileCreated={onProfileCreated}
+          onCreateCategory={(step) => {
+            if (!editingProfileId) return;
+            setCategoryCreateStep(step ?? "choice");
+            setCategoryCreateOpen(true);
+          }}
+          onCategoryCreated={onCategoryCreated}
           categoryCreateOpen={categoryCreateOpen}
           highlightedProfileId={highlightedProfileId}
           highlightedCategoryId={highlightedCategoryId}
@@ -1542,6 +1551,7 @@ export function AppHeader({
           habitShowcase={habitShowcase}
           habitShowcaseLocked={habitShowcaseLocked}
           guidedOnboardingActive={guidedOnboardingActive}
+          bypassLimits={demoExplorationActive}
         />
       ) : null}
 
@@ -1567,6 +1577,7 @@ export function AppHeader({
           onCalendarOpen={onGuidedCalendarOpen}
           onCalendarClose={onGuidedCalendarClose}
           onCalendarImported={(pack) => onGuidedCalendarImported?.(pack)}
+          initialStep={categoryCreateStep}
           onBack={
             effectiveInlineEditMode
               ? () => setCategoryCreateOpen(false)

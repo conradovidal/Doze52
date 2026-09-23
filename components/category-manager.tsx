@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ArrowLeft } from "lucide-react";
+import { Archive, ArrowLeft } from "lucide-react";
 import { CategoryColorPicker } from "@/components/category-color-picker";
 import { ProUpgradeDialog } from "@/components/billing/pro-upgrade-dialog";
 import { ProfileIcon } from "@/components/profile-icon";
@@ -40,6 +40,7 @@ import { useTheme } from "@/lib/theme";
 import { useBilling } from "@/lib/use-billing";
 import type { AnchorPoint } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { nudgeProAtLastFreeSlot } from "@/lib/pro-upgrade-nudge";
 
 const CHIP_TRIGGER_CLASS =
   "h-10 w-full rounded-xl border px-3 text-sm shadow-sm transition-colors";
@@ -47,6 +48,12 @@ const CATEGORY_NAME_MAX_LENGTH = 28;
 
 type CategoryManagerProps = {
   mode: "edit" | "create";
+  /**
+   * Renderiza só o formulário (sem Dialog), para viver dentro de outro painel —
+   * o Organizar troca de tela em vez de empilhar um pop-up sobre o outro. O
+   * título e o "voltar" ficam por conta de quem hospeda.
+   */
+  embedded?: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   categoryId?: string;
@@ -61,6 +68,7 @@ type CategoryManagerProps = {
 
 export function CategoryManager({
   mode,
+  embedded = false,
   open,
   onOpenChange,
   categoryId,
@@ -104,6 +112,7 @@ export function CategoryManager({
   const [archiveDisplay, setArchiveDisplay] = React.useState<"show" | "hide">("hide");
   const [deleteTargetCategoryId, setDeleteTargetCategoryId] = React.useState("");
   const [deleteError, setDeleteError] = React.useState<string | null>(null);
+  const [archiveChoiceOpen, setArchiveChoiceOpen] = React.useState(false);
   const currentProfile = React.useMemo(
     () => profiles.find((profile) => profile.id === profileDraftId) ?? null,
     [profileDraftId, profiles]
@@ -158,7 +167,9 @@ export function CategoryManager({
     (candidate) => candidate.id === deleteTargetCategoryId
   );
 
-  React.useEffect(() => {
+  // Layout effect: embutido no Organizar, o formulário não pode pintar um
+  // quadro vazio antes de receber os dados da categoria.
+  React.useLayoutEffect(() => {
     if (!open) return;
     if (mode === "edit") {
       if (!category) {
@@ -176,6 +187,7 @@ export function CategoryManager({
       setIsSaving(false);
       setSaveError(null);
       setDeleteDialogOpen(false);
+      setArchiveChoiceOpen(false);
       setDeleteError(null);
       return;
     }
@@ -201,6 +213,9 @@ export function CategoryManager({
     isLimitReached(categories.length, limits.maxCategories);
   const normalizedName = name.trim().slice(0, CATEGORY_NAME_MAX_LENGTH).trim();
   const canSave = normalizedName.length > 0 && Boolean(profileDraftId);
+  // Vale para qualquer categoria, inclusive de calendário pronto: a
+  // atualização do pacote preserva archivedAt/archiveDisplay.
+  const canArchive = isEdit && Boolean(category);
   const canDelete =
     Boolean(category) &&
     (Boolean(calendarPackCategory) || deletionDestinations.length > 0);
@@ -246,6 +261,15 @@ export function CategoryManager({
       });
       if (id) onCreated?.(id);
       onOpenChange(false);
+      if (id && !bypassLimits) {
+        nudgeProAtLastFreeSlot({
+          reason: "categories",
+          countAfter: categories.length + 1,
+          limit: limits.maxCategories,
+          isPro,
+          notify,
+        });
+      }
     } catch (error) {
       setSaveError(
         error instanceof Error
@@ -289,7 +313,13 @@ export function CategoryManager({
         });
         onOpenChange(false);
       } else {
-        setDeleteStrategy(categoryEventCount > 0 ? "archive" : "delete-events");
+        setDeleteStrategy(
+          categoryEventCount === 0
+            ? "delete-events"
+            : canArchive
+              ? "archive"
+              : "move"
+        );
         setArchiveDisplay("hide");
         setDeleteTargetCategoryId(deletionDestinations[0]?.id ?? "");
         setDeleteError(null);
@@ -304,6 +334,22 @@ export function CategoryManager({
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleArchive = (display: "show" | "hide") => {
+    if (!categoryId || !category) return;
+    archiveCategory(categoryId, display);
+    onOpenChange(false);
+    notify({
+      tone: "success",
+      title: `Categoria "${category.name}" arquivada`,
+      description:
+        display === "show"
+          ? "Os eventos continuam aparecendo no calendário."
+          : "Os eventos ficam guardados e escondidos. Veja em Organizar › Arquivados.",
+      durationMs: 7000,
+      action: { label: "Desfazer", onClick: () => unarchiveCategory(categoryId) },
+    });
   };
 
   const handleConfirmDelete = async () => {
@@ -386,15 +432,7 @@ export function CategoryManager({
     );
   }
 
-  return (
-    <>
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        anchorPoint={anchorPoint}
-        desktopPlacement="right-start"
-        mobileMode="sheet"
-        className="sm:max-w-[500px] p-5 sm:p-6"
-        onKeyDown={(event) => {
+  const handleEnterToSave = (event: React.KeyboardEvent<HTMLElement>) => {
           // Mesmo critério do diálogo de evento: digitar e apertar Enter salva.
           if (event.key !== "Enter" || event.defaultPrevented) return;
           if (event.nativeEvent.isComposing) return;
@@ -402,29 +440,10 @@ export function CategoryManager({
           if (!canSave || isSaving) return;
           event.preventDefault();
           void handleSave();
-        }}
-      >
-        <DialogHeader>
-          <div className="flex items-center gap-2 pr-8">
-            {!isEdit && onBack ? (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                aria-label="Voltar para as opções de categoria"
-                onClick={onBack}
-              >
-                <ArrowLeft className="size-4" />
-              </Button>
-            ) : null}
-            <DialogTitle>{isEdit ? "Editar categoria" : "Nova categoria"}</DialogTitle>
-          </div>
-          <DialogDescription className="sr-only">
-            {isEdit
-              ? "Ajuste o nome, o contexto e a cor desta categoria."
-              : "Defina o nome, o contexto e a cor da nova categoria."}
-          </DialogDescription>
-        </DialogHeader>
+        };
+
+  const formBody = (
+    <>
         <div className="space-y-5">
           <Input
             id="category-name"
@@ -497,17 +516,56 @@ export function CategoryManager({
             </div>
           </div>
 
-          <CategoryColorPicker
-            value={color}
-            onChange={setColor}
-            className="mx-auto max-w-[21rem]"
-          />
+          <CategoryColorPicker value={color} onChange={setColor} fill />
         </div>
+        {canArchive && archiveChoiceOpen ? (
+          <div
+            role="group"
+            aria-label="Arquivar categoria"
+            className="space-y-3 rounded-xl border border-border/70 bg-muted/30 p-4"
+          >
+            <p className="text-sm leading-5 text-muted-foreground">
+              {categoryEventCount > 0
+                ? `Arquivar guarda a categoria e ${categoryEventCount === 1 ? "o evento" : `os ${categoryEventCount} eventos`}, sem apagar nada. Você desarquiva quando quiser em Organizar › Arquivados.`
+                : "Arquivar guarda a categoria sem apagar nada. Você desarquiva quando quiser em Organizar › Arquivados."}
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                type="button"
+                variant="premium"
+                onClick={() => handleArchive("hide")}
+              >
+                Esconder eventos
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => handleArchive("show")}
+              >
+                Manter visíveis
+              </Button>
+            </div>
+          </div>
+        ) : null}
         <DialogFooter className="sm:justify-between">
           {isEdit ? (
-            <Button variant="dangerSoft" onClick={handleDelete} disabled={!canDelete || isSaving}>
-              {calendarPackCategory ? "Remover calendário" : "Deletar"}
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              {canArchive ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  aria-expanded={archiveChoiceOpen}
+                  onClick={() => setArchiveChoiceOpen((current) => !current)}
+                  disabled={isSaving}
+                >
+                  <Archive className="size-4" aria-hidden="true" />
+                  Arquivar
+                </Button>
+              ) : null}
+              <Button variant="dangerSoft" onClick={handleDelete} disabled={!canDelete || isSaving}>
+                {calendarPackCategory ? "Remover calendário" : "Deletar"}
+              </Button>
+            </div>
           ) : (
             <div />
           )}
@@ -525,8 +583,52 @@ export function CategoryManager({
             {saveError}
           </p>
         ) : null}
+        {saveError ? (
+          <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
+            {saveError}
+          </p>
+        ) : null}
+    </>
+  );
+
+  return (
+    <>
+    {embedded ? (
+      <div className="flex flex-col gap-6" onKeyDown={handleEnterToSave}>{formBody}</div>
+    ) : (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        anchorPoint={anchorPoint}
+        desktopPlacement="right-start"
+        mobileMode="sheet"
+        className="sm:max-w-[500px] p-5 sm:p-6"
+        onKeyDown={handleEnterToSave}
+      >
+        <DialogHeader>
+          <div className="flex items-center gap-2 pr-8">
+            {!isEdit && onBack ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Voltar para as opções de categoria"
+                onClick={onBack}
+              >
+                <ArrowLeft className="size-4" />
+              </Button>
+            ) : null}
+            <DialogTitle>{isEdit ? "Editar categoria" : "Nova categoria"}</DialogTitle>
+          </div>
+          <DialogDescription className="sr-only">
+            {isEdit
+              ? "Ajuste o nome, o contexto e a cor desta categoria."
+              : "Defina o nome, o contexto e a cor da nova categoria."}
+          </DialogDescription>
+        </DialogHeader>
+        {formBody}
       </DialogContent>
     </Dialog>
+    )}
     <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
       <DialogContent className="sm:max-w-[520px]">
         <DialogHeader>
