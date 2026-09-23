@@ -1,11 +1,16 @@
 "use client";
 
 import * as React from "react";
-import { Archive, ArrowLeft } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { CategoryColorPicker } from "@/components/category-color-picker";
 import { ProUpgradeDialog } from "@/components/billing/pro-upgrade-dialog";
 import { ProfileIcon } from "@/components/profile-icon";
 import { Button } from "@/components/ui/button";
+import {
+  ArchiveIconButton,
+  DeleteIconButton,
+  DialogSecondaryActions,
+} from "@/components/ui/icon-action-button";
 import {
   Dialog,
   DialogContent,
@@ -547,29 +552,27 @@ export function CategoryManager({
             </div>
           </div>
         ) : null}
-        <DialogFooter className="sm:justify-between">
+        <DialogFooter className="flex-row items-center justify-between sm:justify-between">
           {isEdit ? (
-            <div className="flex flex-wrap gap-2">
+            <DialogSecondaryActions>
               {canArchive ? (
-                <Button
-                  type="button"
-                  variant="outline"
+                <ArchiveIconButton
+                  label="Arquivar categoria"
                   aria-expanded={archiveChoiceOpen}
                   onClick={() => setArchiveChoiceOpen((current) => !current)}
                   disabled={isSaving}
-                >
-                  <Archive className="size-4" aria-hidden="true" />
-                  Arquivar
-                </Button>
+                />
               ) : null}
-              <Button variant="dangerSoft" onClick={handleDelete} disabled={!canDelete || isSaving}>
-                {calendarPackCategory ? "Remover calendário" : "Deletar"}
-              </Button>
-            </div>
+              <DeleteIconButton
+                label={calendarPackCategory ? "Remover calendário" : "Excluir categoria"}
+                onClick={handleDelete}
+                disabled={!canDelete || isSaving}
+              />
+            </DialogSecondaryActions>
           ) : (
             <div />
           )}
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
             <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={isSaving}>
               Cancelar
             </Button>
@@ -578,11 +581,6 @@ export function CategoryManager({
             </Button>
           </div>
         </DialogFooter>
-        {saveError ? (
-          <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
-            {saveError}
-          </p>
-        ) : null}
         {saveError ? (
           <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
             {saveError}

@@ -8,6 +8,8 @@ import { CategoryManager } from "@/components/category-manager";
 import { CategoryCreationChoice } from "@/components/category-creation-flow";
 import { ProfileManager } from "@/components/profile-manager";
 import { ArchivedItemsSection } from "@/components/archived-items-section";
+import { CollapsibleControlRegion } from "@/components/ui/collapsible-control-region";
+import { ViewSwap } from "@/components/ui/view-swap";
 import { HabitEditList } from "@/components/habits/habit-edit-list";
 import { useHabitCheckInCount, useHabitRemoval } from "@/components/habits/use-habit-removal";
 import {
@@ -337,32 +339,32 @@ export function FilterEditPanel({
   // Entrar numa tela de edição desliza para a esquerda (a nova vem da
   // direita); voltar faz o caminho inverso. Trocar de aba só faz fade.
   const viewDepth = !viewIsDetail ? 0 : detail?.kind === "category-new" ? 2 : 1;
-  const [viewMotion, setViewMotion] = React.useState<{
-    view: string;
-    depth: number;
-    direction: "forward" | "back" | "none";
-  }>({ view, depth: viewDepth, direction: "none" });
-  if (viewMotion.view !== view) {
-    setViewMotion({
-      view,
-      depth: viewDepth,
-      direction:
-        viewDepth === viewMotion.depth
-          ? "none"
-          : viewDepth > viewMotion.depth
-            ? "forward"
-            : "back",
-    });
-  }
   const closeDetail = () => setDetail(null);
+  // Passar a vez para o fluxo de criação (calendários prontos) e voltar dele
+  // troca um modal pelo outro no mesmo recorte: a moldura não anima, só o
+  // conteúdo — senão os dois scrims se cruzam e a tela pisca. A saída pula a
+  // animação enquanto o fluxo está aberto; a entrada de volta fica sem
+  // animação até o painel fechar de verdade (tirar a classe com o painel
+  // aberto reiniciaria a animação de entrada).
+  const [skipEnterMotion, setSkipEnterMotion] = React.useState(false);
+  if (categoryCreateOpen && !skipEnterMotion) setSkipEnterMotion(true);
+  if (!open && !categoryCreateOpen && skipEnterMotion) setSkipEnterMotion(false);
+  const shellMotionClass = cn(
+    skipEnterMotion && "data-[state=open]:animate-none",
+    categoryCreateOpen && "data-[state=closed]:animate-none"
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         data-filter-edit-panel
+        overlayClassName={shellMotionClass}
         // Ancorado pelo topo: o cabeçalho e a linha abaixo dele ficam no mesmo
         // lugar em todas as telas; só a parte de baixo cresce ou encolhe.
-        className="flex min-h-[min(28rem,80dvh)] max-h-[80dvh] sm:max-h-[80dvh] w-[min(30rem,calc(100vw-3rem))] max-w-[30rem] flex-col gap-0 overflow-hidden p-0"
+        className={cn(
+          "flex min-h-[min(28rem,80dvh)] max-h-[80dvh] sm:max-h-[80dvh] w-[min(30rem,calc(100vw-3rem))] max-w-[30rem] flex-col gap-0 overflow-hidden p-0",
+          shellMotionClass
+        )}
       >
         <DialogDescription className="sr-only">
           Gerencie contextos, categorias e hábitos.
@@ -440,17 +442,7 @@ export function FilterEditPanel({
             {/* key troca a cada alvo (edição de hábito vs. aba Anual/Hábitos)
                 para a entrada reanimar a cada troca, em vez de saltar
                 instantaneamente de um conteúdo para o outro. */}
-            <div
-              key={view}
-              className={cn(
-                "animate-in fade-in motion-reduce:animate-none",
-                viewMotion.direction === "forward"
-                  ? "slide-in-from-right-6 duration-300"
-                  : viewMotion.direction === "back"
-                    ? "slide-in-from-left-6 duration-300"
-                    : "duration-200"
-              )}
-            >
+            <ViewSwap view={view} depth={viewDepth}>
             {detail?.kind === "category" ? (
               <CategoryManager
                 embedded
@@ -620,12 +612,13 @@ export function FilterEditPanel({
                 />
               </section>
             )}
-            </div>
+            </ViewSwap>
             {!viewIsDetail && archivedCount > 0 ? (
               <section className="mt-6 border-t border-border/55 pt-3">
                 <button
                   type="button"
                   aria-expanded={archivedOpen}
+                  aria-controls="organize-archived-items"
                   onClick={() => setArchivedOpen((current) => !current)}
                   className="flex w-full items-center justify-between gap-2 rounded-lg px-1 py-2 text-left text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
                 >
@@ -637,15 +630,18 @@ export function FilterEditPanel({
                     </span>
                   </span>
                   <ChevronDown
-                    className={`size-4 transition-transform ${archivedOpen ? "rotate-180" : ""}`}
+                    className={`size-4 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${archivedOpen ? "rotate-180" : ""}`}
                     aria-hidden="true"
                   />
                 </button>
-                {archivedOpen ? (
-                  <div className="mt-2">
+                <CollapsibleControlRegion
+                  id="organize-archived-items"
+                  expanded={archivedOpen}
+                >
+                  <div className="pt-2">
                     <ArchivedItemsSection />
                   </div>
-                ) : null}
+                </CollapsibleControlRegion>
               </section>
             ) : null}
             {wrapUpCard && !wrapUpSuggestionsVisible ? (

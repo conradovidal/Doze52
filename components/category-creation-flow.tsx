@@ -5,6 +5,7 @@ import { ArrowLeft, ArrowRight, CalendarDays, Tags } from "lucide-react";
 import { CalendarPackLauncher } from "@/components/calendar-packs/calendar-pack-launcher";
 import { CategoryManager } from "@/components/category-manager";
 import { Button } from "@/components/ui/button";
+import { ViewSwap } from "@/components/ui/view-swap";
 import {
   Dialog,
   DialogContent,
@@ -16,6 +17,10 @@ import type { CalendarPack } from "@/lib/calendar-packs/types";
 import { getCalendarPackGroupId } from "@/lib/calendar-packs/import";
 import { useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
+
+/** Troca Organizar ↔ fluxo sem animar a moldura do modal (só o conteúdo desliza). */
+const HANDOFF_NO_MOTION_CLASS =
+  "data-[state=open]:animate-none data-[state=closed]:animate-none";
 
 export type CategoryCreationStep = "choice" | "custom" | "calendar-packs";
 
@@ -86,102 +91,120 @@ export function CategoryCreationFlow({
     setStep("choice");
   }, [closeFlow, initialStep, onBack, onCalendarClose]);
 
+  const title =
+    step === "custom" ? "Nova categoria" : step === "calendar-packs" ? "Calendários" : "Adicionar categoria";
+  const goBack =
+    step === "custom" ? returnToChoice : step === "calendar-packs" ? returnFromCalendarPacks : onBack;
+
   return (
-    <>
-      <Dialog
-        open={open && step === "choice"}
-        onOpenChange={(nextOpen) => {
-          if (!nextOpen) closeFlow();
-        }}
+    // Um modal só para o fluxo inteiro: cada passo troca o conteúdo (com o
+    // mesmo deslize do Organizar) em vez de fechar um modal e abrir outro,
+    // o que fazia a tela piscar entre os passos.
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (nextOpen) return;
+        if (step === "calendar-packs") onCalendarClose?.();
+        closeFlow();
+      }}
+    >
+      <DialogContent
+        showCloseButton={!onBack}
+        // Aberto a partir do Organizar (onBack): é a continuação do mesmo
+        // painel, com o mesmo recorte — entra e sai sem zoom/fade para a
+        // troca parecer só o conteúdo mudando.
+        overlayClassName={onBack ? HANDOFF_NO_MOTION_CLASS : undefined}
+        className={cn(
+          "flex min-h-[min(28rem,80dvh)] max-h-[80dvh] sm:max-h-[80dvh] w-[min(30rem,calc(100vw-3rem))] max-w-[30rem] flex-col gap-0 overflow-hidden p-0",
+          onBack && HANDOFF_NO_MOTION_CLASS
+        )}
       >
-        {/* Mesmo recorte do painel Organizar: daqui a pessoa vê o conteúdo do
-            painel ser substituído, não um segundo modal por cima do primeiro. */}
-        <DialogContent
-          showCloseButton={!onBack}
-          className="flex h-[min(28rem,86dvh)] w-[min(30rem,calc(100vw-3rem))] max-w-[30rem] flex-col overflow-hidden p-0"
-        >
-          <DialogHeader className="shrink-0 space-y-0 border-b border-border px-5 py-4 text-left">
-            <div className="flex items-center gap-2">
-              {onBack ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  className="-ml-1.5"
-                  aria-label="Voltar para Organizar"
-                  onClick={onBack}
-                >
-                  <ArrowLeft className="size-4" />
-                </Button>
-              ) : null}
-              <DialogTitle className="text-base font-semibold">
-                Adicionar categoria
-              </DialogTitle>
-            </div>
-            <DialogDescription className="sr-only">
-              Escolha o que deseja adicionar.
-            </DialogDescription>
-          </DialogHeader>
+        <DialogHeader className="flex h-16 shrink-0 flex-row items-center gap-2 space-y-0 border-b border-border px-5 text-left">
+          {goBack ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className="-ml-1.5"
+              aria-label={step === "choice" ? "Voltar para Organizar" : "Voltar para as opções de categoria"}
+              onClick={goBack}
+            >
+              <ArrowLeft className="size-4" />
+            </Button>
+          ) : null}
+          <DialogTitle className="text-base font-semibold">{title}</DialogTitle>
+          <DialogDescription className="sr-only">
+            {step === "custom"
+              ? "Defina o nome, o contexto e a cor da nova categoria."
+              : step === "calendar-packs"
+                ? "Adicione calendários prontos ao seu ano."
+                : "Escolha o que deseja adicionar."}
+          </DialogDescription>
+        </DialogHeader>
 
-          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
-            <CategoryCreationChoice
-              disabled={!profile}
-              guided={guidedCalendarSelection}
-              onCustom={() => setStep("custom")}
-              onCalendarPacks={chooseCalendarPacks}
-            />
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <CategoryManager
-        mode="create"
-        open={open && step === "custom"}
-        onOpenChange={(nextOpen) => {
-          if (!nextOpen) closeFlow();
-        }}
-        profileId={profileId}
-        lockProfile
-        onBack={returnToChoice}
-        onCreated={(categoryId) => {
-          focusCreatedCategory(categoryId);
-          onCreated?.(categoryId);
-          closeFlow();
-        }}
-        onRequireAuth={onRequireAuth}
-        bypassLimits={bypassLimits}
-      />
-
-      <CalendarPackLauncher
-        hideTrigger
-        controlledOpen={open && step === "calendar-packs"}
-        onControlledOpenChange={(nextOpen) => {
-          if (!nextOpen && step === "calendar-packs") closeFlow();
-        }}
-        fixedTargetProfileId={profileId}
-        onBack={returnFromCalendarPacks}
-        onFocusYear={onFocusYear}
-        onRequireAuth={onRequireAuth}
-        bypassLimits={bypassLimits}
-        guidedVariantGroupId={
-          guidedCalendarSelection ? "holidays-by-state" : undefined
-        }
-        requireExplicitVariant={guidedCalendarSelection}
-        onClose={onCalendarClose}
-        onImported={(pack) => {
-          const importedCategory = useStore
-            .getState()
-            .categories.find(
-              (category) =>
-                category.profileId === profileId &&
-                category.calendarPackGroupId === getCalendarPackGroupId(pack)
-            );
-          focusCreatedCategory(importedCategory?.id);
-          onCalendarImported?.(pack);
-          closeFlow();
-        }}
-      />
-    </>
+        <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-5 py-5">
+          <ViewSwap view={step} depth={step === "choice" ? 0 : 1}>
+            {step === "custom" ? (
+              <CategoryManager
+                embedded
+                mode="create"
+                open
+                onOpenChange={(nextOpen) => {
+                  if (!nextOpen) closeFlow();
+                }}
+                profileId={profileId}
+                lockProfile
+                onCreated={(categoryId) => {
+                  focusCreatedCategory(categoryId);
+                  onCreated?.(categoryId);
+                  closeFlow();
+                }}
+                onRequireAuth={onRequireAuth}
+                bypassLimits={bypassLimits}
+              />
+            ) : step === "calendar-packs" ? (
+              <CalendarPackLauncher
+                embedded
+                hideTrigger
+                compactList
+                controlledOpen
+                onControlledOpenChange={(nextOpen) => {
+                  if (!nextOpen) closeFlow();
+                }}
+                fixedTargetProfileId={profileId}
+                onFocusYear={onFocusYear}
+                onRequireAuth={onRequireAuth}
+                bypassLimits={bypassLimits}
+                guidedVariantGroupId={
+                  guidedCalendarSelection ? "holidays-by-state" : undefined
+                }
+                requireExplicitVariant={guidedCalendarSelection}
+                onClose={onCalendarClose}
+                onImported={(pack) => {
+                  const importedCategory = useStore
+                    .getState()
+                    .categories.find(
+                      (category) =>
+                        category.profileId === profileId &&
+                        category.calendarPackGroupId === getCalendarPackGroupId(pack)
+                    );
+                  focusCreatedCategory(importedCategory?.id);
+                  onCalendarImported?.(pack);
+                  closeFlow();
+                }}
+              />
+            ) : (
+              <CategoryCreationChoice
+                disabled={!profile}
+                guided={guidedCalendarSelection}
+                onCustom={() => setStep("custom")}
+                onCalendarPacks={chooseCalendarPacks}
+              />
+            )}
+          </ViewSwap>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

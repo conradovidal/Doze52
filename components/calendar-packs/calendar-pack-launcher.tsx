@@ -186,6 +186,7 @@ export function CalendarPackLauncher({
   onBack,
   autoCloseOnImport = false,
   compactList = false,
+  embedded = false,
 }: {
   onFocusYear?: (year: number) => void;
   className?: string;
@@ -210,6 +211,11 @@ export function CalendarPackLauncher({
   // quebrava em 3-4 linhas curtíssimas disputando espaço com o botão na
   // mesma linha.
   compactList?: boolean;
+  /**
+   * Só a lista, sem Dialog próprio: o fluxo de criação de categoria a exibe
+   * dentro do mesmo modal, trocando o conteúdo em vez de abrir outro por cima.
+   */
+  embedded?: boolean;
 }) {
   const { calendarPacks } = useCalendarCatalog();
   const calendarPackCards = React.useMemo(
@@ -458,6 +464,343 @@ export function CalendarPackLauncher({
     [notify, onFocusYear, replaceAllData, setPackFlow, snapshot]
   );
 
+  const launcherDescription = guidedVariantGroupId
+    ? "Feriados do seu estado é uma boa sugestão para começar, mas qualquer calendário serve."
+    : "Adicione calendários prontos ao seu ano.";
+
+  const packList = (
+    <div className="grid gap-2 rounded-[8px] border border-border/75 bg-background p-2.5 shadow-sm sm:p-3">
+      {calendarPackCards.map(({ key, variants }) => {
+        const isGuidedCard = guidedVariantGroupId === key;
+        const isGuidedCardDisabled = false;
+        const selectedPackId = selectedVariantByGroup[key];
+        const selectedVariant = variants.find(
+          (candidate) => candidate.id === selectedPackId
+        );
+        const defaultVariant = getDefaultVariant(key, variants);
+        const groupIsPresent = variants.some((candidate) => {
+          const candidateAvailability = availabilityByPack.get(candidate.id);
+          return (
+            Boolean(candidateAvailability?.hasAnyCategory) ||
+            Boolean(candidateAvailability?.hasImportedEvents)
+          );
+        });
+        const installedVariant =
+          variants.find((candidate) =>
+            isCalendarPackVariantInstalled(snapshot, candidate, variants)
+          ) ?? (groupIsPresent ? selectedVariant ?? variants[0] : undefined);
+        const effectiveVariant =
+          selectedVariant ??
+          installedVariant ??
+          defaultVariant;
+        const pack =
+          effectiveVariant ??
+          variants[0];
+        const isTeamGroup = key === "brasileirao-2026-by-team";
+        const requiresExplicitSelection =
+          (isGuidedCard && requireExplicitVariant) || isTeamGroup;
+        const hasRequiredVariant =
+          !requiresExplicitSelection ||
+          Boolean(effectiveVariant);
+        const availability = availabilityByPack.get(pack.id);
+        const isPresent = groupIsPresent;
+        const currentFlow = flowByPack[pack.id] ?? "idle";
+        const isBusy =
+          currentFlow === "adding" || currentFlow === "removing";
+        const isSwitchingVariant = Boolean(
+          installedVariant && installedVariant.id !== pack.id
+        );
+        const targetProfileId = getTargetProfileId(
+          pack.id,
+          availability?.profileId ??
+            (installedVariant
+              ? availabilityByPack.get(installedVariant.id)?.profileId
+              : null)
+        );
+        const targetProfileName = targetProfileId
+          ? profileNameById.get(targetProfileId)
+          : null;
+        const showAddDetails =
+          !isPresent &&
+          (expandedPackId === pack.id ||
+            ((isGuidedCard || Boolean(fixedTargetProfileId)) &&
+              hasRequiredVariant));
+        const variantGroup = pack.variantGroup;
+
+        return (
+          <article
+            key={key}
+            data-calendar-pack-group={key}
+            data-guided-disabled={isGuidedCardDisabled ? "true" : undefined}
+            className={cn(
+              "rounded-[8px] border border-border/60 bg-muted/15 px-3 py-2.5 transition-[background-color,border-color,box-shadow]",
+              isGuidedCardDisabled && "opacity-45",
+              showAddDetails &&
+                "border-foreground/16 bg-background shadow-[0_12px_24px_-24px_rgba(15,23,42,0.28)]"
+            )}
+          >
+            <div
+              className={cn(
+                "grid items-center gap-3",
+                compactList
+                  ? "grid-cols-1 gap-y-2.5"
+                  : "grid-cols-[minmax(0,1fr)_auto]"
+              )}
+            >
+              <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-x-2.5">
+                <CalendarPackIcon
+                  icon={pack.icon}
+                  className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+                />
+                <div className="min-w-0">
+                  <h4 className="text-sm font-medium text-foreground">
+                    {/* "pack" sempre resolve a alguma variante (o
+                        padrão interno de getDefaultVariant) mesmo
+                        antes de uma escolha real — sem o
+                        "!effectiveVariant", mostraria "Jogos Grêmio"
+                        como se já fosse a seleção da pessoa. */}
+                    {isTeamGroup && !effectiveVariant
+                      ? "Jogos do seu time favorito"
+                      : pack.name}
+                  </h4>
+                  <p
+                    className={cn(
+                      "mt-1.5 text-xs leading-5 text-muted-foreground",
+                      compactList && "line-clamp-2"
+                    )}
+                  >
+                    {pack.description}
+                  </p>
+                  {variantGroup && variants.length > 1 ? (
+                    <div className="mt-2">
+                      <Select
+                        value={
+                          requiresExplicitSelection
+                            ? effectiveVariant?.id ?? ""
+                            : pack.id
+                        }
+                        disabled={isGuidedCardDisabled}
+                        onValueChange={(packId) => {
+                          setSelectedVariantByGroup((current) => ({
+                            ...current,
+                            [key]: packId,
+                          }));
+                          setExpandedPackId(null);
+                        }}
+                      >
+                        <SelectTrigger
+                          size="sm"
+                          className={cn(
+                            "h-7 max-w-full rounded-[8px] border-border bg-card px-2.5 text-xs shadow-none hover:border-foreground/18 hover:bg-muted",
+                            compactList ? "w-full" : "w-40 sm:w-72"
+                          )}
+                          aria-label={`${variantGroup.label} para ${pack.name}`}
+                        >
+                          <SelectValue
+                            placeholder={
+                              requiresExplicitSelection
+                                ? isTeamGroup ? "Escolha seu time" : "Escolha seu estado"
+                                : undefined
+                            }
+                          />
+                        </SelectTrigger>
+                        <SelectContent align="start">
+                          {variants.map((variant) => (
+                            <SelectItem key={variant.id} value={variant.id}>
+                              {variant.variantGroup?.optionLabel}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+
+              <div
+                className={cn(
+                  "flex flex-col items-end gap-1.5",
+                  compactList
+                    ? "w-full flex-row flex-wrap justify-end gap-2"
+                    : "shrink-0 sm:flex-row sm:flex-wrap sm:justify-end sm:gap-2"
+                )}
+              >
+                {isPresent ? (
+                  <>
+                    {isSwitchingVariant ? (
+                      <AsyncStateButton
+                        type="button"
+                        variant="premium"
+                        size="xs"
+                        className="rounded-full"
+                        disabled={isBusy || isGuidedCardDisabled}
+                        onClick={() =>
+                          handleImport(
+                            pack,
+                            variants,
+                            availability?.profileId ?? targetProfileId
+                          )
+                        }
+                        state={getAddButtonState(currentFlow)}
+                        pendingLabel="Atualizando…"
+                        successLabel="Atualizado"
+                        errorLabel="Tentar novamente"
+                      >
+                        {variantGroup?.label === "Estado"
+                          ? "Trocar estado"
+                          : variantGroup?.label === "Cobertura"
+                            ? "Trocar cobertura"
+                            : "Trocar time"}
+                      </AsyncStateButton>
+                    ) : null}
+                    <AsyncStateButton
+                      type="button"
+                      variant="dangerSoft"
+                      size="xs"
+                      className="rounded-full"
+                      disabled={isBusy || isGuidedCardDisabled}
+                      onClick={() => handleRemove(pack, variants)}
+                      state={getRemoveButtonState(currentFlow)}
+                      pendingLabel="Removendo…"
+                      successLabel="Removido"
+                      errorLabel="Tentar remover"
+                    >
+                      <Trash2 className="size-3.5" />
+                      Remover
+                    </AsyncStateButton>
+                  </>
+                ) : showAddDetails ? (
+                  // Sem perfil pra escolher (contexto fixo ou só 1
+                  // existente), pedir pra confirmar um contexto óbvio
+                  // só atrapalha — vira clique direto, como Feriados.
+                  isGuidedCard || fixedTargetProfileId ? (
+                    <AsyncStateButton
+                      type="button"
+                      variant="premium"
+                      size="xs"
+                      className="rounded-full"
+                      disabled={isBusy || !hasRequiredVariant}
+                      onClick={() =>
+                        handleImport(pack, variants, targetProfileId)
+                      }
+                      state={getAddButtonState(currentFlow)}
+                      pendingLabel="Adicionando…"
+                      successLabel="Adicionado"
+                      errorLabel="Tentar adicionar"
+                    >
+                      <Check className="size-3.5" />
+                      Adicionar
+                    </AsyncStateButton>
+                  ) : (
+                  <div className="flex min-w-0 items-center justify-end gap-1.5">
+                    <Select
+                      value={targetProfileId ?? ""}
+                      onValueChange={(profileId) =>
+                        setTargetProfileByPack((current) => ({
+                          ...current,
+                          [pack.id]: profileId,
+                        }))
+                      }
+                    >
+                      <SelectTrigger
+                        size="sm"
+                        className="h-7 w-[8.25rem] rounded-[9px] border-border bg-card px-2.5 text-xs font-semibold shadow-none hover:border-foreground/18 hover:bg-muted sm:w-[9rem]"
+                        aria-label={`Contexto para ${pack.name}`}
+                      >
+                        <SelectValue placeholder="Contexto" />
+                      </SelectTrigger>
+                      <SelectContent align="end">
+                        {profiles.map((profile) => (
+                          <SelectItem key={profile.id} value={profile.id}>
+                            <ProfileIcon
+                              icon={profile.icon}
+                              size={13}
+                              className="shrink-0"
+                            />
+                            <span>{profile.name}</span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <AsyncStateButton
+                      type="button"
+                      variant="premium"
+                      size="icon-xs"
+                      className="rounded-[9px]"
+                      disabled={isBusy || !targetProfileId || !hasRequiredVariant}
+                      onClick={() =>
+                        handleImport(pack, variants, targetProfileId)
+                      }
+                      aria-label={
+                        targetProfileName
+                          ? `Adicionar calendário ${pack.name} ao contexto ${targetProfileName}`
+                          : `Adicionar calendário ${pack.name}`
+                      }
+                      title={
+                        targetProfileName
+                          ? `Adicionar em ${targetProfileName}`
+                          : "Escolha um contexto"
+                      }
+                      state={getAddButtonState(currentFlow)}
+                      pendingLabel="Adicionando…"
+                      successLabel="Adicionado"
+                      errorLabel="Tentar adicionar"
+                    >
+                      <Check className="size-3.5" />
+                      <span className="sr-only">Confirmar</span>
+                    </AsyncStateButton>
+                  </div>
+                  )
+                ) : (
+                  <Button
+                    type="button"
+                    variant="premium"
+                    size="xs"
+                    className="rounded-full"
+                    disabled={
+                      isBusy ||
+                      isGuidedCardDisabled ||
+                      !hasRequiredVariant
+                    }
+                    onClick={() => {
+                      if (isCalendarSubscriptionLimitReached) {
+                        setUpgradeDialogOpen(true);
+                        return;
+                      }
+                      setExpandedPackId(pack.id);
+                    }}
+                  >
+                    <Plus className="size-3.5" />
+                    Adicionar
+                  </Button>
+                )}
+              </div>
+            </div>
+          </article>
+        );
+      })}
+    </div>
+  );
+
+  const upgradeDialog = (
+    <ProUpgradeDialog
+      open={upgradeDialogOpen}
+      onOpenChange={setUpgradeDialogOpen}
+      reason="calendar-subscriptions"
+      onRequireAuth={onRequireAuth}
+    />
+  );
+
+  if (embedded) {
+    return (
+      <div className="space-y-4">
+        <p className="text-sm text-muted-foreground">{launcherDescription}</p>
+        {packList}
+        {upgradeDialog}
+      </div>
+    );
+  }
+
   return (
     <>
       {hideTrigger ? null : <Button
@@ -502,334 +845,15 @@ export function CalendarPackLauncher({
               ) : null}
               <DialogTitle>Calendários</DialogTitle>
             </div>
-            <DialogDescription>
-              {guidedVariantGroupId
-                ? "Feriados do seu estado é uma boa sugestão para começar, mas qualquer calendário serve."
-                : "Adicione calendários prontos ao seu ano."}
-            </DialogDescription>
+            <DialogDescription>{launcherDescription}</DialogDescription>
           </DialogHeader>
 
-          <div className="grid gap-2 rounded-[8px] border border-border/75 bg-background p-2.5 shadow-sm sm:p-3">
-            {calendarPackCards.map(({ key, variants }) => {
-              const isGuidedCard = guidedVariantGroupId === key;
-              const isGuidedCardDisabled = false;
-              const selectedPackId = selectedVariantByGroup[key];
-              const selectedVariant = variants.find(
-                (candidate) => candidate.id === selectedPackId
-              );
-              const defaultVariant = getDefaultVariant(key, variants);
-              const groupIsPresent = variants.some((candidate) => {
-                const candidateAvailability = availabilityByPack.get(candidate.id);
-                return (
-                  Boolean(candidateAvailability?.hasAnyCategory) ||
-                  Boolean(candidateAvailability?.hasImportedEvents)
-                );
-              });
-              const installedVariant =
-                variants.find((candidate) =>
-                  isCalendarPackVariantInstalled(snapshot, candidate, variants)
-                ) ?? (groupIsPresent ? selectedVariant ?? variants[0] : undefined);
-              const effectiveVariant =
-                selectedVariant ??
-                installedVariant ??
-                defaultVariant;
-              const pack =
-                effectiveVariant ??
-                variants[0];
-              const isTeamGroup = key === "brasileirao-2026-by-team";
-              const requiresExplicitSelection =
-                (isGuidedCard && requireExplicitVariant) || isTeamGroup;
-              const hasRequiredVariant =
-                !requiresExplicitSelection ||
-                Boolean(effectiveVariant);
-              const availability = availabilityByPack.get(pack.id);
-              const isPresent = groupIsPresent;
-              const currentFlow = flowByPack[pack.id] ?? "idle";
-              const isBusy =
-                currentFlow === "adding" || currentFlow === "removing";
-              const isSwitchingVariant = Boolean(
-                installedVariant && installedVariant.id !== pack.id
-              );
-              const targetProfileId = getTargetProfileId(
-                pack.id,
-                availability?.profileId ??
-                  (installedVariant
-                    ? availabilityByPack.get(installedVariant.id)?.profileId
-                    : null)
-              );
-              const targetProfileName = targetProfileId
-                ? profileNameById.get(targetProfileId)
-                : null;
-              const showAddDetails =
-                !isPresent &&
-                (expandedPackId === pack.id ||
-                  ((isGuidedCard || Boolean(fixedTargetProfileId)) &&
-                    hasRequiredVariant));
-              const variantGroup = pack.variantGroup;
-
-              return (
-                <article
-                  key={key}
-                  data-calendar-pack-group={key}
-                  data-guided-disabled={isGuidedCardDisabled ? "true" : undefined}
-                  className={cn(
-                    "rounded-[8px] border border-border/60 bg-muted/15 px-3 py-2.5 transition-[background-color,border-color,box-shadow]",
-                    isGuidedCardDisabled && "opacity-45",
-                    showAddDetails &&
-                      "border-foreground/16 bg-background shadow-[0_12px_24px_-24px_rgba(15,23,42,0.28)]"
-                  )}
-                >
-                  <div
-                    className={cn(
-                      "grid items-center gap-3",
-                      compactList
-                        ? "grid-cols-1 gap-y-2.5"
-                        : "grid-cols-[minmax(0,1fr)_auto]"
-                    )}
-                  >
-                    <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-x-2.5">
-                      <CalendarPackIcon
-                        icon={pack.icon}
-                        className="mt-0.5 size-4 shrink-0 text-muted-foreground"
-                      />
-                      <div className="min-w-0">
-                        <h4 className="text-sm font-medium text-foreground">
-                          {/* "pack" sempre resolve a alguma variante (o
-                              padrão interno de getDefaultVariant) mesmo
-                              antes de uma escolha real — sem o
-                              "!effectiveVariant", mostraria "Jogos Grêmio"
-                              como se já fosse a seleção da pessoa. */}
-                          {isTeamGroup && !effectiveVariant
-                            ? "Jogos do seu time favorito"
-                            : pack.name}
-                        </h4>
-                        <p
-                          className={cn(
-                            "mt-1.5 text-xs leading-5 text-muted-foreground",
-                            compactList && "line-clamp-2"
-                          )}
-                        >
-                          {pack.description}
-                        </p>
-                        {variantGroup && variants.length > 1 ? (
-                          <div className="mt-2">
-                            <Select
-                              value={
-                                requiresExplicitSelection
-                                  ? effectiveVariant?.id ?? ""
-                                  : pack.id
-                              }
-                              disabled={isGuidedCardDisabled}
-                              onValueChange={(packId) => {
-                                setSelectedVariantByGroup((current) => ({
-                                  ...current,
-                                  [key]: packId,
-                                }));
-                                setExpandedPackId(null);
-                              }}
-                            >
-                              <SelectTrigger
-                                size="sm"
-                                className={cn(
-                                  "h-7 max-w-full rounded-[8px] border-border bg-card px-2.5 text-xs shadow-none hover:border-foreground/18 hover:bg-muted",
-                                  compactList ? "w-full" : "w-40 sm:w-72"
-                                )}
-                                aria-label={`${variantGroup.label} para ${pack.name}`}
-                              >
-                                <SelectValue
-                                  placeholder={
-                                    requiresExplicitSelection
-                                      ? isTeamGroup ? "Escolha seu time" : "Escolha seu estado"
-                                      : undefined
-                                  }
-                                />
-                              </SelectTrigger>
-                              <SelectContent align="start">
-                                {variants.map((variant) => (
-                                  <SelectItem key={variant.id} value={variant.id}>
-                                    {variant.variantGroup?.optionLabel}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        ) : null}
-                      </div>
-                    </div>
-
-                    <div
-                      className={cn(
-                        "flex flex-col items-end gap-1.5",
-                        compactList
-                          ? "w-full flex-row flex-wrap justify-end gap-2"
-                          : "shrink-0 sm:flex-row sm:flex-wrap sm:justify-end sm:gap-2"
-                      )}
-                    >
-                      {isPresent ? (
-                        <>
-                          {isSwitchingVariant ? (
-                            <AsyncStateButton
-                              type="button"
-                              variant="premium"
-                              size="xs"
-                              className="rounded-full"
-                              disabled={isBusy || isGuidedCardDisabled}
-                              onClick={() =>
-                                handleImport(
-                                  pack,
-                                  variants,
-                                  availability?.profileId ?? targetProfileId
-                                )
-                              }
-                              state={getAddButtonState(currentFlow)}
-                              pendingLabel="Atualizando…"
-                              successLabel="Atualizado"
-                              errorLabel="Tentar novamente"
-                            >
-                              {variantGroup?.label === "Estado"
-                                ? "Trocar estado"
-                                : variantGroup?.label === "Cobertura"
-                                  ? "Trocar cobertura"
-                                  : "Trocar time"}
-                            </AsyncStateButton>
-                          ) : null}
-                          <AsyncStateButton
-                            type="button"
-                            variant="dangerSoft"
-                            size="xs"
-                            className="rounded-full"
-                            disabled={isBusy || isGuidedCardDisabled}
-                            onClick={() => handleRemove(pack, variants)}
-                            state={getRemoveButtonState(currentFlow)}
-                            pendingLabel="Removendo…"
-                            successLabel="Removido"
-                            errorLabel="Tentar remover"
-                          >
-                            <Trash2 className="size-3.5" />
-                            Remover
-                          </AsyncStateButton>
-                        </>
-                      ) : showAddDetails ? (
-                        // Sem perfil pra escolher (contexto fixo ou só 1
-                        // existente), pedir pra confirmar um contexto óbvio
-                        // só atrapalha — vira clique direto, como Feriados.
-                        isGuidedCard || fixedTargetProfileId ? (
-                          <AsyncStateButton
-                            type="button"
-                            variant="premium"
-                            size="xs"
-                            className="rounded-full"
-                            disabled={isBusy || !hasRequiredVariant}
-                            onClick={() =>
-                              handleImport(pack, variants, targetProfileId)
-                            }
-                            state={getAddButtonState(currentFlow)}
-                            pendingLabel="Adicionando…"
-                            successLabel="Adicionado"
-                            errorLabel="Tentar adicionar"
-                          >
-                            <Check className="size-3.5" />
-                            Adicionar
-                          </AsyncStateButton>
-                        ) : (
-                        <div className="flex min-w-0 items-center justify-end gap-1.5">
-                          <Select
-                            value={targetProfileId ?? ""}
-                            onValueChange={(profileId) =>
-                              setTargetProfileByPack((current) => ({
-                                ...current,
-                                [pack.id]: profileId,
-                              }))
-                            }
-                          >
-                            <SelectTrigger
-                              size="sm"
-                              className="h-7 w-[8.25rem] rounded-[9px] border-border bg-card px-2.5 text-xs font-semibold shadow-none hover:border-foreground/18 hover:bg-muted sm:w-[9rem]"
-                              aria-label={`Contexto para ${pack.name}`}
-                            >
-                              <SelectValue placeholder="Contexto" />
-                            </SelectTrigger>
-                            <SelectContent align="end">
-                              {profiles.map((profile) => (
-                                <SelectItem key={profile.id} value={profile.id}>
-                                  <ProfileIcon
-                                    icon={profile.icon}
-                                    size={13}
-                                    className="shrink-0"
-                                  />
-                                  <span>{profile.name}</span>
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <AsyncStateButton
-                            type="button"
-                            variant="premium"
-                            size="icon-xs"
-                            className="rounded-[9px]"
-                            disabled={isBusy || !targetProfileId || !hasRequiredVariant}
-                            onClick={() =>
-                              handleImport(pack, variants, targetProfileId)
-                            }
-                            aria-label={
-                              targetProfileName
-                                ? `Adicionar calendário ${pack.name} ao contexto ${targetProfileName}`
-                                : `Adicionar calendário ${pack.name}`
-                            }
-                            title={
-                              targetProfileName
-                                ? `Adicionar em ${targetProfileName}`
-                                : "Escolha um contexto"
-                            }
-                            state={getAddButtonState(currentFlow)}
-                            pendingLabel="Adicionando…"
-                            successLabel="Adicionado"
-                            errorLabel="Tentar adicionar"
-                          >
-                            <Check className="size-3.5" />
-                            <span className="sr-only">Confirmar</span>
-                          </AsyncStateButton>
-                        </div>
-                        )
-                      ) : (
-                        <Button
-                          type="button"
-                          variant="premium"
-                          size="xs"
-                          className="rounded-full"
-                          disabled={
-                            isBusy ||
-                            isGuidedCardDisabled ||
-                            !hasRequiredVariant
-                          }
-                          onClick={() => {
-                            if (isCalendarSubscriptionLimitReached) {
-                              setUpgradeDialogOpen(true);
-                              return;
-                            }
-                            setExpandedPackId(pack.id);
-                          }}
-                        >
-                          <Plus className="size-3.5" />
-                          Adicionar
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
+          {packList}
 
         </DialogContent>
       </Dialog>
 
-      <ProUpgradeDialog
-        open={upgradeDialogOpen}
-        onOpenChange={setUpgradeDialogOpen}
-        reason="calendar-subscriptions"
-        onRequireAuth={onRequireAuth}
-      />
+      {upgradeDialog}
     </>
   );
 }

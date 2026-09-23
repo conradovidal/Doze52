@@ -60,9 +60,11 @@ function DialogContent({
   anchorPoint: _anchorPoint,
   desktopPlacement: _desktopPlacement = "bottom-start",
   mobileMode: _mobileMode = "center",
+  overlayClassName,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean;
+  overlayClassName?: string;
   anchorPoint?: { x: number; y: number };
   desktopPlacement?: "bottom-start" | "bottom-end" | "right-start";
   mobileMode?: "sheet" | "center";
@@ -73,7 +75,7 @@ function DialogContent({
 
   return (
     <DialogPortal data-slot="dialog-portal">
-      <DialogOverlay />
+      <DialogOverlay className={overlayClassName} />
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(

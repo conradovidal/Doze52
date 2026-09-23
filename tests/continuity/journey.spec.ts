@@ -24,7 +24,7 @@ async function createHabit(page: Page) {
     .getByRole("button", { name: "Criar novo hábito" })
     .click();
   await page.getByLabel("Nome do hábito").fill("Hábito QA continuidade");
-  await page.getByRole("button", { name: "Criar hábito", exact: true }).click();
+  await page.getByRole("button", { name: "Criar", exact: true }).click();
   await page
     .locator(
       '[data-habits-prototype] button[aria-label^="Marcar Hábito QA continuidade"]',

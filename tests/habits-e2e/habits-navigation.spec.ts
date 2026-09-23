@@ -146,7 +146,7 @@ test("mobile abre em Hábitos e preserva a sessão entre superfícies", async ({
   const emptyDay = habits.locator('button[aria-label^="Criar um hábito para"]').first();
   await emptyDay.click();
   await page.getByLabel("Nome do hábito").fill("Caminhar");
-  await page.getByRole("button", { name: "Criar hábito" }).click();
+  await page.getByRole("button", { name: "Criar", exact: true }).click();
   await expect(
     habits.getByRole("button", { name: "Caminhar", exact: true })
   ).toBeVisible();
@@ -786,7 +786,7 @@ test("desktop mantém a grade anual disponível antes do primeiro hábito", asyn
   );
   await expect(page.getByText(/Para se inspirar:/)).toHaveCount(0);
   await habitNameInput.fill("Ler");
-  await page.getByRole("button", { name: "Criar hábito" }).click();
+  await page.getByRole("button", { name: "Criar", exact: true }).click();
   await expect(habits.getByRole("button", { name: "Ler", exact: true })).toHaveAttribute(
     "aria-pressed",
     "true"
@@ -859,7 +859,7 @@ test("desktop edita e reordena hábitos nos controles contextuais", async ({
   await page.waitForTimeout(300);
   await controls.getByRole("button", { name: "Editar hábito Caminhar" }).click();
   await page.getByLabel("Nome do hábito").fill("Corrida");
-  await page.getByRole("button", { name: "Salvar alterações" }).click();
+  await page.getByRole("button", { name: "Salvar", exact: true }).click();
   await expect(controls.getByRole("button", { name: "Editar hábito Corrida" })).toBeVisible();
 
   await controls.getByRole("button", { name: "Editar hábito Ler" }).click();
@@ -949,7 +949,7 @@ test("mobile reordena hábitos pelo mesmo DnD e persiste a posição", async ({
   await expect(chips.first()).toHaveAttribute("data-habit-edit-chip", "mobile-b");
   await controls.getByRole("button", { name: "Editar hábito Caminhar" }).click();
   await page.getByLabel("Nome do hábito").fill("Caminhar mobile");
-  await page.getByRole("button", { name: "Salvar alterações" }).click();
+  await page.getByRole("button", { name: "Salvar", exact: true }).click();
   await controls.getByRole("button", { name: "Editar hábito Ler" }).click();
   await page.getByRole("button", { name: "Excluir hábito" }).click();
   await page.getByRole("button", { name: "Confirmar exclusão" }).click();
@@ -1061,7 +1061,7 @@ test("onboarding desktop apresenta o exemplo e termina no hábito real", async (
   expect(Math.abs((habitNoticeBox?.x ?? 0) + (habitNoticeBox?.width ?? 0) / 2 - ((habitCreateBox?.x ?? 0) + (habitCreateBox?.width ?? 0) / 2))).toBeLessThan(24);
   await page.getByRole("button", { name: "Criar novo hábito" }).click();
   await page.getByLabel("Nome do hábito").fill("Leitura");
-  await page.getByRole("button", { name: "Criar hábito" }).click();
+  await page.getByRole("button", { name: "Criar", exact: true }).click();
 
   const createdNotice = page.locator(
     '[data-guided-toolbar-notice][data-guided-toolbar-target="habit-created"]'

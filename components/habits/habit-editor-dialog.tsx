@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { Trash2 } from "lucide-react";
 import { CategoryColorPicker } from "@/components/category-color-picker";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,6 +12,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  ArchiveIconButton,
+  DeleteIconButton,
+  DialogSecondaryActions,
+} from "@/components/ui/icon-action-button";
 import { Input } from "@/components/ui/input";
 import {
   CATEGORY_COLOR_BASE_BLUE,
@@ -118,34 +124,38 @@ export function HabitEditorFields({
         </p>
       ) : null}
 
-      <DialogFooter className="mt-6">
+      <DialogFooter className="mt-6 flex-row items-center justify-between sm:justify-between">
         {editing && (onArchive || onDelete) ? (
-          <div className="flex flex-wrap gap-2 sm:mr-auto">
-            {onArchive ? (
-              <Button type="button" variant="outline" onClick={onArchive}>
-                Arquivar
-              </Button>
-            ) : null}
+          <DialogSecondaryActions>
+            {onArchive ? <ArchiveIconButton label="Arquivar hábito" onClick={onArchive} /> : null}
             {onDelete ? (
-              <Button
-                type="button"
-                variant="dangerSoft"
-                onClick={() => {
-                  if (confirmingDelete) onDelete();
-                  else setConfirmingDelete(true);
-                }}
-              >
-                {confirmingDelete ? "Confirmar exclusão" : "Excluir hábito"}
-              </Button>
+              confirmingDelete ? (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  aria-label="Confirmar exclusão"
+                  autoFocus
+                  onClick={onDelete}
+                >
+                  <Trash2 aria-hidden="true" />
+                  Excluir
+                </Button>
+              ) : (
+                <DeleteIconButton label="Excluir hábito" onClick={() => setConfirmingDelete(true)} />
+              )
             ) : null}
-          </div>
-        ) : null}
-        <Button type="button" variant="ghost" onClick={onCancel}>
-          Cancelar
-        </Button>
-        <Button type="submit" variant="premium" disabled={!name.trim()}>
-          {editing ? "Salvar alterações" : "Criar hábito"}
-        </Button>
+          </DialogSecondaryActions>
+        ) : (
+          <div />
+        )}
+        <div className="flex items-center gap-2">
+          <Button type="button" variant="ghost" onClick={onCancel}>
+            Cancelar
+          </Button>
+          <Button type="submit" variant="premium" disabled={!name.trim()}>
+            {editing ? "Salvar" : "Criar"}
+          </Button>
+        </div>
       </DialogFooter>
     </form>
   );
