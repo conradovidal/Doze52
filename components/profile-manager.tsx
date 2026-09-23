@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Trash2 } from "lucide-react";
+import { DeleteIconButton } from "@/components/ui/icon-action-button";
 import { ProUpgradeDialog } from "@/components/billing/pro-upgrade-dialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -330,18 +330,15 @@ export function ProfileManager({
           </div>
         </div>
 
-        <DialogFooter className="sm:justify-between">
+        <DialogFooter className="flex-row items-center justify-between sm:justify-between">
           {canDelete ? (
-            <Button variant="dangerSoft" onClick={openDeleteConfirm} disabled={isSaving}>
-              <Trash2 size={14} className="mr-1" />
-              Excluir
-            </Button>
+            <DeleteIconButton label="Excluir contexto" onClick={openDeleteConfirm} disabled={isSaving} />
           ) : (
             <div />
           )}
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
             <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={isSaving}>
-              {isEditMode ? "Fechar" : "Cancelar"}
+              Cancelar
             </Button>
             <Button variant="premium" onClick={handleSave} disabled={!canSave || isSaving}>
               {isSaving ? "Salvando..." : isEditMode ? "Salvar" : "Criar"}

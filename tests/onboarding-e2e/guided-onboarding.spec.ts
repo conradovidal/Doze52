@@ -858,7 +858,7 @@ test("seletor de destino integra o card de mover eventos", async ({
     .first()
     .click();
   const categoryDialog = page.getByRole("dialog", { name: "Editar categoria" });
-  await categoryDialog.getByRole("button", { name: "Deletar" }).click();
+  await categoryDialog.getByRole("button", { name: "Excluir categoria" }).click();
 
   const deleteDialog = page.getByRole("dialog", { name: "Excluir categoria" });
   const moveLabel = deleteDialog.getByText("Mover eventos", { exact: true });

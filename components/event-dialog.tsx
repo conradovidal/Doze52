@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ChevronDown, X } from "lucide-react";
+import { ChevronDown, Trash2, X } from "lucide-react";
 import * as m from "motion/react-m";
 import { ProfileIcon } from "@/components/profile-icon";
 import { Button } from "@/components/ui/button";
@@ -709,12 +709,15 @@ export function EventDialog({
           </div>
       </div>
 
-        <DialogFooter className="gap-2 sm:justify-between">
+        <DialogFooter className="flex-row items-center justify-between gap-2 sm:justify-between">
           {isManagedEvent ? (
             <div />
           ) : onDelete ? (
             <AsyncStateButton
               variant="dangerSoft"
+              size="icon"
+              aria-label="Excluir evento"
+              title="Excluir evento"
               state={isSaving && activeAction === "delete" ? "pending" : submitError && activeAction === "delete" ? "error" : "idle"}
               pendingLabel="Excluindo…"
               errorLabel="Tentar excluir"
@@ -742,7 +745,7 @@ export function EventDialog({
                 }
               }}
             >
-              Excluir
+              <Trash2 aria-hidden="true" />
             </AsyncStateButton>
           ) : (
             <div />
