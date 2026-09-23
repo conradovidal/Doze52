@@ -49,6 +49,10 @@ function DialogOverlay({
   );
 }
 
+// No desktop todo diálogo abre ancorado no mesmo topo (10% da altura),
+// perto da barra onde a pessoa interage, e cresce só para baixo — assim
+// Organizar, Conta, Pro, calendários prontos etc. aparecem sempre no mesmo
+// lugar. No celular continua centralizado (ou como folha, quando pedido).
 function DialogContent({
   className,
   children,
@@ -73,7 +77,7 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-1.5rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-2xl border border-border/80 bg-background p-5 shadow-[0_28px_70px_-32px_rgba(15,23,42,0.4)] outline-none data-[state=closed]:pointer-events-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:opacity-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:max-w-lg sm:p-6",
+          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-1.5rem)] -translate-x-1/2 -translate-y-1/2 gap-4 sm:top-[max(1.5rem,10dvh)] sm:max-h-[calc(100dvh-max(1.5rem,10dvh)-1.5rem)] sm:translate-y-0 rounded-2xl border border-border/80 bg-background p-5 shadow-[0_28px_70px_-32px_rgba(15,23,42,0.4)] outline-none data-[state=closed]:pointer-events-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:opacity-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:max-w-lg sm:p-6",
           DIALOG_MOTION_CLASS,
           className
         )}

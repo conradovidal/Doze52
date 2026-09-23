@@ -55,38 +55,39 @@ export const PRO_UPGRADE_COPY: Record<
   { title: string; description: string; cta: string }
 > = {
   profiles: {
-    title: "Vários contextos fazem parte do Doze 52 Pro.",
+    title: "Cada parte da vida no seu lugar",
     description:
-      "No plano gratuito, você pode usar 1 contexto. O Pro libera mais espaços para organizar trabalho, vida pessoal, viagens e família.",
-    cta: `Assinar Pro por ${FOUNDER_PRICE_LABEL}`,
+      "No plano gratuito você usa 1 contexto. Com o Pro, trabalho, casa, viagens e família ganham o espaço de cada um.",
+    cta: "Assinar Pro",
   },
   categories: {
-    title: "Mais categorias fazem parte do Doze 52 Pro.",
+    title: "Dê nome a tudo que importa",
     description:
-      "No plano gratuito, você pode usar até 3 categorias. O Pro libera mais organização para o seu ano.",
-    cta: `Assinar Pro por ${FOUNDER_PRICE_LABEL}`,
+      "No plano gratuito são 3 categorias. Com o Pro, seu ano ganha todas as cores que precisar.",
+    cta: "Assinar Pro",
   },
   "calendar-subscriptions": {
-    title: "Mais calendários fazem parte do Doze 52 Pro.",
+    title: "Todas as datas importantes, sem esforço",
     description:
-      "No plano gratuito, você pode usar 1 calendário. O Pro libera mais calendários para acompanhar datas importantes no seu ano.",
-    cta: `Assinar Pro por ${FOUNDER_PRICE_LABEL}`,
+      "No plano gratuito você assina 1 calendário pronto. Com o Pro, quantos quiser, sempre atualizados.",
+    cta: "Assinar Pro",
   },
   "calendar-import-export": {
-    title: "Planilhas de calendario fazem parte do Doze52 Pro.",
+    title: "Traga seu ano de uma planilha",
     description:
-      "O Pro permite baixar o template, exportar o calendario e importar eventos com validacao e pre-visualizacao.",
-    cta: `Assinar Pro por ${FOUNDER_PRICE_LABEL}`,
+      "Com o Pro você baixa o modelo, exporta o calendário e importa eventos em lote, com pré-visualização.",
+    cta: "Assinar Pro",
   },
   habits: {
-    title: "Mais hábitos fazem parte do Doze 52 Pro.",
+    title: "Acompanhe mais de uma rotina",
     description:
-      "No plano gratuito, você pode acompanhar 1 hábito. O Pro libera até 4 hábitos no mesmo ano.",
-    cta: `Assinar Pro por ${FOUNDER_PRICE_LABEL}`,
+      "No plano gratuito você acompanha 1 hábito. Com o Pro, até 4 hábitos no mesmo ano.",
+    cta: "Assinar Pro",
   },
   generic: {
-    title: "Doze 52 Pro",
-    description: "Organize mais partes do seu ano.",
+    title: "Seu ano inteiro, sem limites",
+    description:
+      "Mais contextos, categorias, calendários e hábitos para organizar o que importa.",
     cta: "Assinar Pro",
   },
 };

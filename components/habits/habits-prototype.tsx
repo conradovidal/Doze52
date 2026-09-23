@@ -34,6 +34,7 @@ import {
 import type { Habit } from "@/lib/types";
 import { useBilling } from "@/lib/use-billing";
 import { cn } from "@/lib/utils";
+import { nudgeProAtLastFreeSlot } from "@/lib/pro-upgrade-nudge";
 
 const HABITS_PROTOTYPE_SCROLL_PREFIX = "doze52:habits-prototype:scroll";
 const MOBILE_DESKTOP_HINT_STORAGE_KEY = "doze52:mobile-onboarding:desktop-hint-dismissed";
@@ -462,6 +463,15 @@ export function HabitsPrototype({
     }
     createHabitInStore({ name, color: draftColor });
     setCreateDialogOpen(false);
+    if (!mobileOnboardingActive && !showcaseActive) {
+      nudgeProAtLastFreeSlot({
+        reason: "habits",
+        countAfter: activeHabits.length + 1,
+        limit: limits.maxHabits,
+        isPro,
+        notify,
+      });
+    }
     if (mobileOnboardingStep === "create_habit") {
       setMobileOnboardingStep("mark_day");
     }
