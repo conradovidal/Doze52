@@ -346,7 +346,7 @@ export function HabitControls({
       title="Criar novo hábito"
       className={cn(
         "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-border bg-card text-foreground shadow-none transition-all duration-[160ms] ease-[cubic-bezier(0.22,1,0.36,1)] hover:border-foreground/20 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45",
-        mobile && "h-10 w-full rounded-[8px]",
+        mobile && "h-10 w-10 rounded-[8px]",
         guidedNotice?.target === "habit" && "product-spotlight-target",
       )}
       onClick={onRequestCreate}
@@ -373,7 +373,7 @@ export function HabitControls({
             className={cn(
               "inline-flex items-center overflow-hidden border text-[0.78rem] font-semibold shadow-none transition-[background-color,border-color,color,transform] duration-[160ms] ease-[cubic-bezier(0.22,1,0.36,1)] active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45",
               mobile
-                ? "h-10 w-full justify-start rounded-[8px] pr-2 text-left"
+                ? "h-10 max-w-full justify-start rounded-[8px] pr-1 text-left"
                 : "h-8 shrink-0 rounded-[10px]",
               selected
                 ? "hover:brightness-[0.985]"
@@ -412,7 +412,7 @@ export function HabitControls({
             <span
               className={cn(
                 "min-w-0 truncate pl-1 pr-3",
-                mobile && "text-left text-[0.74rem] leading-[0.84rem]"
+                mobile && "text-left text-[0.78rem]"
               )}
             >
               {habit.name}
@@ -423,11 +423,13 @@ export function HabitControls({
     </>
   );
 
+  // Mesmo arranjo das categorias no Anual mobile: chips no tamanho do nome,
+  // quebrando linha, e o "+" como chip quadrado. A edição segue na grade.
   const habitButtons = (
     <div
       className={cn(
         mobile
-          ? "grid w-full grid-cols-2 gap-1.5 min-[430px]:grid-cols-3"
+          ? "flex w-full flex-wrap items-center gap-1.5"
           : "flex min-h-8 w-max shrink-0 flex-nowrap items-center gap-1.5 sm:gap-2"
       )}
     >

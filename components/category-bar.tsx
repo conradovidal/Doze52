@@ -540,8 +540,14 @@ export function CategoryBar({
   );
   const dragEnabled =
     isInlineEditMode && orderedCategoriesForEditingProfile.length > 1 && !locked;
+  // Leitura no mobile: chips no tamanho do nome, quebrando linha — a grade
+  // de colunas fixas deixava o botão de ocultar numa célula inteira e
+  // abria uma linha a mais. A edição (arrastar) segue na grade.
+  const mobileReadChips = mobileDense && !isInlineEditMode;
   const barClass = cn(
-    mobileDense
+    mobileReadChips
+      ? "flex w-full flex-wrap items-center gap-1.5"
+      : mobileDense
       ? "grid w-full grid-cols-2 gap-1.5 min-[430px]:grid-cols-3"
       : compact
         ? "w-full min-h-8 justify-center"
@@ -693,7 +699,7 @@ export function CategoryBar({
               className={cn(
                 `inline-flex items-center overflow-hidden border text-[0.78rem] font-semibold shadow-none transition-all ${MOTION_CLASS}`,
                 mobileDense
-                  ? "h-10 w-full justify-start rounded-[8px] pr-2 text-left"
+                  ? "h-10 max-w-full justify-start rounded-[8px] pr-1 text-left"
                   : "h-8 rounded-[10px]",
                 category.visible
                   ? "hover:brightness-[0.985]"
@@ -732,14 +738,11 @@ export function CategoryBar({
                 />
               </span>
               <span
-                className={`min-w-0 pl-1 pr-3 ${
-                  mobileDense
-                    ? "text-left text-[0.74rem] leading-[0.84rem]"
-                    : "truncate"
+                className={`min-w-0 truncate pl-1 pr-3 ${
+                  mobileDense ? "text-left text-[0.78rem]" : ""
                 } ${
                   category.visible ? "" : "text-muted-foreground/75"
                 }`}
-                style={mobileDense ? MOBILE_CHIP_LABEL_STYLE : undefined}
               >
                 {category.name}
               </span>
@@ -782,7 +785,7 @@ export function CategoryBar({
           onClick={() => setCategoriesVisibility(displayedCategoryIds, !allDisplayedVisible)}
           className={cn(
             `inline-flex items-center justify-center rounded-[10px] border text-muted-foreground shadow-none transition-all ${MOTION_CLASS}`,
-            mobileDense ? "h-10 w-full px-2.5" : "h-8 px-2.5",
+            mobileDense ? "h-10 w-10 rounded-[8px]" : "h-8 px-2.5",
             allDisplayedVisible
               ? "border-border bg-card hover:border-foreground/18 hover:bg-muted hover:text-foreground"
               : "border-foreground/18 bg-muted text-foreground hover:border-foreground/22 hover:bg-muted/80"
