@@ -3,6 +3,7 @@ import { expect, test } from "@playwright/test";
 import {
   expectAuthenticated,
   installVercelBypass,
+  openAuthenticatedSettings,
   openQaApp,
 } from "./support/browser";
 
@@ -50,18 +51,17 @@ test("exportacao permanece utilizavel no mobile", async ({ page }) => {
   await installVercelBypass(page);
   await openQaApp(page);
   await expectAuthenticated(page);
-  await page.getByRole("button", { name: "Abrir menu da conta" }).click();
-  await page.getByRole("button", { name: "Importar ou exportar" }).click();
-
-  const dialog = page.getByRole("dialog", { name: "Importar ou exportar" });
+  const dialog = await openAuthenticatedSettings(page, "data");
   const templateDownloadPromise = page.waitForEvent("download");
-  await dialog.getByRole("button", { name: "Baixar template" }).click();
+  await dialog.getByRole("button", { name: /^Baixar template/ }).click();
   expect((await templateDownloadPromise).suggestedFilename()).toBe(
     "doze52-template-eventos.xlsx"
   );
 
-  await dialog.getByRole("button", { name: "Exportar calendario" }).click();
-  const exportDialog = page.getByRole("dialog", { name: "Selecionar dados para exportar" });
+  await dialog.getByRole("button", { name: /^Exportar calendário/ }).click();
+  // A seleção abre dentro do próprio painel, no lugar da tela inicial.
+  await expect(dialog.getByText("Selecionar dados para exportar")).toBeVisible();
+  const exportDialog = dialog;
   await expect(exportDialog.getByRole("button", { name: "Limpar seleção" })).toBeEnabled();
 
   const viewport = page.viewportSize();

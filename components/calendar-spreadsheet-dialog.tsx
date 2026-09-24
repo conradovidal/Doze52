@@ -13,6 +13,7 @@ import {
   Upload,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { PanelHero, PanelIcon, PanelList, PanelRow } from "@/components/ui/panel-list";
 import {
   AsyncStateButton,
   type AsyncButtonState,
@@ -57,6 +58,14 @@ import { logDevError, logProdError } from "@/lib/safe-log";
 import { isAuthorCategory, isAuthorEvent } from "@/lib/calendar-export";
 import { exportUserData } from "@/lib/sync";
 import { useStore } from "@/lib/store";
+import { cn } from "@/lib/utils";
+import {
+  CATEGORY_COLOR_BASE_AMBER,
+  CATEGORY_COLOR_BASE_CORAL,
+  CATEGORY_COLOR_BASE_INDIGO,
+  CATEGORY_COLOR_BASE_TEAL,
+  CATEGORY_COLOR_BASE_VIOLET,
+} from "@/lib/category-palette";
 
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;
 
@@ -77,50 +86,6 @@ type AssistantStep =
   | "preview"
   | "result";
 type ImportMode = "template" | "custom";
-
-type ActionCardProps = {
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-  disabled?: boolean;
-  onClick: () => void;
-  state: AsyncButtonState;
-  pendingLabel: string;
-  successLabel: string;
-  errorLabel: string;
-};
-
-function ActionCard({
-  icon,
-  title,
-  description,
-  disabled,
-  onClick,
-  state,
-  pendingLabel,
-  successLabel,
-  errorLabel,
-}: ActionCardProps) {
-  return (
-    <AsyncStateButton
-      type="button"
-      variant="outline"
-      disabled={disabled}
-      onClick={onClick}
-      state={state}
-      pendingLabel={pendingLabel}
-      successLabel={successLabel}
-      errorLabel={errorLabel}
-      className="h-auto min-h-28 justify-start whitespace-normal rounded-[14px] border-border/75 bg-card p-3 text-left hover:bg-muted/45"
-    >
-      <span className="block">
-        <span className="mb-2 block size-4 text-muted-foreground">{icon}</span>
-        <span className="block text-sm font-semibold text-foreground">{title}</span>
-        <span className="mt-1 block text-xs leading-5 text-muted-foreground">{description}</span>
-      </span>
-    </AsyncStateButton>
-  );
-}
 
 type ExportScopeCheckboxProps = {
   checked: boolean;
@@ -587,7 +552,7 @@ export function CalendarSpreadsheetPanel({
   };
 
   const renderHome = () => (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <input
         ref={fileInputRef}
         type="file"
@@ -595,89 +560,72 @@ export function CalendarSpreadsheetPanel({
         className="sr-only"
         onChange={(event) => void handleFile(event.target.files?.[0])}
       />
-      <div>
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Exportar
-        </p>
-        <div className="grid gap-3 sm:grid-cols-3">
-          <ActionCard
-            icon={<FileDown className="size-4" />}
-            title="Baixar template"
-            description="Planilha vazia no formato padrao do Doze52."
-            disabled={isWorking}
-            state={workingAction === "template" ? workingState : "idle"}
-            pendingLabel="Gerando template…"
-            successLabel="Template baixado"
-            errorLabel="Tentar baixar"
-            onClick={() =>
-              void runDownload(
-                downloadCalendarSpreadsheetTemplate,
-                "Template baixado",
-                "calendar-spreadsheet.template",
-                "template"
-              )
-            }
-          />
-          <ActionCard
-            icon={<Download className="size-4" />}
-            title="Exportar calendario"
-            description="Escolha os contextos e categorias antes de baixar."
-            disabled={isWorking}
-            state="idle"
-            pendingLabel="Abrindo seleção…"
-            successLabel="Seleção aberta"
-            errorLabel="Tentar novamente"
-            onClick={startExport}
-          />
-          <ActionCard
-            icon={<Archive className="size-4" />}
-            title="Baixar backup técnico"
-            description="ZIP com seus dados autorais em JSON e CSV."
-            disabled={isWorking}
-            state={workingAction === "backup" ? workingState : "idle"}
-            pendingLabel="Gerando backup…"
-            successLabel="Backup baixado"
-            errorLabel="Tentar baixar"
-            onClick={() => void runDownload(
-              () => exportUserData(snapshot),
-              "Backup baixado",
-              "calendar-backup.export",
-              "backup"
-            )}
-          />
-        </div>
-      </div>
-      <div>
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Importar
-        </p>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <ActionCard
-            icon={<Upload className="size-4" />}
-            title="Usar template Doze52"
-            description="Reconhece as colunas padrao e pula o mapeamento."
-            disabled={isWorking}
-            state={workingAction === "import-template" ? workingState : "idle"}
-            pendingLabel="Lendo template…"
-            successLabel="Template lido"
-            errorLabel="Tentar novamente"
-            onClick={() => chooseFile("template")}
-          />
-          <ActionCard
-            icon={<FileSpreadsheet className="size-4" />}
-            title="Usar planilha customizada"
-            description="Escolha as colunas de uma exportacao do Jira ou outra fonte."
-            disabled={isWorking}
-            state={workingAction === "import-custom" ? workingState : "idle"}
-            pendingLabel="Lendo planilha…"
-            successLabel="Planilha lida"
-            errorLabel="Tentar novamente"
-            onClick={() => chooseFile("custom")}
-          />
-        </div>
-      </div>
-      <p className="text-xs leading-5 text-muted-foreground">
-        Aceita .xlsx de ate 5 MB. Cada linha representa um evento; a importacao nao
+      <PanelList title="Exportar">
+        <PanelRow
+          icon={FileDown}
+          color={CATEGORY_COLOR_BASE_AMBER}
+          title="Baixar template"
+          description="Planilha vazia no formato padrão do Doze 52."
+          disabled={isWorking}
+          state={workingAction === "template" ? workingState : "idle"}
+          stateLabels={{ pending: "Gerando template…", success: "Template baixado", error: "Não deu certo. Toque para tentar de novo." }}
+          onClick={() =>
+            void runDownload(
+              downloadCalendarSpreadsheetTemplate,
+              "Template baixado",
+              "calendar-spreadsheet.template",
+              "template"
+            )
+          }
+        />
+        <PanelRow
+          icon={Download}
+          color={CATEGORY_COLOR_BASE_TEAL}
+          title="Exportar calendário"
+          description="Escolha os contextos e categorias antes de baixar."
+          disabled={isWorking}
+          onClick={startExport}
+        />
+        <PanelRow
+          icon={Archive}
+          color={CATEGORY_COLOR_BASE_INDIGO}
+          title="Baixar backup técnico"
+          description="ZIP com seus dados autorais em JSON e CSV."
+          disabled={isWorking}
+          state={workingAction === "backup" ? workingState : "idle"}
+          stateLabels={{ pending: "Gerando backup…", success: "Backup baixado", error: "Não deu certo. Toque para tentar de novo." }}
+          onClick={() => void runDownload(
+            () => exportUserData(snapshot),
+            "Backup baixado",
+            "calendar-backup.export",
+            "backup"
+          )}
+        />
+      </PanelList>
+      <PanelList title="Importar">
+        <PanelRow
+          icon={Upload}
+          color={CATEGORY_COLOR_BASE_VIOLET}
+          title="Usar template Doze 52"
+          description="Reconhece as colunas padrão e pula o mapeamento."
+          disabled={isWorking}
+          state={workingAction === "import-template" ? workingState : "idle"}
+          stateLabels={{ pending: "Lendo template…", success: "Template lido", error: "Não deu certo. Toque para tentar de novo." }}
+          onClick={() => chooseFile("template")}
+        />
+        <PanelRow
+          icon={FileSpreadsheet}
+          color={CATEGORY_COLOR_BASE_CORAL}
+          title="Usar planilha customizada"
+          description="Escolha as colunas de uma exportação do Jira ou outra fonte."
+          disabled={isWorking}
+          state={workingAction === "import-custom" ? workingState : "idle"}
+          stateLabels={{ pending: "Lendo planilha…", success: "Planilha lida", error: "Não deu certo. Toque para tentar de novo." }}
+          onClick={() => chooseFile("custom")}
+        />
+      </PanelList>
+      <p className="px-1 text-xs leading-5 text-muted-foreground">
+        Aceita .xlsx de até 5 MB. Cada linha representa um evento; a importação não
         altera nem remove dados existentes.
       </p>
     </div>
@@ -1017,12 +965,12 @@ export function CalendarSpreadsheetPanel({
   ) : null;
 
   const titles: Record<AssistantStep, [string, string]> = {
-    home: ["Importar ou exportar", "Escolha uma opção para trazer ou baixar seus dados."],
+    home: ["Importar ou exportar", "Traga eventos de uma planilha ou leve seu calendário com você."],
     "export-scope": ["Selecionar dados para exportar", "Escolha os contextos e categorias que devem entrar na planilha."],
-    mapping: ["Mapear colunas", "Defina como a sua planilha representa cada campo do calendario."],
+    mapping: ["Mapear colunas", "Defina como a sua planilha representa cada campo do calendário."],
     structures: ["Revisar estruturas", "Crie, associe ou ignore contextos e categorias encontrados."],
-    preview: ["Revisar importacao", "Confira o resultado antes de alterar o calendario."],
-    result: ["Resultado da importacao", "Veja o que foi criado, importado ou ignorado."],
+    preview: ["Revisar importação", "Confira o resultado antes de alterar o calendário."],
+    result: ["Resultado da importação", "Veja o que foi criado, importado ou ignorado."],
   };
 
   const canAdvanceStructures = Boolean(
@@ -1034,15 +982,22 @@ export function CalendarSpreadsheetPanel({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-start gap-3">
-        <div className="inline-flex size-9 shrink-0 items-center justify-center rounded-[10px] border border-border/75 bg-muted/34 text-foreground">
-          {isWorking ? <LoaderCircle className="size-4 animate-spin" /> : <FileSpreadsheet className="size-4" />}
+      {step === "home" ? (
+        <PanelHero
+          media={<PanelIcon icon={isWorking ? LoaderCircle : FileSpreadsheet} color={CATEGORY_COLOR_BASE_AMBER} size="lg" className={cn(isWorking && "[&>svg]:animate-spin")} />}
+          eyebrow="Dados"
+          title={titles.home[0]}
+          description={titles.home[1]}
+        />
+      ) : (
+        <div className="flex items-start gap-3">
+          <PanelIcon icon={isWorking ? LoaderCircle : FileSpreadsheet} color={CATEGORY_COLOR_BASE_AMBER} className={cn("mt-0.5", isWorking && "[&>svg]:animate-spin")} />
+          <div className="min-w-0">
+            <p className="text-base font-semibold text-foreground">{titles[step][0]}</p>
+            <p className="text-sm leading-6 text-muted-foreground">{titles[step][1]}</p>
+          </div>
         </div>
-        <div className="min-w-0 pt-1">
-          <p className="text-base font-semibold text-foreground">{titles[step][0]}</p>
-          <p className="text-sm leading-6 text-muted-foreground">{titles[step][1]}</p>
-        </div>
-      </div>
+      )}
 
       {step === "home" ? renderHome() : null}
       {step === "export-scope" ? renderExportScope() : null}

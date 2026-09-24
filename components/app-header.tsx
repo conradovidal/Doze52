@@ -38,7 +38,6 @@ import {
   ProfileManager,
   type ProfileManagerIntent,
 } from "@/components/profile-manager";
-import { UserMenu } from "@/components/auth/user-menu";
 import {
   Select,
   SelectContent,
@@ -80,7 +79,6 @@ type AppHeaderProps = {
   year: number;
   onYearChange: (year: number) => void;
   authLoading: boolean;
-  isAuthenticated: boolean;
   isMobileCalendarUi?: boolean;
   showCalendarControls?: boolean;
   useAdaptiveNavigation?: boolean;
@@ -159,7 +157,6 @@ export function AppHeader({
   year,
   onYearChange,
   authLoading,
-  isAuthenticated,
   isMobileCalendarUi = false,
   showCalendarControls = true,
   useAdaptiveNavigation = false,
@@ -317,8 +314,6 @@ export function AppHeader({
     "h-8 w-8 rounded-[10px] border-border bg-card text-muted-foreground shadow-none transition-colors hover:border-foreground/18 hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 md:h-9 md:w-9";
   const utilityActiveEditClass =
     "h-8 rounded-[10px] border border-primary bg-primary px-2.5 text-xs font-semibold text-primary-foreground shadow-none transition-colors hover:border-primary/20 hover:bg-primary/90 hover:text-primary-foreground focus-visible:ring-2 focus-visible:ring-ring/50 md:h-9 md:px-3.5 md:text-sm";
-  const utilityButtonClass =
-    "h-8 rounded-[10px] border-border bg-card px-2.5 text-xs font-semibold text-foreground shadow-none transition-colors hover:border-foreground/18 hover:bg-muted hover:text-foreground md:h-9 md:px-3.5 md:text-sm";
   const yearSelectClass =
     "h-8 min-w-[82px] rounded-[10px] border-border bg-card px-2.5 text-[0.9rem] font-semibold text-foreground shadow-none hover:border-foreground/18 hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/60 md:h-9 md:min-w-[90px] md:px-3.5 md:text-[1rem] [&_svg]:opacity-70 [&_svg]:text-muted-foreground";
   const categoryToggleClass =
@@ -1003,54 +998,6 @@ export function AppHeader({
                 ) : null}
               </div>
 
-              {!useAdaptiveNavigation ? (
-                <>
-                  <div
-                    data-onboarding-spotlight-target={
-                      guidedToolbarNotice?.target === "theme" ? "true" : undefined
-                    }
-                    className="relative shrink-0"
-                  >
-                    <ThemeToggle
-                      highlighted={guidedToolbarNotice?.target === "theme"}
-                      disabled={themeToggleDisabled}
-                    />
-                    {guidedToolbarNotice?.target === "theme" &&
-                    onDismissGuidedSelection ? (
-                      <GuidedToolbarNoticeCard
-                        notice={guidedToolbarNotice}
-                        onClose={onDismissGuidedSelection}
-                        onAction={
-                          guidedToolbarNotice.actionLabel
-                            ? () => onGuidedToolbarAction?.("theme")
-                            : undefined
-                        }
-                        align="end"
-                      />
-                    ) : null}
-                  </div>
-
-                  <div className="flex h-8 items-center justify-end md:h-9">
-                    {authLoading ? null : isAuthenticated ? (
-                      <UserMenu />
-                    ) : (
-                      <Button
-                        data-onboarding-auth-entry
-                        size="sm"
-                        variant="outline"
-                        disabled={onboardingLayoutLocked}
-                        className={utilityButtonClass}
-                        onClick={(event) => {
-                          const rect = event.currentTarget.getBoundingClientRect();
-                          onOpenAuthDialog({ x: rect.right, y: rect.bottom });
-                        }}
-                      >
-                        Entrar
-                      </Button>
-                    )}
-                  </div>
-                </>
-              ) : null}
             </div>
           </div>
         </div>

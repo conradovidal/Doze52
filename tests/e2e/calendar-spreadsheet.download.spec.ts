@@ -4,6 +4,7 @@ import {
   dismissOnboardingIfVisible,
   expectAuthenticated,
   installVercelBypass,
+  openAuthenticatedSettings,
   openQaApp,
   waitForSupabaseWrite,
   waitForSyncReady,
@@ -45,9 +46,7 @@ const openSpreadsheetDialog = async (page: import("@playwright/test").Page) => {
   await openQaApp(page);
   await expectAuthenticated(page);
   await dismissOnboardingIfVisible(page);
-  await page.getByRole("button", { name: "Abrir menu da conta" }).click();
-  await page.getByRole("button", { name: "Importar ou exportar" }).click();
-  return page.getByRole("dialog", { name: "Importar ou exportar" });
+  return openAuthenticatedSettings(page, "data");
 };
 
 test("baixa o template e exporta o recorte selecionado", async ({ page }) => {
@@ -55,12 +54,14 @@ test("baixa o template e exporta o recorte selecionado", async ({ page }) => {
   const dialog = await openSpreadsheetDialog(page);
 
   const templateDownloadPromise = page.waitForEvent("download");
-  await dialog.getByRole("button", { name: "Baixar template" }).click();
+  await dialog.getByRole("button", { name: /^Baixar template/ }).click();
   const templateDownload = await templateDownloadPromise;
   expect(templateDownload.suggestedFilename()).toBe("doze52-template-eventos.xlsx");
 
-  await dialog.getByRole("button", { name: "Exportar calendario" }).click();
-  const exportDialog = page.getByRole("dialog", { name: "Selecionar dados para exportar" });
+  await dialog.getByRole("button", { name: /^Exportar calendário/ }).click();
+  // A seleção abre dentro do próprio painel, no lugar da tela inicial.
+  await expect(dialog.getByText("Selecionar dados para exportar")).toBeVisible();
+  const exportDialog = dialog;
   const firstCategory = exportDialog
     .getByRole("checkbox", { name: /^Selecionar categoria / })
     .first();
@@ -91,7 +92,7 @@ test("baixa o template e exporta o recorte selecionado", async ({ page }) => {
 
   await exportDialog.getByRole("button", { name: "Voltar" }).click();
   const backupDownloadPromise = page.waitForEvent("download");
-  await dialog.getByRole("button", { name: "Baixar backup técnico" }).click();
+  await dialog.getByRole("button", { name: /^Baixar backup técnico/ }).click();
   expect((await backupDownloadPromise).suggestedFilename()).toMatch(
     /^doze52-backup-\d{4}-\d{2}-\d{2}\.zip$/
   );
