@@ -37,6 +37,7 @@ import { MOTION_DURATION, MOTION_EASE, MOTION_SPRING } from "@/lib/motion";
 import { buildHabitPrototypeWeeks } from "@/lib/habits-prototype";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
+import { getTodayWeekScrollTop } from "@/lib/week-scroll";
 
 type MobileWeekCalendarProps = {
   year: number;
@@ -271,13 +272,9 @@ export function MobileWeekCalendar({
   const scrollToToday = React.useCallback((behavior: ScrollBehavior) => {
     const list = scrollRef.current;
     if (!list) return;
-    const row = list.querySelector<HTMLElement>("[data-week-current]");
-    if (!row) return;
-    const top =
-      list.scrollTop +
-      (row.getBoundingClientRect().top - list.getBoundingClientRect().top);
-    // Deixa ~1 semana de contexto acima da semana atual.
-    list.scrollTo({ top: Math.max(0, top - 56), behavior });
+    const top = getTodayWeekScrollTop(list);
+    if (top === null) return;
+    list.scrollTo({ top, behavior });
   }, []);
 
   React.useLayoutEffect(() => {

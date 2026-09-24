@@ -34,9 +34,9 @@ import {
 import type { Habit } from "@/lib/types";
 import { useBilling } from "@/lib/use-billing";
 import { cn } from "@/lib/utils";
+import { getTodayWeekScrollTop } from "@/lib/week-scroll";
 import { nudgeProAtLastFreeSlot } from "@/lib/pro-upgrade-nudge";
 
-const HABITS_PROTOTYPE_SCROLL_PREFIX = "doze52:habits-prototype:scroll";
 const MOBILE_DESKTOP_HINT_STORAGE_KEY = "doze52:mobile-onboarding:desktop-hint-dismissed";
 const ACCESSIBLE_DATE_FORMATTER = new Intl.DateTimeFormat("pt-BR", {
   dateStyle: "full",
@@ -46,8 +46,7 @@ const ACCESSIBLE_DATE_FORMATTER = new Intl.DateTimeFormat("pt-BR", {
 const formatAccessibleDate = (dateIso: string) =>
   ACCESSIBLE_DATE_FORMATTER.format(new Date(`${dateIso}T12:00:00Z`));
 
-const getHabitScrollStorageKey = (year: number, habitId: string) =>
-  `${HABITS_PROTOTYPE_SCROLL_PREFIX}:${year}:${habitId}`;
+const getHabitScrollKey = (year: number, habitId: string) => `${year}:${habitId}`;
 
 export function HabitsPrototype({
   year,
@@ -139,7 +138,8 @@ export function HabitsPrototype({
   const [draftName, setDraftName] = React.useState("");
   const [draftColor, setDraftColor] = React.useState<string>(HABIT_COLORS[0]);
   const scrollRegionRef = React.useRef<HTMLDivElement | null>(null);
-  const currentWeekRef = React.useRef<HTMLButtonElement | null>(null);
+  // Posição de rolagem por hábito, só enquanto a tela está montada.
+  const habitScrollPositionsRef = React.useRef(new Map<string, number>());
   // Passos 2/3 (create_habit/mark_day) desenham o card do guia inline, no
   // fluxo normal — empurra a grade pra baixo. O passo 4 (goto_annual) é
   // flutuante (mobilePlacement="bottom"), sem ocupar espaço nenhum. Sem
@@ -305,32 +305,22 @@ export function HabitsPrototype({
 
   React.useLayoutEffect(() => {
     const region = scrollRegionRef.current;
-    const currentWeek = currentWeekRef.current;
-    if (!region || !currentWeek) return;
+    if (!region) return;
 
+    // Trocar de hábito sem sair da tela volta aonde a pessoa estava nele;
+    // abrir a tela (ou voltar do Anual) sempre recomeça pelo hoje.
     if (selectedHabit && !showcaseActive) {
-      const savedScroll = Number(
-        window.sessionStorage.getItem(
-          getHabitScrollStorageKey(year, selectedHabit.id)
-        )
+      const savedScroll = habitScrollPositionsRef.current.get(
+        getHabitScrollKey(year, selectedHabit.id)
       );
-      if (Number.isFinite(savedScroll) && savedScroll > 0) {
+      if (savedScroll !== undefined) {
         region.scrollTop = savedScroll;
         return;
       }
     }
 
-    const regionRect = region.getBoundingClientRect();
-    const targetRect = currentWeek.getBoundingClientRect();
-    // /2 (não /3): a semana atual fica de fato centralizada verticalmente —
-    // importante sobretudo na abertura do onboarding mobile, quando "hoje"
-    // é o primeiro ponto de referência que a pessoa vê.
-    region.scrollTop = Math.max(
-      0,
-      region.scrollTop +
-        (targetRect.top - regionRect.top) -
-        region.clientHeight / 2
-    );
+    const todayTop = getTodayWeekScrollTop(region);
+    if (todayTop !== null) region.scrollTop = todayTop;
   }, [selectedHabit, showcaseActive, year]);
 
   // Remede a cada render (o card inline pode mudar de altura a qualquer
@@ -373,15 +363,9 @@ export function HabitsPrototype({
     }
 
     const region = scrollRegionRef.current;
-    const currentWeek = currentWeekRef.current;
-    if (!region || !currentWeek) return;
-
-    const regionRect = region.getBoundingClientRect();
-    const targetRect = currentWeek.getBoundingClientRect();
-    const targetTop = Math.max(
-      0,
-      region.scrollTop + (targetRect.top - regionRect.top) - region.clientHeight / 2
-    );
+    if (!region) return;
+    const targetTop = getTodayWeekScrollTop(region);
+    if (targetTop === null) return;
     region.scrollTo({ top: targetTop, behavior: "smooth" });
   }, [todayIso, year, onYearChange]);
 
@@ -847,21 +831,22 @@ export function HabitsPrototype({
             ref={scrollRegionRef}
             onScroll={(event) => {
               if (!selectedHabit) return;
-              try {
-                window.sessionStorage.setItem(
-                  getHabitScrollStorageKey(year, selectedHabit.id),
-                  String(event.currentTarget.scrollTop)
-                );
-              } catch {
-                // A posição volta para a semana atual se o storage falhar.
-              }
+              habitScrollPositionsRef.current.set(
+                getHabitScrollKey(year, selectedHabit.id),
+                event.currentTarget.scrollTop
+              );
             }}
             className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-[calc(4.25rem+env(safe-area-inset-bottom,0px))] pt-2 [scrollbar-width:thin] sm:px-6"
           >
             <div className="mx-auto flex max-w-[20.2rem] items-stretch">
               <div className="flex w-5 shrink-0 flex-col sm:w-6">
                 {weeks.map((week) => (
-                  <div key={week.id} className="relative h-10 sm:h-11">
+                  <div
+                    key={week.id}
+                    data-week-row
+                    data-week-current={week.days.some((day) => day.isToday) ? "true" : undefined}
+                    className="relative h-10 sm:h-11"
+                  >
                     {week.monthLabel ? (
                       <span
                         aria-hidden="true"
@@ -950,7 +935,6 @@ export function HabitsPrototype({
                         return (
                           <button
                             key={day.dateIso}
-                            ref={day.isToday ? currentWeekRef : undefined}
                             type="button"
                             aria-pressed={completed}
                             aria-label={
