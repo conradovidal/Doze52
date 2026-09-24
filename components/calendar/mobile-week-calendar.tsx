@@ -1,15 +1,12 @@
 "use client";
 
 /**
- * PROTÓTIPO — visão mobile do Anual com a mesma estrutura do grid mobile de
- * Hábitos: cada semana é uma linha (7 colunas, segunda a domingo), com o
- * rótulo do mês na vertical à esquerda. Os eventos aparecem como barras sob
- * o número do dia, ocupando as colunas que cobrem (eventos de vários dias
- * atravessam a linha), em "faixas" empilhadas — por isso a linha cresce em
- * altura conforme a semana tem eventos.
- *
- * Mesmo contrato de props de MobileCalendarExperience, para poder trocar um
- * pelo outro em app/page.tsx sem mexer no resto.
+ * Visão mobile do Anual com a mesma estrutura do grid mobile de Hábitos:
+ * cada semana é uma linha (7 colunas, segunda a domingo), com o rótulo do
+ * mês na vertical à esquerda. Os eventos aparecem como barras sob o número
+ * do dia, ocupando as colunas que cobrem (eventos de vários dias atravessam
+ * a linha), em "faixas" empilhadas — por isso a linha cresce em altura
+ * conforme a semana tem eventos.
  */
 
 import { isCategoryShownInCalendar } from "@/lib/category-archive";
@@ -37,6 +34,10 @@ import { MOTION_DURATION, MOTION_EASE, MOTION_SPRING } from "@/lib/motion";
 import { buildHabitPrototypeWeeks } from "@/lib/habits-prototype";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
+import {
+  TODAY_CELL_RING_CLASS,
+  TODAY_NUMBER_BADGE_CLASS,
+} from "@/lib/calendar-layout";
 import { getTodayWeekScrollTop } from "@/lib/week-scroll";
 
 type MobileWeekCalendarProps = {
@@ -59,6 +60,9 @@ type MobileWeekCalendarProps = {
   notice?: React.ReactNode;
 };
 
+const SINGLE_COLUMN_TITLE_FADE_MASK =
+  "linear-gradient(to right, #000 calc(100% - 6px), transparent)";
+
 /** Faixas de evento visíveis por semana; o que passar vira "+N" no dia. */
 const MAX_VISIBLE_LANES = 3;
 
@@ -74,6 +78,26 @@ type WeekSegment = {
 
 const getEventAriaLabel = (event: CalendarRenderEvent) =>
   `Editar ${event.title}`;
+
+/** Eventos do dia = faixas visíveis que cobrem a coluna + os que viraram "+N". */
+const countWeekEventsAt = (
+  layout: { segments: WeekSegment[]; hiddenByCol: number[] },
+  col: number,
+) =>
+  layout.segments.filter(
+    (segment) => segment.startCol <= col && segment.endCol >= col,
+  ).length + layout.hiddenByCol[col];
+
+const getDayAriaLabel = (dateIso: string, isToday: boolean, eventCount: number) =>
+  [
+    formatIsoDate(dateIso, SHEET_DATE_FORMATTER),
+    isToday ? "hoje" : null,
+    eventCount === 0
+      ? "sem eventos"
+      : `${eventCount} ${eventCount === 1 ? "evento" : "eventos"}`,
+  ]
+    .filter(Boolean)
+    .join(", ");
 
 function packWeekSegments(
   weekDates: string[],
@@ -154,6 +178,9 @@ function WeekEventBar({
   onEditEvent: MobileWeekCalendarProps["onEditEvent"];
 }) {
   const { event } = segment;
+  // Numa coluna só (~45px) a reticência come um terço da cápsula: o título
+  // é cortado seco e some num fade, como no Anual do desktop.
+  const isSingleColumn = segment.startCol === segment.endCol;
   const { mode: themeMode } = useTheme();
   const colorToken = React.useMemo(
     () => getCategoryColorToken(event.color, themeMode),
@@ -199,7 +226,20 @@ function WeekEventBar({
         });
       }}
     >
-      <span className="block truncate px-1 text-[10px] font-semibold leading-[16px]">
+      <span
+        className={cn(
+          "block overflow-hidden whitespace-nowrap px-1 text-[10px] font-semibold leading-[16px]",
+          isSingleColumn ? "text-clip" : "text-ellipsis",
+        )}
+        style={
+          isSingleColumn
+            ? {
+                maskImage: SINGLE_COLUMN_TITLE_FADE_MASK,
+                WebkitMaskImage: SINGLE_COLUMN_TITLE_FADE_MASK,
+              }
+            : undefined
+        }
+      >
         {event.title}
       </span>
     </m.button>
@@ -441,7 +481,11 @@ export function MobileWeekCalendar({
                             aria-label={
                               guidedSelectable
                                 ? `Selecionar ${day.dateIso} no guia inicial`
-                                : day.dateIso
+                                : getDayAriaLabel(
+                                    day.dateIso,
+                                    day.isToday,
+                                    countWeekEventsAt(layout, dayIndex),
+                                  )
                             }
                             onClick={() => handleDayClick(day.dateIso)}
                             className={cn(
@@ -455,8 +499,7 @@ export function MobileWeekCalendar({
                                 "ring-1 ring-inset ring-primary/15",
                               (guidedStart || selected) &&
                                 "ring-2 ring-inset ring-primary/40",
-                              day.isToday &&
-                                "z-10 ring-2 ring-inset ring-destructive",
+                              day.isToday && TODAY_CELL_RING_CLASS,
                             )}
                             style={{
                               backgroundColor: `hsl(var(${
@@ -500,8 +543,7 @@ export function MobileWeekCalendar({
                             <span
                               className={cn(
                                 "text-[11px] font-medium tabular-nums leading-5 text-foreground/85",
-                                day.isToday &&
-                                  "grid h-5 min-w-5 place-items-center rounded-full bg-[#b2554c] px-1 font-semibold text-white",
+                                day.isToday && TODAY_NUMBER_BADGE_CLASS,
                               )}
                             >
                               {day.dayOfMonth}
@@ -577,7 +619,7 @@ function WeekLabelCell({
       {label ? (
         <span
           aria-hidden="true"
-          className="absolute left-0 top-0 [writing-mode:vertical-rl] rotate-180 whitespace-nowrap text-[13px] font-semibold uppercase leading-none tracking-[0.08em] text-muted-foreground/40 sm:text-sm"
+          className="absolute left-0 top-0 [writing-mode:vertical-rl] rotate-180 whitespace-nowrap text-[13px] font-semibold uppercase leading-none tracking-[0.08em] text-muted-foreground sm:text-sm"
         >
           {label}
         </span>
@@ -681,6 +723,15 @@ function DayEventsSheet({
   onClose: () => void;
   onEditEvent: MobileWeekCalendarProps["onEditEvent"];
 }) {
+  const closeButtonRef = React.useRef<HTMLButtonElement | null>(null);
+  // Foco entra na folha ao abrir e volta para o dia tocado ao fechar.
+  React.useEffect(() => {
+    const previouslyFocused =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    closeButtonRef.current?.focus({ preventScroll: true });
+    return () => previouslyFocused?.focus({ preventScroll: true });
+  }, []);
+
   React.useEffect(() => {
     const onKeyDown = (keyEvent: KeyboardEvent) => {
       if (keyEvent.key === "Escape") onClose();
@@ -712,6 +763,7 @@ function DayEventsSheet({
         />
         <m.div
           role="dialog"
+          aria-modal="true"
           initial={{ y: "100%" }}
           animate={{ y: 0 }}
           exit={{ y: "100%" }}
@@ -737,6 +789,7 @@ function DayEventsSheet({
               {formatIsoDate(dateIso, SHEET_DATE_FORMATTER)}
             </h2>
             <button
+              ref={closeButtonRef}
               type="button"
               aria-label="Fechar"
               className="grid size-7 place-items-center rounded-full text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45"

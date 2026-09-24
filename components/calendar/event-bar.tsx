@@ -20,6 +20,18 @@ const HOVER_PREVIEW_MAX_WIDTH_PX = 420;
 const HOVER_PREVIEW_MIN_WIDTH_PX = 180;
 const COMPACT_SYMBOL_FONT_FAMILY =
   '"Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
+// Espelham EVENT_ITEM_PADDING_X_CLASS (px-2.5) e COMPACT_TITLE_PADDING_X_CLASS
+// (px-1): a medição decide o modo antes de o padding ser aplicado.
+const DEFAULT_TITLE_PADDING_X_PX = 10;
+const COMPACT_TITLE_PADDING_X_PX = 4;
+const COMPACT_TITLE_PADDING_X_CLASS = "px-1";
+// Menor pedaço de título que ainda identifica o evento ("Jan"). Abaixo disso
+// a cápsula cai no ícone do contexto.
+const MIN_TRUNCATED_TITLE_CHARS = 3;
+// No modo compacto a reticência sozinha ocuparia ~1/3 da cápsula; o título é
+// cortado seco e some num fade na borda direita.
+const COMPACT_TITLE_FADE_MASK =
+  "linear-gradient(to right, #000 calc(100% - 6px), transparent)";
 
 const getHoverPreviewMaxWidth = () =>
   Math.min(
@@ -89,6 +101,7 @@ export function EventBar({
   const hoverPreviewId = React.useId();
   const [isOverflowing, setIsOverflowing] = React.useState(false);
   const [doesFirstWordFit, setDoesFirstWordFit] = React.useState(false);
+  const [doesCompactTitleFit, setDoesCompactTitleFit] = React.useState(false);
   const [isHoverPreviewVisible, setIsHoverPreviewVisible] = React.useState(false);
   const [hoverPreviewStyle, setHoverPreviewStyle] = React.useState<React.CSSProperties | null>(
     null
@@ -108,13 +121,24 @@ export function EventBar({
     if (!button || !text) return;
 
     const updateMeasurements = () => {
-      const nextOverflowing = text.scrollWidth > text.clientWidth + 1;
-      const firstWord = getFirstWord(event.title);
+      // Mede contra a largura do botão (não do texto) porque o padding muda
+      // entre o modo padrão e o compacto.
+      const defaultWidth = button.clientWidth - DEFAULT_TITLE_PADDING_X_PX * 2;
+      const compactWidth = button.clientWidth - COMPACT_TITLE_PADDING_X_PX * 2;
+      const title = event.title.trim();
+      const firstWord = getFirstWord(title);
       const firstWordPreviewWidth = firstWord
         ? measureTextWidth(text, `${firstWord}...`)
         : Number.POSITIVE_INFINITY;
-      setIsOverflowing(nextOverflowing);
-      setDoesFirstWordFit(firstWordPreviewWidth <= text.clientWidth + 1);
+      const compactTitle = Array.from(title)
+        .slice(0, MIN_TRUNCATED_TITLE_CHARS)
+        .join("");
+      const compactPreviewWidth = compactTitle
+        ? measureTextWidth(text, compactTitle)
+        : Number.POSITIVE_INFINITY;
+      setIsOverflowing(measureTextWidth(text, title) > defaultWidth + 1);
+      setDoesFirstWordFit(firstWordPreviewWidth <= defaultWidth + 1);
+      setDoesCompactTitleFit(compactPreviewWidth <= compactWidth + 1);
     };
 
     updateMeasurements();
@@ -200,12 +224,24 @@ export function EventBar({
   const isCompactSymbolMatchup = isCompactSymbolMatchupTitle(event.title);
   const shouldKeepFirstWordPreview =
     isOverflowing && doesFirstWordFit && !isCompactSymbolMatchup;
+  // Sem espaço para a primeira palavra, o título ainda aparece truncado por
+  // caractere com padding menor: "Jant…" diz mais que o ícone do contexto,
+  // que é o mesmo para todos os eventos do perfil.
+  const shouldUseCompactTitle =
+    isOverflowing &&
+    !shouldKeepFirstWordPreview &&
+    doesCompactTitleFit &&
+    !isCompactSymbolMatchup;
   const showProfileIcon =
     isOverflowing &&
     !shouldKeepFirstWordPreview &&
+    !shouldUseCompactTitle &&
     Boolean(profileIcon) &&
     !isCompactSymbolMatchup;
-  const titlePaddingClass = isCompactSymbolMatchup ? "px-1" : EVENT_ITEM_PADDING_X_CLASS;
+  const titlePaddingClass =
+    isCompactSymbolMatchup || shouldUseCompactTitle
+      ? COMPACT_TITLE_PADDING_X_CLASS
+      : EVENT_ITEM_PADDING_X_CLASS;
 
   return (
     <>
@@ -269,13 +305,19 @@ export function EventBar({
         <span
           ref={textRef}
           aria-hidden={showProfileIcon ? "true" : undefined}
-          className={`block truncate ${EVENT_ITEM_LINE_HEIGHT_CLASS} ${
+          className={`block overflow-hidden whitespace-nowrap ${
+            shouldUseCompactTitle ? "text-clip" : "text-ellipsis"
+          } ${EVENT_ITEM_LINE_HEIGHT_CLASS} ${
             isCompactSymbolMatchup ? "text-center tracking-normal" : ""
           } ${
             showProfileIcon ? "invisible" : ""
           }`}
           style={{
             minHeight: `${EVENT_ITEM_HEIGHT_PX}px`,
+            maskImage: shouldUseCompactTitle ? COMPACT_TITLE_FADE_MASK : undefined,
+            WebkitMaskImage: shouldUseCompactTitle
+              ? COMPACT_TITLE_FADE_MASK
+              : undefined,
             fontFamily: isCompactSymbolMatchup
               ? COMPACT_SYMBOL_FONT_FAMILY
               : undefined,

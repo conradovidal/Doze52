@@ -139,11 +139,14 @@ export function DayCell({
     : isWeekend
       ? "bg-neutral-100/78 dark:bg-[hsl(var(--cal-cell-weekend))]"
       : "bg-white dark:bg-[hsl(var(--cal-cell-weekday))]";
+  // O passado recua pelo fundo, não pelo número: o número precisa manter
+  // contraste AA (>= 4.5:1) porque dias passados continuam editáveis. O
+  // futuro sobe um tom para seguir mais forte que o passado.
   const dayNumberToneClass = isPast
-    ? "text-neutral-400 dark:text-neutral-500/75"
+    ? "text-neutral-600 dark:text-neutral-400"
     : isWeekend
-      ? "text-neutral-500 dark:text-neutral-200/86"
-      : "text-muted-foreground dark:text-neutral-100/88";
+      ? "text-neutral-600 dark:text-neutral-200/86"
+      : "text-neutral-700 dark:text-neutral-100/88";
   const showCenterCreateCue =
     !isHabitMode && showCreateCue && !today && !isRangeSelected;
   const habitDayAction = habitPresentation

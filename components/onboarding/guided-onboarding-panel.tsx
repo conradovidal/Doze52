@@ -448,6 +448,9 @@ export function GuidedOnboardingPanel({
   // Identidade à esquerda, progresso à direita, barra embaixo: a contagem
   // aparece uma vez só (antes ela se repetia no subtítulo, no rótulo da
   // barra e no status dela).
+  // Nome curto ("Pessoal") + descrição separada: sem isso o leitor de tela
+  // anuncia título e descrição como uma frase só.
+  const contextOptionIdPrefix = React.useId();
   const header = (
     <div className="space-y-3">
       <div className="flex items-center gap-3">
@@ -611,6 +614,8 @@ export function GuidedOnboardingPanel({
               <button
                 key={option.value}
                 type="button"
+                aria-labelledby={`${contextOptionIdPrefix}-${option.value}-title`}
+                aria-describedby={`${contextOptionIdPrefix}-${option.value}-description`}
                 className="group flex items-center gap-3.5 rounded-2xl border border-border bg-background p-3.5 text-left transition hover:border-primary/35 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
                 onClick={() => onConfigureContext(option.value)}
               >
@@ -635,10 +640,16 @@ export function GuidedOnboardingPanel({
                   })}
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-semibold leading-5">
+                  <span
+                    id={`${contextOptionIdPrefix}-${option.value}-title`}
+                    className="block text-sm font-semibold leading-5"
+                  >
                     {option.title}
                   </span>
-                  <span className="mt-0.5 block text-balance text-[13px] leading-[1.35] text-muted-foreground">
+                  <span
+                    id={`${contextOptionIdPrefix}-${option.value}-description`}
+                    className="mt-0.5 block text-balance text-[13px] leading-[1.35] text-muted-foreground"
+                  >
                     {option.description}
                   </span>
                 </span>

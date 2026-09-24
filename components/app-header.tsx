@@ -369,6 +369,30 @@ export function AppHeader({
       null,
     [profiles, selectedProfileIds]
   );
+  const { ref: mobileProfileScrollFadeRef, style: mobileProfileScrollFadeStyle } =
+    useScrollEdgeFade<HTMLDivElement>();
+  const mobileProfileScrollNodeRef = React.useRef<HTMLDivElement | null>(null);
+  const mobileProfileScrollRef = React.useCallback(
+    (node: HTMLDivElement | null) => {
+      mobileProfileScrollNodeRef.current = node;
+      mobileProfileScrollFadeRef(node);
+    },
+    [mobileProfileScrollFadeRef]
+  );
+  // No mobile, os contextos ficam sempre à vista no cabeçalho (os mesmos
+  // chips do desktop; com um contexto só, o chip dele — igual ao "Hábitos") e o painel expandido guarda só as
+  // categorias — antes era preciso abrir o painel e ele ganhava uma linha
+  // inteira só para o outro contexto.
+  const showMobileProfileSwitcher =
+    isMobileMode && !effectiveInlineEditMode && profiles.length > 0;
+  // Com a linha rolando, o contexto ativo pode ficar fora da vista.
+  React.useEffect(() => {
+    if (!showMobileProfileSwitcher || !selectedProfile) return;
+    const selectedChip = mobileProfileScrollNodeRef.current?.querySelector<HTMLElement>(
+      `[data-onboarding-profile-id="${selectedProfile.id}"]`
+    );
+    selectedChip?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [selectedProfile, showMobileProfileSwitcher]);
 
   const canMinimizeHeader = useAdaptiveNavigation && !isMobileMode;
   // Initial value matches SSR (always expanded) to avoid a hydration
@@ -1054,7 +1078,27 @@ export function AppHeader({
           >
             {isMobileMode ? (
               <div className="w-full overflow-hidden rounded-[10px] border border-border bg-card">
-              <div className="m-[3px] flex h-10 w-[calc(100%-6px)] items-center gap-1 rounded-[8px] px-2.5">
+              <div
+                className={cn(
+                  "m-[3px] flex h-10 w-[calc(100%-6px)] items-center gap-1 rounded-[8px]",
+                  showMobileProfileSwitcher ? "pl-1 pr-1.5" : "px-2.5"
+                )}
+              >
+                {showMobileProfileSwitcher ? (
+                  // Mesmos chips e a mesma rolagem com fade da barra do
+                  // desktop: com muitos contextos a linha rola, sem quebrar.
+                  <div
+                    ref={mobileProfileScrollRef}
+                    style={mobileProfileScrollFadeStyle}
+                    className="min-w-0 flex-1 overflow-x-auto doze52-scrollbar-none"
+                  >
+                    <ProfileBar
+                      compact
+                      className="w-max flex-nowrap justify-start"
+                      highlightedProfileId={highlightedProfileId}
+                    />
+                  </div>
+                ) : (
                 <span className="flex min-w-0 items-center gap-2.5">
                   {!effectiveInlineEditMode && selectedProfile ? (
                     <span className="grid h-7 w-7 shrink-0 place-items-center text-foreground/72">
@@ -1071,6 +1115,7 @@ export function AppHeader({
                       : (selectedProfile?.name ?? "Contextos")}
                   </span>
                 </span>
+                )}
                 <span className="relative ml-auto flex shrink-0 items-center gap-1">
                   {!useAdaptiveNavigation ? (
                     <>
@@ -1114,9 +1159,13 @@ export function AppHeader({
                       aria-expanded={showMobileFilterPanel}
                       aria-controls={filterPanelId}
                       aria-label={
-                        showMobileFilterPanel
-                          ? "Recolher contextos e categorias"
-                          : "Mostrar contextos e categorias"
+                        showMobileProfileSwitcher
+                          ? showMobileFilterPanel
+                            ? "Recolher categorias"
+                            : "Mostrar categorias"
+                          : showMobileFilterPanel
+                            ? "Recolher contextos e categorias"
+                            : "Mostrar contextos e categorias"
                       }
                       onClick={() =>
                         setAreMobileFiltersCollapsed((current) => !current)
@@ -1144,7 +1193,7 @@ export function AppHeader({
                     : "border-0 py-0"
                 )}
               >
-                  {mobileWrapUpActive ? null : (
+                  {mobileWrapUpActive || showMobileProfileSwitcher ? null : (
                     <div className="grid w-full grid-cols-1 gap-1.5">
                       <ProfileBar
                         compact
@@ -1162,7 +1211,7 @@ export function AppHeader({
 
                   <div
                     className={
-                      mobileWrapUpActive
+                      mobileWrapUpActive || showMobileProfileSwitcher
                         ? "relative"
                         : "relative mt-2 border-t border-border/55 pt-2"
                     }

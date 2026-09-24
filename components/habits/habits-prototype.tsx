@@ -34,6 +34,10 @@ import {
 import type { Habit } from "@/lib/types";
 import { useBilling } from "@/lib/use-billing";
 import { cn } from "@/lib/utils";
+import {
+  TODAY_CELL_RING_CLASS,
+  TODAY_NUMBER_BADGE_CLASS,
+} from "@/lib/calendar-layout";
 import { getTodayWeekScrollTop } from "@/lib/week-scroll";
 import { nudgeProAtLastFreeSlot } from "@/lib/pro-upgrade-nudge";
 
@@ -850,7 +854,7 @@ export function HabitsPrototype({
                     {week.monthLabel ? (
                       <span
                         aria-hidden="true"
-                        className="absolute left-0 top-0 [writing-mode:vertical-rl] rotate-180 whitespace-nowrap text-[13px] font-semibold uppercase leading-none tracking-[0.08em] text-muted-foreground/40 sm:text-sm"
+                        className="absolute left-0 top-0 [writing-mode:vertical-rl] rotate-180 whitespace-nowrap text-[13px] font-semibold uppercase leading-none tracking-[0.08em] text-muted-foreground sm:text-sm"
                       >
                         {week.monthLabel}
                       </span>
@@ -940,10 +944,12 @@ export function HabitsPrototype({
                             aria-label={
                               isEditing
                                 ? `${dateLabel}: finalize a edição para registrar hábitos`
-                                : disabled
+                                : dayAction === "blocked"
                                 ? `${dateLabel}: data futura, indisponível`
                                 : presentedSelectedIsShowcase
-                                  ? `${dateLabel}: exemplo, não editável`
+                                  ? `${dateLabel}: ${
+                                      completed ? "marcado" : "não marcado"
+                                    }, exemplo não editável`
                                   : presentedSelectedHabit
                                     ? `${actionLabel} ${presentedSelectedHabit.name} em ${dateLabel}`
                                     : `Criar um hábito para ${dateLabel}`
@@ -956,7 +962,7 @@ export function HabitsPrototype({
                               cornerClass,
                               disabled ? "cursor-not-allowed" : "hover:brightness-110",
                               "text-foreground/85",
-                              day.isToday && "z-10 ring-2 ring-inset ring-destructive"
+                              day.isToday && TODAY_CELL_RING_CLASS
                             )}
                             style={{ backgroundColor: `hsl(var(${cellToneVar}))` }}
                             onClick={() => {
@@ -995,10 +1001,14 @@ export function HabitsPrototype({
                                 style={{ backgroundColor: markerColor }}
                               />
                             ) : null}
+                            {/* O selo de hoje fica por cima do marcador do
+                                hábito: "hoje" e "feito" aparecem juntos. */}
                             <span
                               className={cn(
                                 "relative",
-                                completed && "text-neutral-950"
+                                day.isToday
+                                  ? TODAY_NUMBER_BADGE_CLASS
+                                  : completed && "text-neutral-950"
                               )}
                             >
                               {day.dayOfMonth}
