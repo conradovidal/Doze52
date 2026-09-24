@@ -70,23 +70,23 @@ export function PanelHero({
   children?: React.ReactNode;
 }) {
   return (
-    <div className={cn("px-2 pb-1 pt-2 text-center", className)}>
+    <div className={cn("px-2 text-center", className)}>
       {media ? <div className="flex justify-center">{media}</div> : null}
       {eyebrow ? (
-        <p className={cn(PANEL_EYEBROW_CLASS, "mt-5 inline-flex items-center gap-1.5 text-primary")}>
+        <p className={cn(PANEL_EYEBROW_CLASS, "mt-3.5 inline-flex items-center gap-1.5 text-primary")}>
           {eyebrow}
         </p>
       ) : null}
       <h3
         className={cn(
           "text-balance text-xl font-semibold leading-7 tracking-[-0.01em] text-foreground",
-          eyebrow ? "mt-2" : media ? "mt-4" : undefined
+          eyebrow ? "mt-1.5" : media ? "mt-4" : undefined
         )}
       >
         {title}
       </h3>
       {description ? (
-        <p className="mx-auto mt-2 max-w-[22rem] text-pretty text-sm leading-6 text-muted-foreground">
+        <p className="mx-auto mt-1.5 max-w-[26rem] text-pretty text-sm leading-[1.375rem] text-muted-foreground">
           {description}
         </p>
       ) : null}
@@ -95,20 +95,28 @@ export function PanelHero({
   );
 }
 
-/** Card com linhas separadas por fios; `title` vira a sobrelinha acima. */
+/**
+ * Card com linhas separadas por fios; `title` vira a sobrelinha acima e
+ * `hint`, uma observação curta alinhada à direita na mesma linha.
+ */
 export function PanelList({
   title,
+  hint,
   className,
   children,
 }: {
   title?: React.ReactNode;
+  hint?: React.ReactNode;
   className?: string;
   children: React.ReactNode;
 }) {
   return (
     <section className={className}>
       {title ? (
-        <p className={cn(PANEL_EYEBROW_CLASS, "mb-2 px-1 text-muted-foreground")}>{title}</p>
+        <div className="mb-1.5 flex items-baseline justify-between gap-3 px-1">
+          <p className={cn(PANEL_EYEBROW_CLASS, "text-muted-foreground")}>{title}</p>
+          {hint ? <p className="min-w-0 truncate text-[11px] text-muted-foreground">{hint}</p> : null}
+        </div>
       ) : null}
       <div className="overflow-hidden rounded-2xl border border-border bg-card [&>*+*]:border-t [&>*+*]:border-border/60">
         {children}
@@ -176,7 +184,7 @@ export function PanelRow({
           {title}
         </span>
         {busy || description ? (
-          <span className="mt-0.5 block text-xs leading-5 text-muted-foreground" aria-live="polite">
+          <span className="mt-0.5 block text-xs leading-4 text-muted-foreground" aria-live="polite">
             {busy ? stateLabels?.[state] ?? description : description}
           </span>
         ) : null}
@@ -187,7 +195,7 @@ export function PanelRow({
     </>
   );
   const rowClass = cn(
-    "flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50 focus-visible:bg-muted/60 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-55",
+    "flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-muted/50 focus-visible:bg-muted/60 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-55",
     danger && "hover:bg-rose-500/8",
     className
   );

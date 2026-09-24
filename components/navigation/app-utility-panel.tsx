@@ -45,7 +45,7 @@ import {
   type GuidedToolbarNotice,
 } from "@/components/onboarding/guided-toolbar-notice";
 import { Button } from "@/components/ui/button";
-import { PanelHero, PanelIcon, PanelList, PanelRow } from "@/components/ui/panel-list";
+import { PANEL_EYEBROW_CLASS, PanelHero, PanelIcon, PanelList, PanelRow } from "@/components/ui/panel-list";
 import {
   Dialog,
   DialogContent,
@@ -183,21 +183,34 @@ function AccountAvatar({
   isPro: boolean;
   onAvatarBroken: () => void;
 }) {
-  const className = cn(
-    "size-16 rounded-2xl",
-    isPro && "ring-2 ring-premium"
-  );
-
-  if (avatarUrl && showPhoto) {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img src={avatarUrl} alt="" className={cn(className, "object-cover")} onError={onAvatarBroken} />
-    );
-  }
+  const className = "size-20 rounded-[1.375rem]";
 
   return (
-    <span className={cn(className, "grid place-items-center bg-foreground text-background")}>
-      <CircleUserRound className="size-7" strokeWidth={1.8} aria-hidden="true" />
+    // Pro: halo dourado atrás da foto e selo com a coroa no canto, no lugar
+    // do antigo contorno — a foto continua limpa e o status fica evidente.
+    <span className="relative inline-flex">
+      {isPro ? (
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute -inset-8 rounded-full bg-[radial-gradient(closest-side,var(--premium-soft),transparent)]"
+        />
+      ) : null}
+      {avatarUrl && showPhoto ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={avatarUrl} alt="" className={cn(className, "relative object-cover")} onError={onAvatarBroken} />
+      ) : (
+        <span className={cn(className, "relative grid place-items-center bg-foreground text-background")}>
+          <CircleUserRound className="size-8" strokeWidth={1.8} aria-hidden="true" />
+        </span>
+      )}
+      {isPro ? (
+        <span
+          aria-hidden="true"
+          className="absolute -right-1.5 -bottom-1.5 grid size-7 place-items-center rounded-full bg-premium text-white shadow-sm ring-[3px] ring-background dark:text-neutral-950"
+        >
+          <Crown className="size-3.5" strokeWidth={2.2} />
+        </span>
+      ) : null}
     </span>
   );
 }
@@ -340,6 +353,13 @@ export function AppUtilityPanel({
           ? `Obrigado por apoiar o Doze 52. Próxima renovação em ${formattedPeriodEnd}.`
           : "Obrigado por apoiar o Doze 52."
       : `Você está no plano Free. ${PRO_UPGRADE_COPY.generic.description}`;
+  const accountPlanDescription = !showProIdentity
+    ? "Veja o que o Pro libera"
+    : billingStatus.cancelAtPeriodEnd && formattedPeriodEnd
+      ? `Tudo liberado até ${formattedPeriodEnd}`
+      : formattedPeriodEnd
+        ? `Renova em ${formattedPeriodEnd}`
+        : "Tudo liberado no seu calendário";
   const planActionLabel = !session
     ? "Entrar para assinar"
     : isBillingLoading
@@ -447,15 +467,21 @@ export function AppUtilityPanel({
     switch (sectionId) {
       case "account":
         return session ? (
-          <div className="mx-auto flex max-w-xl flex-col items-center py-4 text-center">
+          <div className="mx-auto flex max-w-xl flex-col items-center pt-2 text-center">
             <AccountAvatar
               avatarUrl={avatarUrl}
               showPhoto={showAvatarPhoto}
               isPro={showProIdentity}
               onAvatarBroken={() => setBrokenAvatar(true)}
             />
+            {showProIdentity ? (
+              <p className={cn(PANEL_EYEBROW_CLASS, "mt-5 inline-flex items-center gap-1.5 text-premium-foreground")}>
+                <Crown className="size-3" aria-hidden="true" />
+                Conta Pro
+              </p>
+            ) : null}
             {isEditingName ? (
-              <div className="mt-4 flex w-full max-w-xs items-center gap-1.5">
+              <div className={cn("flex w-full max-w-xs items-center gap-1.5", showProIdentity ? "mt-1.5" : "mt-4")}>
                 <Input
                   autoFocus
                   value={nameDraft}
@@ -475,14 +501,8 @@ export function AppUtilityPanel({
                 </Button>
               </div>
             ) : (
-              <div className="mt-4 flex items-center gap-1.5">
-                <h3 className="text-xl font-semibold text-foreground">{displayName}</h3>
-                {showProIdentity ? (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-premium-soft px-2 py-0.5 text-[11px] font-semibold text-premium-foreground">
-                    <Crown className="size-3" />
-                    Pro
-                  </span>
-                ) : null}
+              <div className={cn("flex items-center gap-1.5 pl-7", showProIdentity ? "mt-1.5" : "mt-4")}>
+                <h3 className="text-xl font-semibold tracking-[-0.01em] text-foreground">{displayName}</h3>
                 <button
                   type="button"
                   aria-label="Editar nome"
@@ -498,21 +518,29 @@ export function AppUtilityPanel({
             {continuityStatus ? <div role="status" aria-label="Sincronização de hábitos" className="mt-3 text-sm text-muted-foreground">{continuityStatus}{onRetryContinuity ? <Button variant="ghost" size="sm" onClick={onRetryContinuity}>Tentar novamente</Button> : null}</div> : null}
 
             {standalone ? (
+              // Cartão de assinatura: no Pro, tingido de dourado e com a pilha
+              // de benefícios "acesa" — a mesma capa do Plano, agora liberada.
               <button
                 type="button"
-                className="mt-6 flex w-full items-center gap-3.5 rounded-2xl border border-border bg-card p-4 text-left transition-colors hover:bg-muted/60"
+                className={cn(
+                  "mt-6 flex w-full items-center gap-3.5 rounded-2xl border p-4 text-left transition-colors",
+                  showProIdentity
+                    ? "border-premium-border bg-[linear-gradient(135deg,var(--premium-soft),transparent_70%)] hover:bg-premium-soft"
+                    : "border-border bg-card hover:bg-muted/60"
+                )}
                 onClick={() => setActiveSection("plan")}
               >
-                {isPro ? (
-                  <span aria-hidden="true" className="grid size-9 shrink-0 place-items-center rounded-full bg-premium-soft text-premium-foreground">
-                    <Sparkles className="size-4" />
-                  </span>
-                ) : (
-                  <ProFeatureStack size="sm" className="shrink-0" />
-                )}
+                <ProFeatureStack size="sm" className="shrink-0" />
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-foreground">{planLabel}</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">{isPro ? "Ver detalhes da assinatura" : "Veja o que o Pro libera"}</p>
+                  <p className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
+                    {planLabel}
+                    {showProIdentity ? (
+                      <span className="rounded-full bg-premium-soft px-1.5 py-px text-[10px] font-semibold text-premium-foreground">
+                        Ativo
+                      </span>
+                    ) : null}
+                  </p>
+                  <p className="mt-0.5 truncate text-xs text-muted-foreground">{accountPlanDescription}</p>
                 </div>
                 <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
               </button>
@@ -582,10 +610,10 @@ export function AppUtilityPanel({
       case "plan":
         return (
           <div className="max-w-xl space-y-4">
-            <div className="overflow-hidden rounded-2xl border border-border bg-card" data-plan-hero>
-              <div className="px-6 pb-5 pt-7 text-center">
-                <ProFeatureStack className="justify-center" />
-                <p className="mt-5 inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">
+            <PanelHero
+              media={<ProFeatureStack className="justify-center" />}
+              eyebrow={
+                <>
                   <Sparkles className="size-3" aria-hidden="true" />
                   Doze 52 Pro
                   {showProIdentity ? (
@@ -593,57 +621,54 @@ export function AppUtilityPanel({
                       {billingStatus.cancelAtPeriodEnd ? "Até o fim do período" : "Ativo"}
                     </span>
                   ) : null}
-                </p>
-                <h3 className="mt-2 text-balance text-xl font-semibold leading-7 tracking-[-0.01em] text-foreground">
-                  {planHeroTitle}
-                </h3>
-                <p className="mx-auto mt-2 max-w-[22rem] text-pretty text-sm leading-6 text-muted-foreground">
-                  {planHeroDescription}
-                </p>
+                </>
+              }
+              title={planHeroTitle}
+              description={planHeroDescription}
+            />
+            <div className="overflow-hidden rounded-2xl border border-border bg-card">
+              <div className="grid grid-cols-[minmax(0,1fr)_2.75rem_5.25rem] px-4 pt-2.5 text-sm sm:grid-cols-[minmax(0,1fr)_4rem_6rem]">
+                <span className="pb-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">O que muda</span>
+                <span className="flex items-end justify-center pb-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Free</span>
+                <span className="flex items-end justify-center gap-1 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">
+                  <Sparkles className="size-3" aria-hidden="true" />
+                  Pro
+                </span>
+                {PRO_FEATURES.map((feature) => (
+                  <React.Fragment key={feature.id}>
+                    <span className="flex min-w-0 items-center gap-2.5 border-t border-border/60 py-1.5 text-foreground">
+                      <ProFeatureIcon feature={feature} />
+                      <span className="min-w-0 truncate leading-5">{feature.shortLabel}</span>
+                    </span>
+                    <span className="flex items-center justify-center border-t border-border/60 py-1.5 tabular-nums text-muted-foreground">{feature.free}</span>
+                    <span className="flex items-center justify-center border-t border-border/60 py-1.5 font-semibold tabular-nums text-foreground">{feature.pro}</span>
+                  </React.Fragment>
+                ))}
               </div>
-              <div className="border-t border-border/70 px-6 pb-6 pt-5">
-                {isPro ? null : (
-                  <>
-                    <div className="flex items-baseline justify-center gap-2">
-                      <span className="text-2xl font-semibold tracking-[-0.02em] tabular-nums">{FOUNDER_PRICE_LABEL}</span>
-                      <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-foreground">Preço fundador</span>
-                    </div>
-                    <p className="mt-1 text-center text-xs text-muted-foreground">Cancele quando quiser.</p>
-                  </>
-                )}
+              <div className="flex items-center gap-4 border-t border-border bg-muted/30 px-4 py-3">
+                <div className="min-w-0 flex-1">
+                  {isPro ? (
+                    <p className="text-xs leading-5 text-muted-foreground">Troque o cartão, veja faturas ou cancele.</p>
+                  ) : (
+                    <>
+                      <p className="flex flex-wrap items-baseline gap-x-2">
+                        <span className="text-lg font-semibold tracking-[-0.02em] tabular-nums text-foreground">{FOUNDER_PRICE_LABEL}</span>
+                        <span className="text-[11px] font-semibold text-muted-foreground">Preço fundador</span>
+                      </p>
+                      <p className="text-xs text-muted-foreground">Cancele quando quiser.</p>
+                    </>
+                  )}
+                </div>
                 <Button
                   type="button"
                   variant={isPro ? "outline" : "premium"}
-                  className={cn("mx-auto flex h-11 w-full max-w-xs text-[15px]", !isPro && "mt-4")}
+                  className="h-10 shrink-0 px-5"
                   disabled={isPlanActionLoading || hasBillingError}
                   onClick={handlePlanAction}
                 >
                   {isPro ? <CreditCard className="size-4" /> : null}
                   {planActionLabel}
                 </Button>
-                {isPro ? (
-                  <p className="mt-2 text-center text-xs text-muted-foreground">Troque o cartão, veja faturas ou cancele.</p>
-                ) : null}
-              </div>
-            </div>
-            <div className="rounded-2xl border border-border bg-card px-5 py-4">
-              <div className="grid grid-cols-[minmax(0,1fr)_2.75rem_5.25rem] text-sm sm:grid-cols-[minmax(0,1fr)_4rem_6rem]">
-                <span className="pb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">O que muda</span>
-                <span className="flex items-end justify-center pb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Free</span>
-                <span className="flex items-end justify-center gap-1 pb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">
-                  <Sparkles className="size-3" aria-hidden="true" />
-                  Pro
-                </span>
-                {PRO_FEATURES.map((feature) => (
-                  <React.Fragment key={feature.id}>
-                    <span className="flex min-w-0 items-center gap-2.5 border-t border-border/60 py-2.5 text-foreground">
-                      <ProFeatureIcon feature={feature} />
-                      <span className="min-w-0 leading-5">{feature.shortLabel}</span>
-                    </span>
-                    <span className="flex items-center justify-center border-t border-border/60 py-2.5 tabular-nums text-muted-foreground">{feature.free}</span>
-                    <span className="flex items-center justify-center border-t border-border/60 py-2.5 font-semibold tabular-nums text-foreground">{feature.pro}</span>
-                  </React.Fragment>
-                ))}
               </div>
             </div>
           </div>
@@ -777,17 +802,18 @@ export function AppUtilityPanel({
               </div>
             </div>
           ) : (
+            // Marca e canais moram na barra lateral: a coluna de conteúdo usa a
+            // altura inteira do painel e cada tópico cabe sem rolar.
             <div className="grid h-full min-h-0 grid-cols-[180px_minmax(0,1fr)]">
-              <aside className="min-h-0 border-r border-border bg-muted/24 p-3 pt-4"><DialogTitle className="sr-only">Configurações</DialogTitle>{topicButtons}</aside>
-              <section className="flex min-h-0 flex-col">
-                <header className="flex h-16 shrink-0 items-center justify-between gap-3 border-b border-border px-6">
-                  <div className="flex items-center gap-2">
-                    <BrandLogo className="h-6 w-[68px]" />
-                  </div>
-                  <SocialLinksRow />
-                </header>
-                <div className="min-h-0 flex-1 overflow-y-auto py-6 pr-12 pl-6">{renderSection(activeSection)}</div>
-              </section>
+              <aside className="flex min-h-0 flex-col border-r border-border bg-muted/24 p-3">
+                <DialogTitle className="sr-only">Configurações</DialogTitle>
+                <div className="flex h-12 shrink-0 items-center px-3">
+                  <BrandLogo className="h-6 w-[68px]" />
+                </div>
+                <div className="mt-2 min-h-0 flex-1">{topicButtons}</div>
+                <SocialLinksRow className="shrink-0 justify-start gap-0.5 px-0.5" />
+              </aside>
+              <section className="min-h-0 overflow-y-auto px-8 pb-3 pt-6">{renderSection(activeSection)}</section>
             </div>
           )}
           {guidedAppearanceNotice && onDismissGuidedNotice ? (
