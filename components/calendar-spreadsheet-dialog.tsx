@@ -551,8 +551,10 @@ export function CalendarSpreadsheetPanel({
     else setStep("home");
   };
 
+  // O input fica fora da pilha de listas: mesmo invisível, ele ganharia a
+  // margem do space-y e empurraria a altura da tela.
   const renderHome = () => (
-    <div className="space-y-5">
+    <>
       <input
         ref={fileInputRef}
         type="file"
@@ -560,75 +562,73 @@ export function CalendarSpreadsheetPanel({
         className="sr-only"
         onChange={(event) => void handleFile(event.target.files?.[0])}
       />
-      <PanelList title="Exportar">
-        <PanelRow
-          icon={FileDown}
-          color={CATEGORY_COLOR_BASE_AMBER}
-          title="Baixar template"
-          description="Planilha vazia no formato padrão do Doze 52."
-          disabled={isWorking}
-          state={workingAction === "template" ? workingState : "idle"}
-          stateLabels={{ pending: "Gerando template…", success: "Template baixado", error: "Não deu certo. Toque para tentar de novo." }}
-          onClick={() =>
-            void runDownload(
-              downloadCalendarSpreadsheetTemplate,
-              "Template baixado",
-              "calendar-spreadsheet.template",
-              "template"
-            )
-          }
-        />
-        <PanelRow
-          icon={Download}
-          color={CATEGORY_COLOR_BASE_TEAL}
-          title="Exportar calendário"
-          description="Escolha os contextos e categorias antes de baixar."
-          disabled={isWorking}
-          onClick={startExport}
-        />
-        <PanelRow
-          icon={Archive}
-          color={CATEGORY_COLOR_BASE_INDIGO}
-          title="Baixar backup técnico"
-          description="ZIP com seus dados autorais em JSON e CSV."
-          disabled={isWorking}
-          state={workingAction === "backup" ? workingState : "idle"}
-          stateLabels={{ pending: "Gerando backup…", success: "Backup baixado", error: "Não deu certo. Toque para tentar de novo." }}
-          onClick={() => void runDownload(
-            () => exportUserData(snapshot),
-            "Backup baixado",
-            "calendar-backup.export",
-            "backup"
-          )}
-        />
-      </PanelList>
-      <PanelList title="Importar">
-        <PanelRow
-          icon={Upload}
-          color={CATEGORY_COLOR_BASE_VIOLET}
-          title="Usar template Doze 52"
-          description="Reconhece as colunas padrão e pula o mapeamento."
-          disabled={isWorking}
-          state={workingAction === "import-template" ? workingState : "idle"}
-          stateLabels={{ pending: "Lendo template…", success: "Template lido", error: "Não deu certo. Toque para tentar de novo." }}
-          onClick={() => chooseFile("template")}
-        />
-        <PanelRow
-          icon={FileSpreadsheet}
-          color={CATEGORY_COLOR_BASE_CORAL}
-          title="Usar planilha customizada"
-          description="Escolha as colunas de uma exportação do Jira ou outra fonte."
-          disabled={isWorking}
-          state={workingAction === "import-custom" ? workingState : "idle"}
-          stateLabels={{ pending: "Lendo planilha…", success: "Planilha lida", error: "Não deu certo. Toque para tentar de novo." }}
-          onClick={() => chooseFile("custom")}
-        />
-      </PanelList>
-      <p className="px-1 text-xs leading-5 text-muted-foreground">
-        Aceita .xlsx de até 5 MB. Cada linha representa um evento; a importação não
-        altera nem remove dados existentes.
-      </p>
-    </div>
+      <div className="space-y-4">
+        <PanelList title="Exportar">
+          <PanelRow
+            icon={FileDown}
+            color={CATEGORY_COLOR_BASE_AMBER}
+            title="Baixar template"
+            description="Planilha vazia no formato padrão do Doze 52."
+            disabled={isWorking}
+            state={workingAction === "template" ? workingState : "idle"}
+            stateLabels={{ pending: "Gerando template…", success: "Template baixado", error: "Não deu certo. Toque para tentar de novo." }}
+            onClick={() =>
+              void runDownload(
+                downloadCalendarSpreadsheetTemplate,
+                "Template baixado",
+                "calendar-spreadsheet.template",
+                "template"
+              )
+            }
+          />
+          <PanelRow
+            icon={Download}
+            color={CATEGORY_COLOR_BASE_TEAL}
+            title="Exportar calendário"
+            description="Escolha os contextos e categorias antes de baixar."
+            disabled={isWorking}
+            onClick={startExport}
+          />
+          <PanelRow
+            icon={Archive}
+            color={CATEGORY_COLOR_BASE_INDIGO}
+            title="Baixar backup técnico"
+            description="ZIP com seus dados autorais em JSON e CSV."
+            disabled={isWorking}
+            state={workingAction === "backup" ? workingState : "idle"}
+            stateLabels={{ pending: "Gerando backup…", success: "Backup baixado", error: "Não deu certo. Toque para tentar de novo." }}
+            onClick={() => void runDownload(
+              () => exportUserData(snapshot),
+              "Backup baixado",
+              "calendar-backup.export",
+              "backup"
+            )}
+          />
+        </PanelList>
+        <PanelList title="Importar" hint=".xlsx até 5 MB · não altera o que já existe">
+          <PanelRow
+            icon={Upload}
+            color={CATEGORY_COLOR_BASE_VIOLET}
+            title="Usar template Doze 52"
+            description="Colunas reconhecidas, sem mapeamento."
+            disabled={isWorking}
+            state={workingAction === "import-template" ? workingState : "idle"}
+            stateLabels={{ pending: "Lendo template…", success: "Template lido", error: "Não deu certo. Toque para tentar de novo." }}
+            onClick={() => chooseFile("template")}
+          />
+          <PanelRow
+            icon={FileSpreadsheet}
+            color={CATEGORY_COLOR_BASE_CORAL}
+            title="Usar planilha customizada"
+            description="Mapeie as colunas de outra fonte, como o Jira."
+            disabled={isWorking}
+            state={workingAction === "import-custom" ? workingState : "idle"}
+            stateLabels={{ pending: "Lendo planilha…", success: "Planilha lida", error: "Não deu certo. Toque para tentar de novo." }}
+            onClick={() => chooseFile("custom")}
+          />
+        </PanelList>
+      </div>
+    </>
   );
 
   const renderExportScope = () => {
@@ -965,7 +965,7 @@ export function CalendarSpreadsheetPanel({
   ) : null;
 
   const titles: Record<AssistantStep, [string, string]> = {
-    home: ["Importar ou exportar", "Traga eventos de uma planilha ou leve seu calendário com você."],
+    home: ["Importar ou exportar", "Leve seu calendário ou traga eventos de uma planilha."],
     "export-scope": ["Selecionar dados para exportar", "Escolha os contextos e categorias que devem entrar na planilha."],
     mapping: ["Mapear colunas", "Defina como a sua planilha representa cada campo do calendário."],
     structures: ["Revisar estruturas", "Crie, associe ou ignore contextos e categorias encontrados."],
@@ -1012,34 +1012,36 @@ export function CalendarSpreadsheetPanel({
         </div>
       ) : null}
 
-      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
-        {step === "home" && onRequestClose ? <Button variant="ghost" onClick={onRequestClose}>Fechar</Button> : null}
-        {step !== "home" && step !== "result" ? <Button variant="ghost" onClick={back}><ArrowLeft className="size-4" />Voltar</Button> : null}
-        {step === "export-scope" ? (
-          <AsyncStateButton
-            variant="premium"
-            disabled={selectedExportEventCount === 0 || isWorking}
-            state={workingAction === "export" ? workingState : "idle"}
-            pendingLabel="Gerando exportação…"
-            successLabel="Calendário exportado"
-            errorLabel="Tentar exportar"
-            onClick={() =>
-              void runDownload(
-                () => exportCalendarSpreadsheet(snapshot, exportSelection),
-                "Calendario exportado",
-                "calendar-spreadsheet.export",
-                "export"
-              )
-            }
-          >
-            Exportar {selectedExportEventCount} evento{selectedExportEventCount === 1 ? "" : "s"}
-          </AsyncStateButton>
-        ) : null}
-        {step === "mapping" ? <Button variant="premium" disabled={mappingErrors.length > 0} onClick={continueFromMapping}>Revisar estruturas</Button> : null}
-        {step === "structures" ? <Button variant="premium" disabled={!canAdvanceStructures} onClick={() => setStep("preview")}>Ver pre-visualizacao</Button> : null}
-        {step === "preview" ? <Button variant="premium" disabled={!canConfirm} onClick={confirmImport}>Importar {plan?.summary.importedEvents ?? 0} evento(s)</Button> : null}
-        {step === "result" ? <Button variant="premium" onClick={() => (onRequestClose ? onRequestClose() : setStep("home"))}>Concluir</Button> : null}
-      </div>
+      {step === "home" && !onRequestClose ? null : (
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
+          {step === "home" && onRequestClose ? <Button variant="ghost" onClick={onRequestClose}>Fechar</Button> : null}
+          {step !== "home" && step !== "result" ? <Button variant="ghost" onClick={back}><ArrowLeft className="size-4" />Voltar</Button> : null}
+          {step === "export-scope" ? (
+            <AsyncStateButton
+              variant="premium"
+              disabled={selectedExportEventCount === 0 || isWorking}
+              state={workingAction === "export" ? workingState : "idle"}
+              pendingLabel="Gerando exportação…"
+              successLabel="Calendário exportado"
+              errorLabel="Tentar exportar"
+              onClick={() =>
+                void runDownload(
+                  () => exportCalendarSpreadsheet(snapshot, exportSelection),
+                  "Calendario exportado",
+                  "calendar-spreadsheet.export",
+                  "export"
+                )
+              }
+            >
+              Exportar {selectedExportEventCount} evento{selectedExportEventCount === 1 ? "" : "s"}
+            </AsyncStateButton>
+          ) : null}
+          {step === "mapping" ? <Button variant="premium" disabled={mappingErrors.length > 0} onClick={continueFromMapping}>Revisar estruturas</Button> : null}
+          {step === "structures" ? <Button variant="premium" disabled={!canAdvanceStructures} onClick={() => setStep("preview")}>Ver pre-visualizacao</Button> : null}
+          {step === "preview" ? <Button variant="premium" disabled={!canConfirm} onClick={confirmImport}>Importar {plan?.summary.importedEvents ?? 0} evento(s)</Button> : null}
+          {step === "result" ? <Button variant="premium" onClick={() => (onRequestClose ? onRequestClose() : setStep("home"))}>Concluir</Button> : null}
+        </div>
+      )}
     </div>
   );
 }
