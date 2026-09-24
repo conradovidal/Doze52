@@ -72,31 +72,26 @@ export const dismissOnboardingIfVisible = async (page: Page) => {
 };
 
 export const expectAuthenticated = async (page: Page) => {
-  await expect(
-    page
-      .getByRole("button", { name: "Abrir menu da conta" })
-      .or(page.getByRole("button", { name: /Abrir (perfil|conta)/ }))
-  ).toBeVisible();
+  await expect(page.getByRole("button", { name: /Abrir (perfil|conta)/ })).toBeVisible();
   await expect(page.getByRole("button", { name: "Entrar", exact: true })).toHaveCount(0);
 };
 
+/**
+ * Abre o painel de conta e entra no tópico. No desktop o tópico é um botão
+ * da barra lateral ("Dados"); no mobile é uma linha da lista da raiz
+ * ("Dados Importação e exportação"), que desliza para a tela do tópico.
+ * Devolve o painel.
+ */
 export const openAuthenticatedSettings = async (
   page: Page,
   topic: "data" | "help" = "data"
 ) => {
-  const adaptiveEntry = page.getByRole("button", { name: /Abrir (perfil|conta)/ });
-  const legacyEntry = page.getByRole("button", { name: "Abrir menu da conta" });
-  await expect(legacyEntry.or(adaptiveEntry)).toBeVisible();
-  if (await adaptiveEntry.isVisible().catch(() => false)) {
-    await adaptiveEntry.click();
-    const label = topic === "data" ? /^Dados/ : /^Ajuda/;
-    await page
-      .locator("[data-app-utility-panel]")
-      .getByRole("button", { name: label })
-      .click();
-    return;
-  }
-  await legacyEntry.click();
+  await page.getByRole("button", { name: /Abrir (perfil|conta)/ }).click();
+  const panel = page.locator("[data-app-utility-panel]");
+  await expect(panel).toBeVisible();
+  const topicLabel = topic === "data" ? "Dados" : "Ajuda";
+  await panel.getByRole("button", { name: new RegExp(`^${topicLabel}\\b`) }).first().click();
+  return panel;
 };
 
 export const waitForSupabaseWrite = (

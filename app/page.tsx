@@ -3153,7 +3153,6 @@ export default function HomePage() {
           year={year}
           onYearChange={handleYearChange}
           authLoading={authLoading}
-          isAuthenticated={Boolean(session)}
           isMobileCalendarUi={isMobileCalendarUi === true}
           showCalendarControls={isCalendarSurfaceActive}
           useAdaptiveNavigation

@@ -1,15 +1,7 @@
 "use client";
 
 import * as React from "react";
-import {
-  CalendarDays,
-  FileSpreadsheet,
-  Layers,
-  Repeat,
-  Sparkles,
-  Tags,
-  type LucideIcon,
-} from "lucide-react";
+import { Sparkles } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { AsyncStateButton } from "@/components/ui/async-state-button";
@@ -20,13 +12,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  CATEGORY_COLOR_BASE_AMBER,
-  CATEGORY_COLOR_BASE_CORAL,
-  CATEGORY_COLOR_BASE_INDIGO,
-  CATEGORY_COLOR_BASE_TEAL,
-  CATEGORY_COLOR_BASE_VIOLET,
-  getCategoryColorToken,
-} from "@/lib/category-palette";
+  PRO_FEATURES,
+  ProFeatureIcon,
+  ProFeatureStack,
+} from "@/components/billing/pro-features";
 import {
   FOUNDER_PRICE_LABEL,
   PRO_UPGRADE_COPY,
@@ -42,25 +31,6 @@ type ProUpgradeDialogProps = {
   reason?: ProUpgradeReason;
   onRequireAuth?: () => void;
 };
-
-type ProFeature = {
-  id: string;
-  label: string;
-  Icon: LucideIcon;
-  color: string;
-  /** Motivo que destaca este benefício (o que a pessoa acabou de tentar). */
-  reason: ProUpgradeReason;
-};
-
-// Mesma técnica visual da capa do onboarding: uma pilha de ícones nas cores
-// das categorias deixa o valor legível antes de qualquer texto.
-const PRO_FEATURES: readonly ProFeature[] = [
-  { id: "profiles", label: "Contextos ilimitados", Icon: Layers, color: CATEGORY_COLOR_BASE_INDIGO, reason: "profiles" },
-  { id: "categories", label: "Categorias ilimitadas", Icon: Tags, color: CATEGORY_COLOR_BASE_CORAL, reason: "categories" },
-  { id: "calendars", label: "Calendários prontos ilimitados", Icon: CalendarDays, color: CATEGORY_COLOR_BASE_TEAL, reason: "calendar-subscriptions" },
-  { id: "habits", label: "Até 4 hábitos", Icon: Repeat, color: CATEGORY_COLOR_BASE_VIOLET, reason: "habits" },
-  { id: "spreadsheet", label: "Importar e exportar planilhas", Icon: FileSpreadsheet, color: CATEGORY_COLOR_BASE_AMBER, reason: "calendar-import-export" },
-];
 
 export function ProUpgradeDialog({
   open,
@@ -87,30 +57,7 @@ export function ProUpgradeDialog({
         className="inverse-product-surface gap-0 overflow-hidden rounded-[1.5rem] border-border bg-card p-0 text-card-foreground shadow-[0_30px_95px_-20px_rgba(15,23,42,0.82)] sm:max-w-[500px] sm:p-0"
       >
         <div className="px-6 pb-5 pt-7 text-center sm:px-8">
-          <div className="flex justify-center -space-x-2.5">
-            {PRO_FEATURES.map(({ id, Icon, color, reason: featureReason }, index) => {
-              const token = getCategoryColorToken(color);
-              const featured = featureReason === reason;
-              return (
-                <span
-                  key={id}
-                  aria-hidden="true"
-                  style={{
-                    backgroundColor: token.soft,
-                    borderColor: token.border,
-                    color: token.text,
-                    zIndex: featured ? PRO_FEATURES.length + 1 : PRO_FEATURES.length - index,
-                  }}
-                  className={cn(
-                    "relative grid size-11 place-items-center rounded-full border ring-[3px] ring-card transition-transform",
-                    featured && "-translate-y-1 scale-110"
-                  )}
-                >
-                  <Icon className="size-[18px]" />
-                </span>
-              );
-            })}
-          </div>
+          <ProFeatureStack reason={reason} className="justify-center" />
 
           <p className="mt-5 inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">
             <Sparkles className="size-3" aria-hidden="true" />
@@ -125,29 +72,20 @@ export function ProUpgradeDialog({
         </div>
 
         <ul className="mx-6 grid grid-cols-1 gap-x-4 gap-y-2.5 border-y border-border/70 py-4 sm:mx-8 sm:grid-cols-2">
-          {PRO_FEATURES.map(({ id, label, Icon, color, reason: featureReason }) => {
-            const token = getCategoryColorToken(color);
-            return (
-              <li
-                key={id}
-                className={cn(
-                  "flex items-center gap-2.5 text-sm leading-5",
-                  featureReason === reason
-                    ? "font-semibold text-foreground"
-                    : "text-muted-foreground"
-                )}
-              >
-                <span
-                  aria-hidden="true"
-                  className="grid size-6 shrink-0 place-items-center rounded-full"
-                  style={{ backgroundColor: token.soft, color: token.text }}
-                >
-                  <Icon className="size-3.5" />
-                </span>
-                {label}
-              </li>
-            );
-          })}
+          {PRO_FEATURES.map((feature) => (
+            <li
+              key={feature.id}
+              className={cn(
+                "flex items-center gap-2.5 text-sm leading-5",
+                feature.reason === reason
+                  ? "font-semibold text-foreground"
+                  : "text-muted-foreground"
+              )}
+            >
+              <ProFeatureIcon feature={feature} />
+              {feature.label}
+            </li>
+          ))}
           <li className="flex items-center gap-2.5 text-sm leading-5 text-muted-foreground">
             <span
               aria-hidden="true"

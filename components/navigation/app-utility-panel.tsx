@@ -4,11 +4,15 @@ import * as React from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import {
+  ArrowUpRight,
   Bug,
   CalendarCog,
   Check,
+  ChevronLeft,
+  ChevronRight,
   CircleHelp,
   CircleUserRound,
+  Compass,
   CreditCard,
   Crown,
   Database,
@@ -31,6 +35,7 @@ import {
 
 import { AuthForm } from "@/components/auth/auth-form";
 import { DeleteAccountDialog } from "@/components/account/delete-account-dialog";
+import { PRO_FEATURES, ProFeatureIcon, ProFeatureStack } from "@/components/billing/pro-features";
 import { ProUpgradeDialog } from "@/components/billing/pro-upgrade-dialog";
 import { BrandLogo } from "@/components/brand-logo";
 import { FeedbackDialog } from "@/components/feedback/feedback-dialog";
@@ -40,6 +45,7 @@ import {
   type GuidedToolbarNotice,
 } from "@/components/onboarding/guided-toolbar-notice";
 import { Button } from "@/components/ui/button";
+import { PanelHero, PanelIcon, PanelList, PanelRow } from "@/components/ui/panel-list";
 import {
   Dialog,
   DialogContent,
@@ -47,9 +53,19 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useFeedback } from "@/components/ui/feedback-provider";
+import { ViewSwap } from "@/components/ui/view-swap";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth";
-import { isCalendarSpreadsheetProGateEnabled, PLAN_LIMITS } from "@/lib/entitlements";
+import {
+  CATEGORY_COLOR_BASE_AMBER,
+  CATEGORY_COLOR_BASE_CORAL,
+  CATEGORY_COLOR_BASE_GRAPHITE,
+  CATEGORY_COLOR_BASE_INDIGO,
+  CATEGORY_COLOR_BASE_SKY,
+  CATEGORY_COLOR_BASE_TEAL,
+  CATEGORY_COLOR_BASE_VIOLET,
+} from "@/lib/category-palette";
+import { FOUNDER_PRICE_LABEL, isCalendarSpreadsheetProGateEnabled, PRO_UPGRADE_COPY } from "@/lib/entitlements";
 import { logDevError, logProdError } from "@/lib/safe-log";
 import { useStore } from "@/lib/store";
 import { saveSnapshot } from "@/lib/sync";
@@ -71,14 +87,6 @@ const EMPTY_ADMIN_CAPABILITIES: AdminCapabilities = {
 };
 const SUPPORT_EMAIL = "doze52cal@gmail.com";
 
-const PLAN_COMPARISON_ROWS: ReadonlyArray<{ label: string; free: string; pro: string }> = [
-  { label: "Hábitos", free: `${PLAN_LIMITS.free.maxHabits}`, pro: `${PLAN_LIMITS.pro.maxHabits}` },
-  { label: "Contextos", free: `${PLAN_LIMITS.free.maxProfiles}`, pro: "Ilimitados" },
-  { label: "Categorias", free: `${PLAN_LIMITS.free.maxCategories}`, pro: "Ilimitadas" },
-  { label: "Calendários", free: `${PLAN_LIMITS.free.maxCalendarSubscriptions}`, pro: "Ilimitados" },
-  { label: "Planilhas de importação/exportação", free: "—", pro: "Incluídas" },
-];
-
 const TOPICS: ReadonlyArray<{
   id: UtilityPanelSection;
   label: string;
@@ -91,6 +99,15 @@ const TOPICS: ReadonlyArray<{
   { id: "help", label: "Ajuda", description: "Feedback e contato", icon: HelpCircle },
   { id: "admin", label: "Admin", description: "Ferramentas internas", icon: ShieldCheck },
 ];
+
+// Cor de cada tópico na lista do mobile; o Plano usa o dourado do Pro.
+const MOBILE_TOPIC_META: Record<UtilityPanelSection, { color?: string; iconClassName?: string }> = {
+  account: {},
+  plan: { iconClassName: "bg-premium-soft text-premium-foreground" },
+  data: { color: CATEGORY_COLOR_BASE_AMBER },
+  help: { color: CATEGORY_COLOR_BASE_SKY },
+  admin: { color: CATEGORY_COLOR_BASE_GRAPHITE },
+};
 
 function BrandXIcon({ className }: { className?: string }) {
   return (
@@ -152,28 +169,6 @@ function SocialLinksRow({ className }: { className?: string }) {
         );
       })}
     </div>
-  );
-}
-
-function PanelAction({
-  icon: Icon,
-  children,
-  danger = false,
-  ...props
-}: React.ComponentProps<typeof Button> & { icon: LucideIcon; danger?: boolean }) {
-  return (
-    <Button
-      type="button"
-      variant="ghost"
-      className={cn(
-        "h-11 w-full justify-start rounded-xl px-3 text-sm font-medium shadow-none",
-        danger && "text-rose-700 hover:bg-rose-50 hover:text-rose-800 dark:text-rose-200 dark:hover:bg-rose-500/12"
-      )}
-      {...props}
-    >
-      <Icon className={cn("size-4 text-muted-foreground", danger && "text-rose-500")} />
-      <span className="min-w-0 flex-1 truncate text-left">{children}</span>
-    </Button>
   );
 }
 
@@ -331,13 +326,20 @@ export function AppUtilityPanel({
       : null;
   const hasBillingError = Boolean(billingError);
   const planLabel = isBillingLoading ? "Carregando..." : hasBillingError ? "Plano indisponível" : isPro ? "Doze 52 Pro" : "Plano Free";
-  const planDescription = hasBillingError
-    ? "Não foi possível carregar o status do plano."
+  const planHeroTitle = hasBillingError
+    ? "Plano indisponível"
+    : isPro
+      ? "Seu ano inteiro, sem limites"
+      : PRO_UPGRADE_COPY.generic.title;
+  const planHeroDescription = hasBillingError
+    ? "Não foi possível carregar o status do plano. Tente de novo em instantes."
     : isPro
       ? billingStatus.cancelAtPeriodEnd && formattedPeriodEnd
-        ? `Pro ativo até ${formattedPeriodEnd}.`
-        : "Até 4 hábitos, contextos ampliados e calendários ilimitados."
-      : "1 hábito, 1 contexto, 3 categorias e 1 calendário.";
+        ? `Seu Pro continua ativo até ${formattedPeriodEnd}. Depois, a conta volta ao plano Free sem perder dados.`
+        : formattedPeriodEnd
+          ? `Obrigado por apoiar o Doze 52. Próxima renovação em ${formattedPeriodEnd}.`
+          : "Obrigado por apoiar o Doze 52."
+      : `Você está no plano Free. ${PRO_UPGRADE_COPY.generic.description}`;
   const planActionLabel = !session
     ? "Entrar para assinar"
     : isBillingLoading
@@ -354,6 +356,11 @@ export function AppUtilityPanel({
     return true;
   });
   const activeTopic = visibleTopics.find((topic) => topic.id === activeSection) ?? visibleTopics[0];
+
+  // No mobile, "account" é a raiz da folha; os outros tópicos abrem como
+  // uma tela mais funda, com voltar (mesmo padrão do Organizar).
+  const mobileSubTopic =
+    session && activeTopic && activeTopic.id !== "account" ? activeTopic : null;
 
   React.useEffect(() => {
     if (!open || !activeTopic || activeTopic.id === activeSection) return;
@@ -493,26 +500,66 @@ export function AppUtilityPanel({
             {standalone ? (
               <button
                 type="button"
-                className="mt-6 flex w-full items-center justify-between gap-4 rounded-2xl border border-border bg-card p-4 text-left transition-colors hover:bg-muted/60"
+                className="mt-6 flex w-full items-center gap-3.5 rounded-2xl border border-border bg-card p-4 text-left transition-colors hover:bg-muted/60"
                 onClick={() => setActiveSection("plan")}
               >
-                <div>
+                {isPro ? (
+                  <span aria-hidden="true" className="grid size-9 shrink-0 place-items-center rounded-full bg-premium-soft text-premium-foreground">
+                    <Sparkles className="size-4" />
+                  </span>
+                ) : (
+                  <ProFeatureStack size="sm" className="shrink-0" />
+                )}
+                <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-foreground">{planLabel}</p>
                   <p className="mt-0.5 text-xs text-muted-foreground">{isPro ? "Ver detalhes da assinatura" : "Veja o que o Pro libera"}</p>
                 </div>
-                <Sparkles className={cn("size-5 shrink-0", isPro ? "text-premium" : "text-muted-foreground")} />
+                <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
               </button>
-            ) : null}
+            ) : (
+              <PanelList className="mt-6 w-full text-left">
+                {visibleTopics
+                  .filter((topic) => topic.id !== "account")
+                  .map((topic) => {
+                    const meta = MOBILE_TOPIC_META[topic.id];
+                    return (
+                      <PanelRow
+                        key={topic.id}
+                        icon={topic.icon}
+                        color={meta.color}
+                        iconClassName={meta.iconClassName}
+                        title={topic.label}
+                        description={topic.id === "plan" ? (isPro ? "Doze 52 Pro · sua assinatura" : "Plano Free · veja o que o Pro libera") : topic.description}
+                        onClick={() => setActiveSection(topic.id)}
+                      />
+                    );
+                  })}
+              </PanelList>
+            )}
 
-            <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+            <PanelList className="mt-4 w-full text-left">
               {canChangePassword ? (
-                <Button type="button" variant="outline" className="min-w-48" disabled={isSendingPasswordReset} onClick={handleChangePassword}>
-                  <KeyRound className="size-4" />
-                  {isSendingPasswordReset ? "Enviando..." : "Alterar senha"}
-                </Button>
+                <PanelRow
+                  icon={KeyRound}
+                  color={CATEGORY_COLOR_BASE_INDIGO}
+                  title="Alterar senha"
+                  description="Enviamos um link para o seu e-mail."
+                  trailing={false}
+                  state={isSendingPasswordReset ? "pending" : "idle"}
+                  stateLabels={{ pending: "Enviando link…" }}
+                  onClick={handleChangePassword}
+                />
               ) : null}
-              <Button type="button" variant="outline" className="min-w-48" disabled={isSigningOut} onClick={handleSignOut}><LogOut className="size-4" />{isSigningOut ? "Saindo..." : "Sair"}</Button>
-            </div>
+              <PanelRow
+                icon={LogOut}
+                title="Sair"
+                description="Seus dados ficam salvos nesta conta."
+                trailing={false}
+                state={isSigningOut ? "pending" : "idle"}
+                stateLabels={{ pending: "Saindo…" }}
+                onClick={handleSignOut}
+              />
+            </PanelList>
 
             <button
               type="button"
@@ -535,20 +582,66 @@ export function AppUtilityPanel({
       case "plan":
         return (
           <div className="max-w-xl space-y-4">
-            <div className="rounded-2xl border border-border bg-card p-5">
-              <div className="flex items-start justify-between gap-5"><div><p className="text-lg font-semibold text-foreground">{planLabel}</p><p className="mt-2 text-sm leading-6 text-muted-foreground">{planDescription}</p></div><Sparkles className={cn("mt-1 size-5", isPro ? "text-premium" : "text-muted-foreground")} /></div>
-              <Button type="button" variant={isPro ? "outline" : "premium"} className="mt-6" disabled={isPlanActionLoading || hasBillingError} onClick={handlePlanAction}><CreditCard className="size-4" />{planActionLabel}</Button>
+            <div className="overflow-hidden rounded-2xl border border-border bg-card" data-plan-hero>
+              <div className="px-6 pb-5 pt-7 text-center">
+                <ProFeatureStack className="justify-center" />
+                <p className="mt-5 inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">
+                  <Sparkles className="size-3" aria-hidden="true" />
+                  Doze 52 Pro
+                  {showProIdentity ? (
+                    <span className="ml-1 rounded-full bg-premium-soft px-1.5 py-px text-[9px] tracking-[0.12em] text-premium-foreground">
+                      {billingStatus.cancelAtPeriodEnd ? "Até o fim do período" : "Ativo"}
+                    </span>
+                  ) : null}
+                </p>
+                <h3 className="mt-2 text-balance text-xl font-semibold leading-7 tracking-[-0.01em] text-foreground">
+                  {planHeroTitle}
+                </h3>
+                <p className="mx-auto mt-2 max-w-[22rem] text-pretty text-sm leading-6 text-muted-foreground">
+                  {planHeroDescription}
+                </p>
+              </div>
+              <div className="border-t border-border/70 px-6 pb-6 pt-5">
+                {isPro ? null : (
+                  <>
+                    <div className="flex items-baseline justify-center gap-2">
+                      <span className="text-2xl font-semibold tracking-[-0.02em] tabular-nums">{FOUNDER_PRICE_LABEL}</span>
+                      <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-foreground">Preço fundador</span>
+                    </div>
+                    <p className="mt-1 text-center text-xs text-muted-foreground">Cancele quando quiser.</p>
+                  </>
+                )}
+                <Button
+                  type="button"
+                  variant={isPro ? "outline" : "premium"}
+                  className={cn("mx-auto flex h-11 w-full max-w-xs text-[15px]", !isPro && "mt-4")}
+                  disabled={isPlanActionLoading || hasBillingError}
+                  onClick={handlePlanAction}
+                >
+                  {isPro ? <CreditCard className="size-4" /> : null}
+                  {planActionLabel}
+                </Button>
+                {isPro ? (
+                  <p className="mt-2 text-center text-xs text-muted-foreground">Troque o cartão, veja faturas ou cancele.</p>
+                ) : null}
+              </div>
             </div>
-            <div className="overflow-hidden rounded-2xl border border-border bg-card">
-              <div className="grid grid-cols-[1fr_auto_auto] items-center gap-x-4 gap-y-2.5 px-5 py-4 text-sm">
-                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">O que muda</span>
-                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Free</span>
-                <span className="text-xs font-semibold uppercase tracking-wide text-emerald-600 dark:text-emerald-300">Pro</span>
-                {PLAN_COMPARISON_ROWS.map((row) => (
-                  <React.Fragment key={row.label}>
-                    <span className="text-foreground">{row.label}</span>
-                    <span className="text-muted-foreground">{row.free}</span>
-                    <span className="font-medium text-emerald-600 dark:text-emerald-300">{row.pro}</span>
+            <div className="rounded-2xl border border-border bg-card px-5 py-4">
+              <div className="grid grid-cols-[minmax(0,1fr)_2.75rem_5.25rem] text-sm sm:grid-cols-[minmax(0,1fr)_4rem_6rem]">
+                <span className="pb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">O que muda</span>
+                <span className="flex items-end justify-center pb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Free</span>
+                <span className="flex items-end justify-center gap-1 pb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">
+                  <Sparkles className="size-3" aria-hidden="true" />
+                  Pro
+                </span>
+                {PRO_FEATURES.map((feature) => (
+                  <React.Fragment key={feature.id}>
+                    <span className="flex min-w-0 items-center gap-2.5 border-t border-border/60 py-2.5 text-foreground">
+                      <ProFeatureIcon feature={feature} />
+                      <span className="min-w-0 leading-5">{feature.shortLabel}</span>
+                    </span>
+                    <span className="flex items-center justify-center border-t border-border/60 py-2.5 tabular-nums text-muted-foreground">{feature.free}</span>
+                    <span className="flex items-center justify-center border-t border-border/60 py-2.5 font-semibold tabular-nums text-foreground">{feature.pro}</span>
                   </React.Fragment>
                 ))}
               </div>
@@ -557,37 +650,64 @@ export function AppUtilityPanel({
         );
       case "data":
         return spreadsheetRequiresPro && !isPro && !isBillingLoading ? (
-          <div className="max-w-xl rounded-2xl border border-border bg-card p-5">
-            <div className="flex items-start justify-between gap-5">
-              <div>
-                <p className="text-base font-semibold text-foreground">Importação e exportação</p>
-                <p className="mt-2 text-sm leading-6 text-muted-foreground">Traga eventos de outra planilha ou baixe seu calendário — disponível no plano Pro.</p>
-              </div>
-              <FileSpreadsheet className="mt-1 size-5 shrink-0 text-muted-foreground" />
-            </div>
-            <Button type="button" variant="premium" className="mt-6" onClick={() => setSpreadsheetUpgradeOpen(true)}><CreditCard className="size-4" />Assinar Pro</Button>
+          <div className="max-w-xl rounded-2xl border border-border bg-card px-6 pb-6 pt-5">
+            <PanelHero
+              media={<PanelIcon icon={FileSpreadsheet} color={CATEGORY_COLOR_BASE_AMBER} size="lg" />}
+              eyebrow={<><Sparkles className="size-3" aria-hidden="true" />Doze 52 Pro</>}
+              title={PRO_UPGRADE_COPY["calendar-import-export"].title}
+              description={PRO_UPGRADE_COPY["calendar-import-export"].description}
+            >
+              <Button type="button" variant="premium" className="mx-auto mt-5 flex h-11 w-full max-w-xs text-[15px]" onClick={() => setSpreadsheetUpgradeOpen(true)}>
+                Conhecer o Pro
+              </Button>
+            </PanelHero>
           </div>
         ) : (
           <CalendarSpreadsheetPanel />
         );
       case "help":
         return (
-          <div className="max-w-xl rounded-2xl border border-border bg-card p-2">
-            {onOpenAnnualHelp ? <PanelAction icon={HelpCircle} onClick={onOpenAnnualHelp}>Introdução ao Anual</PanelAction> : null}
-            {session ? <PanelAction icon={Bug} onClick={openFeedback}>Enviar feedback</PanelAction> : null}
-            <a href={`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent("Dúvida: ")}`} className="flex h-11 w-full items-center gap-3 rounded-xl px-3 text-sm font-medium text-foreground hover:bg-muted/60">
-              <CircleHelp className="size-4 shrink-0 text-muted-foreground" />
-              <span className="min-w-0 flex-1 truncate text-left">Enviar uma dúvida</span>
-            </a>
-            <a href={`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent("Comentário: ")}`} className="flex h-11 w-full items-center gap-3 rounded-xl px-3 text-sm font-medium text-foreground hover:bg-muted/60">
-              <MessageCircle className="size-4 shrink-0 text-muted-foreground" />
-              <span className="min-w-0 flex-1 truncate text-left">Fazer um comentário</span>
-            </a>
+          <div className="max-w-xl space-y-5">
+            {standalone ? (
+              <PanelHero
+                media={<PanelIcon icon={HelpCircle} color={CATEGORY_COLOR_BASE_SKY} size="lg" />}
+                eyebrow="Ajuda"
+                title="Como podemos ajudar?"
+                description={<>Tire uma dúvida, conte o que achou ou reveja a introdução. Tudo chega em {SUPPORT_EMAIL}.</>}
+              />
+            ) : null}
+            <PanelList>
+              {onOpenAnnualHelp ? (
+                <PanelRow icon={Compass} color={CATEGORY_COLOR_BASE_TEAL} title="Introdução ao Anual" description="Reveja como o ano cabe em uma página." onClick={onOpenAnnualHelp} />
+              ) : null}
+              {session ? (
+                <PanelRow icon={Bug} color={CATEGORY_COLOR_BASE_CORAL} title="Enviar feedback" description="Conte um problema ou uma ideia, com print se quiser." onClick={openFeedback} />
+              ) : null}
+              <PanelRow href={`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent("Dúvida: ")}`} icon={CircleHelp} color={CATEGORY_COLOR_BASE_INDIGO} title="Enviar uma dúvida" description="Abre seu app de e-mail." trailing={<ArrowUpRight className="size-4 shrink-0 text-muted-foreground/70" aria-hidden="true" />} />
+              <PanelRow href={`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent("Comentário: ")}`} icon={MessageCircle} color={CATEGORY_COLOR_BASE_VIOLET} title="Fazer um comentário" description="Elogios e sugestões também são bem-vindos." trailing={<ArrowUpRight className="size-4 shrink-0 text-muted-foreground/70" aria-hidden="true" />} />
+            </PanelList>
           </div>
         );
       case "admin":
         return (
-          <div className="max-w-xl rounded-2xl border border-border bg-card p-2">{adminCapabilities.feedback ? <PanelAction icon={MessageSquareText} onClick={() => navigateTo("/admin/feedback")}>Painel de feedback</PanelAction> : null}{adminCapabilities.calendarPacks ? <PanelAction icon={CalendarCog} onClick={() => navigateTo("/admin/calendar-packs")}>Painel de calendários</PanelAction> : null}</div>
+          <div className="max-w-xl space-y-5">
+            {standalone ? (
+              <PanelHero
+                media={<PanelIcon icon={ShieldCheck} color={CATEGORY_COLOR_BASE_GRAPHITE} size="lg" />}
+                eyebrow="Admin"
+                title="Ferramentas internas"
+                description="Visível só para quem administra o Doze 52."
+              />
+            ) : null}
+            <PanelList>
+              {adminCapabilities.feedback ? (
+                <PanelRow icon={MessageSquareText} color={CATEGORY_COLOR_BASE_AMBER} title="Painel de feedback" description="Leia e trie o que as pessoas enviaram." onClick={() => navigateTo("/admin/feedback")} />
+              ) : null}
+              {adminCapabilities.calendarPacks ? (
+                <PanelRow icon={CalendarCog} color={CATEGORY_COLOR_BASE_TEAL} title="Painel de calendários" description="Publique e revise os calendários prontos." onClick={() => navigateTo("/admin/calendar-packs")} />
+              ) : null}
+            </PanelList>
+          </div>
         );
     }
   };
@@ -611,34 +731,46 @@ export function AppUtilityPanel({
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent
           data-app-utility-panel
-          className={cn("overflow-hidden p-0", isMobile ? "inset-x-0 top-auto bottom-0 h-[min(34rem,58dvh)] w-screen max-w-none translate-x-0 translate-y-0 rounded-none rounded-t-[1.75rem] border-0 border-t border-border/70 data-[state=open]:slide-in-from-bottom-2 data-[state=closed]:slide-out-to-bottom-2 sm:max-w-none" : "h-[min(600px,80dvh)] w-[min(720px,calc(100vw-5rem))] max-w-[720px] sm:max-w-[720px]")}
+          className={cn("overflow-hidden p-0", isMobile ? cn("inset-x-0 top-auto bottom-0 w-screen max-w-none translate-x-0 translate-y-0 rounded-none rounded-t-[1.75rem] border-0 border-t border-border/70 data-[state=open]:slide-in-from-bottom-2 data-[state=closed]:slide-out-to-bottom-2 sm:max-w-none", session ? "h-[min(44rem,86dvh)]" : "h-[min(34rem,58dvh)]") : "h-[min(600px,80dvh)] w-[min(720px,calc(100vw-5rem))] max-w-[720px] sm:max-w-[720px]")}
           onCloseAutoFocus={(event) => { event.preventDefault(); returnFocusRef.current?.focus(); }}
         >
           <DialogDescription className="sr-only">Gerencie sua conta, plano, dados e canais do Doze 52.</DialogDescription>
           {isMobile ? (
             <div className="flex h-full min-h-0 flex-col">
-              <header className="flex h-16 shrink-0 items-center gap-3 border-b border-border px-4 pr-12">
-                <div className="min-w-0 flex-1">
-                  <DialogTitle>Conta e configurações</DialogTitle>
-                  {session ? (
-                    <p className="text-xs text-muted-foreground">
-                      Sua conta, plano e canais de contato.
-                    </p>
-                  ) : null}
-                </div>
-              </header>
-              <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))]">
-                {session ? (
-                  <div className="space-y-7">
-                    {visibleTopics.map((topic) => (
-                        <section key={topic.id}>
-                          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                            {topic.label}
-                          </h3>
-                          {renderSection(topic.id, { standalone: false })}
-                        </section>
-                      ))}
+              <header className="flex h-16 shrink-0 items-center gap-2 border-b border-border px-4 pr-12">
+                {mobileSubTopic ? (
+                  <>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      className="-ml-1.5 shrink-0"
+                      aria-label="Voltar para Conta e configurações"
+                      onClick={() => setActiveSection("account")}
+                    >
+                      <ChevronLeft className="size-5" />
+                    </Button>
+                    <DialogTitle className="sr-only">Conta e configurações</DialogTitle>
+                    <p className="min-w-0 flex-1 truncate text-base font-semibold text-foreground">{mobileSubTopic.label}</p>
+                  </>
+                ) : (
+                  <div className="min-w-0 flex-1">
+                    <DialogTitle>Conta e configurações</DialogTitle>
+                    {session ? (
+                      <p className="text-xs text-muted-foreground">
+                        Sua conta, plano e canais de contato.
+                      </p>
+                    ) : null}
                   </div>
+                )}
+              </header>
+              <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-4 py-5 pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))]">
+                {session ? (
+                  <ViewSwap view={mobileSubTopic?.id ?? "account"} depth={mobileSubTopic ? 1 : 0}>
+                    {mobileSubTopic
+                      ? renderSection(mobileSubTopic.id)
+                      : renderSection("account", { standalone: false })}
+                  </ViewSwap>
                 ) : (
                   renderSection("account")
                 )}
