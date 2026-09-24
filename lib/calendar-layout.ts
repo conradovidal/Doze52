@@ -12,3 +12,9 @@ export const EVENT_ITEM_PADDING_X_CLASS = "px-2.5";
 export const EVENT_ITEM_RADIUS_CLASS = "rounded-[8px]";
 export const EVENT_ITEM_TEXT_CLASS = "text-[11px] font-medium tracking-normal";
 export const EVENT_ITEM_LINE_HEIGHT_CLASS = "leading-[18px]";
+
+// Marcador de "hoje": mesmo vermelho e mesma forma (anel na célula + número
+// num círculo preenchido) em todas as superfícies, desktop e mobile.
+export const TODAY_CELL_RING_CLASS = "z-10 ring-2 ring-inset ring-[#b2554c]";
+export const TODAY_NUMBER_BADGE_CLASS =
+  "grid h-5 min-w-5 place-items-center rounded-full bg-[#b2554c] px-1 font-semibold leading-none text-white";
