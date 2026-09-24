@@ -525,16 +525,17 @@ export function HabitControls({
       <h1 className="sr-only">Hábitos</h1>
 
       {mobile ? (
-        <div className="m-[3px] flex h-10 w-[calc(100%-6px)] items-center gap-1 rounded-[8px] px-2.5">
-          <span className="flex min-w-0 items-center gap-2.5">
-            <span className="grid size-7 shrink-0 place-items-center text-foreground/72">
-              <CircleCheck className="size-3.5" aria-hidden="true" />
+        // Mesmo cabeçalho do Anual mobile: chip preenchido à esquerda (o
+        // mesmo "Hábitos" do desktop, espelhando o contexto selecionado) e o
+        // chevron no mesmo lugar.
+        <div className="m-[3px] flex h-10 w-[calc(100%-6px)] items-center gap-1 rounded-[8px] pl-1 pr-1.5">
+          <div className="inline-flex h-8 shrink-0 items-center overflow-hidden rounded-[10px] border border-primary bg-primary text-[0.78rem] font-semibold text-primary-foreground">
+            <span className="inline-flex h-8 w-7 items-center justify-center" aria-hidden="true">
+              <CircleCheck className="size-3.5" />
             </span>
-            <span className="truncate text-[13px] font-semibold leading-4 text-foreground">
-              Hábitos
-            </span>
-          </span>
-          <span className="ml-auto flex items-center gap-1">
+            <span className="pr-2.5">Hábitos</span>
+          </div>
+          <span className="ml-auto flex shrink-0 items-center gap-1">
             <button
               type="button"
               className="inline-flex h-8 w-8 items-center justify-center rounded-[10px] border border-border bg-card text-foreground/70 shadow-none transition-[background-color,border-color,color,box-shadow,transform] duration-150 ease-out hover:border-foreground/18 hover:bg-muted hover:text-foreground active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45"
@@ -545,9 +546,10 @@ export function HabitControls({
             >
               <ChevronDown
                 className={cn(
-                  "size-4 transition-transform duration-300",
-                  effectiveExpanded && "rotate-180"
+                  "h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
+                  effectiveExpanded ? "rotate-180" : "rotate-0"
                 )}
+                aria-hidden="true"
               />
             </button>
           </span>

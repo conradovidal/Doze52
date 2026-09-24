@@ -379,12 +379,12 @@ export function AppHeader({
     },
     [mobileProfileScrollFadeRef]
   );
-  // No mobile, com mais de um contexto, a troca fica sempre à vista no
-  // cabeçalho (os mesmos chips do desktop) e o painel expandido guarda só as
+  // No mobile, os contextos ficam sempre à vista no cabeçalho (os mesmos
+  // chips do desktop; com um contexto só, o chip dele — igual ao "Hábitos") e o painel expandido guarda só as
   // categorias — antes era preciso abrir o painel e ele ganhava uma linha
   // inteira só para o outro contexto.
   const showMobileProfileSwitcher =
-    isMobileMode && !effectiveInlineEditMode && profiles.length > 1;
+    isMobileMode && !effectiveInlineEditMode && profiles.length > 0;
   // Com a linha rolando, o contexto ativo pode ficar fora da vista.
   React.useEffect(() => {
     if (!showMobileProfileSwitcher || !selectedProfile) return;
