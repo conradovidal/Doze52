@@ -51,6 +51,8 @@ export type GuidedOnboardingStep =
   | "habit_created_confirmation"
   | "visibility_instruction"
   | "profile_instruction"
+  // Legados: tema/aparência saíram do guia (o tema é descobrível sozinho no
+  // menu do perfil). Só existem para migrar sessões salvas nesses passos.
   | "appearance_instruction"
   | "theme_instruction"
   | "wrap_up_instruction"
@@ -72,12 +74,9 @@ export type GuidedOnboardingState = {
   periodItemsCreated?: number;
   firstDateCreatedAt?: string;
   firstPeriodCreatedAt?: string;
-  themeConfirmedAt?: string;
   firstHabitCreatedAt?: string;
   habitRetrospectiveInteractedAt?: string;
   periodNavigationInteractedAt?: string;
-  profileOpenedAt?: string;
-  appearanceOpenedAt?: string;
   holidayUf?: string;
   holidayCalendarAddedAt?: string;
   addedCalendarPackGroupId?: string;
@@ -134,9 +133,6 @@ export type GuidedOnboardingAction =
   | { type: "finish_habit_onboarding"; at?: string }
   | { type: "continue_from_visibility"; at?: string }
   | { type: "return_to_year"; at?: string }
-  | { type: "open_profile"; at?: string }
-  | { type: "open_appearance"; at?: string }
-  | { type: "confirm_theme"; complete?: boolean; at?: string }
   | { type: "continue_from_wrap_up"; at?: string }
   | { type: "finish_profile_onboarding"; at?: string }
   | { type: "complete"; at?: string }
@@ -315,7 +311,10 @@ export const migrateGuidedOnboardingState = (
               candidate.step === "appearance_instruction" ||
               candidate.step === "theme_instruction")
           ? "completed"
-          : candidate.step;
+          : candidate.step === "appearance_instruction" ||
+              candidate.step === "theme_instruction"
+            ? "wrap_up_instruction"
+            : candidate.step;
     return {
       version: 15,
       step: migratedStep,
@@ -344,13 +343,10 @@ export const migrateGuidedOnboardingState = (
           : 0,
       firstDateCreatedAt: candidate.firstDateCreatedAt,
       firstPeriodCreatedAt: candidate.firstPeriodCreatedAt,
-      themeConfirmedAt: candidate.themeConfirmedAt,
       firstHabitCreatedAt: candidate.firstHabitCreatedAt,
       habitRetrospectiveInteractedAt:
         candidate.habitRetrospectiveInteractedAt,
       periodNavigationInteractedAt: candidate.periodNavigationInteractedAt,
-      profileOpenedAt: candidate.profileOpenedAt,
-      appearanceOpenedAt: candidate.appearanceOpenedAt,
       holidayUf:
         typeof candidate.holidayUf === "string" ? candidate.holidayUf : undefined,
       holidayCalendarAddedAt: candidate.holidayCalendarAddedAt,
@@ -407,7 +403,6 @@ export const migrateGuidedOnboardingState = (
           : 0,
       firstDateCreatedAt: candidate.firstDateCreatedAt,
       firstPeriodCreatedAt: candidate.firstPeriodCreatedAt,
-      themeConfirmedAt: candidate.themeConfirmedAt,
       holidayUf:
         typeof candidate.holidayUf === "string" ? candidate.holidayUf : undefined,
       holidayCalendarAddedAt: candidate.holidayCalendarAddedAt,
@@ -444,12 +439,6 @@ export const migrateGuidedOnboardingState = (
         : candidate.firstPeriodCreatedAt
           ? 1
           : 0;
-    const themeConfirmedAt =
-      typeof candidate.themeConfirmedAt === "string"
-        ? candidate.themeConfirmedAt
-        : candidate.version === 5 && candidate.step === "completion_choice"
-          ? candidate.completedAt ?? nowIso()
-          : undefined;
     let step: GuidedOnboardingStep;
 
     if (candidate.step === "completed" || candidate.step === "dismissed") {
@@ -493,7 +482,6 @@ export const migrateGuidedOnboardingState = (
       periodItemsCreated,
       firstDateCreatedAt: candidate.firstDateCreatedAt,
       firstPeriodCreatedAt: candidate.firstPeriodCreatedAt,
-      themeConfirmedAt,
       postOnboardingEventsCreated:
         typeof candidate.postOnboardingEventsCreated === "number"
           ? Math.max(0, candidate.postOnboardingEventsCreated)
@@ -679,10 +667,7 @@ export const reduceGuidedOnboardingState = (
       if (action.showPeriodNavigation) {
         return { ...withCalendar, step: "period_navigation_instruction" };
       }
-      if (!withCalendar.themeConfirmedAt) {
-        return { ...withCalendar, step: "theme_instruction" };
-      }
-      return buildCompletedState(withCalendar, action.at);
+      return { ...withCalendar, step: "wrap_up_instruction" };
     }
     case "continue_from_year":
       return state.step === "year_instruction"
@@ -697,7 +682,7 @@ export const reduceGuidedOnboardingState = (
       if (state.step !== "period_navigation_instruction") return state;
       return {
         ...state,
-        step: action.showHabit ? "habit_surface_instruction" : "theme_instruction",
+        step: action.showHabit ? "habit_surface_instruction" : "wrap_up_instruction",
       };
     case "interact_with_period_navigation":
       return state.step === "period_navigation_instruction" && !state.periodNavigationInteractedAt
@@ -749,41 +734,11 @@ export const reduceGuidedOnboardingState = (
         : state;
     case "finish_habit_onboarding":
       if (state.step !== "habit_created_confirmation") return state;
-      return {
-        ...state,
-        step: state.themeConfirmedAt ? "wrap_up_instruction" : "theme_instruction",
-      };
+      return { ...state, step: "wrap_up_instruction" };
     case "return_to_year":
       return state.step === "habit_created_confirmation"
         ? { ...state, step: "profile_instruction" }
         : state;
-    case "open_profile":
-      return state.step === "profile_instruction"
-        ? {
-            ...state,
-            step: "appearance_instruction",
-            profileOpenedAt: action.at ?? nowIso(),
-          }
-        : state;
-    case "open_appearance":
-      return state.step === "appearance_instruction"
-        ? {
-            ...state,
-            step: "theme_instruction",
-            appearanceOpenedAt: action.at ?? nowIso(),
-          }
-        : state;
-    case "confirm_theme": {
-      if (state.step !== "theme_instruction") return state;
-      if (!action.complete) {
-        return { ...state, themeConfirmedAt: action.at ?? nowIso() };
-      }
-      return {
-        ...state,
-        themeConfirmedAt: state.themeConfirmedAt ?? action.at ?? nowIso(),
-        step: "wrap_up_instruction",
-      };
-    }
     case "continue_from_wrap_up":
       return state.step === "wrap_up_instruction"
         ? buildCompletedState(state, action.at)
@@ -793,10 +748,7 @@ export const reduceGuidedOnboardingState = (
         ? buildCompletedState(state, action.at)
         : state;
     case "complete":
-      if (
-        state.step !== "year_instruction" &&
-        (state.step !== "theme_instruction" || !state.themeConfirmedAt)
-      ) {
+      if (state.step !== "year_instruction") {
         return state;
       }
       return buildCompletedState(state, action.at);
@@ -961,7 +913,7 @@ export type WrapUpCategorySuggestion = {
 // com pelo menos um. Aparecem no resumo final do guia (wrap_up_instruction)
 // para adotar como categoria de verdade.
 const WRAP_UP_SUGGESTIONS_PERSONAL: WrapUpCategorySuggestion[] = [
-  { id: "wrap-up-eventos", name: "Eventos", color: CATEGORY_COLOR_BASE_GRAPHITE },
+  { id: "wrap-up-eventos", name: "Geral", color: CATEGORY_COLOR_BASE_GRAPHITE },
   { id: "wrap-up-saude", name: "Saúde", color: CATEGORY_COLOR_BASE_CORAL },
   { id: "wrap-up-estudos", name: "Estudos", color: CATEGORY_COLOR_BASE_INDIGO },
   { id: "wrap-up-casa", name: "Casa", color: CATEGORY_COLOR_BASE_SAND },
@@ -973,7 +925,7 @@ const WRAP_UP_SUGGESTIONS_PERSONAL: WrapUpCategorySuggestion[] = [
 ];
 
 const WRAP_UP_SUGGESTIONS_WORK: WrapUpCategorySuggestion[] = [
-  { id: "wrap-up-eventos-work", name: "Eventos", color: CATEGORY_COLOR_BASE_GRAPHITE },
+  { id: "wrap-up-eventos-work", name: "Geral", color: CATEGORY_COLOR_BASE_GRAPHITE },
   { id: "wrap-up-reunioes", name: "Reuniões", color: CATEGORY_COLOR_BASE_TEAL },
   { id: "wrap-up-metas", name: "Metas", color: CATEGORY_COLOR_BASE_ORANGE },
   { id: "wrap-up-treinamentos", name: "Treinamentos", color: CATEGORY_COLOR_BASE_VIOLET },

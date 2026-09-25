@@ -19,22 +19,43 @@ async function openHome(page: Page) {
   await page.goto("/");
 }
 async function createHabit(page: Page) {
+  await expect(page.locator("[data-habits-prototype]")).toBeVisible();
+  // No mobile a jornada abre com o cartão de boas-vindas (ele entra um
+  // instante depois da tela), que mantém a lista recolhida até "Continuar".
+  const welcome = page.locator(
+    '[data-guided-toolbar-notice][data-guided-toolbar-target="mobile-intro"]',
+  );
+  await welcome.waitFor({ state: "visible", timeout: 3000 }).catch(() => {});
+  if (await welcome.isVisible())
+    await welcome.getByRole("button", { name: "Continuar" }).click();
+  const showHabits = page.getByRole("button", { name: "Mostrar hábitos" });
+  if (await showHabits.isVisible().catch(() => false)) await showHabits.click();
   await page
     .locator("[data-habits-prototype]")
     .getByRole("button", { name: "Criar novo hábito" })
     .click();
   await page.getByLabel("Nome do hábito").fill("Hábito QA continuidade");
   await page.getByRole("button", { name: "Criar", exact: true }).click();
-  await page
+  // Mobile: o dia se marca direto ("Marcar <hábito> em …"). Desktop, no
+  // guia: os dias recentes ficam destacados para o primeiro registro.
+  const markDay = page
     .locator(
       '[data-habits-prototype] button[aria-label^="Marcar Hábito QA continuidade"]',
     )
-    .last()
-    .click();
+    .last();
+  const recentDay = page
+    .locator('[data-onboarding-retrospective-date="true"]')
+    .last();
+  await expect(markDay.or(recentDay).first()).toBeVisible();
+  if (await markDay.isVisible()) await markDay.click();
+  else await recentDay.click();
 }
 async function finishAnnual(page: Page) {
+  // Guia atual do desktop: contexto → categoria de datas → duas datas →
+  // Hábitos (criar e marcar) → resumo final no Organizar.
   const panel = page.getByRole("region", { name: "Guia inicial do Doze 52" });
-  await panel.getByRole("button", { name: /Pessoal Para/ }).click();
+  const notice = page.locator("[data-guided-toolbar-notice]:visible");
+  await panel.getByRole("button", { name: /^Pessoal/ }).click();
   await panel
     .getByRole("button", { name: "Aniversários", exact: true })
     .click();
@@ -51,38 +72,22 @@ async function finishAnnual(page: Page) {
       page.getByRole("textbox", { name: "Título do evento" }),
     ).toHaveCount(0);
   }
-  await expect(page.locator("[data-guided-toolbar-notice]")).toContainText(
-    "Esconda",
+  await expect(notice).toHaveAttribute(
+    "data-guided-toolbar-target",
+    "habit-surface",
   );
-  await page.setViewportSize({ width: 1280, height: 700 });
-  await page.locator("[data-onboarding-category-id]").first().click();
   await page
-    .locator("[data-guided-toolbar-notice]")
-    .getByRole("button", { name: "Continuar" })
+    .locator('[data-product-navigation="desktop"] [data-product-destination="habits"]')
     .click();
-  await page.locator('[data-product-organize="desktop"]').click();
-  await page
-    .getByRole("button", { name: "Criar nova categoria", exact: true })
-    .click();
-  await page
-    .getByRole("button", { name: /Adicionar calendário pronto/ })
-    .click();
-  await page
-    .getByRole("button", { name: "Adicionar feriados", exact: true })
-    .click();
-  await page
-    .locator("[data-guided-toolbar-notice]")
-    .getByRole("button", { name: "Continuar" })
-    .click();
-  await page
-    .locator("[data-guided-toolbar-notice]")
-    .getByRole("button", { name: "Continuar" })
-    .click();
-  await expect(page.locator("[data-guided-toolbar-notice]")).toContainText(
-    "Veja o que você",
+  await expect(notice).toHaveAttribute("data-guided-toolbar-target", "habit");
+  await createHabit(page);
+  await expect(notice).toHaveAttribute(
+    "data-guided-toolbar-target",
+    "habit-created",
   );
+  await notice.getByRole("button", { name: "Continuar" }).click();
+  await expect(notice).toHaveAttribute("data-guided-toolbar-target", "wrap-up");
   await page.locator('[data-product-organize="desktop"]').click();
-  await page.getByRole("button", { name: /Adicionar categoria/ }).first().click();
   await page.getByRole("button", { name: "Finalizar guia" }).click();
   await expect
     .poll(() =>
@@ -127,12 +132,6 @@ for (const viewport of [
     await openHome(page);
     const panel = page.getByRole("region", { name: "Guia inicial do Doze 52" });
     await expect(panel).toBeVisible();
-    await page
-      .locator('[data-onboarding-profile-id][title="Profissional"]')
-      .click();
-    await expect(
-      page.locator('[data-onboarding-profile-id][title="Profissional"]'),
-    ).toHaveAttribute("aria-pressed", "true");
     await finishAnnual(page);
   });
 test("account carries habits to an independent desktop browser and isolates sign-out", async ({
@@ -281,7 +280,7 @@ test("account carries habits to an independent desktop browser and isolates sign
     await b.getByRole("button", { name: "Abrir perfil", exact: true }).click();
     await b.getByRole("button", { name: "Ajuda", exact: true }).click();
     await b
-      .getByRole("button", { name: "Introdução ao Anual", exact: true })
+      .getByRole("button", { name: "Introdução aos Eventos", exact: true })
       .click();
     await b
       .getByRole("button", { name: "Montar meu ano", exact: true })

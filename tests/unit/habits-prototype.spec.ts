@@ -284,7 +284,7 @@ test("empilha apenas hábitos concluídos preservando a ordem visível", () => {
 
 test("dimensiona a linha pelo total de hábitos visíveis", () => {
   expect([0, 1, 2, 3, 4, 5].map(getDesktopHabitRowMinHeight)).toEqual([
-    60, 60, 80, 100, 120, 120,
+    72, 72, 72, 92, 112, 112,
   ]);
 });
 
@@ -341,7 +341,7 @@ test("define um hábito Free e quatro Pro com upgrade contextual", () => {
 
 test("expõe somente os destinos funcionais da navegação", () => {
   expect(PRODUCT_DESTINATIONS.map(({ id, label }) => ({ id, label }))).toEqual([
-    { id: "annual", label: "Anual" },
+    { id: "annual", label: "Eventos" },
     { id: "habits", label: "Hábitos" },
   ]);
 });

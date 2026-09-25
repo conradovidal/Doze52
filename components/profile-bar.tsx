@@ -129,7 +129,7 @@ function EditProfileChip({
       style={style}
       className={cn(
         CHIP_SHELL_CLASS,
-        mobileDense && "h-10 w-full rounded-[8px]",
+        mobileDense && "h-10 max-w-full rounded-[8px]",
         isPlaceholder
           ? "border-border bg-card text-muted-foreground"
           : isActive
@@ -529,7 +529,7 @@ export function ProfileBar({
           <button
             type="button"
             onClick={onCreateProfile}
-            className={cn(CREATE_ACTION_CLASS, mobileDense && "h-10 w-full rounded-[8px]")}
+            className={cn(CREATE_ACTION_CLASS, mobileDense && "h-10 w-10 rounded-[8px]")}
             aria-label="Criar novo contexto"
             title="Criar novo contexto"
           >

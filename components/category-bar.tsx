@@ -202,7 +202,7 @@ function EditCategoryChip({
       className={cn(
         CHIP_SHELL_CLASS,
         `transition-[opacity,transform] ${MOTION_CLASS}`,
-        mobileDense && "h-10 w-full rounded-[8px]",
+        mobileDense && "h-10 max-w-full rounded-[8px]",
         isOverlay && CHIP_OVERLAY_CLASS,
         isRemoving && "opacity-60 ring-2 ring-destructive",
         isPlaceholder && "bg-background/80",
@@ -376,7 +376,7 @@ function GhostCategoryChip({
           ? "border-dashed bg-transparent text-muted-foreground/55"
           : "onboarding-category-reveal",
         "pointer-events-none",
-        mobileDense && "h-10 w-full rounded-[8px]"
+        mobileDense && "h-10 max-w-full rounded-[8px]"
       )}
     >
       {dashed ? null : (
@@ -542,13 +542,11 @@ export function CategoryBar({
     isInlineEditMode && orderedCategoriesForEditingProfile.length > 1 && !locked;
   // Leitura no mobile: chips no tamanho do nome, quebrando linha — a grade
   // de colunas fixas deixava o botão de ocultar numa célula inteira e
-  // abria uma linha a mais. A edição (arrastar) segue na grade.
-  const mobileReadChips = mobileDense && !isInlineEditMode;
+  // abria uma linha a mais. Na edição (Organizar) vale o mesmo arranjo do
+  // Organizar do desktop: chips lado a lado, alça e lápis dentro de cada um.
   const barClass = cn(
-    mobileReadChips
+    mobileDense
       ? "flex w-full flex-wrap items-center gap-1.5"
-      : mobileDense
-      ? "grid w-full grid-cols-2 gap-1.5 min-[430px]:grid-cols-3"
       : compact
         ? "w-full min-h-8 justify-center"
         : "mb-2 min-h-8 justify-start",
@@ -844,7 +842,7 @@ export function CategoryBar({
             disabled={!editingProfileId || locked}
             className={cn(
               CREATE_ACTION_CLASS,
-              mobileDense && "h-10 w-full rounded-[8px]",
+              mobileDense && "h-10 w-10 rounded-[8px]",
               (!editingProfileId || locked) &&
                 "cursor-not-allowed border-border bg-card text-muted-foreground/55 hover:border-border hover:bg-card hover:text-muted-foreground/55"
             )}

@@ -25,9 +25,11 @@ import {
   Mail,
   MessageCircle,
   MessageSquareText,
+  MoonStar,
   PencilLine,
   ShieldCheck,
   Sparkles,
+  SunMedium,
   Trash2,
   X,
   type LucideIcon,
@@ -40,10 +42,6 @@ import { ProUpgradeDialog } from "@/components/billing/pro-upgrade-dialog";
 import { BrandLogo } from "@/components/brand-logo";
 import { FeedbackDialog } from "@/components/feedback/feedback-dialog";
 import type { UtilityPanelSection } from "@/components/navigation/adaptive-navigation";
-import {
-  GuidedToolbarNoticeCard,
-  type GuidedToolbarNotice,
-} from "@/components/onboarding/guided-toolbar-notice";
 import { Button } from "@/components/ui/button";
 import { PANEL_EYEBROW_CLASS, PanelHero, PanelIcon, PanelList, PanelRow } from "@/components/ui/panel-list";
 import {
@@ -68,6 +66,7 @@ import {
 import { FOUNDER_PRICE_LABEL, isCalendarSpreadsheetProGateEnabled, PRO_UPGRADE_COPY } from "@/lib/entitlements";
 import { logDevError, logProdError } from "@/lib/safe-log";
 import { useStore } from "@/lib/store";
+import { useTheme } from "@/lib/theme";
 import { saveSnapshot } from "@/lib/sync";
 import { useBilling } from "@/lib/use-billing";
 import { cn } from "@/lib/utils";
@@ -223,11 +222,8 @@ type AppUtilityPanelProps = {
   section: UtilityPanelSection;
   isMobile: boolean;
   returnFocusRef: React.RefObject<HTMLElement | null>;
-  guidedAppearanceNotice?: GuidedToolbarNotice | null;
   onOpenChange: (open: boolean) => void;
   onOpenAuthDialog: () => void;
-  onDismissGuidedNotice?: () => void;
-  onGuidedAppearanceOpen?: () => void;
   /**
    * Força o formulário de conta a abrir em "Cadastro" em vez do padrão
    * "Login" — usado pela jornada própria do mobile (goto_profile em
@@ -237,6 +233,51 @@ type AppUtilityPanelProps = {
   authInitialMode?: "login" | "signup";
 };
 
+// Tema saiu do cabeçalho e mora no menu do perfil, logo depois de Plano
+// (Conta · Plano · Tema · Ajuda): alterna direto, sem abrir uma seção. Mesmo
+// lugar no desktop (barra lateral) e no mobile (lista da folha).
+function useThemeRowState() {
+  const { mode, setTheme } = useTheme();
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => setMounted(true), []);
+  const isDark = mounted && mode === "dark";
+  return { isDark, toggle: () => setTheme(isDark ? "light" : "dark") };
+}
+
+function ThemeSidebarItem() {
+  const { isDark, toggle } = useThemeRowState();
+  const Icon = isDark ? MoonStar : SunMedium;
+  return (
+    <button
+      type="button"
+      data-theme-toggle
+      aria-label={isDark ? "Tema escuro. Usar tema claro" : "Tema claro. Usar tema escuro"}
+      className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+      onClick={toggle}
+    >
+      <Icon className="size-4 shrink-0" />
+      <span className="min-w-0 flex-1 truncate text-sm font-semibold">Tema</span>
+      <span className="shrink-0 text-xs font-medium text-muted-foreground/80">
+        {isDark ? "Escuro" : "Claro"}
+      </span>
+    </button>
+  );
+}
+
+function ThemePanelRow() {
+  const { isDark, toggle } = useThemeRowState();
+  return (
+    <PanelRow
+      icon={isDark ? MoonStar : SunMedium}
+      color={CATEGORY_COLOR_BASE_VIOLET}
+      title="Tema"
+      description={isDark ? "Escuro · toque para usar o claro" : "Claro · toque para usar o escuro"}
+      trailing={false}
+      onClick={toggle}
+    />
+  );
+}
+
 export function AppUtilityPanel({
   onOpenAnnualHelp,
   continuityStatus,
@@ -245,11 +286,8 @@ export function AppUtilityPanel({
   section,
   isMobile,
   returnFocusRef,
-  guidedAppearanceNotice = null,
   onOpenChange,
   onOpenAuthDialog,
-  onDismissGuidedNotice,
-  onGuidedAppearanceOpen,
   authInitialMode = "login",
 }: AppUtilityPanelProps) {
   const router = useRouter();
@@ -304,17 +342,6 @@ export function AppUtilityPanel({
       });
     return () => controller.abort();
   }, [open, session]);
-
-  const guidedAppearanceFiredRef = React.useRef(false);
-  React.useEffect(() => {
-    if (!open) {
-      guidedAppearanceFiredRef.current = false;
-      return;
-    }
-    if (guidedAppearanceFiredRef.current) return;
-    guidedAppearanceFiredRef.current = true;
-    onGuidedAppearanceOpen?.();
-  }, [open, onGuidedAppearanceOpen]);
 
   const metadata = session?.user.metadata ?? {};
   const rawName =
@@ -380,7 +407,7 @@ export function AppUtilityPanel({
   // No mobile, "account" é a raiz da folha; os outros tópicos abrem como
   // uma tela mais funda, com voltar (mesmo padrão do Organizar).
   const mobileSubTopic =
-    session && activeTopic && activeTopic.id !== "account" ? activeTopic : null;
+    activeTopic && activeTopic.id !== "account" ? activeTopic : null;
 
   React.useEffect(() => {
     if (!open || !activeTopic || activeTopic.id === activeSection) return;
@@ -551,8 +578,8 @@ export function AppUtilityPanel({
                   .map((topic) => {
                     const meta = MOBILE_TOPIC_META[topic.id];
                     return (
+                      <React.Fragment key={topic.id}>
                       <PanelRow
-                        key={topic.id}
                         icon={topic.icon}
                         color={meta.color}
                         iconClassName={meta.iconClassName}
@@ -560,6 +587,8 @@ export function AppUtilityPanel({
                         description={topic.id === "plan" ? (isPro ? "Doze 52 Pro · sua assinatura" : "Plano Free · veja o que o Pro libera") : topic.description}
                         onClick={() => setActiveSection(topic.id)}
                       />
+                      {topic.id === "plan" ? <ThemePanelRow /> : null}
+                      </React.Fragment>
                     );
                   })}
               </PanelList>
@@ -605,6 +634,27 @@ export function AppUtilityPanel({
               initialMode={authInitialMode}
               onSuccess={() => onOpenChange(false)}
             />
+            {/* Sem conta, a folha do mobile não tem barra lateral: os mesmos
+                tópicos (Plano · Tema · Ajuda) vêm logo abaixo do formulário. */}
+            {isMobile ? (
+              <PanelList className="mt-5 w-full text-left">
+                {visibleTopics
+                  .filter((topic) => topic.id !== "account")
+                  .map((topic) => (
+                    <React.Fragment key={topic.id}>
+                      <PanelRow
+                        icon={topic.icon}
+                        color={MOBILE_TOPIC_META[topic.id].color}
+                        iconClassName={MOBILE_TOPIC_META[topic.id].iconClassName}
+                        title={topic.label}
+                        description={topic.description}
+                        onClick={() => setActiveSection(topic.id)}
+                      />
+                      {topic.id === "plan" ? <ThemePanelRow /> : null}
+                    </React.Fragment>
+                  ))}
+              </PanelList>
+            ) : null}
           </div>
         );
       case "plan":
@@ -703,7 +753,7 @@ export function AppUtilityPanel({
             ) : null}
             <PanelList>
               {onOpenAnnualHelp ? (
-                <PanelRow icon={Compass} color={CATEGORY_COLOR_BASE_TEAL} title="Introdução ao Anual" description="Reveja como o ano cabe em uma página." onClick={onOpenAnnualHelp} />
+                <PanelRow icon={Compass} color={CATEGORY_COLOR_BASE_TEAL} title="Introdução aos Eventos" description="Reveja como o ano cabe em uma página." onClick={onOpenAnnualHelp} />
               ) : null}
               {session ? (
                 <PanelRow icon={Bug} color={CATEGORY_COLOR_BASE_CORAL} title="Enviar feedback" description="Conte um problema ou uma ideia, com print se quiser." onClick={openFeedback} />
@@ -743,9 +793,12 @@ export function AppUtilityPanel({
         const Icon = topic.icon;
         const selected = activeSection === topic.id;
         return (
-          <button key={topic.id} type="button" aria-current={selected ? "page" : undefined} data-onboarding-appearance-topic={topic.id === "account" ? "true" : undefined} className={cn("flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60", selected ? "bg-foreground text-background" : "text-muted-foreground hover:bg-muted hover:text-foreground", guidedAppearanceNotice && topic.id === "account" && "product-spotlight-target")} onClick={() => { setActiveSection(topic.id); if (topic.id === "account") onGuidedAppearanceOpen?.(); }}>
+          <React.Fragment key={topic.id}>
+          <button type="button" aria-current={selected ? "page" : undefined} className={cn("flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60", selected ? "bg-foreground text-background" : "text-muted-foreground hover:bg-muted hover:text-foreground")} onClick={() => setActiveSection(topic.id)}>
             <Icon className="size-4 shrink-0" /><span className="min-w-0 truncate text-sm font-semibold">{topic.label}</span>
           </button>
+          {topic.id === "plan" ? <ThemeSidebarItem /> : null}
+          </React.Fragment>
         );
       })}
     </nav>
@@ -756,12 +809,14 @@ export function AppUtilityPanel({
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent
           data-app-utility-panel
-          className={cn("overflow-hidden p-0", isMobile ? cn("inset-x-0 top-auto bottom-0 w-screen max-w-none translate-x-0 translate-y-0 rounded-none rounded-t-[1.75rem] border-0 border-t border-border/70 data-[state=open]:slide-in-from-bottom-2 data-[state=closed]:slide-out-to-bottom-2 sm:max-w-none", session ? "h-[min(44rem,86dvh)]" : "h-[min(34rem,58dvh)]") : "h-[min(600px,80dvh)] w-[min(720px,calc(100vw-5rem))] max-w-[720px] sm:max-w-[720px]")}
+          className={cn("overflow-hidden p-0", isMobile ? cn("inset-x-0 top-auto bottom-0 w-screen max-w-none translate-x-0 translate-y-0 rounded-none rounded-t-[1.75rem] border-0 border-t border-border/70 data-[state=open]:slide-in-from-bottom-2 data-[state=closed]:slide-out-to-bottom-2 sm:max-w-none", "h-auto max-h-[86dvh]") : "h-[min(600px,80dvh)] w-[min(720px,calc(100vw-5rem))] max-w-[720px] sm:max-w-[720px]")}
           onCloseAutoFocus={(event) => { event.preventDefault(); returnFocusRef.current?.focus(); }}
         >
           <DialogDescription className="sr-only">Gerencie sua conta, plano, dados e canais do Doze 52.</DialogDescription>
           {isMobile ? (
-            <div className="flex h-full min-h-0 flex-col">
+            // Altura do conteúdo (até 86dvh): o formulário de entrada cabe
+            // sem rolar; só rola quando não couber mesmo.
+            <div className="flex max-h-[86dvh] min-h-0 flex-col">
               <header className="flex h-16 shrink-0 items-center gap-2 border-b border-border px-4 pr-12">
                 {mobileSubTopic ? (
                   <>
@@ -790,15 +845,11 @@ export function AppUtilityPanel({
                 )}
               </header>
               <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-4 py-5 pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))]">
-                {session ? (
-                  <ViewSwap view={mobileSubTopic?.id ?? "account"} depth={mobileSubTopic ? 1 : 0}>
-                    {mobileSubTopic
-                      ? renderSection(mobileSubTopic.id)
-                      : renderSection("account", { standalone: false })}
-                  </ViewSwap>
-                ) : (
-                  renderSection("account")
-                )}
+                <ViewSwap view={mobileSubTopic?.id ?? "account"} depth={mobileSubTopic ? 1 : 0}>
+                  {mobileSubTopic
+                    ? renderSection(mobileSubTopic.id)
+                    : renderSection("account", { standalone: false })}
+                </ViewSwap>
               </div>
             </div>
           ) : (
@@ -816,17 +867,6 @@ export function AppUtilityPanel({
               <section className="min-h-0 overflow-y-auto px-8 pb-3 pt-6">{renderSection(activeSection)}</section>
             </div>
           )}
-          {guidedAppearanceNotice && onDismissGuidedNotice ? (
-            <GuidedToolbarNoticeCard
-              notice={guidedAppearanceNotice}
-              onClose={onDismissGuidedNotice}
-              placement="panel"
-              portaled
-              portalTargetSelector="[data-app-utility-panel]"
-              anchorSelector="[data-onboarding-appearance-topic='true']"
-              anchorPlacement="right-center"
-            />
-          ) : null}
         </DialogContent>
       </Dialog>
       <ProUpgradeDialog open={spreadsheetUpgradeOpen} onOpenChange={setSpreadsheetUpgradeOpen} reason="calendar-import-export" />

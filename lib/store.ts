@@ -185,8 +185,10 @@ export const ONBOARDING_CATEGORY_IDS = {
 } as const;
 
 export const ONBOARDING_DEFAULT_CATEGORY_ID = ONBOARDING_CATEGORY_IDS.events;
+// v9: categoria padrão "Eventos" virou "Geral" (não colide com a tela
+// Eventos). Exemplos antigos ainda bloqueados são trocados automaticamente.
 export const ONBOARDING_PERSONAL_DEMO_GROUP_ID =
-  "onboarding-personal-demo-v8";
+  "onboarding-personal-demo-v9";
 const ONBOARDING_PERSONAL_DEMO_GROUP_IDS = new Set([
   "onboarding-personal-demo-v1",
   "onboarding-personal-demo-v2",
@@ -195,6 +197,7 @@ const ONBOARDING_PERSONAL_DEMO_GROUP_IDS = new Set([
   "onboarding-personal-demo-v5",
   "onboarding-personal-demo-v6",
   "onboarding-personal-demo-v7",
+  "onboarding-personal-demo-v8",
   ONBOARDING_PERSONAL_DEMO_GROUP_ID,
 ]);
 
@@ -310,7 +313,7 @@ const getLegacyDefaultCategories = (): CategoryItem[] => [
   {
     id: ONBOARDING_CATEGORY_IDS.events,
     profileId: ONBOARDING_PROFILE_IDS.personal,
-    name: "Eventos",
+    name: "Geral",
     color: ONBOARDING_CATEGORY_COLOR_BY_ID[ONBOARDING_CATEGORY_IDS.events],
     visible: true,
   },
@@ -355,7 +358,7 @@ const getFeatureDefaultCategories = (): CategoryItem[] => [
   {
     id: ONBOARDING_CATEGORY_IDS.events,
     profileId: ONBOARDING_PROFILE_IDS.personal,
-    name: "Eventos",
+    name: "Geral",
     color: ONBOARDING_CATEGORY_COLOR_BY_ID[ONBOARDING_CATEGORY_IDS.events],
     visible: true,
   },
@@ -415,7 +418,7 @@ const getPersonalDemoCategories = (): CategoryItem[] => [
   demoCategory(
     ONBOARDING_CATEGORY_IDS.events,
     ONBOARDING_PROFILE_IDS.personal,
-    "Eventos",
+    "Geral",
     CATEGORY_COLOR_BASE_GRAPHITE
   ),
   demoCategory(
@@ -457,7 +460,7 @@ const getPersonalDemoCategories = (): CategoryItem[] => [
   demoCategory(
     DEMO_CATEGORY_IDS.workEvents,
     ONBOARDING_PROFILE_IDS.professional,
-    "Eventos",
+    "Geral",
     CATEGORY_COLOR_BASE_GREEN
   ),
   demoCategory(

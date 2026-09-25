@@ -56,7 +56,7 @@ export const dismissOnboardingIfVisible = async (page: Page) => {
   if (await guidedButton.isVisible().catch(() => false)) {
     await guidedButton.click();
     const confirmation = page.getByRole("dialog", {
-      name: "Quer encerrar a montagem guiada?",
+      name: /Encerrar o guia\?/,
     });
     if (await confirmation.isVisible().catch(() => false)) {
       await confirmation

@@ -313,20 +313,22 @@ const HABIT_DOT_MAX_PX = 18;
 const HABIT_DOT_GAP_PX = 2;
 const HABIT_STACK_TOP_OFFSET_PX = 30;
 const HABIT_STACK_BOTTOM_OFFSET_PX = 4;
-// Folga real para absorver arredondamento do clamp em vw e variações de
-// zoom/DPI — sem isso a pilha de bolinhas cabia raspando e podia transbordar.
-const HABIT_STACK_SAFETY_BUFFER_PX = 8;
+// Mesma regra do Anual de eventos: por padrão o mês comporta 2 (eventos lá,
+// hábitos marcados no mesmo dia aqui) e só cresce a partir do 3º. Com 2
+// hábitos a altura dá 72px — igual a um mês com 2 linhas de evento
+// (MONTH_EVENTS_MIN_TOP_OFFSET + 2 cápsulas + padding do Anual), então as
+// duas telas têm o mesmo tamanho de ano. As bolinhas usam
+// clamp(12px,1.1vw,18px) e a conta usa o máximo, o que já sobra folga.
+const HABIT_ROWS_BEFORE_GROWTH = 2;
 
 export const getDesktopHabitRowMinHeight = (visibleHabitCount: number) => {
-  const count = Math.max(1, Math.min(4, visibleHabitCount));
+  const count = Math.max(
+    HABIT_ROWS_BEFORE_GROWTH,
+    Math.min(4, visibleHabitCount)
+  );
   const stackHeightPx =
     count * HABIT_DOT_MAX_PX + (count - 1) * HABIT_DOT_GAP_PX;
-  return (
-    HABIT_STACK_TOP_OFFSET_PX +
-    HABIT_STACK_BOTTOM_OFFSET_PX +
-    stackHeightPx +
-    HABIT_STACK_SAFETY_BUFFER_PX
-  );
+  return HABIT_STACK_TOP_OFFSET_PX + HABIT_STACK_BOTTOM_OFFSET_PX + stackHeightPx;
 };
 
 export type HabitDayAction = "blocked" | "create" | "toggle";
