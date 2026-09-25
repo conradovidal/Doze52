@@ -122,7 +122,6 @@ type AppHeaderProps = {
   onGuidedCalendarImported?: (pack?: CalendarPack) => void;
   guidedCalendarSelectionActive?: boolean;
   guidedEditPreviewActive?: boolean;
-  accountNudgeHighlightProfile?: boolean;
   onboardingLayoutLocked?: boolean;
   onboardingLayoutReserved?: boolean;
   mobileExamplePreviewActive?: boolean;
@@ -185,7 +184,6 @@ export function AppHeader({
   onGuidedCalendarImported,
   guidedCalendarSelectionActive = false,
   guidedEditPreviewActive = false,
-  accountNudgeHighlightProfile = false,
   onboardingLayoutLocked = false,
   onboardingLayoutReserved = false,
   mobileExamplePreviewActive = false,
@@ -207,7 +205,6 @@ export function AppHeader({
 }: AppHeaderProps) {
   const profiles = useStore((s) => s.profiles);
   const categories = useStore((s) => s.categories);
-  const events = useStore((s) => s.events);
   const selectedProfileIds = useStore((s) => s.selectedProfileIds);
   const setSelectedProfiles = useStore((s) => s.setSelectedProfiles);
   const setCategoriesVisibility = useStore((s) => s.setCategoriesVisibility);
@@ -228,11 +225,19 @@ export function AppHeader({
   // calendário quando é o caso, senão exclui como categoria comum.
   const handleRemoveWrapUpCategory = React.useCallback(
     (categoryId: string) => {
-      const category = categories.find((candidate) => candidate.id === categoryId);
+      // Lê o store na hora (não o snapshot do último render): a troca das
+      // sugestões remove depois de um intervalo, e um snapshot antigo
+      // desfazia o que tivesse mudado nesse meio-tempo.
+      const current = useStore.getState();
+      const category = current.categories.find((candidate) => candidate.id === categoryId);
       if (!category) return false;
       if (category.calendarPackGroupId) {
         const result = removeCalendarPackByCategory(
-          { profiles, categories, events },
+          {
+            profiles: current.profiles,
+            categories: current.categories,
+            events: current.events,
+          },
           calendarPacks,
           categoryId
         );
@@ -245,7 +250,7 @@ export function AppHeader({
         strategy: { type: "delete-events" },
       });
     },
-    [calendarPacks, categories, deleteCategory, events, profiles, replaceAllData]
+    [calendarPacks, deleteCategory, replaceAllData]
   );
 
   const [isInlineEditMode, setIsInlineEditMode] = React.useState(false);
@@ -763,8 +768,7 @@ export function AppHeader({
                 guidedToolbarNotice?.target === "wrap-up"
               }
               highlightProfile={
-                guidedToolbarNotice?.target === "profile" ||
-                accountNudgeHighlightProfile
+                guidedToolbarNotice?.target === "profile"
               }
               highlightDestination={
                 guidedToolbarNotice?.target === "habit-surface" ? "habits" : undefined
@@ -792,6 +796,23 @@ export function AppHeader({
               anchorSelector="[data-onboarding-category-id]"
               anchorMultiple
               anchorPlacement="below-center"
+            />
+          ) : null}
+          {/* Resumo do guia com Hábitos ainda no fundo (o Anual só entra no
+              "Finalizar guia"): a fileira de contextos/categorias, onde este
+              card mora no Anual, não existe aqui — ancora no próprio lápis. */}
+          {guidedToolbarNotice?.target === "wrap-up" &&
+          !showCalendarControls &&
+          !isMobileMode &&
+          !effectiveInlineEditMode &&
+          onDismissGuidedSelection ? (
+            <GuidedToolbarNoticeCard
+              notice={guidedToolbarNotice}
+              onClose={onDismissGuidedSelection}
+              placement="viewport"
+              portaled
+              anchorSelector="[data-product-organize='desktop']"
+              anchorPlacement="below-end"
             />
           ) : null}
           {guidedToolbarNotice?.target === "habit-surface" &&
@@ -823,8 +844,8 @@ export function AppHeader({
                   type="button"
                   data-product-organize="mobile"
                   aria-pressed={organizeActive}
-                  aria-label={organizeActive ? "Finalizar organização" : "Organizar"}
-                  title={organizeActive ? "Finalizar organização" : "Organizar"}
+                  aria-label={organizeActive ? "Finalizar edição" : "Editar"}
+                  title={organizeActive ? "Finalizar edição" : "Editar"}
                   disabled={organizeDisabled}
                   className={cn(
                     // Depois do ano, na ponta — o mesmo lugar em que fica
@@ -1537,7 +1558,11 @@ export function AppHeader({
           onCreated={onCategoryCreated}
           onFocusYear={onCalendarPackFocusYear}
           onRequireAuth={() => onOpenAuthDialog()}
-          bypassLimits={demoExplorationActive}
+          // No resumo do guia, um 2º calendário pronto troca o anterior (ver
+          // WrapUpCategorySuggestions) em vez de abrir o Pro no meio do passo.
+          bypassLimits={
+            demoExplorationActive || guidedToolbarNotice?.target === "wrap-up"
+          }
           guidedCalendarSelection={guidedCalendarSelectionActive}
           onCalendarOpen={onGuidedCalendarOpen}
           onCalendarClose={onGuidedCalendarClose}

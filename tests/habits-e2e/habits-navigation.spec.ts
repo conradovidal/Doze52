@@ -220,8 +220,9 @@ test("mobile abre em Hábitos e preserva a sessão entre superfícies", async ({
   await expect(
     utilityPanel.getByRole("button", { name: "Criar conta", exact: true })
   ).toBeVisible();
+  // Em "Cadastro" o mesmo botão fala de criar conta, não de entrar.
   await expect(
-    utilityPanel.getByRole("button", { name: "Entrar com Google" })
+    utilityPanel.getByRole("button", { name: "Continuar com Google" })
   ).toBeVisible();
 });
 
@@ -287,7 +288,7 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
   await expect(page.locator("[data-rail-divider]")).toHaveCount(0);
   await expect(desktopNavigation.getByRole("button", { name: "Editar", exact: true })).toHaveCount(0);
   await expect(page.locator('[data-calendar-ui-mode="desktop"]')).toBeVisible();
-  const contextualEdit = page.getByRole("button", { name: "Organizar", exact: true });
+  const contextualEdit = page.getByRole("button", { name: "Editar", exact: true });
   const collapseCategories = page.getByRole("button", { name: "Recolher categorias" });
   await expect(contextualEdit).toBeVisible();
   await expect(collapseCategories).toBeVisible();
@@ -426,7 +427,7 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
   // Organizar (ainda modal — o botão do cabeçalho fica inacessível
   // enquanto ele estiver aberto); um segundo Escape finaliza a organização.
   await page.keyboard.press("Escape");
-  const organizePanel = page.getByRole("dialog", { name: "Organizar" });
+  const organizePanel = page.getByRole("dialog", { name: "Editar", exact: true });
   await expect(organizePanel).toBeVisible();
   // A criação de categoria é uma tela dentro do próprio painel: espera a
   // troca de tela assentar antes do segundo Escape (que fecha o painel).
@@ -854,9 +855,9 @@ test("desktop edita e reordena hábitos nos controles contextuais", async ({
   // controles de reordenar/editar ficam em [data-filter-edit-panel], não
   // mais na faixa sempre visível [data-habit-controls-layout="desktop"].
   const controls = page.locator("[data-filter-edit-panel]");
-  const edit = page.getByRole("button", { name: "Organizar", exact: true });
+  const edit = page.getByRole("button", { name: "Editar", exact: true });
   await edit.click();
-  const organizePanel = page.getByRole("dialog", { name: "Organizar" });
+  const organizePanel = page.getByRole("dialog", { name: "Editar", exact: true });
   await expect(organizePanel).toBeVisible();
   await expect(page.locator('[data-day-cell][aria-disabled="true"]').first()).toBeVisible();
 
@@ -941,7 +942,7 @@ test("mobile reordena hábitos pelo mesmo DnD e persiste a posição", async ({
   // O gatilho de edição foi unificado com o do Anual ("Organizar") e vive no
   // cabeçalho (components/app-header.tsx), não mais dentro dos próprios
   // controles de Hábitos como um botão "Editar" separado.
-  await page.getByRole("button", { name: "Organizar", exact: true }).click();
+  await page.getByRole("button", { name: "Editar", exact: true }).click();
   const handle = controls.getByRole("button", { name: "Reordenar hábito Caminhar" });
   await handle.focus();
   await page.keyboard.press("Space");
@@ -966,7 +967,7 @@ test("mobile reordena hábitos pelo mesmo DnD e persiste a posição", async ({
   }).toBe("mobile-b,mobile-a");
 
   await page.reload();
-  await page.getByRole("button", { name: "Organizar", exact: true }).click();
+  await page.getByRole("button", { name: "Editar", exact: true }).click();
   const chips = controls.locator("[data-habit-edit-chip]");
   await expect(chips.first()).toHaveAttribute("data-habit-edit-chip", "mobile-b");
   await controls.getByRole("button", { name: "Editar hábito Caminhar" }).click();

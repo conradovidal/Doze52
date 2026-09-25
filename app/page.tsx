@@ -30,7 +30,6 @@ import {
   getGuidedSelectionNotice,
   type GuidedCalendarDraft,
 } from "@/components/onboarding/guided-onboarding-panel";
-import { AccountNudge } from "@/components/onboarding/account-nudge";
 import { DemoExplorationInvite } from "@/components/onboarding/demo-exploration-invite";
 import { MobileDesktopFirstNotice } from "@/components/onboarding/mobile-desktop-first-notice";
 import { OnboardingExitDialog } from "@/components/onboarding/onboarding-exit-dialog";
@@ -111,7 +110,7 @@ import {
   materializeUserOwnedSnapshot,
 } from "@/lib/snapshot-ownership";
 import { cn } from "@/lib/utils";
-import type { AnchorPoint, CategoryItem } from "@/lib/types";
+import type { AnchorPoint } from "@/lib/types";
 import { trackOnboardingRegion } from "@/lib/onboarding-region";
 import { useHabitsStore } from "@/lib/habits-store";
 import {
@@ -474,7 +473,6 @@ export default function HomePage() {
     React.useState<ProductOnboardingState | null>(null);
   const [guidedOnboarding, setGuidedOnboarding] =
     React.useState<GuidedOnboardingState | null>(null);
-  const [accountNudgeVisible, setAccountNudgeVisible] = React.useState(false);
   const [onboardingExitOpen, setOnboardingExitOpen] = React.useState(false);
   const [workspaceEditMode, setWorkspaceEditMode] = React.useState<
     "calendar" | "habits" | null
@@ -767,12 +765,15 @@ export default function HomePage() {
   // (o hábito real nasce ao lado dela), mas deixa de travar a interação.
   // No mobile essa é a única via: a vitrine já entra composta com os hábitos
   // reais desde o começo, sem passo travado.
+  // O resumo (wrap_up_instruction) acontece com Hábitos ainda no fundo, e a
+  // vitrine segue ali até o "Finalizar guia".
   const onboardingHabitShowcaseDisplay =
     guidedHabitShowcaseSource &&
     guidedOnboarding &&
     (habitShowcaseDisplayOnly ||
       guidedOnboarding.step === "habit_instruction" ||
-      guidedOnboarding.step === "habit_created_confirmation")
+      guidedOnboarding.step === "habit_created_confirmation" ||
+      guidedOnboarding.step === "wrap_up_instruction")
       ? guidedHabitShowcaseSource
       : null;
 
@@ -1989,52 +1990,24 @@ export default function HomePage() {
   }, [notify]);
 
   // O ano de exemplo é um vislumbre de como a aplicação fica com uso
-  // consistente — não vira dado da pessoa. No resumo final sobrevive só o
-  // que é dela: a categoria que ela criou durante o tour (com os itens que
-  // ela salvou nela) e o calendário pronto que ela escolheu, com os eventos
-  // dele. Nada de categoria vazia sobrando. Roda uma única vez, ao entrar no
-  // passo de resumo (wrap_up_instruction) — dali em diante ela já está livre
-  // para adicionar categorias (inclusive pelas sugestões), então o
-  // encerramento do guia não repete esse corte.
-  const trimToRealCategories = React.useCallback(
-    (next: GuidedOnboardingState) => {
-      const current = useStore.getState();
-      const createdCategoryIds = new Set(
-        [next.dateCategoryId, next.periodCategoryId].filter(
-          (categoryId): categoryId is string => Boolean(categoryId)
-        )
-      );
-      // O pack escolhido no passo dos calendários prontos fica instalado
-      // inteiro: ela seguiu a instrução do guia de propósito, e é ele que dá
-      // volume ao ano. O fallback cobre estados antigos, salvos antes de o
-      // guia registrar o grupo do pack.
-      const chosenPackGroupId = next.addedCalendarPackGroupId;
-      const isChosenPackCategory = (category: CategoryItem) =>
-        Boolean(category.calendarPackGroupId) &&
-        !isOnboardingPersonalDemoGroup(category.calendarPackGroupId) &&
-        (!chosenPackGroupId ||
-          category.calendarPackGroupId === chosenPackGroupId);
-      const keepCategoryIds = new Set(
-        current.categories
-          .filter(
-            (category) =>
-              createdCategoryIds.has(category.id) ||
-              (isAccountContinuityEnabled && !isOnboardingPersonalDemoGroup(category.calendarPackGroupId)) ||
-              isChosenPackCategory(category)
-          )
-          .map((category) => category.id)
-      );
-      const categories = current.categories.filter((category) =>
-        keepCategoryIds.has(category.id)
-      );
-      const events = current.events.filter((event) =>
-        keepCategoryIds.has(event.categoryId)
-      );
-      replaceAllData({ profiles: current.profiles, categories, events });
-      unlockOnboardingPersonalDemo();
-    },
-    [replaceAllData, unlockOnboardingPersonalDemo]
-  );
+  // consistente — não vira dado da pessoa. Ele fica no fundo até o fim do
+  // guia (inclusive no resumo, enquanto ela escolhe as categorias) e só sai
+  // no "Finalizar guia": sobrevive tudo o que é dela — a categoria criada
+  // durante o tour, as sugestões adotadas e os calendários prontos, com os
+  // eventos de cada um. Só as categorias do exemplo (e os eventos delas)
+  // somem.
+  const trimToRealCategories = React.useCallback(() => {
+    const current = useStore.getState();
+    const categories = current.categories.filter(
+      (category) => !isOnboardingPersonalDemoGroup(category.calendarPackGroupId)
+    );
+    const keepCategoryIds = new Set(categories.map((category) => category.id));
+    const events = current.events.filter((event) =>
+      keepCategoryIds.has(event.categoryId)
+    );
+    replaceAllData({ profiles: current.profiles, categories, events });
+    unlockOnboardingPersonalDemo();
+  }, [replaceAllData, unlockOnboardingPersonalDemo]);
 
   // "Editar categoria", "calendário pronto" (como passo isolado), "trocar
   // de ano" e "Q1-Q4/meses" deixaram de pausar o guia pra explicar — cada
@@ -2070,13 +2043,12 @@ export default function HomePage() {
     // Q1-Q4/meses também não pausa mais (não há cartão para esse passo):
     // sem este pulo, sessões salvas nele ficavam paradas, sem guia algum.
     if (step === "period_navigation_instruction") {
-      const next = updateGuidedOnboarding({
+      updateGuidedOnboarding({
         type: "continue_from_period_navigation",
         showHabit: showHabitSteps,
       });
-      if (next.step === "wrap_up_instruction") trimToRealCategories(next);
     }
-  }, [guidedOnboarding?.step, showHabitSteps, trimToRealCategories, updateGuidedOnboarding]);
+  }, [guidedOnboarding?.step, showHabitSteps, updateGuidedOnboarding]);
 
   const finalizeGuidedOnboarding = React.useCallback(
     (next: GuidedOnboardingState) => {
@@ -2137,7 +2109,6 @@ export default function HomePage() {
     }
     setGuidedDraft(null);
     setMobileGuidedRangeStart(null);
-    setAccountNudgeVisible(false);
     setDemoInviteSuppressed(false);
     setOnboardingExitOpen(false);
   }, [inlineEditModeActive, updateGuidedOnboarding]);
@@ -2175,6 +2146,29 @@ export default function HomePage() {
     updateGuidedOnboarding,
   ]);
 
+  // Convite de conta depois de ela já usar o ano de verdade (2 eventos após
+  // o guia, ou 3 criações depois de sair dele): em vez de um card pequeno no
+  // canto, abre direto a Conta em modo cadastro — a tela que já tem o Google
+  // e o formulário, sem um passo a mais entre o convite e a ação. Espera
+  // qualquer diálogo aberto (o do evento fechando, ou o Editar, onde nasce a
+  // 3ª criação depois de sair do guia) sair de cena antes, para não empilhar
+  // dois modais.
+  const openAccountSignup = React.useCallback(() => {
+    const startedAt = Date.now();
+    const tryOpen = () => {
+      if (document.querySelector('[role="dialog"]')) {
+        if (Date.now() - startedAt < 5 * 60_000) window.setTimeout(tryOpen, 300);
+        return;
+      }
+      utilityPanelTriggerRef.current =
+        document.querySelector<HTMLElement>("[data-product-account]") ?? null;
+      setUtilityPanelSection("account");
+      setUtilityPanelAuthMode("signup");
+      setUtilityPanelOpen(true);
+    };
+    window.setTimeout(tryOpen, 450);
+  }, []);
+
   const trackPostOnboardingEvent = React.useCallback(
     () => {
       if (session?.user.id) return;
@@ -2184,10 +2178,10 @@ export default function HomePage() {
         type: "record_post_onboarding_event",
       });
       if (!current.accountNudgeShownAt && next.accountNudgeShownAt) {
-        setAccountNudgeVisible(true);
+        openAccountSignup();
       }
     },
-    [session?.user.id, updateGuidedOnboarding]
+    [openAccountSignup, session?.user.id, updateGuidedOnboarding]
   );
 
   const trackPostExitCreation = React.useCallback(
@@ -2202,10 +2196,10 @@ export default function HomePage() {
         key,
       });
       if (!current.accountNudgeShownAt && next.accountNudgeShownAt) {
-        setAccountNudgeVisible(true);
+        openAccountSignup();
       }
     },
-    [session?.user.id, updateGuidedOnboarding]
+    [openAccountSignup, session?.user.id, updateGuidedOnboarding]
   );
 
   const handleSubmit = async (submission: EventDialogSubmission) => {
@@ -2738,7 +2732,7 @@ export default function HomePage() {
         target: "wrap-up",
         instruction: inlineEditModeActive
           ? "Defina 3 categorias para começar! Avalie as sugestões, os calendários prontos e fique à vontade para editá-los."
-          : "Aqui você organiza os seus contextos, categorias de eventos e hábitos. Olhe como está ficando!",
+          : "Aqui você edita seus contextos, categorias de eventos e hábitos. Clique no lápis para montar o seu ano.",
         actionLabel: inlineEditModeActive ? "Finalizar guia" : undefined,
         stepLabel,
         categorySuggestions: getWrapUpCategorySuggestions(
@@ -2764,6 +2758,7 @@ export default function HomePage() {
     // pra eles aqui.
     const current = readGuidedOnboardingState();
     if (target === "wrap-up" && current.step === "wrap_up_instruction") {
+      trimToRealCategories();
       const next = updateGuidedOnboarding({ type: "continue_from_wrap_up" });
       setWorkspaceEditMode(null);
       finalizeGuidedOnboarding(next);
@@ -2776,6 +2771,7 @@ export default function HomePage() {
   }, [
     finalizeGuidedOnboarding,
     setWorkspaceEditMode,
+    trimToRealCategories,
     updateGuidedOnboarding,
   ]);
 
@@ -2806,10 +2802,9 @@ export default function HomePage() {
       if (next.step !== current.step) {
         setWorkspaceEditMode(null);
         if (uf) void trackOnboardingRegion(uf);
-        if (next.step === "wrap_up_instruction") trimToRealCategories(next);
       }
     },
-    [showHabitSteps, trimToRealCategories, updateGuidedOnboarding]
+    [showHabitSteps, updateGuidedOnboarding]
   );
 
   React.useEffect(() => {
@@ -3163,7 +3158,10 @@ export default function HomePage() {
             isCalendarSurfaceActive ? guidedSelectionNotice : null
           }
           guidedToolbarNotice={
-            isCalendarSurfaceActive ? headerGuidedToolbarNotice : null
+            isCalendarSurfaceActive ||
+            headerGuidedToolbarNotice?.target === "wrap-up"
+              ? headerGuidedToolbarNotice
+              : null
           }
           mobileContinuationHighlightTarget={
             isCalendarSurfaceActive
@@ -3182,9 +3180,6 @@ export default function HomePage() {
           }
           guidedEditPreviewActive={
             isCalendarSurfaceActive && guidedOnboarding?.step === "edit_preview"
-          }
-          accountNudgeHighlightProfile={
-            accountNudgeVisible && !session?.user.id
           }
           onboardingActive={categoriesForceExpandActive}
           guidedHabitStepActive={guidedHabitStepActive}
@@ -3300,20 +3295,10 @@ export default function HomePage() {
               finalizeGuidedOnboarding(next);
               return;
             }
-            if (next.step === "wrap_up_instruction") {
-              // Tema já tinha sido confirmado antes — pula direto para o
-              // resumo, cortando o ano de exemplo aqui mesmo.
-              trimToRealCategories(next);
-            }
-            // O guia continua no Anual a partir daqui (tema, resumo, conta)
-            // — é lá que vive a UI desses passos finais.
-            setActiveDestination("annual");
-            resetCalendarFocusOnYearChange();
-            window.history.replaceState(
-              window.history.state,
-              "",
-              buildProductDestinationUrl(window.location.href, "annual")
-            );
+            // O resumo (escolher categorias no Editar) acontece com Hábitos
+            // e o ano de exemplo ainda no fundo, populados — o corte do
+            // exemplo e a virada para Eventos só vêm no "Finalizar guia"
+            // (ver trimToRealCategories), já com as categorias escolhidas.
           }}
         />
       ) : isMobileCalendarUi === true ? (
@@ -3509,18 +3494,6 @@ export default function HomePage() {
               ? "bottom"
               : "top"
           }
-        />
-      ) : null}
-
-      {accountNudgeVisible && !session?.user.id ? (
-        <AccountNudge
-          onDismiss={() => setAccountNudgeVisible(false)}
-          onCreateAccount={() => {
-            setAccountNudgeVisible(false);
-            setAuthDialogInitialMode("signup");
-            setAuthDialogAnchorPoint(undefined);
-            setAuthDialogOpen(true);
-          }}
         />
       ) : null}
 

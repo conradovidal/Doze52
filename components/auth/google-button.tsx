@@ -7,9 +7,11 @@ import { Button } from "@/components/ui/button";
 export function GoogleButton({
   onClick,
   disabled,
+  label = "Entrar com Google",
 }: {
   onClick: () => void;
   disabled?: boolean;
+  label?: string;
 }) {
   return (
     <Button
@@ -29,7 +31,7 @@ export function GoogleButton({
           height={18}
         />
       </span>
-      <span>Entrar com Google</span>
+      <span>{label}</span>
     </Button>
   );
 }

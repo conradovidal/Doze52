@@ -376,7 +376,11 @@ export function AuthForm({
           Cadastro
         </button>
       </div>
-      <GoogleButton onClick={handleGoogle} disabled={loading} />
+      <GoogleButton
+        onClick={handleGoogle}
+        disabled={loading}
+        label={mode === "signup" ? "Continuar com Google" : "Entrar com Google"}
+      />
       {pendingGooglePopup ? (
         <p className="rounded-xl border border-border/70 bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
           Aguardando conclusão do login com Google...

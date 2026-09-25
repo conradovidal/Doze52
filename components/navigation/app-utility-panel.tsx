@@ -35,6 +35,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+import { AccountSignupHero } from "@/components/auth/account-signup-hero";
 import { AuthForm } from "@/components/auth/auth-form";
 import { DeleteAccountDialog } from "@/components/account/delete-account-dialog";
 import { PRO_FEATURES, ProFeatureIcon, ProFeatureStack } from "@/components/billing/pro-features";
@@ -629,6 +630,7 @@ export function AppUtilityPanel({
           </div>
         ) : (
           <div className="mx-auto max-w-sm text-left">
+            <AccountSignupHero className="mb-4" />
             <AuthForm
               open={open}
               initialMode={authInitialMode}
