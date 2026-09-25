@@ -220,8 +220,8 @@ export function DesktopProductNavigation({
             data-product-organize="desktop"
             data-onboarding-highlighted={organizeHighlighted ? "true" : undefined}
             aria-pressed={organizeActive}
-            aria-label={organizeActive ? "Finalizar organização" : "Organizar"}
-            title={organizeActive ? "Finalizar organização" : "Organizar"}
+            aria-label={organizeActive ? "Finalizar edição" : "Editar"}
+            title={organizeActive ? "Finalizar edição" : "Editar"}
             disabled={organizeDisabled}
             className={cn(
               "grid size-10 place-items-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-transparent disabled:hover:text-muted-foreground",

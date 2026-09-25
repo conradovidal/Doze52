@@ -402,14 +402,14 @@ export function FilterEditPanel({
             ) : (
               <>
                 <DialogTitle className="text-base font-semibold">
-                  Organizar
+                  Editar
                 </DialogTitle>
                 {/* Mesmo padrão da navegação do topo do app (ícone, ativo em
                     primeiro plano, inativo esmaecido), em vez de um controle
                     segmentado que não aparece em nenhum outro lugar. */}
                 <div
                   role="tablist"
-                  aria-label="Visão a organizar"
+                  aria-label="Visão a editar"
                   className="flex items-center gap-1 justify-self-center"
                 >
                   {ORGANIZE_SECTION_OPTIONS.map((option) => {
@@ -467,7 +467,10 @@ export function FilterEditPanel({
                   onCategoryCreated?.(categoryId);
                 }}
                 onRequireAuth={onRequireAuth ? () => onRequireAuth() : undefined}
-                bypassLimits={bypassLimits}
+                // No resumo do guia o ano de exemplo ainda está no fundo e
+                // enche a contagem comum; o teto de 3 ali é garantido pela
+                // troca em WrapUpCategorySuggestions, não por um bloqueio.
+                bypassLimits={bypassLimits || showWrapUpNotice}
               />
             ) : detail?.kind === "category-choice" ? (
               <CategoryCreationChoice

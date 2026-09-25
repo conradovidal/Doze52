@@ -1,5 +1,4 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { setThemeMode } from "../e2e/support/theme";
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
@@ -49,7 +48,8 @@ const selectGuidedDate = async (
 
 const completePersonalOnboarding = async (
   page: Page,
-  mobile: boolean
+  mobile: boolean,
+  options: { beforeFinish?: () => Promise<void> } = {}
 ) => {
   if (!mobile) {
     // A coluna de nomes dos hábitos (e o "+" de criar) só renderiza com
@@ -223,13 +223,21 @@ const completePersonalOnboarding = async (
   // getGuidedToolbarNotice em app/page.tsx: actionLabel só existe quando
   // inlineEditModeActive, o que não é o caso na nav adaptativa).
   if (adaptiveDesktop) {
+    // O resumo acontece com Hábitos ainda no fundo (vitrine incluída); a
+    // virada para Eventos só vem no "Finalizar guia".
+    await expect(page).toHaveURL(/surface=habits/);
+    await expect(
+      page.getByRole("button", { name: "Exercício", exact: true })
+    ).toBeVisible();
     await editControl.click();
   }
+  await options.beforeFinish?.();
   const finishGuideButton = page.getByRole("button", { name: "Finalizar guia" });
   await expect(finishGuideButton).toBeVisible();
   await finishGuideButton.click();
   await expect(panel).toBeHidden();
   await expect(toolbarNotice).toBeHidden();
+  await expect(page).toHaveURL(/surface=annual/);
 };
 
 const createRegularEvent = async (
@@ -646,8 +654,8 @@ test("seletor de destino integra o card de mover eventos", async ({
   // "Finalizar organização" para alternar de volta (#94) — cada categoria
   // tem seu próprio ícone de lápis ("Editar categoria X"), que já é o mesmo
   // aria-label usado abaixo.
-  const editWorkspace = page.getByRole("button", { name: "Organizar" });
-  const organizeDialog = page.getByRole("dialog", { name: "Organizar" });
+  const editWorkspace = page.getByRole("button", { name: "Editar", exact: true });
+  const organizeDialog = page.getByRole("dialog", { name: "Editar", exact: true });
   await expect(async () => {
     await editWorkspace.click();
     await expect(organizeDialog).toBeVisible({ timeout: 1_500 });
@@ -1344,7 +1352,7 @@ test("saída após criar contexto preserva o ano e convida após três criaçõe
   });
 
   await page
-    .getByRole("button", { name: "Organizar" })
+    .getByRole("button", { name: "Editar", exact: true })
     .click();
   for (const name of ["Saúde", "Família", "Projetos"]) {
     await page.getByRole("button", { name: "Criar nova categoria" }).click();
@@ -1359,16 +1367,16 @@ test("saída após criar contexto preserva o ano e convida após três criaçõe
     await dialog.getByRole("button", { name: "Criar", exact: true }).click();
     await expect(dialog).toBeHidden();
   }
-  // O painel "Organizar" (#94) marca o resto da página aria-hidden enquanto
-  // aberto — o convite de conta já existe por baixo, só não é alcançável
-  // pela árvore de acessibilidade até fechar o painel.
+  // O convite (a Conta em modo cadastro) espera o painel Editar fechar —
+  // nunca abre um modal por cima do outro.
+  const accountHero = page.getByRole("heading", { name: "Guarde o seu ano" });
+  await page.waitForTimeout(800);
+  await expect(accountHero).toBeHidden();
   await page.keyboard.press("Escape");
   await expect(
-    page.getByRole("dialog", { name: "Organizar" })
+    page.getByRole("dialog", { name: "Editar", exact: true })
   ).toBeHidden();
-  await expect(
-    page.getByRole("complementary", { name: "Convite para guardar o ano" })
-  ).toBeVisible();
+  await expect(accountHero).toBeVisible();
 });
 
 test("substitui automaticamente um exemplo v3 ainda bloqueado", async ({
@@ -1627,45 +1635,195 @@ test("centraliza cards e mantém a instrução visível no cabeçalho fixo", asy
   }
 });
 
-test("dois eventos espontâneos disparam o convite de conta", async ({
+test("dois eventos espontâneos abrem a Conta em modo cadastro", async ({
   page,
 }, testInfo) => {
   test.skip(
     testInfo.project.name === "mobile-chromium",
     "Criação normal coberta no desktop"
   );
-  await page.addInitScript(() => {
-    window.localStorage.setItem("doze52-theme", "light");
-  });
   await page.goto("/?mobileUi=0");
   await completePersonalOnboarding(page, false);
 
-  const nudge = page.getByRole("complementary", {
-    name: "Convite para guardar o ano",
-  });
+  // Em vez do antigo card "Guarde seu ano" no canto, o convite abre direto
+  // a própria Conta (com Google e formulário), já em "Cadastro".
+  const accountHero = page.getByRole("heading", { name: "Guarde o seu ano" });
   await createRegularEvent(page, "2026-06-02", "Evento espontâneo 1");
-  await expect(nudge).toBeHidden();
+  await expect(accountHero).toBeHidden();
   await createRegularEvent(page, "2026-07-03", "Evento espontâneo 2");
-  await expect(nudge).toBeVisible();
-  await expect(nudge).toContainText("Guarde seu ano");
-  await expect(nudge).toContainText(
-    "Crie sua conta para acessá-lo em qualquer aparelho."
-  );
+  await expect(accountHero).toBeVisible();
   await expect(
-    nudge.getByRole("button", { name: "Guardar meu ano" })
+    page.getByRole("button", { name: "Continuar com Google" })
   ).toBeVisible();
-  await expect(nudge.locator('[data-account-nudge-icon="calendar"]')).toBeVisible();
-  // O card usa .inverse-product-surface (bg-card) — em tema claro isso é
-  // o --card do tema escuro (#262626), não um tom de azul-marinho antigo.
-  await expect(nudge).toHaveCSS("background-color", "rgb(38, 38, 38)");
+  await expect(page.getByRole("button", { name: "Criar conta" })).toBeVisible();
 
-  await setThemeMode(page, "dark");
-  await expect(page.locator("html")).toHaveClass(/dark/);
-  await expect(nudge).toHaveCSS("background-color", "rgb(255, 255, 255)");
+  // Só uma vez: fechar e criar mais um evento não reabre.
+  await page.keyboard.press("Escape");
+  await expect(accountHero).toBeHidden();
+  await createRegularEvent(page, "2026-08-04", "Evento espontâneo 3");
+  await page.waitForTimeout(800);
+  await expect(accountHero).toBeHidden();
+});
 
-  await nudge.getByRole("button", { name: "Fechar convite" }).click();
+test("resumo mantém o ano de exemplo e o teto de 3 vale também pelo +", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name === "mobile-chromium",
+    "O guia completo roda no desktop"
+  );
+  const readCategories = () =>
+    page.evaluate(() => {
+      const raw = window.localStorage.getItem("yiv-store");
+      const parsed = raw ? JSON.parse(raw) : null;
+      return (parsed?.state?.categories ?? []) as {
+        name: string;
+        calendarPackGroupId?: string;
+      }[];
+    });
+  const isDemo = (category: { calendarPackGroupId?: string }) =>
+    Boolean(category.calendarPackGroupId?.startsWith("onboarding-personal-demo"));
+
+  await page.goto("/?mobileUi=0");
+  await completePersonalOnboarding(page, false, {
+    beforeFinish: async () => {
+      // O ano de exemplo segue no fundo durante o resumo…
+      expect((await readCategories()).some(isDemo)).toBe(true);
+      const panel = page.locator("[data-filter-edit-panel]");
+      await expect(panel).toBeVisible();
+      for (const name of ["Geral", "Saúde"]) {
+        await panel.getByRole("button", { name: `Adicionar categoria ${name}` }).click();
+        await page.waitForTimeout(400);
+      }
+      await expect
+        .poll(async () => (await readCategories()).filter((c) => !isDemo(c)).length)
+        .toBe(3);
+
+      // …e um calendário pronto pelo "+" (fluxo próprio, fora das
+      // sugestões) troca a última em vez de virar a 4ª.
+      await page.getByRole("button", { name: "Criar nova categoria" }).click();
+      await page.getByRole("button", { name: /Adicionar calendário pronto/ }).click();
+      const calendarDialog = page.getByRole("dialog", { name: "Calendários" });
+      await expect(calendarDialog).toBeVisible();
+      await calendarDialog
+        .locator('[data-calendar-pack-group]')
+        .first()
+        .getByRole("button", { name: "Adicionar", exact: true })
+        .click();
+      await expect(calendarDialog).toBeHidden();
+      if (!(await panel.isVisible())) {
+        await page.locator('[data-product-organize="desktop"]').click();
+      }
+      await expect(panel).toBeVisible();
+      await expect
+        .poll(async () => (await readCategories()).filter((c) => !isDemo(c)).length)
+        .toBe(3);
+      expect(
+        (await readCategories()).some(
+          (c) => c.calendarPackGroupId && !isDemo(c)
+        )
+      ).toBe(true);
+
+      // Um 2º calendário pronto troca o 1º (plano grátis: 1), sem abrir o
+      // Pro no meio do guia, e avisa a troca.
+      const firstPackGroup = (await readCategories()).find(
+        (c) => c.calendarPackGroupId && !isDemo(c)
+      )!.calendarPackGroupId;
+      await page.getByRole("button", { name: "Criar nova categoria" }).click();
+      await page.getByRole("button", { name: /Adicionar calendário pronto/ }).click();
+      await expect(calendarDialog).toBeVisible();
+      await calendarDialog
+        // A Copa (Brasil) — foi a que apareceu vazia num teste manual.
+        .locator('[data-calendar-pack-group="world-cup-2026-coverage"]')
+        .getByRole("button", { name: "Adicionar", exact: true })
+        .click();
+      await expect(calendarDialog).toBeHidden();
+      await expect(page.getByText("Doze 52 Pro", { exact: false })).toHaveCount(0);
+      if (!(await panel.isVisible())) {
+        await page.locator('[data-product-organize="desktop"]').click();
+      }
+      await expect(panel).toBeVisible();
+      await expect(page.getByText("Calendário trocado")).toBeVisible();
+      await expect
+        .poll(async () => {
+          const packs = (await readCategories()).filter(
+            (c) => c.calendarPackGroupId && !isDemo(c)
+          );
+          return packs.map((c) => c.calendarPackGroupId).join(",");
+        })
+        .not.toContain(firstPackGroup!);
+      await expect
+        .poll(async () =>
+          (await readCategories()).filter((c) => c.calendarPackGroupId && !isDemo(c)).length
+        )
+        .toBe(1);
+      await expect
+        .poll(async () => (await readCategories()).filter((c) => !isDemo(c)).length)
+        .toBe(3);
+      // O calendário que saiu não volta como sugestão comum (recriá-lo por
+      // ali daria uma categoria vazia com o mesmo nome).
+      await expect(
+        panel.getByRole("button", { name: /^Adicionar categoria Feriados/ })
+      ).toHaveCount(0);
+    },
+  });
+
+  // Só no "Finalizar guia" o exemplo sai — e ficam as 3 dela.
+  const after = await readCategories();
+  expect(after.some(isDemo)).toBe(false);
+  expect(after).toHaveLength(3);
+  // O calendário pronto chega com os eventos dele (não só a categoria).
+  const packEventCounts = await page.evaluate(() => {
+    const parsed = JSON.parse(window.localStorage.getItem("yiv-store") ?? "{}");
+    const categories = (parsed.state?.categories ?? []) as {
+      id: string;
+      name: string;
+      calendarPackGroupId?: string;
+    }[];
+    const events = (parsed.state?.events ?? []) as { categoryId: string }[];
+    return categories
+      .filter((category) => category.calendarPackGroupId)
+      .map((category) => ({
+        name: category.name,
+        events: events.filter((event) => event.categoryId === category.id).length,
+      }));
+  });
+  for (const pack of packEventCounts) expect(pack.events).toBeGreaterThan(0);
+});
+
+test("recarregar depois do guia mantém só as categorias escolhidas", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name === "mobile-chromium",
+    "O guia completo roda no desktop"
+  );
+  await page.goto("/?mobileUi=0");
+  await completePersonalOnboarding(page, false);
+
+  const readCategories = () =>
+    page.evaluate(() => {
+      const raw = window.localStorage.getItem("yiv-store");
+      const parsed = raw ? JSON.parse(raw) : null;
+      return (parsed?.state?.categories ?? []).map(
+        (category: { name: string; calendarPackGroupId?: string }) => ({
+          name: category.name,
+          group: category.calendarPackGroupId ?? null,
+        })
+      );
+    });
+  const before = await readCategories();
+  expect(before.length).toBeLessThanOrEqual(3);
+  expect(
+    before.some((category: { group: string | null }) =>
+      category.group?.startsWith("onboarding-personal-demo")
+    )
+  ).toBe(false);
+
   await page.reload();
-  await expect(nudge).toBeHidden();
+  await expect(page.locator("[data-day-cell]").first()).toBeVisible();
+  await page.waitForTimeout(1000);
+  expect(await readCategories()).toEqual(before);
 });
 
 test("spotlight respeita redução de movimento", async ({ page }, testInfo) => {

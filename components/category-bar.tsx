@@ -116,6 +116,10 @@ type CategoryBarProps = {
   // do guia (WrapUpCategorySuggestions), pra abrir espaço pra uma sugestão
   // sem depender só da troca automática da última posição.
   onDragCategoryOut?: (categoryId: string) => void;
+  // Categorias que não entram na fileira de edição (ex.: as do ano de
+  // exemplo durante o resumo do guia — seguem no calendário, mas não são
+  // dela para organizar).
+  hiddenCategoryIds?: ReadonlySet<string>;
 };
 
 // Distância mínima pra baixo pra contar como "arrastou pra fora", não um
@@ -477,6 +481,7 @@ export function CategoryBar({
   nowrap = false,
   locked = false,
   onDragCategoryOut,
+  hiddenCategoryIds,
 }: CategoryBarProps) {
   const { mode: themeMode } = useTheme();
   const selectedProfileIds = useStore((s) => s.selectedProfileIds);
@@ -523,10 +528,13 @@ export function CategoryBar({
     () =>
       editingProfileId
         ? categories.filter(
-            (category) => !category.archivedAt && category.profileId === editingProfileId
+            (category) =>
+              !category.archivedAt &&
+              category.profileId === editingProfileId &&
+              !hiddenCategoryIds?.has(category.id)
           )
         : [],
-    [categories, editingProfileId]
+    [categories, editingProfileId, hiddenCategoryIds]
   );
   const orderedCategoriesForEditingProfile = React.useMemo(
     () => orderItemsByIds(categoriesForEditingProfile, draftOrderIds),
