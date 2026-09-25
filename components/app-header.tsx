@@ -1349,16 +1349,6 @@ export function AppHeader({
                     )}
                   >
                     <div className="flex min-w-0 shrink-0 flex-nowrap items-center gap-1.5 overflow-hidden sm:gap-2">
-                      <button
-                        type="button"
-                        onClick={openCreateCategory}
-                        disabled={!editingProfileId}
-                        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-border bg-card text-foreground shadow-none transition-all hover:border-foreground/20 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45 disabled:cursor-not-allowed disabled:opacity-45"
-                        aria-label="Criar nova categoria"
-                        title="Criar nova categoria"
-                      >
-                        <Plus className="h-3.5 w-3.5" />
-                      </button>
                       <CategoryBar
                         compact
                         nowrap
@@ -1367,6 +1357,20 @@ export function AppHeader({
                         highlightedCategoryEffect={highlightedCategoryEffect}
                         highlightAllVisible={
                           guidedToolbarNotice?.target === "visibility"
+                        }
+                        // "+" no fim das categorias, antes do mostrar/ocultar
+                        // todas — mesma ordem da fileira de Hábitos.
+                        trailingAction={
+                          <button
+                            type="button"
+                            onClick={openCreateCategory}
+                            disabled={!editingProfileId}
+                            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-border bg-card text-foreground shadow-none transition-all hover:border-foreground/20 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45 disabled:cursor-not-allowed disabled:opacity-45"
+                            aria-label="Criar nova categoria"
+                            title="Criar nova categoria"
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                          </button>
                         }
                       />
                     </div>
