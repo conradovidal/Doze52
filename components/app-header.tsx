@@ -6,7 +6,6 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  LayoutGrid,
   PencilLine,
   Plus,
 } from "lucide-react";
@@ -46,7 +45,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { CollapsibleControlRegion } from "@/components/ui/collapsible-control-region";
 import { useStore } from "@/lib/store";
 import { useScrollEdgeFade } from "@/lib/use-scroll-edge-fade";
@@ -129,6 +127,8 @@ type AppHeaderProps = {
   onboardingLayoutReserved?: boolean;
   mobileExamplePreviewActive?: boolean;
   demoExplorationActive?: boolean;
+  /** Mostra "Ano de exemplo" ao lado do seletor de ano (desktop). */
+  showDemoYearBadge?: boolean;
   categoryCreateRequestKey?: number;
   onCategoryCreated?: (categoryId: string) => void;
   onProfileCreated?: (profileId: string) => void;
@@ -138,7 +138,6 @@ type AppHeaderProps = {
   exitInlineEditRequestKey?: number;
   expandCategoriesRequestKey?: number;
   onYearLabelClick?: () => void;
-  onGuidedThemeChange?: () => void;
   headerMinimized?: boolean;
   onboardingActive?: boolean;
   // Passos do guia focados em hábito (ver app/page.tsx) — a fileira de
@@ -152,6 +151,9 @@ const getPreferredEditingProfileId = (
   selectedProfileIds: string[],
   profileIds: string[]
 ) => selectedProfileIds.find((id) => profileIds.includes(id)) ?? profileIds[0] ?? null;
+
+const YEAR_STEPPER_ARROW_CLASS =
+  "grid size-8 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-background/80 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-45 dark:hover:bg-white/10";
 
 export function AppHeader({
   year,
@@ -188,6 +190,7 @@ export function AppHeader({
   onboardingLayoutReserved = false,
   mobileExamplePreviewActive = false,
   demoExplorationActive = false,
+  showDemoYearBadge = false,
   categoryCreateRequestKey = 0,
   onCategoryCreated,
   onProfileCreated,
@@ -197,7 +200,6 @@ export function AppHeader({
   exitInlineEditRequestKey = 0,
   expandCategoriesRequestKey = 0,
   onYearLabelClick,
-  onGuidedThemeChange,
   headerMinimized = false,
   onboardingActive = false,
   guidedHabitStepActive = false,
@@ -339,8 +341,6 @@ export function AppHeader({
     (onboardingLayoutLocked && !guidedCalendarSelectionActive);
   const yearSelectDisabled =
     onboardingLayoutLocked && guidedToolbarNotice?.target !== "year";
-  const themeToggleDisabled =
-    onboardingLayoutLocked && guidedToolbarNotice?.target !== "theme";
   const isMobileMode = isMobileCalendarUi === true;
   const filterPanelId = React.useId();
   // Passo "annual_organize" antes de abrir o Organizar: aponta pro botão,
@@ -393,6 +393,67 @@ export function AppHeader({
     );
     selectedChip?.scrollIntoView({ block: "nearest", inline: "nearest" });
   }, [selectedProfile, showMobileProfileSwitcher]);
+
+  // Seletor de ano do cabeçalho adaptativo — o mesmo no mobile (à direita,
+  // na linha do logo) e no desktop (entre o tema e o perfil). No desktop ele
+  // substitui o rodapé da grade, liberando altura para o ano caber.
+  // Seletor de ano do cabeçalho mobile: um bloco só (fundo sutil, sem borda)
+  // para setas e ano não parecerem três botões soltos. No desktop o ano vive
+  // numa aba presa ao cartão da grade (year-grid.tsx).
+  const adaptiveYearStepper = (
+    <div
+      data-calendar-year-stepper
+      data-onboarding-year-control
+      data-onboarding-highlighted={
+        guidedToolbarNotice?.target === "year" ? "true" : undefined
+      }
+      className={cn(
+        "inline-flex h-9 items-center rounded-xl bg-muted/60 px-0.5",
+        guidedToolbarNotice?.target === "year" && "product-spotlight-target"
+      )}
+    >
+      <button
+        type="button"
+        aria-label={`Voltar para ${year - 1}`}
+        title={`Voltar para ${year - 1}`}
+        disabled={yearSelectDisabled}
+        className={YEAR_STEPPER_ARROW_CLASS}
+        onClick={() => onYearChange(year - 1)}
+      >
+        <ChevronLeft className="size-4" />
+      </button>
+      {onYearLabelClick ? (
+        <button
+          type="button"
+          aria-label={`Ano ${year}. Ir para hoje`}
+          aria-live="polite"
+          title="Ir para hoje"
+          className="h-8 min-w-11 rounded-lg px-1 text-center text-sm font-semibold tabular-nums text-foreground/85 transition-colors hover:bg-background/80 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 dark:hover:bg-white/10"
+          onClick={onYearLabelClick}
+        >
+          {year}
+        </button>
+      ) : (
+        <span
+          aria-label={`Ano ${year}`}
+          aria-live="polite"
+          className="min-w-11 px-1 text-center text-sm font-semibold tabular-nums text-foreground/85"
+        >
+          {year}
+        </span>
+      )}
+      <button
+        type="button"
+        aria-label={`Avançar para ${year + 1}`}
+        title={`Avançar para ${year + 1}`}
+        disabled={yearSelectDisabled}
+        className={YEAR_STEPPER_ARROW_CLASS}
+        onClick={() => onYearChange(year + 1)}
+      >
+        <ChevronRight className="size-4" />
+      </button>
+    </div>
+  );
 
   const canMinimizeHeader = useAdaptiveNavigation && !isMobileMode;
   // Initial value matches SSR (always expanded) to avoid a hydration
@@ -672,9 +733,20 @@ export function AppHeader({
             data-brand-logo-position={
               useAdaptiveNavigation ? "header-adaptive" : undefined
             }
-            className={cn(useAdaptiveNavigation && "md:justify-self-start")}
+            className={cn(
+              useAdaptiveNavigation && "md:justify-self-start",
+              "flex items-center gap-2.5"
+            )}
           >
             <BrandLogo />
+            {showDemoYearBadge && !isMobileMode ? (
+              <span
+                data-demo-mode-badge
+                className="rounded-full border border-border/75 px-2.5 py-0.5 text-[11px] font-semibold tracking-wide text-muted-foreground"
+              >
+                Ano de exemplo
+              </span>
+            ) : null}
           </div>
 
           {useAdaptiveNavigation && onDestinationSelect && onOpenUtilityPanel ? (
@@ -697,31 +769,12 @@ export function AppHeader({
               highlightDestination={
                 guidedToolbarNotice?.target === "habit-surface" ? "habits" : undefined
               }
-              themeHighlighted={guidedToolbarNotice?.target === "theme"}
-              themeDisabled={themeToggleDisabled}
-              onGuidedThemeChange={onGuidedThemeChange}
               showHeaderMinimizeToggle={canMinimizeHeader}
               headerMinimized={headerMinimized}
               onToggleHeaderMinimized={() => {
                 onToggleHeaderMinimized?.();
                 onFilterLayoutChange?.();
               }}
-            />
-          ) : null}
-          {guidedToolbarNotice?.target === "theme" &&
-          onDismissGuidedSelection ? (
-            <GuidedToolbarNoticeCard
-              notice={guidedToolbarNotice}
-              onClose={onDismissGuidedSelection}
-              onAction={
-                guidedToolbarNotice.actionLabel
-                  ? () => onGuidedToolbarAction?.("theme")
-                  : undefined
-              }
-              placement="viewport"
-              portaled
-              anchorSelector="[data-product-theme='desktop']"
-              anchorPlacement="below-end"
             />
           ) : null}
           {guidedToolbarNotice?.target === "visibility" &&
@@ -774,7 +827,9 @@ export function AppHeader({
                   title={organizeActive ? "Finalizar organização" : "Organizar"}
                   disabled={organizeDisabled}
                   className={cn(
-                    "grid size-9 shrink-0 place-items-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-transparent disabled:hover:text-muted-foreground",
+                    // Depois do ano, na ponta — o mesmo lugar em que fica
+                    // colado ao perfil no desktop.
+                    "order-last grid size-9 shrink-0 place-items-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-transparent disabled:hover:text-muted-foreground",
                     organizeActive &&
                       "bg-foreground text-background hover:bg-foreground/90 hover:text-background",
                     mobileContinuationHighlightTarget === "mobile-organize" &&
@@ -782,36 +837,8 @@ export function AppHeader({
                   )}
                   onClick={handleToggleOrganize}
                 >
-                  <LayoutGrid className="size-[18px]" />
+                  <PencilLine className="size-[18px]" />
                 </button>
-              ) : null}
-              {useAdaptiveNavigation ? (
-                <span
-                  data-onboarding-spotlight-target={
-                    guidedToolbarNotice?.target === "theme" ? "true" : undefined
-                  }
-                  className="relative"
-                >
-                  <ThemeToggle
-                    variant="bare"
-                    highlighted={guidedToolbarNotice?.target === "theme"}
-                    disabled={themeToggleDisabled}
-                    onThemeChange={onGuidedThemeChange}
-                  />
-                  {guidedToolbarNotice?.target === "theme" &&
-                  onDismissGuidedSelection ? (
-                    <GuidedToolbarNoticeCard
-                      notice={guidedToolbarNotice}
-                      onClose={onDismissGuidedSelection}
-                      onAction={
-                        guidedToolbarNotice.actionLabel
-                          ? () => onGuidedToolbarAction?.("theme")
-                          : undefined
-                      }
-                      align="end"
-                    />
-                  ) : null}
-                </span>
               ) : null}
               {showCalendarControls && !useAdaptiveNavigation ? (
                 <div
@@ -920,68 +947,10 @@ export function AppHeader({
                 data-onboarding-spotlight-target={
                   guidedToolbarNotice?.target === "year" ? "true" : undefined
                 }
-                className={cn(
-                  "relative shrink-0",
-                  useAdaptiveNavigation && "md:hidden"
-                )}
+                className="relative shrink-0"
               >
                 {useAdaptiveNavigation ? (
-                  isMobileMode ? (
-                    <div
-                      data-onboarding-year-control
-                      data-onboarding-highlighted={
-                        guidedToolbarNotice?.target === "year"
-                          ? "true"
-                          : undefined
-                      }
-                      className={cn(
-                        "inline-flex h-9 items-center rounded-xl border border-border bg-card",
-                        guidedToolbarNotice?.target === "year" &&
-                          "product-spotlight-target"
-                      )}
-                    >
-                      <button
-                        type="button"
-                        aria-label={`Voltar para ${year - 1}`}
-                        title={`Voltar para ${year - 1}`}
-                        disabled={yearSelectDisabled}
-                        className="grid size-9 place-items-center rounded-l-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-45"
-                        onClick={() => onYearChange(year - 1)}
-                      >
-                        <ChevronLeft className="size-4" />
-                      </button>
-                      {onYearLabelClick ? (
-                        <button
-                          type="button"
-                          aria-label={`Ano ${year}. Ir para hoje`}
-                          aria-live="polite"
-                          title="Ir para hoje"
-                          className="min-w-9 text-center text-[0.9rem] font-semibold tabular-nums text-foreground transition-colors hover:text-foreground/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:rounded-md"
-                          onClick={onYearLabelClick}
-                        >
-                          {year}
-                        </button>
-                      ) : (
-                        <span
-                          aria-label={`Ano ${year}`}
-                          aria-live="polite"
-                          className="min-w-9 text-center text-[0.9rem] font-semibold tabular-nums text-foreground"
-                        >
-                          {year}
-                        </span>
-                      )}
-                      <button
-                        type="button"
-                        aria-label={`Avançar para ${year + 1}`}
-                        title={`Avançar para ${year + 1}`}
-                        disabled={yearSelectDisabled}
-                        className="grid size-9 place-items-center rounded-r-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-45"
-                        onClick={() => onYearChange(year + 1)}
-                      >
-                        <ChevronRight className="size-4" />
-                      </button>
-                    </div>
-                  ) : null
+                  isMobileMode ? adaptiveYearStepper : null
                 ) : (
                   <Select
                     value={String(year)}
@@ -1194,7 +1163,7 @@ export function AppHeader({
                 )}
               >
                   {mobileWrapUpActive || showMobileProfileSwitcher ? null : (
-                    <div className="grid w-full grid-cols-1 gap-1.5">
+                    <div className="flex w-full flex-wrap items-center gap-1.5">
                       <ProfileBar
                         compact
                         mobileDense

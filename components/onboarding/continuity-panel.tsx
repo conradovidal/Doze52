@@ -63,7 +63,7 @@ export function ContinuityPanel({
             ? "Guardar seus hábitos"
             : c.conflicts.length || c.limit
               ? "Revisar sincronização"
-              : "Seu Anual"}
+              : "Seu ano"}
         </DialogTitle>
         <DialogDescription>
           {c.legacy || c.conflicts.length || c.limit

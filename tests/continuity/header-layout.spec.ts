@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { getOnboardingContextSeedSnapshot } from "../../lib/store";
+import { setThemeMode } from "../e2e/support/theme";
 
 for (const viewport of [
   { width: 1280, height: 720 },
@@ -85,12 +86,7 @@ for (const viewport of [
     expect(habits.control.h).toBe(annual.control.h);
     // Theme identity must match the approved neutral tokens in both surfaces.
     for (const mode of ["dark", "light"] as const) {
-      await page
-        .getByRole("button", {
-          name: mode === "dark" ? "Ativar tema escuro" : "Ativar tema claro",
-          exact: true,
-        })
-        .click();
+      await setThemeMode(page, mode);
       const colors = () =>
         page.evaluate(() => {
           const s = getComputedStyle(document.documentElement);
@@ -153,11 +149,11 @@ for (const viewport of [
       .click();
     await page.getByRole("button", { name: "Ajuda", exact: true }).click();
     await page
-      .getByRole("button", { name: "Introdução ao Anual", exact: true })
+      .getByRole("button", { name: /^Introdução aos Eventos/ })
       .click();
-    await expect(page.getByRole("dialog", { name: "Seu Anual" })).toBeVisible();
+    await expect(page.getByRole("dialog", { name: "Seu ano" })).toBeVisible();
     await page.getByRole("button", { name: "Agora não", exact: true }).click();
-    await expect(page.getByRole("dialog", { name: "Seu Anual" })).toHaveCount(
+    await expect(page.getByRole("dialog", { name: "Seu ano" })).toHaveCount(
       0,
     );
   });

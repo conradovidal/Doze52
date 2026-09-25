@@ -10,7 +10,7 @@ export type ProductDestination = {
 export const PRODUCT_DESTINATIONS: readonly ProductDestination[] = [
   {
     id: "annual",
-    label: "Anual",
+    label: "Eventos",
     icon: "calendar-days",
     href: "/?surface=annual",
   },

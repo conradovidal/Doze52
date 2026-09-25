@@ -18,8 +18,6 @@ export type GuidedToolbarNotice = {
     | "habit-created"
     | "visibility"
     | "profile"
-    | "appearance"
-    | "theme"
     | "wrap-up"
     // Passos da jornada curta e própria do mobile (lib/mobile-habits-onboarding.ts).
     // Não fazem parte do tour desktop.

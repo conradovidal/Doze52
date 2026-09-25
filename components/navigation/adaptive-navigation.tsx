@@ -3,19 +3,18 @@
 import * as React from "react";
 import {
   CalendarDays,
-  ChevronsDownUp,
-  ChevronsUpDown,
+  ChevronDown,
   CircleCheck,
-  LayoutGrid,
+  PencilLine,
   UserRound,
   type LucideIcon,
 } from "lucide-react";
-import { ThemeToggle } from "@/components/theme-toggle";
 import {
   PRODUCT_DESTINATIONS,
   type ProductDestinationId,
 } from "@/lib/product-navigation";
 import { cn } from "@/lib/utils";
+import { getDestinationTabClass } from "@/components/navigation/destination-tab-class";
 
 export type UtilityPanelSection =
   | "account"
@@ -45,9 +44,6 @@ type ProductNavigationProps = {
    * para a Anual.
    */
   disabledDestination?: ProductDestinationId;
-  themeHighlighted?: boolean;
-  themeDisabled?: boolean;
-  onGuidedThemeChange?: () => void;
   showHeaderMinimizeToggle?: boolean;
   headerMinimized?: boolean;
   onToggleHeaderMinimized?: () => void;
@@ -105,12 +101,18 @@ function DestinationButton({
       data-onboarding-highlighted={highlighted ? "true" : undefined}
       className={cn(
         "group relative inline-flex items-center justify-center rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
-        mobile ? "min-h-12 min-w-16 flex-1" : "size-10",
-        disabled
-          ? "text-muted-foreground/30"
-          : active
-            ? "text-foreground"
-            : "text-muted-foreground/55 hover:bg-muted/45 hover:text-foreground/80",
+        // Destinos com rótulo: ícone ao lado do nome no desktop, embaixo no
+        // mobile. O ativo usa o mesmo fundo discreto do hover dos ícones.
+        mobile
+          ? cn(
+              "min-h-12 min-w-16 flex-1 flex-col gap-0.5 text-[11px] font-medium",
+              disabled
+                ? "text-muted-foreground/30"
+                : active
+                  ? "text-foreground"
+                  : "text-muted-foreground/70 hover:bg-muted/45 hover:text-foreground/85"
+            )
+          : getDestinationTabClass(active),
         highlighted && "product-spotlight-target"
       )}
       onClick={(event) => {
@@ -133,8 +135,8 @@ function DestinationButton({
         onSelect(destination.id);
       }}
     >
-      <Icon className="size-5" aria-hidden="true" />
-      <span className="sr-only">{destination.label}</span>
+      <Icon className={mobile ? "size-5" : "size-[18px]"} aria-hidden="true" />
+      <span>{destination.label}</span>
     </a>
   );
 }
@@ -150,9 +152,6 @@ export function DesktopProductNavigation({
   organizeHighlighted = false,
   highlightProfile = false,
   highlightDestination,
-  themeHighlighted = false,
-  themeDisabled = false,
-  onGuidedThemeChange,
   showHeaderMinimizeToggle = false,
   headerMinimized = false,
   onToggleHeaderMinimized,
@@ -164,23 +163,26 @@ export function DesktopProductNavigation({
 
   return (
     <>
-      <nav
-        aria-label="Navegação principal"
-        data-product-navigation="desktop"
-        className="col-start-2 hidden items-center justify-center gap-1 md:flex"
-      >
-        {PRODUCT_DESTINATIONS.map((destination) => (
-          <DestinationButton
-            key={destination.id}
-            destination={destination}
-            active={activeDestination === destination.id}
-            onSelect={onDestinationSelect}
-            highlighted={highlightDestination === destination.id}
-          />
-        ))}
-      </nav>
-
-      <div className="col-start-3 hidden items-center gap-1 justify-self-end md:flex">
+      <div className="relative col-start-2 hidden items-center justify-center md:flex">
+        <nav
+          aria-label="Navegação principal"
+          data-product-navigation="desktop"
+          className="flex items-center gap-1"
+        >
+          {PRODUCT_DESTINATIONS.map((destination) => (
+            <DestinationButton
+              key={destination.id}
+              destination={destination}
+              active={activeDestination === destination.id}
+              onSelect={onDestinationSelect}
+              highlighted={highlightDestination === destination.id}
+            />
+          ))}
+        </nav>
+        {/* Recolher a faixa de contextos/categorias fica colado ao seletor
+            de visão: é o controle de "o que estou vendo", nunca some junto
+            com a faixa e usa o mesmo chevron do mobile. Ancorado à direita
+            para o seletor seguir exatamente no centro. */}
         {showHeaderMinimizeToggle && onToggleHeaderMinimized ? (
           <button
             type="button"
@@ -196,25 +198,22 @@ export function DesktopProductNavigation({
                 ? "Mostrar contextos e categorias"
                 : "Minimizar contextos e categorias"
             }
-            className="grid size-10 place-items-center rounded-xl text-muted-foreground/55 transition-colors hover:bg-muted/45 hover:text-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+            className="absolute left-full ml-1 grid size-10 place-items-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
             onClick={onToggleHeaderMinimized}
           >
-            <span className="relative grid size-[18px] place-items-center">
-              <ChevronsUpDown
-                className={cn(
-                  "absolute size-[18px] transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
-                  headerMinimized ? "scale-100 opacity-100" : "scale-75 opacity-0"
-                )}
-              />
-              <ChevronsDownUp
-                className={cn(
-                  "absolute size-[18px] transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
-                  headerMinimized ? "scale-75 opacity-0" : "scale-100 opacity-100"
-                )}
-              />
-            </span>
+            <ChevronDown
+              className={cn(
+                "size-[18px] transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
+                headerMinimized ? "rotate-0" : "rotate-180"
+              )}
+              aria-hidden="true"
+            />
           </button>
         ) : null}
+      </div>
+
+      <div className="col-start-3 hidden items-center gap-1 justify-self-end md:flex">
+        {/* Organizar (editar) colado ao perfil. */}
         {onToggleOrganize ? (
           <button
             type="button"
@@ -231,17 +230,9 @@ export function DesktopProductNavigation({
             )}
             onClick={onToggleOrganize}
           >
-            <LayoutGrid className="size-[18px]" />
+            <PencilLine className="size-[18px]" />
           </button>
         ) : null}
-        <span data-product-theme="desktop" className="relative">
-          <ThemeToggle
-            variant="bare"
-            highlighted={themeHighlighted}
-            disabled={themeDisabled}
-            onThemeChange={onGuidedThemeChange}
-          />
-        </span>
         <button
           type="button"
           data-product-account="desktop"
@@ -301,12 +292,13 @@ export function AdaptiveNavigation({
         aria-label="Abrir perfil"
         disabled={authLoading}
         className={cn(
-          "inline-flex min-h-12 min-w-16 flex-1 items-center justify-center rounded-xl text-muted-foreground/55 transition-colors hover:bg-muted/45 hover:text-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 disabled:opacity-45",
+          "inline-flex min-h-12 min-w-16 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl text-[11px] font-medium text-muted-foreground/70 transition-colors hover:bg-muted/45 hover:text-foreground/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 disabled:opacity-45",
           highlightProfile && "text-foreground/80 product-spotlight-target"
         )}
         onClick={handleAccount}
       >
         {authLoading ? null : <AccountGlyph compact />}
+        <span aria-hidden="true">Perfil</span>
       </button>
     </nav>
   );

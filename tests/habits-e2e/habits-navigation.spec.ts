@@ -63,7 +63,7 @@ test("desktop antecipa a demonstração de hábitos e reinicia o guia no ano", a
     '[data-guided-onboarding-step="context_selection"]'
   );
   await expect(onboardingPanel).toContainText(
-    "Por qual contexto você quer começar?"
+    "Escolha um contexto para começar."
   );
   const annualDemoFrameTop = (
     await page
@@ -90,9 +90,9 @@ test("desktop antecipa a demonstração de hábitos e reinicia o guia no ano", a
     await expect(habits.getByRole("button", { name, exact: true })).toBeVisible();
   }
   const habitDay = habits.locator("[data-day-cell]").first();
-  // Altura para 2 hábitos de demonstração (a vitrine hoje só traz Exercício
-  // e Ler 20 minutos — ver ONBOARDING_HABIT_SHOWCASE_DEFINITIONS).
-  await expect.poll(async () => (await habitDay.boundingBox())?.height).toBe(54);
+  // Mesma altura de um mês de Eventos (72px): comporta 2 hábitos por padrão
+  // e só cresce a partir do 3º (ver getDesktopHabitRowMinHeight).
+  await expect.poll(async () => (await habitDay.boundingBox())?.height).toBe(72);
   await expect(habits.locator("[data-habit-marker]").first()).toBeVisible();
 
   const currentYear = new Date().getFullYear();
@@ -101,14 +101,14 @@ test("desktop antecipa a demonstração de hábitos e reinicia o guia no ano", a
   await habits.locator('button[title="Abrir Janeiro"]:visible').first().click();
   await expect(habits.locator("[data-month-row]")).toHaveCount(1);
 
-  await page.getByRole("link", { name: "Anual" }).click();
+  await page.getByRole("link", { name: "Eventos" }).click();
   await expect(onboardingPanel).toBeVisible();
   await onboardingPanel
     .getByRole("button")
     .filter({ hasText: "Pessoal" })
     .click();
 
-  await expect(page.locator('[data-product-navigation="desktop"] a[aria-current="page"]')).toHaveAttribute("title", "Anual");
+  await expect(page.locator('[data-product-navigation="desktop"] a[aria-current="page"]')).toHaveAttribute("title", "Eventos");
   await expect(page.locator('[data-calendar-year-stepper]:visible button[aria-live="polite"]').first()).toHaveText(
     String(currentYear)
   );
@@ -186,7 +186,7 @@ test("mobile abre em Hábitos e preserva a sessão entre superfícies", async ({
   await expect(pastButton).toHaveAttribute("aria-pressed", "false");
   expect(await habits.locator("button:disabled").count()).toBeGreaterThan(0);
 
-  await page.getByRole("link", { name: "Anual" }).click();
+  await page.getByRole("link", { name: "Eventos" }).click();
   await expect(page.locator("[data-mobile-calendar-experience]")).toBeVisible();
   await expect(page.getByRole("button", { name: "Novo evento" })).toBeVisible();
   await page.getByRole("link", { name: "Hábitos" }).click();
@@ -269,13 +269,13 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
   await page.goto("/");
   const desktopNavigation = page.locator('[data-product-navigation="desktop"]');
   await expect(desktopNavigation).toBeVisible();
-  await expect(desktopNavigation.getByRole("link", { name: "Anual" })).toHaveClass(/text-foreground/);
-  await expect(desktopNavigation.getByRole("link", { name: "Anual" })).not.toHaveClass(/bg-foreground/);
+  await expect(desktopNavigation.getByRole("link", { name: "Eventos" })).toHaveClass(/text-foreground/);
+  await expect(desktopNavigation.getByRole("link", { name: "Eventos" })).not.toHaveClass(/bg-foreground/);
   await expectLogoPosition(page);
   const profile = page.locator('[data-product-account="desktop"]');
   const navigationBox = await desktopNavigation.boundingBox();
   const profileBox = await profile.boundingBox();
-  const annualBox = await desktopNavigation.getByRole("link", { name: "Anual" }).boundingBox();
+  const annualBox = await desktopNavigation.getByRole("link", { name: "Eventos" }).boundingBox();
   const habitsBox = await desktopNavigation.getByRole("link", { name: "Hábitos" }).boundingBox();
   const desktopViewport = page.viewportSize();
   if (!navigationBox || !profileBox || !annualBox || !habitsBox || !desktopViewport) {
@@ -292,14 +292,13 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
   await expect(contextualEdit).toBeVisible();
   await expect(collapseCategories).toBeVisible();
   await expect(page.locator("[data-calendar-scale-control]")).toHaveCount(0);
-  const scaleBox = await page.locator("[data-calendar-footer-center]").boundingBox();
-  if (!scaleBox || !desktopViewport) throw new Error("Escala não pôde ser medida.");
-  expect(Math.abs(scaleBox.x + scaleBox.width / 2 - desktopViewport.width / 2)).toBeLessThanOrEqual(2);
   const calendarFrame = page.locator('[data-year-grid-surface="calendar"] [data-year-grid-frame]');
-  const calendarDock = page.locator('[data-year-grid-surface="calendar"] [data-year-grid-dock]');
-  const calendarYearStepper = calendarDock.locator("[data-calendar-year-stepper]");
+  // O ano vive numa aba presa à borda de baixo do cartão da grade, fora da
+  // área que rola.
+  const calendarYearStepper = page.locator(
+    '[data-year-grid-surface="calendar"] [data-year-grid-dock] [data-calendar-year-stepper]'
+  );
   await expect(calendarFrame).toBeVisible();
-  await expect(calendarDock).toBeVisible();
   await expect(calendarYearStepper).toBeVisible();
   const annualExpandedGeometry = await page.evaluate(() => {
     const navigationRow = document.querySelector<HTMLElement>(
@@ -364,34 +363,41 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
       Boolean(element.closest("[data-year-grid-frame]"))
     )
   ).toBe(false);
-  const frameAndDockGeometry = await page
+  const frameAndTabGeometry = await page
     .locator('[data-year-grid-surface="calendar"]')
     .evaluate((element) => {
       const frame = element.querySelector<HTMLElement>("[data-year-grid-frame]");
-      const dock = element.querySelector<HTMLElement>("[data-year-grid-dock]");
-      if (!frame || !dock) return null;
+      const tab = element.querySelector<HTMLElement>(
+        "[data-year-grid-dock] [data-calendar-year-stepper]"
+      );
+      if (!frame || !tab) return null;
       const frameBox = frame.getBoundingClientRect();
-      const yearStepper = dock.querySelector<HTMLElement>("[data-calendar-year-stepper]");
-      const yearStepperBox = yearStepper?.getBoundingClientRect();
+      const tabBox = tab.getBoundingClientRect();
       const frameStyle = getComputedStyle(frame);
       return {
-        gap: yearStepperBox ? yearStepperBox.top - frameBox.bottom : null,
+        // A aba começa na própria borda do cartão (sobrepõe 1px da borda).
+        gap: tabBox.top - frameBox.bottom,
+        centerOffset: tabBox.left + tabBox.width / 2 - (frameBox.left + frameBox.width / 2),
         bottomLeftRadius: Number.parseFloat(frameStyle.borderBottomLeftRadius),
         bottomRightRadius: Number.parseFloat(frameStyle.borderBottomRightRadius),
       };
     });
-  expect(frameAndDockGeometry).not.toBeNull();
-  expect(frameAndDockGeometry?.gap).toBeCloseTo(12, 0);
-  expect(frameAndDockGeometry?.bottomLeftRadius ?? 0).toBeGreaterThanOrEqual(20);
-  expect(frameAndDockGeometry?.bottomRightRadius ?? 0).toBeGreaterThanOrEqual(20);
+  expect(frameAndTabGeometry).not.toBeNull();
+  expect(frameAndTabGeometry?.gap).toBeCloseTo(-1, 0);
+  expect(Math.abs(frameAndTabGeometry?.centerOffset ?? 99)).toBeLessThanOrEqual(1);
+  expect(frameAndTabGeometry?.bottomLeftRadius ?? 0).toBeGreaterThanOrEqual(20);
+  expect(frameAndTabGeometry?.bottomRightRadius ?? 0).toBeGreaterThanOrEqual(20);
   await expect(page.getByRole("button", { name: "Adicionar ou gerenciar calendários." })).toHaveCount(0);
 
   await contextualEdit.click();
   await page.getByRole("button", { name: "Criar nova categoria" }).click();
   const categoryChoice = page.getByRole("dialog", { name: "Adicionar categoria" });
   await expect(categoryChoice).toBeVisible();
-  await expect(categoryChoice.getByText("Escolha o que deseja adicionar.")).toBeVisible();
-  await expect(categoryChoice.getByText(/contexto/i)).toHaveCount(0);
+  // Com um único contexto, as opções não pedem para escolher contexto (a
+  // descrição do painel Organizar menciona "contextos", por isso o recorte).
+  await expect(
+    categoryChoice.getByRole("button").filter({ hasText: /contexto/i })
+  ).toHaveCount(0);
   await expect(categoryChoice.getByRole("button", { name: /Criar minha categoria/ })).toBeVisible();
   await categoryChoice.getByRole("button", { name: /Adicionar calendário pronto/ }).click();
   const calendarGallery = page.getByRole("dialog", { name: "Calendários" });
@@ -405,14 +411,14 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
   ).toContainText("Grêmio");
   const defaultTeamCard = calendarGallery
     .getByRole("article")
-    .filter({ hasText: "Jogos do seu time favorito" });
+    .filter({ hasText: "Jogos do seu time" });
   // Só existe 1 perfil ("Meu ano"), então não há contexto a confirmar — o
   // botão já importa direto, sem chip+select intermediário (mesmo
   // comportamento que Feriados já tinha). Não clica de verdade aqui: como
   // agora é uma ação só, clicar fecharia o diálogo (ver onImported em
   // CategoryCreationFlow) e cortaria o resto deste teste.
   await expect(
-    defaultTeamCard.getByRole("button", { name: "Adicionar calendário" })
+    defaultTeamCard.getByRole("button", { name: "Adicionar", exact: true })
   ).toBeVisible();
   await calendarGallery.getByRole("button", { name: "Voltar para as opções de categoria" }).click();
   await expect(categoryChoice).toBeVisible();
@@ -422,6 +428,9 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
   await page.keyboard.press("Escape");
   const organizePanel = page.getByRole("dialog", { name: "Organizar" });
   await expect(organizePanel).toBeVisible();
+  // A criação de categoria é uma tela dentro do próprio painel: espera a
+  // troca de tela assentar antes do segundo Escape (que fecha o painel).
+  await expect(page.getByRole("button", { name: /Criar minha categoria/ })).toHaveCount(0);
   await page.keyboard.press("Escape");
   await expect(organizePanel).toBeHidden();
   // Layout adaptivo usa aria-expanded no botão + colapso via CSS
@@ -480,8 +489,10 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
   expect(
     Math.abs(panelBox.x + panelBox.width / 2 - viewport.width / 2)
   ).toBeLessThanOrEqual(1);
+  // No desktop os diálogos ancoram no topo (max(1.5rem, 10dvh)) em vez de
+  // centralizar na vertical — ver components/ui/dialog.tsx (#118).
   expect(
-    Math.abs(panelBox.y + panelBox.height / 2 - viewport.height / 2)
+    Math.abs(panelBox.y - Math.max(24, viewport.height * 0.1))
   ).toBeLessThanOrEqual(1);
   expect((await calendarRegion.boundingBox())?.width).toBe(widthBefore);
   await expect(panel.getByText("Plano", { exact: true })).toBeVisible();
@@ -509,7 +520,16 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
         rowGap: style.rowGap,
       };
     });
-  expect(habitControlSpacing).toEqual(calendarControlSpacing);
+  // O respiro acima da faixa mora em elementos diferentes em cada tela; a
+  // paridade vertical real (topo das grades) já é conferida no teste de
+  // demonstração. Aqui basta largura e espaçamento entre linhas.
+  expect({
+    maxWidth: habitControlSpacing.maxWidth,
+    rowGap: habitControlSpacing.rowGap,
+  }).toEqual({
+    maxWidth: calendarControlSpacing?.maxWidth,
+    rowGap: calendarControlSpacing?.rowGap,
+  });
   expect(
     Math.abs(
       habitControlsBox.x + habitControlsBox.width / 2 - desktopViewport.width / 2
@@ -558,26 +578,23 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
   // para reproduzir exatamente os mesmos dois espaços fixos da Anual (gap
   // acima da faixa de controles + acima da grade), independente do estado
   // de expandido/recolhido.
-  expect(habitsExpandedGeometry?.navToDivider).toBeCloseTo(8, 0);
-  expect(habitsExpandedGeometry?.controlsToGrid).toBeCloseTo(12, 0);
+  // Hábitos não tem o divisor da faixa de Eventos, então as caixas de
+  // controle têm alturas diferentes; o que precisa bater é o que se vê: a
+  // grade começa exatamente no mesmo ponto nas duas telas.
+  expect(habitsExpandedGeometry?.frameTop).toBeCloseTo(
+    annualExpandedGeometry?.frameTop ?? -1,
+    0
+  );
   expect(Math.abs(habitsExpandedGeometry?.canvasLeftGap ?? 99)).toBeLessThanOrEqual(1);
   expect(Math.abs(habitsExpandedGeometry?.canvasRightGap ?? 99)).toBeLessThanOrEqual(1);
 
+  const habitsFrameTopBeforeCollapse = (await habitsFrame.boundingBox())?.y;
   await page.getByRole("button", { name: "Recolher hábitos" }).click();
-  // O gap fixo (12px, igual à Anual) não muda ao recolher só a fileira de
-  // hábitos — só a largura da fileira colapsa (mesmo mecanismo do
-  // "Recolher categorias" da Anual), a grade não deve se mover.
+  // Recolher só a fileira de hábitos não move a grade (mesmo mecanismo do
+  // "Recolher categorias" de Eventos): só a largura da fileira colapsa.
   await expect
-    .poll(async () => {
-      const controlsBox = await page
-        .locator('[data-habit-controls-layout="desktop"]')
-        .boundingBox();
-      const frameBox = await habitsFrame.boundingBox();
-      return controlsBox && frameBox
-        ? Math.round(frameBox.y - (controlsBox.y + controlsBox.height))
-        : null;
-    })
-    .toBe(12);
+    .poll(async () => Math.round((await habitsFrame.boundingBox())?.y ?? -1))
+    .toBe(Math.round(habitsFrameTopBeforeCollapse ?? -2));
   await page.getByRole("button", { name: "Mostrar hábitos" }).click();
   await expect(habits.locator('[data-year-grid-surface="habits"]')).toBeVisible();
   const completedDay = habits.locator('[data-day-cell][data-day-iso$="-01-01"]');
@@ -589,7 +606,8 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
   }
   const completedDayBox = await completedDay.boundingBox();
   if (!completedDayBox) throw new Error("Célula de hábitos não pôde ser medida.");
-  expect(completedDayBox.height).toBeGreaterThanOrEqual(114);
+  // 4 hábitos: 30px (número) + 4 bolinhas de até 18px + espaços + 4px.
+  expect(completedDayBox.height).toBeGreaterThanOrEqual(112);
   const markerGeometry = await completedDay.locator("[data-day-habit-markers]").evaluate(
     (element) => {
       const marker = element.querySelector<HTMLElement>("[data-habit-marker]");
@@ -632,12 +650,15 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
   const habitsScrollViewport = habits.locator(
     "[data-desktop-habits-scroll-region]"
   );
-  const habitsDock = habits.locator("[data-year-grid-dock]");
-  const dockBoxAtTop = await habitsDock.boundingBox();
+  // A aba do ano fica fixa, presa ao cartão, enquanto a grade rola.
+  const habitsYearStepper = habits.locator(
+    "[data-year-grid-dock] [data-calendar-year-stepper]"
+  );
+  const dockBoxAtTop = await habitsYearStepper.boundingBox();
   const januaryBoxAtTop = await habits.locator('[data-month-row="0"]').boundingBox();
   const habitsViewportBox = await habitsScrollViewport.boundingBox();
   if (!dockBoxAtTop || !januaryBoxAtTop || !habitsViewportBox) {
-    throw new Error("Grade e dock de hábitos não puderam ser medidos.");
+    throw new Error("Grade e seletor de ano não puderam ser medidos.");
   }
   expect(januaryBoxAtTop.y).toBeGreaterThanOrEqual(habitsViewportBox.y - 2);
   await habitsScrollViewport.evaluate((element) => {
@@ -646,7 +667,7 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
   await expect
     .poll(() => habitsScrollViewport.evaluate((element) => element.scrollTop))
     .toBeGreaterThan(0);
-  const dockBoxAtBottom = await habitsDock.boundingBox();
+  const dockBoxAtBottom = await habitsYearStepper.boundingBox();
   expect(dockBoxAtBottom).not.toBeNull();
   expect(Math.abs((dockBoxAtBottom?.y ?? 0) - dockBoxAtTop.y)).toBeLessThanOrEqual(1);
   await habitsScrollViewport.evaluate((element) => {
@@ -691,7 +712,8 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
   await hiddenFilter.click();
   await expect(hiddenFilter).toHaveAttribute("aria-pressed", "false");
   await expect(completedDay.locator("[data-habit-marker]")).toHaveCount(3);
-  await expect.poll(async () => (await completedDay.boundingBox())?.height).toBe(94);
+  // 3 hábitos visíveis: 30px + 3 bolinhas de 18px + 2 espaços + 4px.
+  await expect.poll(async () => (await completedDay.boundingBox())?.height).toBe(92);
   await completedDay.click();
   await expect(
     page.locator("[data-habit-day-picker]").getByRole("button", {
@@ -706,7 +728,7 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
     return JSON.parse(raw ?? "{}").state?.visibleHabitIds ?? [];
   }).not.toContain("habit-4");
   await expect(habits.locator('[data-day-cell][aria-disabled="true"]').first()).toBeVisible();
-  await page.getByRole("link", { name: "Anual" }).click();
+  await page.getByRole("link", { name: "Eventos" }).click();
   await expect(calendarRegion).toBeVisible();
   await expect
     .poll(() => calendarRegion.evaluate((element) => element.scrollTop))
@@ -981,26 +1003,12 @@ test("onboarding desktop apresenta o exemplo e termina no hábito real", async (
   });
   await page.goto("/?surface=annual");
 
-  const periodNotice = page.locator(
-    '[data-guided-toolbar-notice][data-guided-toolbar-target="period-navigation"]'
-  );
-  await expect(periodNotice).toBeVisible();
-  await expect(page.locator('[data-onboarding-period-control="true"]')).toHaveCount(4);
-  await expect(page.locator('[data-onboarding-period-outline="true"]')).toHaveCount(1);
-  await expect(page.locator(".product-spotlight-target")).toHaveCount(0);
-  const periodNoticeBox = await periodNotice.boundingBox();
-  const periodAnchorBox = await page.locator("[data-onboarding-period-anchor]").boundingBox();
-  expect(periodNoticeBox).not.toBeNull();
-  expect(periodAnchorBox).not.toBeNull();
-  expect(Math.abs((periodNoticeBox?.y ?? 0) + (periodNoticeBox?.height ?? 0) / 2 - ((periodAnchorBox?.y ?? 0) + (periodAnchorBox?.height ?? 0) / 2))).toBeLessThan(24);
-  await page.getByTitle("1o trimestre").click();
-  await expect(page.locator("[data-month-row]")).toHaveCount(3);
-  await page.getByTitle("Abrir Janeiro").click();
-  await expect(page.locator("[data-month-row]")).toHaveCount(1);
-  await expect(page.locator('[data-onboarding-period-outline="true"]')).toHaveCount(0);
-  await periodNotice.getByRole("button", { name: "Continuar" }).click();
-  await expect(page.locator("[data-month-row]")).toHaveCount(12);
-  await expect(page.locator('[data-product-navigation="desktop"] a[aria-current="page"]')).toHaveAttribute("title", "Anual");
+  // "Q1-Q4/meses" saiu do guia: uma sessão salva nesse passo é pulada
+  // sozinha direto para o convite de Hábitos (sem ficar presa sem cartão).
+  await expect(
+    page.locator('[data-guided-toolbar-notice][data-guided-toolbar-target="period-navigation"]')
+  ).toHaveCount(0);
+  await expect(page.locator('[data-product-navigation="desktop"] a[aria-current="page"]')).toHaveAttribute("title", "Eventos");
   const habitSurfaceNotice = page.locator(
     '[data-guided-toolbar-notice][data-guided-toolbar-target="habit-surface"]'
   );
@@ -1066,7 +1074,7 @@ test("onboarding desktop apresenta o exemplo e termina no hábito real", async (
   const createdNotice = page.locator(
     '[data-guided-toolbar-notice][data-guided-toolbar-target="habit-created"]'
   );
-  await expect(createdNotice).toContainText("duas últimas semanas");
+  await expect(createdNotice).toContainText("Registre as últimas vezes que você realizou este hábito.");
   const retrospectiveDates = page.locator(
     '[data-onboarding-retrospective-date="true"]'
   );
@@ -1093,17 +1101,12 @@ test("onboarding desktop apresenta o exemplo e termina no hábito real", async (
     page.locator('[data-onboarding-retrospective-highlighted="true"]')
   ).toHaveCount(0);
   await expect(createdNotice).toBeVisible();
-  // Encerrar o hábito não fecha mais o guia direto: agora ele segue pelo
-  // tema e pelo resumo (wrap-up) antes de terminar, igual ao restante do
-  // tour guiado (ver "finish_habit_onboarding" em lib/onboarding.ts).
+  // Encerrar o hábito não fecha o guia direto: segue pelo resumo (wrap-up)
+  // antes de terminar. O tema saiu do guia (mora no menu do perfil).
   await createdNotice.getByRole("button", { name: "Continuar" }).click();
-
-  const themeNotice = page
-    .locator('[data-guided-toolbar-notice][data-guided-toolbar-target="theme"]:visible')
-    .first();
-  await expect(themeNotice).toBeVisible();
-  await page.locator("[data-onboarding-theme-control]:visible").first().click();
-  await themeNotice.getByRole("button", { name: "Continuar" }).click();
+  await expect(
+    page.locator('[data-guided-toolbar-notice][data-guided-toolbar-target="theme"]')
+  ).toHaveCount(0);
 
   const wrapUpNotice = page
     .locator('[data-guided-toolbar-notice][data-guided-toolbar-target="wrap-up"]:visible')
@@ -1114,7 +1117,7 @@ test("onboarding desktop apresenta o exemplo e termina no hábito real", async (
 
   await expect(
     page.locator('[data-product-navigation="desktop"] a[aria-current="page"]')
-  ).toHaveAttribute("title", "Anual");
+  ).toHaveAttribute("title", "Eventos");
   await expect(
     page.locator('[data-guided-toolbar-target="profile"]')
   ).toHaveCount(0);
@@ -1136,10 +1139,13 @@ test("onboarding desktop apresenta o exemplo e termina no hábito real", async (
   ).toMatchObject({ step: "completed", habitCount: 1, checkInCount: 1 });
 });
 
-test("onboarding mantém a edição aberta até importar o calendário", async ({
+test("sessão antiga em passos que saíram do guia segue direto para Hábitos", async ({
   page,
 }, testInfo) => {
   test.skip(!testInfo.project.name.startsWith("desktop-"), "Cenário desktop");
+  // "Editar categoria" e "calendário pronto" deixaram de pausar o guia (o
+  // calendário virou sugestão no resumo final). Uma sessão salva nesses
+  // passos não pode ficar presa: o guia passa direto por eles.
   await page.addInitScript(() => {
     window.localStorage.setItem(
       "doze52:onboarding:v2",
@@ -1155,75 +1161,22 @@ test("onboarding mantém a edição aberta até importar o calendário", async (
   });
   await page.goto("/?surface=annual");
 
-  const edit = page.locator('[data-product-organize="desktop"]');
-  const editNotice = page.locator(
-    '[data-guided-toolbar-notice][data-guided-toolbar-target="edit"]'
-  );
-  await expect(editNotice).toBeVisible();
-  await expect(editNotice).toHaveCSS("position", "fixed");
-  const editBox = await edit.boundingBox();
-  const editNoticeBox = await editNotice.boundingBox();
-  const viewport = page.viewportSize();
-  if (!editBox || !editNoticeBox || !viewport) {
-    throw new Error("Orientação do modo de edição não pôde ser medida.");
+  await expect(
+    page.locator('[data-guided-toolbar-notice][data-guided-toolbar-target="habit-surface"]')
+  ).toBeVisible();
+  for (const removedTarget of ["edit", "calendars", "period-navigation", "theme"]) {
+    await expect(
+      page.locator(
+        `[data-guided-toolbar-notice][data-guided-toolbar-target="${removedTarget}"]`
+      )
+    ).toHaveCount(0);
   }
-  expect(editNoticeBox.x).toBeGreaterThanOrEqual(-0.5);
-  expect(editNoticeBox.x + editNoticeBox.width).toBeLessThanOrEqual(
-    viewport.width + 0.5
-  );
   expect(
-    await editNotice.evaluate((element) => {
-      const rect = element.getBoundingClientRect();
-      const hit = document.elementFromPoint(
-        rect.left + rect.width / 2,
-        rect.top + rect.height / 2
-      );
-      return Boolean(hit && element.contains(hit));
-    })
-  ).toBe(true);
-  await edit.click();
-  await expect(edit).toHaveAttribute("aria-label", /Finalizar organização/);
-  await expect(
-    page.locator(
-      '[data-guided-toolbar-notice][data-guided-toolbar-target="calendars"]'
+    await page.evaluate(
+      () =>
+        JSON.parse(window.localStorage.getItem("doze52:onboarding:v2") ?? "{}").step
     )
-  ).toBeVisible();
-  // O botão fica com a aparência original (sem destaque de fundo/anel) —
-  // a posição do card, ancorado nele, já deixa claro qual usar.
-  const calendarTarget = page.locator('[data-onboarding-calendar-control]');
-  await expect(calendarTarget).toBeVisible();
-  await expect(calendarTarget).not.toHaveClass(/product-spotlight-target/);
-
-  await page.locator("[data-onboarding-calendar-control]").click();
-  const choice = page.getByRole("dialog", { name: "Adicionar categoria" });
-  const readyCalendarOption = choice.getByRole("button", {
-    name: /Adicionar calendário pronto/,
-  });
-  await expect(readyCalendarOption).toHaveAttribute(
-    "data-onboarding-calendar-choice",
-    "true"
-  );
-  // Cartão original (mesmo componente do vizinho "Criar minha categoria"),
-  // só com a borda mais grossa para sugerir "é este".
-  await expect(readyCalendarOption).toHaveClass(/border-2/);
-  await choice
-    .getByRole("button", { name: /Adicionar calendário pronto/ })
-    .click();
-  const gallery = page.getByRole("dialog", { name: "Calendários" });
-  const nationalStateCard = gallery
-    .locator("[data-calendar-pack-group]")
-    .filter({ hasText: "Feriados" });
-  await expect(nationalStateCard).toBeVisible();
-  await nationalStateCard
-    .getByRole("button", { name: "Adicionar feriados" })
-    .click();
-
-  await expect(
-    page.locator(
-      '[data-guided-toolbar-notice][data-guided-toolbar-target="period-navigation"]'
-    )
-  ).toBeVisible();
-  await expect(edit).toHaveAttribute("aria-label", /^Organizar/);
+  ).toBe("habit_surface_instruction");
 });
 
 test("demonstração não apaga um hábito real já existente", async ({

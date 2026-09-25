@@ -2037,8 +2037,9 @@ export default function HomePage() {
   );
 
   // "Editar categoria", "calendário pronto" (como passo isolado), "trocar
-  // de ano", "Q1-Q4/meses" e "tema" deixaram de pausar o guia pra explicar
-  // — cada um é descobrível sozinho (ícone de lápis, setas, sol/lua), e
+  // de ano" e "Q1-Q4/meses" deixaram de pausar o guia pra explicar — cada
+  // um é descobrível sozinho (ícone de lápis, setas; o tema saiu de vez do
+  // guia e mora no menu do perfil), e
   // "calendário pronto" virou uma sugestão dentro do resumo final em vez de
   // passo próprio (ver wrap_up_instruction). O estado interno de cada um
   // continua existindo no tipo (sessões antigas salvas ainda migram sem
@@ -2066,14 +2067,16 @@ export default function HomePage() {
       updateGuidedOnboarding({ type: "continue_from_visibility" });
       return;
     }
-    if (step === "theme_instruction") {
+    // Q1-Q4/meses também não pausa mais (não há cartão para esse passo):
+    // sem este pulo, sessões salvas nele ficavam paradas, sem guia algum.
+    if (step === "period_navigation_instruction") {
       const next = updateGuidedOnboarding({
-        type: "confirm_theme",
-        complete: true,
+        type: "continue_from_period_navigation",
+        showHabit: showHabitSteps,
       });
       if (next.step === "wrap_up_instruction") trimToRealCategories(next);
     }
-  }, [guidedOnboarding?.step, trimToRealCategories, updateGuidedOnboarding]);
+  }, [guidedOnboarding?.step, showHabitSteps, trimToRealCategories, updateGuidedOnboarding]);
 
   const finalizeGuidedOnboarding = React.useCallback(
     (next: GuidedOnboardingState) => {
@@ -2122,10 +2125,6 @@ export default function HomePage() {
     window.location.reload();
   }, []);
 
-  const dismissGuidedOnboarding = React.useCallback(() => {
-    setOnboardingExitOpen(true);
-  }, []);
-
   const confirmDismissGuidedOnboarding = React.useCallback(() => {
     const current = readGuidedOnboardingState();
     if (current.step === "context_selection") {
@@ -2142,6 +2141,17 @@ export default function HomePage() {
     setDemoInviteSuppressed(false);
     setOnboardingExitOpen(false);
   }, [inlineEditModeActive, updateGuidedOnboarding]);
+
+  // No primeiro passo nada foi criado ainda e o X só leva ao ano de exemplo
+  // (o guia pode ser retomado): a confirmação seria um passo a mais sem
+  // nada a proteger. Dali em diante, confirma antes de encerrar.
+  const dismissGuidedOnboarding = React.useCallback(() => {
+    if (readGuidedOnboardingState().step === "context_selection") {
+      confirmDismissGuidedOnboarding();
+      return;
+    }
+    setOnboardingExitOpen(true);
+  }, [confirmDismissGuidedOnboarding]);
 
   const restartGuidedOnboardingFromDemo = React.useCallback(() => {
     loadOnboardingPersonalDemo(initialYear);
@@ -2796,9 +2806,10 @@ export default function HomePage() {
       if (next.step !== current.step) {
         setWorkspaceEditMode(null);
         if (uf) void trackOnboardingRegion(uf);
+        if (next.step === "wrap_up_instruction") trimToRealCategories(next);
       }
     },
-    [showHabitSteps, updateGuidedOnboarding]
+    [showHabitSteps, trimToRealCategories, updateGuidedOnboarding]
   );
 
   React.useEffect(() => {
@@ -2933,21 +2944,29 @@ export default function HomePage() {
     scrollRegion.scrollTop = desktopCalendarScrollTopRef.current;
   }, [activeDestination, isMobileCalendarUi]);
 
-  React.useEffect(() => {
-    if (
-      isMobileCalendarUi !== true ||
-      guidedOnboarding?.step !== "period_navigation_instruction"
-    ) {
-      return;
-    }
-    updateGuidedOnboarding({ type: "continue_from_period_navigation" });
-  }, [guidedOnboarding?.step, isMobileCalendarUi, updateGuidedOnboarding]);
-
   const isHabitsSurfaceActive = activeDestination === "habits";
   const isCalendarSurfaceActive = !isHabitsSurfaceActive;
+  // "Ano de exemplo": no desktop fica ao lado do logo, no cabeçalho; no
+  // mobile segue flutuando no rodapé.
+  const showDemoYearBadge =
+    isCalendarSurfaceActive &&
+    (isDemoExploration ||
+      (showGuidedOnboarding && guidedOnboarding?.step === "context_selection"));
+  // "Ir para hoje" no desktop: volta ao ano atual (se preciso) e centraliza
+  // o dia de hoje na grade. Usado pela aba do ano presa ao cartão.
+  const goToDesktopToday = () => {
+    const todayYear = todayIso ? Number(todayIso.slice(0, 4)) : year;
+    pendingDesktopTodayCenterRef.current = true;
+    resetCalendarFocusOnYearChange();
+    if (todayYear !== year) {
+      handleYearChange(todayYear);
+    } else {
+      pendingDesktopTodayCenterRef.current = false;
+      requestDesktopTodayCenter();
+    }
+  };
   const headerGuidedToolbarNotice =
-    (guidedToolbarNotice?.target === "appearance" ||
-      guidedToolbarNotice?.target === "year" ||
+    (guidedToolbarNotice?.target === "year" ||
       guidedToolbarNotice?.target === "habit-showcase" ||
       guidedToolbarNotice?.target === "habit" ||
       guidedToolbarNotice?.target === "habit-created")
@@ -3103,21 +3122,12 @@ export default function HomePage() {
             continuityStatus={isAccountContinuityEnabled && session ? (continuity.status === "saved" ? "Salvo" : continuity.status === "saving" ? "Salvando…" : continuity.status === "loading" ? "Carregando seus hábitos…" : "Sincronização pendente") : undefined}
             onRetryContinuity={continuity.status === "pending" || continuity.status === "unavailable" ? continuity.retry : undefined}
             returnFocusRef={utilityPanelTriggerRef}
-            guidedAppearanceNotice={
-              guidedToolbarNotice?.target === "appearance"
-                ? guidedToolbarNotice
-                : null
-            }
             onOpenChange={setUtilityPanelOpen}
             onOpenAuthDialog={() => {
               setAuthDialogInitialMode("login");
               setAuthDialogAnchorPoint(undefined);
               setAuthDialogOpen(true);
             }}
-            onDismissGuidedNotice={dismissGuidedOnboarding}
-            onGuidedAppearanceOpen={() =>
-              updateGuidedOnboarding({ type: "open_appearance" })
-            }
           />
         </>
       ) : null}
@@ -3178,7 +3188,13 @@ export default function HomePage() {
           }
           onboardingActive={categoriesForceExpandActive}
           guidedHabitStepActive={guidedHabitStepActive}
-          guidedOnboardingActive={showGuidedOnboarding}
+          // Só trava o Organizar enquanto o guia está de fato em andamento —
+          // no ano de exemplo (guia encerrado para explorar) criar categoria
+          // tem que funcionar, não "disponível quando o guia terminar".
+          guidedOnboardingActive={
+            showGuidedOnboarding &&
+            Boolean(guidedOnboarding && isGuidedOnboardingInProgress(guidedOnboarding))
+          }
           onboardingLayoutLocked={false}
           onboardingLayoutReserved={
             isCalendarSurfaceActive && Boolean(guidedSelectionNotice)
@@ -3198,27 +3214,13 @@ export default function HomePage() {
           onYearLabelClick={
             isMobileCalendarUi === true
               ? () => setScrollToTodayRequestKey((key) => key + 1)
-              : () => {
-                  const todayYear = todayIso
-                    ? Number(todayIso.slice(0, 4))
-                    : year;
-                  pendingDesktopTodayCenterRef.current = true;
-                  resetCalendarFocusOnYearChange();
-                  if (todayYear !== year) {
-                    handleYearChange(todayYear);
-                  } else {
-                    pendingDesktopTodayCenterRef.current = false;
-                    requestDesktopTodayCenter();
-                  }
-                }
-          }
-          onGuidedThemeChange={() =>
-            updateGuidedOnboarding({ type: "confirm_theme" })
+              : goToDesktopToday
           }
           headerMinimized={guidedOnboardingContextChosen ? false : headerMinimized}
           onToggleHeaderMinimized={() => { if (!guidedOnboardingContextChosen) setHeaderMinimized(!headerMinimized); }}
           mobileExamplePreviewActive={isMobileExamplePreview}
           demoExplorationActive={bypassCreationLimits}
+          showDemoYearBadge={showDemoYearBadge}
           onCategoryCreated={(categoryId) => {
             recordDemoInteraction(`mutation:category:create:${categoryId}`);
             trackPostExitCreation(`category:${categoryId}`);
@@ -3435,6 +3437,7 @@ export default function HomePage() {
               )}
               showScaleControl={false}
               scrollViewportRef={desktopCalendarScrollRef}
+              onGoToToday={goToDesktopToday}
               scrollRegion="calendar"
             />
           </div>
@@ -3466,10 +3469,7 @@ export default function HomePage() {
         onConfirm={confirmDismissGuidedOnboarding}
       />
 
-      {isCalendarSurfaceActive &&
-      (isDemoExploration ||
-        (showGuidedOnboarding &&
-          guidedOnboarding?.step === "context_selection")) ? (
+      {showDemoYearBadge && isMobileCalendarUi === true ? (
         <div
           data-demo-mode-badge
           className="pointer-events-none fixed bottom-3 left-1/2 z-30 -translate-x-1/2 rounded-full border border-border/75 bg-card/92 px-3 py-1 text-[11px] font-semibold tracking-wide text-muted-foreground shadow-sm backdrop-blur"

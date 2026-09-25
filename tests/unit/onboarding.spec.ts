@@ -205,17 +205,11 @@ test("cria contexto, categoria incremental de datas e pula direto para edição"
     uf: "RS",
     at: "2026-07-20T10:04:30.000Z",
   });
+  // O tema saiu do guia: o calendário pronto leva direto ao resumo final.
   expect(state).toMatchObject({
-    step: "theme_instruction",
+    step: "wrap_up_instruction",
     holidayUf: "RS",
   });
-
-  state = reduceGuidedOnboardingState(state, {
-    type: "confirm_theme",
-    complete: true,
-    at: "2026-07-20T10:05:00.000Z",
-  });
-  expect(state.step).toBe("wrap_up_instruction");
 
   state = reduceGuidedOnboardingState(state, {
     type: "continue_from_wrap_up",
@@ -282,22 +276,15 @@ test("onboarding desktop termina em Hábitos sem retornar ao ano", () => {
     })
   ).toEqual(retrospective);
 
-  // Sem tema confirmado ainda, o guia segue para o tema (não volta ao Anual,
-  // e ainda não termina) antes do resumo final e do convite de conta.
+  // O tema saiu do guia: depois dos hábitos vem direto o resumo final (não
+  // volta aos Eventos, e ainda não termina) antes do convite de conta.
   const afterHabits = reduceGuidedOnboardingState(retrospective, {
     type: "finish_habit_onboarding",
     at: "2026-08-26T12:01:00.000Z",
   });
-  expect(afterHabits.step).toBe("theme_instruction");
+  expect(afterHabits.step).toBe("wrap_up_instruction");
 
-  const themed = reduceGuidedOnboardingState(afterHabits, {
-    type: "confirm_theme",
-    complete: true,
-    at: "2026-08-26T12:01:30.000Z",
-  });
-  expect(themed.step).toBe("wrap_up_instruction");
-
-  const completed = reduceGuidedOnboardingState(themed, {
+  const completed = reduceGuidedOnboardingState(afterHabits, {
     type: "continue_from_wrap_up",
     at: "2026-08-26T12:02:00.000Z",
   });
@@ -521,7 +508,7 @@ test("migra v6 sem perder períodos e posiciona calendários depois deles", () =
   });
 });
 
-test("migra v6 com tema confirmado e preserva a confirmação", () => {
+test("migra v6 com tema confirmado sem depender do passo de tema", () => {
   expect(
     migrateGuidedOnboardingState({
       version: 6,
@@ -534,7 +521,6 @@ test("migra v6 com tema confirmado e preserva a confirmação", () => {
   ).toMatchObject({
     version: 15,
     step: "calendar_instruction",
-    themeConfirmedAt: "2026-07-20T10:04:30.000Z",
   });
 });
 
@@ -562,7 +548,6 @@ test("migra v7 sem reabrir terminais e consolida o passo de contexto", () => {
   ).toMatchObject({
     version: 15,
     step: "calendar_instruction",
-    themeConfirmedAt: "2026-07-20T10:04:30.000Z",
   });
 
   expect(
@@ -807,11 +792,11 @@ test("demonstração monta dois contextos e categorias pessoais e profissionais"
     "Profissional",
   ]);
   expect(snapshot.categories.map((category) => category.name)).toEqual([
-    "Eventos",
+    "Geral",
     "Família",
     "Amigos",
     "Viagens",
-    "Eventos",
+    "Geral",
     "Rituais",
     "Projetos",
     "Marketing",
@@ -860,7 +845,7 @@ test("demonstração monta dois contextos e categorias pessoais e profissionais"
       (category) => category.profileId === ONBOARDING_PROFILE_IDS.professional
     ).map((category) => category.name)
   ).toEqual([
-    "Eventos",
+    "Geral",
     "Rituais",
     "Projetos",
     "Marketing",
@@ -900,7 +885,7 @@ test("demonstração monta dois contextos e categorias pessoais e profissionais"
         event.categoryId === personalCategoryIds.get(name) &&
         event.calendarPackEventKey?.startsWith("2026:")
     ).length;
-  expect(countCategoryEvents("Eventos")).toBe(15);
+  expect(countCategoryEvents("Geral")).toBe(15);
   expect(countCategoryEvents("Família")).toBe(17);
   expect(countCategoryEvents("Amigos")).toBe(19);
   expect(countCategoryEvents("Viagens")).toBe(6);
@@ -1063,7 +1048,7 @@ test("reconhece e remove snapshots demonstrativos v1 a v8", () => {
     "onboarding-personal-demo-v5",
     "onboarding-personal-demo-v6",
     "onboarding-personal-demo-v7",
-    "onboarding-personal-demo-v8",
+    "onboarding-personal-demo-v9",
   ]) {
     const current = getOnboardingPersonalDemoSnapshot(2026);
     const legacy = {
@@ -1253,7 +1238,7 @@ test("sandbox libera criação, edição e exclusão sem preservar a origem demo
 
   const category = sandbox.categories.find((item) => item.name === "Amigos");
   const targetCategory = sandbox.categories.find(
-    (item) => item.name === "Eventos" && item.profileId === category?.profileId
+    (item) => item.name === "Geral" && item.profileId === category?.profileId
   );
   expect(category).toBeTruthy();
   expect(targetCategory).toBeTruthy();
@@ -1338,4 +1323,12 @@ test("materialização cria IDs distintos e preserva relacionamentos", () => {
   expect([...firstIds].some((id) => secondIds.has(id))).toBe(false);
   expect(first.categories[0]?.profileId).toBe(first.profiles[0]?.id);
   expect(first.events[0]?.categoryId).toBe(first.categories[0]?.id);
+});
+
+test("sessões salvas nos passos legados de tema/aparência migram para o resumo", () => {
+  for (const step of ["theme_instruction", "appearance_instruction"] as const) {
+    expect(
+      migrateGuidedOnboardingState({ version: 15, step, context: "personal" }).step
+    ).toBe("wrap_up_instruction");
+  }
 });

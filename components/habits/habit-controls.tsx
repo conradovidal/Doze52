@@ -120,7 +120,7 @@ function EditHabitChip({
       data-premium-sortable
       className={cn(
         "relative inline-flex h-8 shrink-0 items-center overflow-hidden rounded-[10px] border bg-card text-[0.78rem] font-semibold transition-[transform,background-color,border-color,box-shadow]",
-        mobile && "h-10 w-full rounded-[8px]",
+        mobile && "h-10 max-w-full rounded-[8px]",
         selected ? "border-foreground/30" : "border-border",
         isOverlay && "shadow-[0_18px_34px_-24px_rgba(15,23,42,0.36)]"
       )}
@@ -452,7 +452,7 @@ export function HabitControls({
       <SortableContext items={orderedHabits.map((habit) => habit.id)} strategy={rectSortingStrategy}>
         <div className={cn(
           mobile
-            ? "grid w-full grid-cols-2 gap-1.5 min-[430px]:grid-cols-3"
+            ? "flex w-full flex-wrap items-center gap-1.5"
             : "flex min-h-8 w-max min-w-full flex-nowrap items-center justify-center gap-1.5 sm:gap-2"
         )}>
           {orderedHabits.map((habit) => (
@@ -473,7 +473,7 @@ export function HabitControls({
               title="Criar novo hábito"
               className={cn(
                 "inline-flex h-8 w-8 items-center justify-center rounded-[10px] border border-border bg-card",
-                mobile && "h-10 w-full rounded-[8px]"
+                mobile && "h-10 w-10 rounded-[8px]"
               )}
               onClick={onRequestCreate}
             >
