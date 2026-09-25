@@ -1,15 +1,23 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { applyOfficialSourceToCatalog } from "../../lib/calendar-catalog/catalog-builder";
 import { materialHash } from "../../lib/calendar-catalog/material";
 import type { CalendarCatalog, OfficialCalendarEvent } from "../../lib/calendar-catalog/types";
 import clubs from "../../lib/calendar-packs/brazilian-clubs-2026.json";
 import { dismissOnboardingIfVisible } from "./support/browser";
 
+// Calendários prontos moram no Organizar desde #97/#118: "+" (Criar nova
+// categoria) → "Adicionar calendário pronto" → tela "Calendários".
+const openCalendarGallery = async (page: Page) => {
+  await page.locator('[data-product-organize="desktop"]').click();
+  await page.getByRole("button", { name: "Criar nova categoria" }).click();
+  await page.getByRole("button", { name: /Adicionar calendário pronto/ }).click();
+};
+
 test("fallback compilado pré-seleciona São Paulo e Grêmio entre as opções disponíveis", async ({ page }) => {
   await page.goto("/");
   await page.waitForLoadState("networkidle");
   await dismissOnboardingIfVisible(page);
-  await page.getByRole("button", { name: "Adicionar ou gerenciar calendários." }).click();
+  await openCalendarGallery(page);
   const dialog = page.getByRole("dialog", { name: "Calendários" });
   await expect(
     dialog.getByRole("combobox", { name: /Estado para/ })
@@ -69,7 +77,7 @@ test("catálogo remoto oferece 20 clubes e consulta uma nova versão sem deploy"
   await page.goto("/");
   await page.waitForLoadState("networkidle");
   await dismissOnboardingIfVisible(page);
-  await page.getByRole("button", { name: "Adicionar ou gerenciar calendários." }).click();
+  await openCalendarGallery(page);
   const dialog = page.getByRole("dialog", { name: "Calendários" });
   await dialog.getByRole("combobox", { name: /Time para Jogos do/ }).click();
   await expect(page.getByRole("option")).toHaveCount(20);

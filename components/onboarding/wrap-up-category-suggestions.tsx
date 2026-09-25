@@ -3,13 +3,14 @@
 import * as React from "react";
 import { CalendarDays, Check, GripVertical, Plus, X } from "lucide-react";
 import { CalendarPackLauncher } from "@/components/calendar-packs/calendar-pack-launcher";
+import { useFeedback } from "@/components/ui/feedback-provider";
 import { getCalendarPackGroupId } from "@/lib/calendar-packs/import";
 import {
   CATEGORY_COLOR_BASE_GRAPHITE,
   getCategoryColorToken,
 } from "@/lib/category-palette";
 import type { WrapUpCategorySuggestion } from "@/lib/onboarding";
-import { useStore } from "@/lib/store";
+import { isOnboardingPersonalDemoGroup, useStore } from "@/lib/store";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 
@@ -157,6 +158,7 @@ export function WrapUpCategorySuggestions({
   children: React.ReactNode;
 }) {
   const { mode: themeMode } = useTheme();
+  const { notify } = useFeedback();
   const categories = useStore((s) => s.categories);
   const createCategory = useStore((s) => s.createCategory);
   const deleteCategoryFallback = useStore((s) => s.deleteCategory);
@@ -175,12 +177,41 @@ export function WrapUpCategorySuggestions({
   // adotadas por aqui: se a 3a posição for uma categoria criada durante a
   // prática guiada (não uma sugestão), ela também sai quando uma nova
   // sugestão é arrastada para cima.
+  //
+  // O ano de exemplo segue no fundo até o "Finalizar guia" (só é cortado
+  // ali, ver trimToRealCategories em app/page.tsx): as categorias dele não
+  // aparecem aqui nem contam no teto — este passo é só sobre as dela.
   const profileCategories = React.useMemo(
     () =>
       categories.filter(
-        (category) => !profileId || category.profileId === profileId
+        (category) =>
+          (!profileId || category.profileId === profileId) &&
+          !category.archivedAt &&
+          !isOnboardingPersonalDemoGroup(category.calendarPackGroupId)
       ),
     [categories, profileId]
+  );
+  const demoCategoryIds = React.useMemo(
+    () =>
+      new Set(
+        categories
+          .filter((category) =>
+            isOnboardingPersonalDemoGroup(category.calendarPackGroupId)
+          )
+          .map((category) => category.id)
+      ),
+    [categories]
+  );
+  // Uma sugestão conta como escolhida se já existe uma categoria com o mesmo
+  // nome — não só as adotadas nesta montagem. Fechar e reabrir o Editar
+  // remonta este componente e zera `adopted`; sem isto, "Geral" voltava a
+  // aparecer desmarcada e um toque criava uma segunda "Geral".
+  const existingNames = React.useMemo(
+    () =>
+      new Set(
+        profileCategories.map((category) => category.name.trim().toLowerCase())
+      ),
+    [profileCategories]
   );
   const [adopted, setAdopted] = React.useState<
     { suggestionId: string; categoryId: string }[]
@@ -231,11 +262,123 @@ export function WrapUpCategorySuggestions({
   const lastCategoryId =
     profileCategories[profileCategories.length - 1]?.id;
 
+  // O teto vale para qualquer caminho, não só para as sugestões daqui: o "+"
+  // abre a criação de categoria e o calendário pronto por fluxos próprios
+  // (que fecham este painel no meio), e sem esta guarda terminar o guia com
+  // 4 categorias era só uma questão de passar por um deles. Quando passa do
+  // teto, fica a que acabou de entrar e sai a anterior mais recente — a
+  // mesma troca da última posição que as sugestões já fazem. Na montagem
+  // (voltando de um desses fluxos) não há "antes" para comparar: a mais nova
+  // é a última da lista, que é onde toda criação entra.
+  const previousCategoryIdsRef = React.useRef<Set<string> | null>(null);
+  React.useEffect(() => {
+    // Lê o store na hora, não a lista deste render: o efeito pode rodar de
+    // novo antes do próximo render (StrictMode, ou uma troca que acabou de
+    // remover algo), e com a lista antiga removia uma categoria a mais.
+    const readLive = () =>
+      useStore
+        .getState()
+        .categories.filter(
+          (category) =>
+            (!profileId || category.profileId === profileId) &&
+            !category.archivedAt &&
+            !isOnboardingPersonalDemoGroup(category.calendarPackGroupId)
+        );
+    const profileCategories = readLive();
+    const previous = previousCategoryIdsRef.current;
+    const rememberLive = () => {
+      previousCategoryIdsRef.current = new Set(readLive().map((category) => category.id));
+    };
+    if (pendingEvictingCategoryId) {
+      rememberLive();
+      return;
+    }
+    const freshIds = new Set(
+      previous
+        ? profileCategories
+            .filter((category) => !previous.has(category.id))
+            .map((category) => category.id)
+        : [profileCategories[profileCategories.length - 1]?.id]
+    );
+
+    // Plano grátis: 1 calendário pronto. No guia, um novo substitui o
+    // anterior (em vez de abrir o Pro no meio do passo) — e avisa, para a
+    // troca não parecer que o outro sumiu sozinho.
+    let remaining = profileCategories;
+    if (cap != null) {
+      const packCategories = profileCategories.filter(
+        (category) => category.calendarPackGroupId
+      );
+      const freshPack = packCategories.find((category) => freshIds.has(category.id));
+      const stalePacks = packCategories.filter(
+        (category) =>
+          !freshIds.has(category.id) &&
+          category.calendarPackGroupId !== freshPack?.calendarPackGroupId
+      );
+      if (freshPack && stalePacks.length > 0) {
+        const removed = stalePacks.filter((category) => removeCategory(category.id));
+        const removedIds = new Set(removed.map((category) => category.id));
+        remaining = profileCategories.filter((category) => !removedIds.has(category.id));
+        setImportedPacks((current) =>
+          current.filter((entry) => !entry.categoryId || !removedIds.has(entry.categoryId))
+        );
+        if (removed.length > 0) {
+          notify({
+            tone: "info",
+            title: "Calendário trocado",
+            description: `${freshPack.name} entrou no lugar de ${removed
+              .map((category) => category.name)
+              .join(", ")} — no plano grátis cabe 1 calendário pronto.`,
+          });
+        }
+      }
+    }
+
+    if (cap == null || remaining.length <= cap) {
+      rememberLive();
+      return;
+    }
+    const fresh = freshIds;
+    const overflow = remaining.length - cap;
+    const evicting = [...remaining]
+      .reverse()
+      .filter((category) => !fresh.has(category.id))
+      .slice(0, overflow);
+    for (const category of evicting) {
+      if (!removeCategory(category.id)) continue;
+      const wasTrackedSuggestion = adopted.some(
+        (entry) => entry.categoryId === category.id
+      );
+      setAdopted((current) =>
+        current.filter((entry) => entry.categoryId !== category.id)
+      );
+      setImportedPacks((current) =>
+        current.filter((entry) => entry.categoryId !== category.id)
+      );
+      if (!wasTrackedSuggestion && !category.calendarPackGroupId) {
+        setEvictedSuggestions((current) => [
+          { id: `evicted-${category.id}`, name: category.name, color: category.color },
+          ...current,
+        ]);
+      }
+    }
+    rememberLive();
+  }, [
+    adopted,
+    cap,
+    notify,
+    pendingEvictingCategoryId,
+    profileCategories,
+    profileId,
+    removeCategory,
+  ]);
+
   const adoptSuggestion = React.useCallback(
     (suggestionId: string) => {
       const suggestion = allSuggestions.find((item) => item.id === suggestionId);
       if (!suggestion) return;
       if (adopted.some((entry) => entry.suggestionId === suggestion.id)) return;
+      if (existingNames.has(suggestion.name.trim().toLowerCase())) return;
 
       const evictingCategoryId = atCap ? lastCategoryId : undefined;
       const evictingCategory = evictingCategoryId
@@ -259,7 +402,14 @@ export function WrapUpCategorySuggestions({
         const evictedWasTrackedSuggestion = evictingCategoryId
           ? adopted.some((entry) => entry.categoryId === evictingCategoryId)
           : false;
-        if (evictingCategory && !evictedWasTrackedSuggestion) {
+        // Calendário pronto que sai não vira sugestão comum: recriá-lo por
+        // aqui daria uma categoria vazia com o mesmo nome (sem os jogos ou
+        // feriados) — o caminho de volta é o chip "Calendário pronto".
+        if (
+          evictingCategory &&
+          !evictedWasTrackedSuggestion &&
+          !evictingCategory.calendarPackGroupId
+        ) {
           setEvictedSuggestions((current) => [
             { id: `evicted-${evictingCategory.id}`, name: evictingCategory.name, color: evictingCategory.color },
             ...current,
@@ -297,6 +447,7 @@ export function WrapUpCategorySuggestions({
     [
       allSuggestions,
       adopted,
+      existingNames,
       atCap,
       lastCategoryId,
       profileCategories,
@@ -339,6 +490,7 @@ export function WrapUpCategorySuggestions({
       const category = profileCategories.find((item) => item.id === categoryId);
       if (!category) return;
       if (!removeCategory(categoryId)) return;
+      if (category.calendarPackGroupId) return;
       setEvictedSuggestions((current) => [
         { id: `evicted-${category.id}`, name: category.name, color: category.color },
         ...current,
@@ -371,8 +523,10 @@ export function WrapUpCategorySuggestions({
           previewEvictingCategoryId?: string;
           previewEnteringCategoryId?: string;
           onDragCategoryOut?: (categoryId: string) => void;
+          hiddenCategoryIds?: ReadonlySet<string>;
         }>,
         {
+          hiddenCategoryIds: demoCategoryIds,
           previewGhostSuggestion,
           previewEvictingCategoryId,
           previewEnteringCategoryId: enteringCategoryId ?? undefined,
@@ -542,7 +696,10 @@ export function WrapUpCategorySuggestions({
             <SuggestionChip
               key={suggestion.id}
               suggestion={suggestion}
-              adopted={adopted.some((entry) => entry.suggestionId === suggestion.id)}
+              adopted={
+                adopted.some((entry) => entry.suggestionId === suggestion.id) ||
+                existingNames.has(suggestion.name.trim().toLowerCase())
+              }
               tapOnly={hideExistingCategories}
               onDragStart={() => {
                 draggingSuggestionIdRef.current = suggestion.id;
@@ -552,6 +709,12 @@ export function WrapUpCategorySuggestions({
             />
           ))}
         </div>
+        {cap != null ? (
+          <p className="mt-2.5 text-[11px] leading-4 text-muted-foreground">
+            No plano grátis: até {cap} categorias, sendo 1 calendário pronto.
+            Escolher outro troca o anterior.
+          </p>
+        ) : null}
       </div>
 
       {/* Sem gatilho próprio (hideTrigger): abre controlado pelo chip acima.
@@ -563,6 +726,9 @@ export function WrapUpCategorySuggestions({
         onControlledOpenChange={setCalendarPackOpen}
         fixedTargetProfileId={profileId}
         onRequireAuth={onRequireAuth}
+        // O limite de 1 calendário vale, mas como troca (ver o efeito do
+        // teto acima), não como bloqueio com o Pro no meio do guia.
+        bypassLimits
         autoCloseOnImport
         compactList={hideExistingCategories}
         onImported={(pack) => {
@@ -571,11 +737,10 @@ export function WrapUpCategorySuggestions({
           // componente, que pode não ter repropagado ainda neste mesmo
           // tick) para achar a categoria de verdade que o import acabou
           // de criar.
-          const createdCategory = useStore
-            .getState()
-            .categories.find(
-              (category) => category.calendarPackGroupId === groupId
-            );
+          const storeCategories = useStore.getState().categories;
+          const createdCategory = storeCategories.find(
+            (category) => category.calendarPackGroupId === groupId
+          );
           setImportedPacks((current) =>
             current.some((entry) => entry.groupId === groupId)
               ? current

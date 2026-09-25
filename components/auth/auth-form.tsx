@@ -339,7 +339,7 @@ export function AuthForm({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {showHeader ? (
         <div>
           <h2 className="text-lg font-semibold text-foreground">
@@ -375,6 +375,22 @@ export function AuthForm({
         >
           Cadastro
         </button>
+      </div>
+      <GoogleButton
+        onClick={handleGoogle}
+        disabled={loading}
+        label={mode === "signup" ? "Continuar com Google" : "Entrar com Google"}
+      />
+      {pendingGooglePopup ? (
+        <p className="rounded-xl border border-border/70 bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+          Aguardando conclusão do login com Google...
+        </p>
+      ) : null}
+      {/* Google primeiro (o caminho mais rápido); e-mail e senha logo abaixo. */}
+      <div className="flex items-center gap-3 text-[11px] font-medium text-muted-foreground">
+        <span className="h-px flex-1 bg-border" aria-hidden="true" />
+        ou com e-mail
+        <span className="h-px flex-1 bg-border" aria-hidden="true" />
       </div>
       <div className="space-y-1.5">
         <label htmlFor="auth-email" className="text-[12px] font-medium text-foreground/70">
@@ -418,18 +434,12 @@ export function AuthForm({
           )}
         </div>
       ) : null}
-      <GoogleButton onClick={handleGoogle} disabled={loading} />
-      {pendingGooglePopup ? (
-        <p className="rounded-xl border border-border/70 bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-          Aguardando conclusão do login com Google...
-        </p>
-      ) : null}
       {error ? (
         <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
           {error}
         </p>
       ) : null}
-      <div className="flex items-center justify-between gap-2 pt-1">
+      <div className="flex items-center justify-between gap-2">
         {onCancel ? (
           <Button type="button" variant="ghost" onClick={onCancel}>
             Cancelar

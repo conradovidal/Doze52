@@ -116,6 +116,13 @@ type CategoryBarProps = {
   // do guia (WrapUpCategorySuggestions), pra abrir espaço pra uma sugestão
   // sem depender só da troca automática da última posição.
   onDragCategoryOut?: (categoryId: string) => void;
+  // Categorias que não entram na fileira de edição (ex.: as do ano de
+  // exemplo durante o resumo do guia — seguem no calendário, mas não são
+  // dela para organizar).
+  hiddenCategoryIds?: ReadonlySet<string>;
+  // Ação no fim da fileira de filtros (fora da edição), antes do "mostrar/
+  // ocultar todas" — ex.: o "+" de criar categoria no cabeçalho de Eventos.
+  trailingAction?: React.ReactNode;
 };
 
 // Distância mínima pra baixo pra contar como "arrastou pra fora", não um
@@ -202,7 +209,7 @@ function EditCategoryChip({
       className={cn(
         CHIP_SHELL_CLASS,
         `transition-[opacity,transform] ${MOTION_CLASS}`,
-        mobileDense && "h-10 w-full rounded-[8px]",
+        mobileDense && "h-10 max-w-full rounded-[8px]",
         isOverlay && CHIP_OVERLAY_CLASS,
         isRemoving && "opacity-60 ring-2 ring-destructive",
         isPlaceholder && "bg-background/80",
@@ -376,7 +383,7 @@ function GhostCategoryChip({
           ? "border-dashed bg-transparent text-muted-foreground/55"
           : "onboarding-category-reveal",
         "pointer-events-none",
-        mobileDense && "h-10 w-full rounded-[8px]"
+        mobileDense && "h-10 max-w-full rounded-[8px]"
       )}
     >
       {dashed ? null : (
@@ -477,6 +484,8 @@ export function CategoryBar({
   nowrap = false,
   locked = false,
   onDragCategoryOut,
+  hiddenCategoryIds,
+  trailingAction,
 }: CategoryBarProps) {
   const { mode: themeMode } = useTheme();
   const selectedProfileIds = useStore((s) => s.selectedProfileIds);
@@ -523,10 +532,13 @@ export function CategoryBar({
     () =>
       editingProfileId
         ? categories.filter(
-            (category) => !category.archivedAt && category.profileId === editingProfileId
+            (category) =>
+              !category.archivedAt &&
+              category.profileId === editingProfileId &&
+              !hiddenCategoryIds?.has(category.id)
           )
         : [],
-    [categories, editingProfileId]
+    [categories, editingProfileId, hiddenCategoryIds]
   );
   const orderedCategoriesForEditingProfile = React.useMemo(
     () => orderItemsByIds(categoriesForEditingProfile, draftOrderIds),
@@ -540,9 +552,13 @@ export function CategoryBar({
   );
   const dragEnabled =
     isInlineEditMode && orderedCategoriesForEditingProfile.length > 1 && !locked;
+  // Leitura no mobile: chips no tamanho do nome, quebrando linha — a grade
+  // de colunas fixas deixava o botão de ocultar numa célula inteira e
+  // abria uma linha a mais. Na edição (Organizar) vale o mesmo arranjo do
+  // Organizar do desktop: chips lado a lado, alça e lápis dentro de cada um.
   const barClass = cn(
     mobileDense
-      ? "grid w-full grid-cols-2 gap-1.5 min-[430px]:grid-cols-3"
+      ? "flex w-full flex-wrap items-center gap-1.5"
       : compact
         ? "w-full min-h-8 justify-center"
         : "mb-2 min-h-8 justify-start",
@@ -662,7 +678,7 @@ export function CategoryBar({
   );
 
   if (!isInlineEditMode && displayedCategories.length === 0 && !highlightCreate) {
-    return null;
+    return trailingAction ? <div className={barClass}>{trailingAction}</div> : null;
   }
 
   if (!isInlineEditMode) {
@@ -693,7 +709,7 @@ export function CategoryBar({
               className={cn(
                 `inline-flex items-center overflow-hidden border text-[0.78rem] font-semibold shadow-none transition-all ${MOTION_CLASS}`,
                 mobileDense
-                  ? "h-10 w-full justify-start rounded-[8px] pr-2 text-left"
+                  ? "h-10 max-w-full justify-start rounded-[8px] pr-1 text-left"
                   : "h-8 rounded-[10px]",
                 category.visible
                   ? "hover:brightness-[0.985]"
@@ -732,14 +748,11 @@ export function CategoryBar({
                 />
               </span>
               <span
-                className={`min-w-0 pl-1 pr-3 ${
-                  mobileDense
-                    ? "text-left text-[0.74rem] leading-[0.84rem]"
-                    : "truncate"
+                className={`min-w-0 truncate pl-1 pr-3 ${
+                  mobileDense ? "text-left text-[0.78rem]" : ""
                 } ${
                   category.visible ? "" : "text-muted-foreground/75"
                 }`}
-                style={mobileDense ? MOBILE_CHIP_LABEL_STYLE : undefined}
               >
                 {category.name}
               </span>
@@ -777,12 +790,14 @@ export function CategoryBar({
           </button>
         ) : null}
 
+        {trailingAction}
+
         <button
           type="button"
           onClick={() => setCategoriesVisibility(displayedCategoryIds, !allDisplayedVisible)}
           className={cn(
             `inline-flex items-center justify-center rounded-[10px] border text-muted-foreground shadow-none transition-all ${MOTION_CLASS}`,
-            mobileDense ? "h-10 w-full px-2.5" : "h-8 px-2.5",
+            mobileDense ? "h-10 w-10 rounded-[8px]" : "h-8 px-2.5",
             allDisplayedVisible
               ? "border-border bg-card hover:border-foreground/18 hover:bg-muted hover:text-foreground"
               : "border-foreground/18 bg-muted text-foreground hover:border-foreground/22 hover:bg-muted/80"
@@ -841,7 +856,7 @@ export function CategoryBar({
             disabled={!editingProfileId || locked}
             className={cn(
               CREATE_ACTION_CLASS,
-              mobileDense && "h-10 w-full rounded-[8px]",
+              mobileDense && "h-10 w-10 rounded-[8px]",
               (!editingProfileId || locked) &&
                 "cursor-not-allowed border-border bg-card text-muted-foreground/55 hover:border-border hover:bg-card hover:text-muted-foreground/55"
             )}

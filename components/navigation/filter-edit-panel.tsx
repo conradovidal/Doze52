@@ -41,9 +41,10 @@ import { cn } from "@/lib/utils";
 import { nudgeProAtLastFreeSlot } from "@/lib/pro-upgrade-nudge";
 import type { AnchorPoint } from "@/lib/types";
 import type { ProductDestinationId } from "@/lib/product-navigation";
+import { getDestinationTabClass } from "@/components/navigation/destination-tab-class";
 
 const ORGANIZE_SECTION_OPTIONS = [
-  { value: "annual", label: "Anual", icon: CalendarDays },
+  { value: "annual", label: "Eventos", icon: CalendarDays },
   { value: "habits", label: "Hábitos", icon: CircleCheck },
 ] as const satisfies ReadonlyArray<{
   value: ProductDestinationId;
@@ -401,14 +402,14 @@ export function FilterEditPanel({
             ) : (
               <>
                 <DialogTitle className="text-base font-semibold">
-                  Organizar
+                  Editar
                 </DialogTitle>
                 {/* Mesmo padrão da navegação do topo do app (ícone, ativo em
                     primeiro plano, inativo esmaecido), em vez de um controle
                     segmentado que não aparece em nenhum outro lugar. */}
                 <div
                   role="tablist"
-                  aria-label="Visão a organizar"
+                  aria-label="Visão a editar"
                   className="flex items-center gap-1 justify-self-center"
                 >
                   {ORGANIZE_SECTION_OPTIONS.map((option) => {
@@ -421,12 +422,7 @@ export function FilterEditPanel({
                         role="tab"
                         aria-selected={active}
                         onClick={() => setSection(option.value)}
-                        className={cn(
-                          "inline-flex h-9 items-center gap-1.5 rounded-xl px-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
-                          active
-                            ? "text-foreground"
-                            : "text-muted-foreground/55 hover:bg-muted/45 hover:text-foreground/80"
-                        )}
+                        className={getDestinationTabClass(active)}
                       >
                         <Icon className="size-[18px]" aria-hidden="true" />
                         {option.label}
@@ -439,7 +435,7 @@ export function FilterEditPanel({
             )}
           </header>
           <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-5 py-5">
-            {/* key troca a cada alvo (edição de hábito vs. aba Anual/Hábitos)
+            {/* key troca a cada alvo (edição de hábito vs. aba Eventos/Hábitos)
                 para a entrada reanimar a cada troca, em vez de saltar
                 instantaneamente de um conteúdo para o outro. */}
             <ViewSwap view={view} depth={viewDepth}>
@@ -471,7 +467,10 @@ export function FilterEditPanel({
                   onCategoryCreated?.(categoryId);
                 }}
                 onRequireAuth={onRequireAuth ? () => onRequireAuth() : undefined}
-                bypassLimits={bypassLimits}
+                // No resumo do guia o ano de exemplo ainda está no fundo e
+                // enche a contagem comum; o teto de 3 ali é garantido pela
+                // troca em WrapUpCategorySuggestions, não por um bloqueio.
+                bypassLimits={bypassLimits || showWrapUpNotice}
               />
             ) : detail?.kind === "category-choice" ? (
               <CategoryCreationChoice

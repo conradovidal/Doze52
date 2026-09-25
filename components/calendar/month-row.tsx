@@ -623,7 +623,7 @@ export function MonthRow({
             </span>
           </button>
         ) : (
-          <span className="flex h-full w-full items-center justify-center bg-card px-1 py-2.5 text-[9.5px] font-medium uppercase tracking-[0.12em] text-foreground/68 min-[420px]:px-1.5 min-[420px]:text-[10px] min-[420px]:tracking-[0.14em] md:px-2 md:text-[10.5px]">
+          <span className="flex h-full w-full items-center justify-center bg-card px-1 py-2.5 text-[9.5px] font-medium uppercase tracking-[0.12em] text-foreground/80 min-[420px]:px-1.5 min-[420px]:text-[10px] min-[420px]:tracking-[0.14em] md:px-2 md:text-[10.5px]">
             {monthLabel}
           </span>
         )}

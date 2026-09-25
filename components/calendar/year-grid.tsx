@@ -82,18 +82,11 @@ const CALENDAR_ZOOM_MIN_PERCENT = 100;
 const CALENDAR_ZOOM_MAX_PERCENT = 180;
 const CALENDAR_VERTICAL_ZOOM_MAX_PERCENT = 140;
 
-const YEAR_ROW_BOTTOM_PADDING_ROOMY_PX = 12;
-const YEAR_ROW_BOTTOM_PADDING_FLOOR_PX = 4;
-const YEAR_ROW_BOTTOM_PADDING_MAX_SAVINGS_PX =
-  12 * (YEAR_ROW_BOTTOM_PADDING_ROOMY_PX - YEAR_ROW_BOTTOM_PADDING_FLOOR_PX);
-// Quando sobra altura (viewport mais alto que o conteúdo do ano), o padding
-// também cresce além do "roomy" para consumir esse espaço em vez de deixá-lo
-// como faixa em branco abaixo da grade — o mesmo mecanismo de compactação,
-// só que na direção oposta. O teto evita linhas exageradamente espaçadas em
-// monitores muito altos; a sobra além dele fica como margem externa.
-const YEAR_ROW_BOTTOM_PADDING_CEILING_PX = 32;
-const YEAR_ROW_BOTTOM_PADDING_MAX_GROWTH_PX =
-  12 * (YEAR_ROW_BOTTOM_PADDING_CEILING_PX - YEAR_ROW_BOTTOM_PADDING_ROOMY_PX);
+// Altura fixa por mês no Anual: comporta 2 linhas de eventos (e 2 hábitos,
+// ver getDesktopHabitRowMinHeight) e só cresce a partir da 3ª. Sem esticar
+// para preencher a tela e sem reajustar ao abrir/fechar filtros — o recorte
+// por trimestre na barra lateral cobre telas baixas.
+const YEAR_ROW_BOTTOM_PADDING_PX = 4;
 
 const CALENDAR_VIEW_OPTIONS = [
   { value: "year", label: "Ano" },
@@ -162,6 +155,8 @@ export function YearGrid({
   onGuidedPeriodInteraction,
   guidedPeriodInteracted = false,
   showScaleControl = true,
+  showYearStepper = true,
+  onGoToToday,
   scrollViewportRef,
   scrollRegion,
 }: {
@@ -196,6 +191,10 @@ export function YearGrid({
   onGuidedPeriodAction?: () => void;
   onGuidedPeriodInteraction?: () => void;
   guidedPeriodInteracted?: boolean;
+  /** false quando o seletor de ano vive no cabeçalho (desktop adaptativo). */
+  showYearStepper?: boolean;
+  /** "Ir para hoje" (clique no ano): volta ao ano atual e centraliza hoje. */
+  onGoToToday?: () => void;
   showScaleControl?: boolean;
   scrollViewportRef?: React.Ref<HTMLDivElement>;
   scrollRegion?: "calendar" | "habits";
@@ -214,6 +213,13 @@ export function YearGrid({
   const focusMonth = useStore((s) => s.focusMonth);
   const setCalendarZoomPercent = useStore((s) => s.setCalendarZoomPercent);
   const [yearDirection, setYearDirection] = React.useState<1 | -1>(1);
+  // O ano também pode mudar por fora (seletor no cabeçalho): deriva a
+  // direção da animação da própria troca de prop.
+  const [renderedYear, setRenderedYear] = React.useState(year);
+  if (renderedYear !== year) {
+    setRenderedYear(year);
+    setYearDirection(getYearTransitionDirection(renderedYear, year));
+  }
   const [isYearTransitioning, setIsYearTransitioning] = React.useState(false);
   const requestYearChange = React.useCallback(
     (nextYear: number) => {
@@ -293,61 +299,7 @@ export function YearGrid({
     () => zoomViewportRef.current as HTMLDivElement
   );
 
-  const [yearRowBottomPaddingPx, setYearRowBottomPaddingPx] = React.useState(
-    YEAR_ROW_BOTTOM_PADDING_ROOMY_PX
-  );
-  const canCompactYearDensity = !habitPresentation && viewMode === "year";
-  React.useLayoutEffect(() => {
-    if (!canCompactYearDensity) {
-      setYearRowBottomPaddingPx(YEAR_ROW_BOTTOM_PADDING_ROOMY_PX);
-      return;
-    }
-    const viewport = zoomViewportRef.current;
-    if (!viewport) return;
-
-    const measure = () => {
-      const clientHeight = viewport.clientHeight;
-      if (clientHeight <= 0) return;
-      const scrollHeight = viewport.scrollHeight;
-      const monthCount = 12;
-      setYearRowBottomPaddingPx((currentPaddingPx) => {
-        // Desfaz o ajuste atual (para cima ou para baixo) para recuperar a
-        // altura "natural" do conteúdo com padding roomy, e então decide de
-        // novo: sobra vira crescimento, falta vira compactação.
-        const currentAdjustmentPerRow =
-          currentPaddingPx - YEAR_ROW_BOTTOM_PADDING_ROOMY_PX;
-        const naturalScrollHeight =
-          scrollHeight - currentAdjustmentPerRow * monthCount;
-        const slack = clientHeight - naturalScrollHeight;
-        const nextPaddingPx =
-          slack >= 0
-            ? YEAR_ROW_BOTTOM_PADDING_ROOMY_PX +
-              Math.min(YEAR_ROW_BOTTOM_PADDING_MAX_GROWTH_PX, slack) / monthCount
-            : YEAR_ROW_BOTTOM_PADDING_ROOMY_PX -
-              Math.min(YEAR_ROW_BOTTOM_PADDING_MAX_SAVINGS_PX, -slack) / monthCount;
-        return Math.abs(nextPaddingPx - currentPaddingPx) > 0.5
-          ? nextPaddingPx
-          : currentPaddingPx;
-      });
-    };
-
-    measure();
-    // Recolher/expandir contextos e categorias anima a altura do viewport por
-    // ~300ms, disparando o observer a cada quadro. Medir a cada quadro
-    // re-renderiza a grade inteira (365 dias) e mexe no padding de todas as
-    // linhas em pleno movimento — é isso que deixa a animação arrastada
-    // com dados reais. Espera o redimensionamento assentar e mede uma vez.
-    let settleTimer: number | undefined;
-    const resizeObserver = new ResizeObserver(() => {
-      window.clearTimeout(settleTimer);
-      settleTimer = window.setTimeout(measure, 90);
-    });
-    resizeObserver.observe(viewport);
-    return () => {
-      window.clearTimeout(settleTimer);
-      resizeObserver.disconnect();
-    };
-  }, [canCompactYearDensity, yearRowBottomPaddingPx, year, events, habitPresentation]);
+  const usesYearRowPadding = !habitPresentation && viewMode === "year";
 
   const visibleEvents = React.useMemo(
     () =>
@@ -1003,7 +955,7 @@ export function YearGrid({
                     density={density}
                     verticalScale={verticalZoomScale}
                     compactBottomPaddingPx={
-                      canCompactYearDensity ? yearRowBottomPaddingPx : undefined
+                      usesYearRowPadding ? YEAR_ROW_BOTTOM_PADDING_PX : undefined
                     }
                     events={habitPresentation ? [] : events}
                     visibleCategoryIds={visibleCategoryIds}
@@ -1109,19 +1061,24 @@ export function YearGrid({
         </div>
       </div>
 
+      {showYearStepper || showScaleControl || hasFocusZoom ? (
       <div
         data-year-grid-dock
-        className="grid shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 px-1 pt-3"
+        className="grid shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-3 px-1"
       >
         <span aria-hidden="true" />
         <div data-calendar-footer-center className="flex items-center justify-center gap-2 justify-self-center">
+          {showYearStepper ? (
           <div
             data-calendar-year-stepper
             data-onboarding-highlighted={
               guidedYearNotice?.target === "year" ? "true" : undefined
             }
+            // Aba presa à borda de baixo do cartão (sem borda em cima, mesmo
+            // fundo, cantos só embaixo): o ano pertence a este calendário e
+            // fica fora da área que rola, sempre à vista.
             className={cn(
-              "relative inline-flex h-8 items-center overflow-visible rounded-[10px] border border-border bg-card",
+              "relative -mt-px inline-flex h-7 items-center overflow-visible rounded-b-xl border border-t-0 border-border bg-card px-0.5",
               guidedYearNotice?.target === "year" && "product-spotlight-target"
             )}
           >
@@ -1131,7 +1088,7 @@ export function YearGrid({
               aria-label={`Voltar para ${year - 1}`}
               title={`Voltar para ${year - 1}`}
               disabled={isYearTransitioning}
-              className="grid size-8 place-items-center rounded-[9px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-45"
+              className="grid size-7 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-45"
               onClick={() => requestYearChange(year - 1)}
             >
               <ChevronLeft className="size-3.5" />
@@ -1142,8 +1099,12 @@ export function YearGrid({
               aria-live="polite"
               title="Ir para hoje"
               disabled={isYearTransitioning}
-              className="min-w-11 rounded-[9px] text-center text-xs font-semibold tabular-nums text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-45"
-              onClick={() => requestYearChange(Number(todayIso.slice(0, 4)))}
+              className="h-7 min-w-11 rounded-lg text-center text-xs font-semibold tabular-nums text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-45"
+              onClick={() =>
+                onGoToToday
+                  ? onGoToToday()
+                  : requestYearChange(Number(todayIso.slice(0, 4)))
+              }
             >
               {year}
             </button>
@@ -1152,7 +1113,7 @@ export function YearGrid({
               aria-label={`Avançar para ${year + 1}`}
               title={`Avançar para ${year + 1}`}
               disabled={isYearTransitioning}
-              className="grid size-8 place-items-center rounded-[9px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-45"
+              className="grid size-7 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-45"
               onClick={() => requestYearChange(year + 1)}
             >
               <ChevronRight className="size-3.5" />
@@ -1166,6 +1127,7 @@ export function YearGrid({
               />
             ) : null}
           </div>
+          ) : null}
           {showScaleControl ? (
             <div data-calendar-scale-control>
               <SegmentedControl
@@ -1199,6 +1161,7 @@ export function YearGrid({
           </label>
         ) : null}
       </div>
+      ) : null}
     </div>
   );
 }
