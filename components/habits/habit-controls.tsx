@@ -595,8 +595,8 @@ export function HabitControls({
                 )}
               >
                 <div className="flex min-h-8 min-w-0 shrink-0 flex-nowrap items-center gap-1.5 overflow-hidden sm:gap-2">
-                  {createButton}
                   {habitChipButtons}
+                  {createButton}
                 </div>
               </div>
             )}

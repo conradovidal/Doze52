@@ -120,6 +120,9 @@ type CategoryBarProps = {
   // exemplo durante o resumo do guia — seguem no calendário, mas não são
   // dela para organizar).
   hiddenCategoryIds?: ReadonlySet<string>;
+  // Ação no fim da fileira de filtros (fora da edição), antes do "mostrar/
+  // ocultar todas" — ex.: o "+" de criar categoria no cabeçalho de Eventos.
+  trailingAction?: React.ReactNode;
 };
 
 // Distância mínima pra baixo pra contar como "arrastou pra fora", não um
@@ -482,6 +485,7 @@ export function CategoryBar({
   locked = false,
   onDragCategoryOut,
   hiddenCategoryIds,
+  trailingAction,
 }: CategoryBarProps) {
   const { mode: themeMode } = useTheme();
   const selectedProfileIds = useStore((s) => s.selectedProfileIds);
@@ -674,7 +678,7 @@ export function CategoryBar({
   );
 
   if (!isInlineEditMode && displayedCategories.length === 0 && !highlightCreate) {
-    return null;
+    return trailingAction ? <div className={barClass}>{trailingAction}</div> : null;
   }
 
   if (!isInlineEditMode) {
@@ -785,6 +789,8 @@ export function CategoryBar({
             <Plus className="h-3.5 w-3.5" />
           </button>
         ) : null}
+
+        {trailingAction}
 
         <button
           type="button"
