@@ -346,25 +346,26 @@ test("expõe somente os destinos funcionais da navegação", () => {
   ]);
 });
 
-test("resolve a superfície inicial pelo endereço antes do breakpoint", () => {
+test("resolve a superfície inicial: endereço, depois a última tela, depois Eventos", () => {
+  expect(resolveInitialProductDestination({ search: "" })).toBe("annual");
   expect(
-    resolveInitialProductDestination({ search: "", isMobile: true })
+    resolveInitialProductDestination({ search: "", lastDestination: "habits" })
   ).toBe("habits");
-  expect(
-    resolveInitialProductDestination({ search: "", isMobile: false })
-  ).toBe("annual");
   expect(
     resolveInitialProductDestination({
       search: "?surface=annual",
-      isMobile: true,
+      lastDestination: "habits",
     })
   ).toBe("annual");
   expect(
     resolveInitialProductDestination({
       search: "?surface=habits",
-      isMobile: false,
+      lastDestination: "annual",
     })
   ).toBe("habits");
+  expect(
+    resolveInitialProductDestination({ search: "?surface=rotina" })
+  ).toBe("annual");
 });
 
 test("atualiza somente o parâmetro da superfície no endereço", () => {

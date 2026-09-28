@@ -35,6 +35,7 @@ import type { Habit } from "@/lib/types";
 import { useBilling } from "@/lib/use-billing";
 import { cn } from "@/lib/utils";
 import {
+  MOBILE_YEAR_GRID_MAX_WIDTH_CLASS,
   TODAY_CELL_RING_CLASS,
   TODAY_NUMBER_BADGE_CLASS,
 } from "@/lib/calendar-layout";
@@ -842,7 +843,7 @@ export function HabitsPrototype({
             }}
             className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-[calc(4.25rem+env(safe-area-inset-bottom,0px))] pt-2 [scrollbar-width:thin] sm:px-6"
           >
-            <div className="mx-auto flex max-w-[20.2rem] items-stretch">
+            <div className={cn("mx-auto flex items-stretch", MOBILE_YEAR_GRID_MAX_WIDTH_CLASS)}>
               <div className="flex w-5 shrink-0 flex-col sm:w-6">
                 {weeks.map((week) => (
                   <div
