@@ -76,6 +76,7 @@ import {
   hasAuthorCalendarEvents,
   getGuidedCategoryRevealRemainingMs,
   getWrapUpCategorySuggestions,
+  hasSettledGuidedOnboarding,
   isGuidedOnboardingInProgress,
   readGuidedOnboardingState,
   readProductOnboardingState,
@@ -115,7 +116,9 @@ import { trackOnboardingRegion } from "@/lib/onboarding-region";
 import { useHabitsStore } from "@/lib/habits-store";
 import {
   buildProductDestinationUrl,
+  readLastProductDestination,
   resolveInitialProductDestination,
+  writeLastProductDestination,
   type ProductDestinationId,
 } from "@/lib/product-navigation";
 
@@ -530,7 +533,12 @@ export default function HomePage() {
     (mobileHabitsOnboardingStep === "intro" ||
       mobileHabitsOnboardingStep === "create_habit" ||
       mobileHabitsOnboardingStep === "mark_day") &&
-    !(guidedOnboarding && isGuidedOnboardingInProgress(guidedOnboarding));
+    !session?.user.id &&
+    !(
+      guidedOnboarding &&
+      (isGuidedOnboardingInProgress(guidedOnboarding) ||
+        hasSettledGuidedOnboarding(guidedOnboarding))
+    );
   const [activeDestination, setActiveDestination] =
     React.useState<ProductDestinationId>("annual");
   // Desktop-only "minimize chrome" toggle, shared by the Anual and Hábitos
@@ -899,45 +907,63 @@ export default function HomePage() {
     };
   }, [windowContext]);
 
+  // Lembra a última tela usada para a próxima abertura (ver
+  // readLastProductDestination). Declarado antes da inicialização abaixo:
+  // assim o "annual" provisório do primeiro render nunca é gravado por cima
+  // da tela lembrada.
+  React.useEffect(() => {
+    if (!surfaceInitializedRef.current) return;
+    writeLastProductDestination(activeDestination);
+  }, [activeDestination]);
+
   React.useEffect(() => {
     if (isMobileCalendarUi === null) return;
     if (surfaceInitializedRef.current) return;
 
-    surfaceInitializedRef.current = true;
+    const guidedStateAtLoad = readGuidedOnboardingState();
+    const desktopTourInProgress =
+      isGuidedOnboardingInProgress(guidedStateAtLoad);
+    const lastDestination = readLastProductDestination();
+    // Um guia do desktop em andamento conduz a própria navegação — a última
+    // tela lembrada não interfere nele.
     const resolvedDestination = resolveInitialProductDestination({
       search: window.location.search,
-      isMobile: isMobileCalendarUi,
+      lastDestination: desktopTourInProgress ? null : lastDestination,
     });
-    // A trava do nav (handleDestinationSelect) só intercepta cliques — um
-    // link direto para `?surface=annual` a contorna completamente. Mesma
-    // regra aqui: quem ainda está criando o hábito ou marcando o primeiro
-    // dia não entra na Anual, nem por URL. `null` conta como travado
-    // também — é o valor de quem nunca abriu Hábitos nem uma vez (o próprio
-    // link de entrada já foi direto para a Anual); manda para Hábitos, que
-    // decide sozinho se essa pessoa é mesmo nova ou já estabelecida.
-    // Duas exceções: autenticado nunca trava (a jornada é só para anônimo);
-    // e quem já está em progresso no guia do desktop (ex.: abriu o tour lá,
-    // depois trocou de aparelho) também não — ela está noutro fluxo guiado,
-    // não faz sentido empurrá-la para o de Hábitos por cima.
+    // A única entrada imposta em Hábitos é a da jornada mobile
+    // (lib/mobile-habits-onboarding.ts), que começa lá: vale para quem ainda
+    // está criando o primeiro hábito ou marcando o primeiro dia, e para quem
+    // abre o app pela primeira vez neste navegador (sem passo salvo e sem
+    // tela lembrada). Nunca para quem entrou na conta nem para quem já
+    // passou pelo guia do desktop — os dois fluxos cobrem o mesmo conteúdo,
+    // então quem fez um não é empurrado para o outro.
     const mobileStepAtLoad = readMobileHabitsOnboardingStep();
-    const initialDestination =
+    const mobileJourneyMayForceHabits =
       resolvedDestination === "annual" &&
       isMobileCalendarUi === true &&
-      !session?.user.id &&
-      !isGuidedOnboardingInProgress(readGuidedOnboardingState()) &&
-      (mobileStepAtLoad === null ||
+      !desktopTourInProgress &&
+      !hasSettledGuidedOnboarding(guidedStateAtLoad) &&
+      ((mobileStepAtLoad === null && lastDestination === null) ||
         mobileStepAtLoad === "intro" ||
         mobileStepAtLoad === "create_habit" ||
-        mobileStepAtLoad === "mark_day")
+        mobileStepAtLoad === "mark_day");
+    // Só dá para saber se a pessoa está logada depois que a sessão carrega —
+    // decidir antes era o que jogava contas logadas em Hábitos na abertura.
+    if (mobileJourneyMayForceHabits && authLoading) return;
+
+    surfaceInitializedRef.current = true;
+    const initialDestination =
+      mobileJourneyMayForceHabits && !session?.user.id
         ? "habits"
         : resolvedDestination;
     setActiveDestination(initialDestination);
+    writeLastProductDestination(initialDestination);
     window.history.replaceState(
       window.history.state,
       "",
       buildProductDestinationUrl(window.location.href, initialDestination)
     );
-  }, [isMobileCalendarUi, session?.user.id]);
+  }, [authLoading, isMobileCalendarUi, session?.user.id]);
 
   React.useEffect(() => {
     if (windowContext !== "main") return;
@@ -2842,11 +2868,12 @@ export default function HomePage() {
         // storage direto (não o espelho em estado) para não depender do
         // React já ter propagado a última mudança.
         const mobileStep = readMobileHabitsOnboardingStep();
-        const desktopTourInProgress = isGuidedOnboardingInProgress(
-          readGuidedOnboardingState()
-        );
+        const guidedState = readGuidedOnboardingState();
+        const desktopTourInProgress = isGuidedOnboardingInProgress(guidedState);
         if (
           !desktopTourInProgress &&
+          !hasSettledGuidedOnboarding(guidedState) &&
+          !session?.user.id &&
           (mobileStep === "intro" ||
             mobileStep === "create_habit" ||
             mobileStep === "mark_day")
@@ -2895,6 +2922,7 @@ export default function HomePage() {
       initialYear,
       isMobileCalendarUi,
       resetCalendarFocusOnYearChange,
+      session?.user.id,
       updateGuidedOnboarding,
     ]
   );

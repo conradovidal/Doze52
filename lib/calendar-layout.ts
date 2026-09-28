@@ -13,6 +13,12 @@ export const EVENT_ITEM_RADIUS_CLASS = "rounded-[8px]";
 export const EVENT_ITEM_TEXT_CLASS = "text-[11px] font-medium tracking-normal";
 export const EVENT_ITEM_LINE_HEIGHT_CLASS = "leading-[18px]";
 
+// Largura da grade anual no mobile, a mesma em Eventos e Hábitos: trocar de
+// tela não move a grade nem a faixa dos meses. Meio-termo entre o antigo
+// limite de Hábitos (20.2rem, células quase quadradas) e o de Eventos
+// (31rem, largura toda do celular para os títulos).
+export const MOBILE_YEAR_GRID_MAX_WIDTH_CLASS = "max-w-[22rem]";
+
 // Marcador de "hoje": mesmo vermelho e mesma forma (anel na célula + número
 // num círculo preenchido) em todas as superfícies, desktop e mobile.
 export const TODAY_CELL_RING_CLASS = "z-10 ring-2 ring-inset ring-[#b2554c]";

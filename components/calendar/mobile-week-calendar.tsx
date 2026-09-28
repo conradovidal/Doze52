@@ -35,6 +35,7 @@ import { buildHabitPrototypeWeeks } from "@/lib/habits-prototype";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import {
+  MOBILE_YEAR_GRID_MAX_WIDTH_CLASS,
   TODAY_CELL_RING_CLASS,
   TODAY_NUMBER_BADGE_CLASS,
 } from "@/lib/calendar-layout";
@@ -401,7 +402,7 @@ export function MobileWeekCalendar({
       >
         <m.div
           key={year}
-          className="mx-auto max-w-[31rem]"
+          className={cn("mx-auto", MOBILE_YEAR_GRID_MAX_WIDTH_CLASS)}
           initial={{ opacity: 0, x: yearMotion.direction * 28 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{
