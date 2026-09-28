@@ -505,12 +505,10 @@ export function EventDialog({
             ) : null}
           </div>
 
-          {/* Contexto e categoria têm flex-auto: encolhem proporcionalmente
-              ao próprio tamanho quando o espaço aperta, em vez de ficarem
-              fixos e forçarem a data a absorver todo o aperto sozinha. No
-              mobile (abaixo do md), a data ainda assim quebra pra própria
-              linha — ver comentário no DateRangeQuickPicker abaixo. */}
-          <div className="flex flex-wrap items-center gap-2">
+          {/* Contexto, categoria e data numa linha só. Contexto e categoria
+              têm flex-auto e encolhem (com reticências) quando o espaço
+              aperta; a data mantém a largura do próprio texto, que é curto. */}
+          <div className="flex items-center gap-2">
             <Select
               value={profileId}
               onValueChange={handleProfileSelect}
@@ -518,11 +516,17 @@ export function EventDialog({
             >
               <SelectTrigger
                 size="sm"
-                className="h-8 min-w-0 flex-auto gap-1.5 rounded-full border-primary bg-primary px-3 text-[12.5px] font-semibold text-primary-foreground shadow-none hover:bg-primary/90 dark:bg-primary dark:hover:bg-primary/90"
+                // A linha divide espaço com categoria e data: os seletores
+                // não têm seta (a pílula já diz que é clicável) e, no mobile,
+                // o contexto fica só no ícone (o nome segue para leitores de
+                // tela).
+                className="h-8 min-w-0 shrink-0 gap-1.5 rounded-full border-primary bg-primary px-3 text-[12.5px] font-semibold text-primary-foreground shadow-none hover:bg-primary/90 max-md:px-2.5 md:flex-auto dark:bg-primary dark:hover:bg-primary/90 [&>svg:last-child]:hidden"
               >
                 <span className="inline-flex min-w-0 items-center gap-1.5">
                   {currentProfile ? <ProfileIcon icon={currentProfile.icon} size={12} /> : null}
-                  <span className="truncate">{currentProfile?.name ?? "Contexto"}</span>
+                  <span className="truncate max-md:sr-only">
+                    {currentProfile?.name ?? "Contexto"}
+                  </span>
                 </span>
               </SelectTrigger>
               <SelectContent position="popper" side="bottom" align="start">
@@ -547,7 +551,7 @@ export function EventDialog({
             >
               <SelectTrigger
                 size="sm"
-                className="h-8 min-w-0 flex-auto gap-1.5 rounded-full px-3 text-[12.5px] font-semibold shadow-none"
+                className="h-8 min-w-0 flex-auto gap-1.5 rounded-full px-3 text-[12.5px] font-semibold shadow-none [&>svg:last-child]:hidden"
                 style={
                   currentCategoryToken
                     ? {
@@ -595,13 +599,7 @@ export function EventDialog({
               startDate={startDate}
               endDate={endDate}
               disabled={isManagedEvent}
-              // Abaixo do breakpoint em que o editor vira popover ancorado
-              // (md, o mesmo usado por isDesktopViewport), o card fica
-              // estreito demais para os 3 pills lado a lado sem espremer os
-              // outros dois. basis-full força a data pra própria linha só
-              // nesse caso; a partir do md volta a dividir a linha com os
-              // outros dois normalmente.
-              className="min-w-0 grow shrink basis-full justify-center md:basis-auto"
+              className="shrink-0"
               onChange={({ startDate: nextStart, endDate: nextEnd }) => {
                 changedFieldsRef.current.add("startDate");
                 changedFieldsRef.current.add("endDate");
@@ -871,7 +869,7 @@ export function EventDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showCloseButton={false}
-        className="max-h-[calc(100dvh-1.5rem)] overflow-y-auto p-5 sm:max-w-[440px] sm:p-6"
+        className="overflow-y-auto p-5 sm:max-w-[440px] sm:p-6"
         onKeyDown={handleContentKeyDown}
         onOpenAutoFocus={handleOpenAutoFocus}
         onCloseAutoFocus={(event) => {

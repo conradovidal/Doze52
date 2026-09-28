@@ -2,11 +2,11 @@
 
 import * as React from "react";
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
-import { addMonths, startOfMonth } from "date-fns";
+import { addMonths, differenceInCalendarDays, startOfMonth } from "date-fns";
 import {
   Popover,
+  PopoverAnchor,
   PopoverContent,
-  PopoverTrigger,
 } from "@/components/ui/popover";
 import {
   fmtIsoDate,
@@ -40,6 +40,9 @@ type DateRangeQuickPickerProps = {
   className?: string;
 };
 
+// Qual ponta do período o calendário aberto está escolhendo.
+type PickerMode = "start" | "end";
+
 function parseIsoLocal(iso: string) {
   return new Date(`${iso}T00:00:00`);
 }
@@ -49,17 +52,30 @@ function parseIsoLocal(iso: string) {
 // sozinho ao simplesmente passar o ponteiro de raspão pelo dia.
 const EDGE_HOLD_MS = 420;
 
-function formatRangeLabel(startDate: string, endDate: string) {
-  if (!startDate) return "Selecionar data";
-  const start = parseIsoLocal(startDate);
-  const dayPart = (date: Date) => `${date.getDate()} ${fmtMonthLabel(date)}`;
-  if (!endDate || endDate === startDate) {
-    return dayPart(start);
-  }
-  const end = parseIsoLocal(endDate);
-  return `${dayPart(start)} – ${dayPart(end)}`;
+// Rótulo da pílula: sem dia da semana, para caber na linha do contexto e da
+// categoria — o dia da semana aparece nas abas do calendário.
+function formatPillLabel(startDate: string, endDate: string) {
+  if (!startDate) return "Data";
+  const short = (iso: string) => {
+    const date = parseIsoLocal(iso);
+    return `${date.getDate()} ${fmtMonthLabel(date)}`;
+  };
+  if (!endDate || endDate <= startDate) return short(startDate);
+  return `${short(startDate)} – ${short(endDate)}`;
 }
 
+function formatDayLabel(iso: string) {
+  const date = parseIsoLocal(iso);
+  return `${weekdayAbbr[date.getDay()]}, ${date.getDate()} ${fmtMonthLabel(date)}`;
+}
+
+// A data é uma pílula como contexto e categoria ("28 set" ou "28 set – 2 out").
+// Ao tocar, o calendário abre com abas Início e Fim no topo: o fim é opcional
+// (como o "End date" do Notion) e cada aba escolhe a sua ponta — um toque por
+// decisão. Antes o calendário pedia "clique um dia, ou arraste até o dia
+// final": o arrastar não funciona com o dedo (o toque fica preso ao dia onde
+// começou) e o segundo toque para marcar o fim não era descobrível. O arrastar continua existindo no calendário de início para
+// quem usa mouse, como atalho.
 export function DateRangeQuickPicker({
   startDate,
   endDate,
@@ -68,13 +84,15 @@ export function DateRangeQuickPicker({
   className,
 }: DateRangeQuickPickerProps) {
   const [open, setOpen] = React.useState(false);
-  const [pickingEnd, setPickingEnd] = React.useState(false);
+  const [mode, setMode] = React.useState<PickerMode>("start");
   const [visibleMonth, setVisibleMonth] = React.useState(() =>
     startOfMonth(startDate ? parseIsoLocal(startDate) : new Date())
   );
   const [monthDirection, setMonthDirection] = React.useState<1 | -1>(1);
+  const groupRef = React.useRef<HTMLButtonElement | null>(null);
   const pointerDownIsoRef = React.useRef<string | null>(null);
   const hasDraggedRef = React.useRef(false);
+  const suppressClickRef = React.useRef(false);
   const onChangeRef = React.useRef(onChange);
   onChangeRef.current = onChange;
   const edgeHoldRef = React.useRef<{ iso: string; timeoutId: number } | null>(null);
@@ -86,6 +104,11 @@ export function DateRangeQuickPicker({
   // uma ação explícita (seta ou segurar na borda ao arrastar).
   const skipMonthAnimRef = React.useRef(true);
 
+  const hasRange = Boolean(startDate && endDate && endDate > startDate);
+  const dayCount = hasRange
+    ? differenceInCalendarDays(parseIsoLocal(endDate), parseIsoLocal(startDate)) + 1
+    : 1;
+
   const clearEdgeHold = React.useCallback(() => {
     if (edgeHoldRef.current) {
       window.clearTimeout(edgeHoldRef.current.timeoutId);
@@ -93,13 +116,23 @@ export function DateRangeQuickPicker({
     }
   }, []);
 
-  const openPicker = (nextOpen: boolean) => {
-    setOpen(nextOpen);
-    if (nextOpen) {
-      skipMonthAnimRef.current = true;
-      setPickingEnd(false);
-      setVisibleMonth(startOfMonth(startDate ? parseIsoLocal(startDate) : new Date()));
+  const openFor = (nextMode: PickerMode) => {
+    if (open && mode === nextMode) {
+      setOpen(false);
+      return;
     }
+    const focusIso =
+      nextMode === "end" ? (hasRange ? endDate : startDate) : startDate;
+    const nextMonth = startOfMonth(focusIso ? parseIsoLocal(focusIso) : new Date());
+    // Trocar de ponta com o calendário já aberto anima a virada de mês como
+    // as setas; abrir do zero não (a entrada do popover já é o movimento).
+    skipMonthAnimRef.current = !open;
+    if (open && nextMonth.getTime() !== visibleMonth.getTime()) {
+      setMonthDirection(nextMonth > visibleMonth ? 1 : -1);
+    }
+    setMode(nextMode);
+    setVisibleMonth(nextMonth);
+    setOpen(true);
   };
 
   const goToMonth = (direction: 1 | -1) => {
@@ -109,19 +142,15 @@ export function DateRangeQuickPicker({
   };
 
   const handlePickDay = (dayIso: string) => {
-    if (!pickingEnd) {
-      onChange({ startDate: dayIso, endDate: dayIso });
-      setPickingEnd(true);
-      return;
-    }
-    if (dayIso >= startDate) {
-      onChange({ startDate, endDate: dayIso });
+    if (mode === "start") {
+      // Mantém o fim quando ele ainda vem depois do novo início; se não,
+      // o evento volta a ser de um dia só.
+      const keepEnd = hasRange && endDate >= dayIso;
+      onChange({ startDate: dayIso, endDate: keepEnd ? endDate : dayIso });
     } else {
-      onChange({ startDate: dayIso, endDate: dayIso });
-      setPickingEnd(true);
-      return;
+      if (dayIso < startDate) return;
+      onChange({ startDate, endDate: dayIso });
     }
-    setPickingEnd(false);
     setOpen(false);
   };
 
@@ -151,7 +180,14 @@ export function DateRangeQuickPicker({
     [clearEdgeHold]
   );
 
-  const handleDayPointerDown = (dayIso: string) => {
+  const handleDayPointerDown = (
+    event: React.PointerEvent<HTMLButtonElement>,
+    dayIso: string
+  ) => {
+    suppressClickRef.current = false;
+    // Arrastar só com mouse/caneta: no toque, o dedo fica preso ao dia onde
+    // começou e o gesto nunca chega aos outros dias.
+    if (mode !== "start" || event.pointerType === "touch") return;
     pointerDownIsoRef.current = dayIso;
     hasDraggedRef.current = false;
     clearEdgeHold();
@@ -206,47 +242,136 @@ export function DateRangeQuickPicker({
 
   React.useEffect(() => {
     const handleWindowPointerUp = () => {
-      const anchorIso = pointerDownIsoRef.current;
-      if (!anchorIso) return;
+      if (!pointerDownIsoRef.current) return;
       const wasDrag = hasDraggedRef.current;
       pointerDownIsoRef.current = null;
       hasDraggedRef.current = false;
       clearEdgeHold();
       if (wasDrag) {
-        setPickingEnd(false);
+        // O período já foi aplicado durante o arraste; o click que o
+        // navegador ainda dispara (se o gesto voltou ao dia de origem) não
+        // deve desfazê-lo.
+        suppressClickRef.current = true;
         setOpen(false);
-        return;
       }
-      handlePickDay(anchorIso);
     };
     window.addEventListener("pointerup", handleWindowPointerUp);
     return () => window.removeEventListener("pointerup", handleWindowPointerUp);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pickingEnd, startDate, clearEdgeHold]);
+  }, [clearEdgeHold]);
 
   React.useEffect(() => clearEdgeHold, [clearEdgeHold]);
 
+  const tabClass = (segment: PickerMode) =>
+    cn(
+      "flex min-w-0 flex-col items-start gap-0.5 rounded-[10px] px-2.5 py-1.5 text-left transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+      mode === segment
+        ? "bg-background shadow-[0_1px_2px_rgba(15,23,42,0.12)] ring-1 ring-border"
+        : "hover:bg-muted/70"
+    );
+
   return (
-    <Popover open={open} onOpenChange={openPicker}>
-      <PopoverTrigger asChild>
+    <Popover
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) setOpen(false);
+      }}
+    >
+      {/* Mesma altura e forma das pílulas de contexto e categoria, na
+          mesma linha: só o dia ("28 set") ou o período enxuto
+          ("28 set – 2 out"). Início, fim e "voltar a um dia" são geridos
+          dentro do calendário que ela abre. */}
+      <PopoverAnchor asChild>
         <button
+          ref={groupRef}
           type="button"
           disabled={disabled}
+          aria-haspopup="dialog"
+          aria-expanded={open}
+          aria-label={
+            startDate
+              ? hasRange
+                ? `Datas: ${formatDayLabel(startDate)} a ${formatDayLabel(endDate)}, ${dayCount} dias`
+                : `Data: ${formatDayLabel(startDate)}`
+              : "Escolher data"
+          }
           className={cn(
-            "inline-flex h-8 w-auto items-center gap-1.5 rounded-full border border-border/80 bg-muted/40 px-3 text-[12.5px] font-semibold text-foreground/85 shadow-none transition-colors hover:bg-muted/70 disabled:cursor-not-allowed disabled:opacity-60",
+            "inline-flex h-8 min-w-0 items-center gap-1.5 rounded-full border border-border/80 bg-muted/40 px-3 text-[12.5px] font-semibold text-foreground/85 shadow-none transition-colors hover:bg-muted/70 outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-60",
             className
           )}
+          onClick={() => (open ? setOpen(false) : openFor("start"))}
         >
           <CalendarDays className="size-3.5 shrink-0 text-muted-foreground" />
-          <span className="truncate">{formatRangeLabel(startDate, endDate)}</span>
+          <span className="truncate">{formatPillLabel(startDate, endDate)}</span>
         </button>
-      </PopoverTrigger>
-      <PopoverContent align="start" className="w-[272px] p-3">
+      </PopoverAnchor>
+      {/* A pílula fica no fim da linha do editor: o calendário se alinha
+          pela direita dela e respeita uma margem da borda da tela. */}
+      <PopoverContent
+        align="end"
+        collisionPadding={12}
+        aria-label={mode === "start" ? "Escolher início" : "Escolher fim"}
+        className="w-[min(19rem,calc(100vw-2rem))] p-3"
+        // O foco fica na pílula que abriu o calendário: no celular, mover o
+        // foco para o popover reabriria o teclado virtual.
+        onOpenAutoFocus={(event) => event.preventDefault()}
+        onInteractOutside={(event) => {
+          // Tocar na pílula com o calendário aberto fecha pelo próprio
+          // clique dela, sem fechar aqui e reabrir no clique.
+          const target = event.target;
+          if (target instanceof Node && groupRef.current?.contains(target)) {
+            event.preventDefault();
+          }
+        }}
+      >
+        {/* Início e Fim explícitos só aqui dentro, como abas: deixa claro
+            qual ponta o calendário está escolhendo sem ocupar o editor. */}
+        <div
+          role="tablist"
+          aria-label="Ponta do período"
+          className="mb-2 grid grid-cols-2 gap-0.5 rounded-xl bg-muted/50 p-0.5"
+        >
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === "start"}
+            className={tabClass("start")}
+            onClick={() => mode !== "start" && openFor("start")}
+          >
+            <span className="text-[10px] font-medium leading-none text-muted-foreground">
+              Início
+            </span>
+            <span className="max-w-full truncate text-[12.5px] font-semibold leading-4 text-foreground">
+              {startDate ? formatDayLabel(startDate) : "—"}
+            </span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === "end"}
+            disabled={!startDate}
+            className={tabClass("end")}
+            onClick={() => mode !== "end" && openFor("end")}
+          >
+            <span className="text-[10px] font-medium leading-none text-muted-foreground">
+              {hasRange ? `Fim · ${dayCount} dias` : "Fim"}
+            </span>
+            <span
+              className={cn(
+                "max-w-full truncate text-[12.5px] leading-4",
+                hasRange
+                  ? "font-semibold text-foreground"
+                  : "font-medium text-muted-foreground"
+              )}
+            >
+              {hasRange ? formatDayLabel(endDate) : "Mesmo dia"}
+            </span>
+          </button>
+        </div>
         <div className="flex items-center justify-between pb-2">
           <button
             type="button"
             aria-label="Mês anterior"
-            className="grid size-7 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
+            className="grid size-8 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
             onClick={() => goToMonth(-1)}
           >
             <ChevronLeft className="size-4" />
@@ -257,7 +382,7 @@ export function DateRangeQuickPicker({
           <button
             type="button"
             aria-label="Próximo mês"
-            className="grid size-7 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
+            className="grid size-8 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
             onClick={() => goToMonth(1)}
           >
             <ChevronRight className="size-4" />
@@ -277,7 +402,7 @@ export function DateRangeQuickPicker({
           <div
             key={`${visibleMonth.getFullYear()}-${visibleMonth.getMonth()}`}
             className={cn(
-              "grid grid-cols-7 gap-1",
+              "grid grid-cols-7 gap-y-1",
               !skipMonthAnimRef.current &&
                 (monthDirection === 1
                   ? "animate-in fade-in-0 slide-in-from-right-2 duration-[220ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
@@ -290,20 +415,37 @@ export function DateRangeQuickPicker({
                 return <div key={`blank-${index}`} />;
               }
               const dayIso = fmtIsoDate(d);
-              const isSelected =
-                Boolean(startDate) && dayIso >= startDate && dayIso <= (endDate || startDate);
+              const rangeEnd = endDate || startDate;
+              const isEndpoint =
+                Boolean(startDate) && (dayIso === startDate || dayIso === rangeEnd);
+              const isInside =
+                Boolean(startDate) && dayIso > startDate && dayIso < rangeEnd;
+              const beforeStart = mode === "end" && Boolean(startDate) && dayIso < startDate;
               return (
                 <button
                   key={dayIso}
                   type="button"
                   data-day-iso={dayIso}
-                  onPointerDown={() => handleDayPointerDown(dayIso)}
+                  disabled={beforeStart}
+                  aria-pressed={isEndpoint || isInside}
+                  aria-label={formatDayLabel(dayIso)}
+                  onPointerDown={(event) => handleDayPointerDown(event, dayIso)}
                   onPointerEnter={() => handleDayPointerEnter(dayIso)}
+                  onClick={() => {
+                    if (suppressClickRef.current) {
+                      suppressClickRef.current = false;
+                      return;
+                    }
+                    handlePickDay(dayIso);
+                  }}
                   className={cn(
-                    "grid h-7 place-items-center rounded-lg text-[12px] transition-colors select-none touch-none",
-                    isSelected
-                      ? "bg-foreground text-background font-semibold"
-                      : "text-foreground/78 hover:bg-muted/70"
+                    "grid h-9 place-items-center text-[13px] tabular-nums transition-colors select-none md:h-8 md:text-[12px]",
+                    isEndpoint
+                      ? "rounded-lg bg-foreground font-semibold text-background"
+                      : isInside
+                        ? "bg-foreground/12 font-medium text-foreground"
+                        : "rounded-lg text-foreground/78 hover:bg-muted/70",
+                    beforeStart && "cursor-not-allowed text-foreground/25 hover:bg-transparent"
                   )}
                 >
                   {d.getDate()}
@@ -312,9 +454,31 @@ export function DateRangeQuickPicker({
             })}
           </div>
         </div>
-        <p className="pt-2 text-center text-[10.5px] text-muted-foreground">
-          clique um dia, ou arraste até o dia final
-        </p>
+        {mode === "end" && hasRange ? (
+          <div className="flex justify-center pt-2">
+            <button
+              type="button"
+              className="rounded-full px-2.5 py-1 text-[11px] font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+              onClick={() => {
+                setOpen(false);
+                onChange({ startDate, endDate: startDate });
+              }}
+            >
+              Voltar para um dia só
+            </button>
+          </div>
+        ) : (
+          <p className="pt-2 text-center text-[11px] text-muted-foreground">
+            {mode === "start" ? (
+              <>
+                Escolha o dia de início
+                <span className="hidden md:inline"> — ou arraste até o último dia</span>
+              </>
+            ) : (
+              "Escolha o último dia"
+            )}
+          </p>
+        )}
       </PopoverContent>
     </Popover>
   );

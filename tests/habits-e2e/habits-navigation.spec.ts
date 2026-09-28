@@ -115,13 +115,17 @@ test("desktop antecipa a demonstração de hábitos e reinicia o guia no ano", a
   await expect(page.locator("[data-month-row]")).toHaveCount(12);
 });
 
-test("mobile abre em Hábitos e preserva a sessão entre superfícies", async ({
+test("mobile volta na última tela e preserva a sessão entre superfícies", async ({
   page,
 }, testInfo) => {
   test.skip(!testInfo.project.name.startsWith("mobile-"), "Cenário mobile");
 
   await installCompletedOnboarding(page);
+  // Quem já passou pelo onboarding não é empurrado para Hábitos: sem tela
+  // lembrada, o app abre em Eventos.
   await page.goto("/");
+  await expect(page.locator("[data-mobile-calendar-experience]")).toBeVisible();
+  await page.getByRole("link", { name: "Hábitos" }).click();
   const habits = page.locator("[data-habits-prototype]");
   await expect(habits.getByRole("heading", { name: "Hábitos" })).toHaveCount(1);
   await expect(page.getByRole("navigation", { name: "Navegação principal" })).toBeVisible();
@@ -195,7 +199,8 @@ test("mobile abre em Hábitos e preserva a sessão entre superfícies", async ({
   ).toBeVisible();
   await expect(habits.getByRole("button", { name: "Caminhar", exact: true })).toBeVisible();
 
-  await page.reload();
+  // O app instalado sempre abre em "/": a última tela usada é que decide.
+  await page.goto("/");
   await expect(page.locator("[data-habits-prototype]")).toBeVisible();
   await expect(page.getByRole("button", { name: "Caminhar", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Abrir perfil" }).click();

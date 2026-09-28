@@ -948,6 +948,14 @@ export const isGuidedOnboardingInProgress = (state: GuidedOnboardingState) =>
   state.step !== "completed" &&
   state.step !== "dismissed";
 
+// O guia já foi resolvido (concluído, fechado ou trocado pela exploração do
+// ano de exemplo): a pessoa já conheceu Eventos e Hábitos por ele.
+export const hasSettledGuidedOnboarding = (state: GuidedOnboardingState) =>
+  state.step === "completed" ||
+  state.step === "dismissed" ||
+  state.step === "dismissed_preserved" ||
+  state.step === "demo_exploration";
+
 const HABIT_SHOWCASE_PREVIEW_STEPS = new Set<GuidedOnboardingStep>([
   "context_selection",
   "date_category_selection",
