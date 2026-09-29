@@ -71,3 +71,20 @@ export const filterHabitsByContext = <T extends Pick<Habit, "contextId">>(
   habits.filter(
     (habit) => resolveHabitContextId(habit, orderedContexts) === contextId
   );
+
+/**
+ * Contextos reais + os da vitrine do onboarding, em ordem. Os da vitrine só
+ * aparecem na tela: nada é gravado, e hábito criado neles vai para um real.
+ */
+export const withShowcaseContexts = (
+  orderedContexts: HabitContext[],
+  showcaseContexts: HabitContext[] | undefined
+) =>
+  showcaseContexts?.length
+    ? getHabitContexts([
+        ...orderedContexts,
+        ...showcaseContexts.filter(
+          (showcase) => !orderedContexts.some((context) => context.id === showcase.id)
+        ),
+      ])
+    : orderedContexts;

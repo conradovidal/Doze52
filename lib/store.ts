@@ -186,9 +186,10 @@ export const ONBOARDING_CATEGORY_IDS = {
 
 export const ONBOARDING_DEFAULT_CATEGORY_ID = ONBOARDING_CATEGORY_IDS.events;
 // v9: categoria padrão "Eventos" virou "Geral" (não colide com a tela
-// Eventos). Exemplos antigos ainda bloqueados são trocados automaticamente.
+// Eventos). v10: categoria "Triatlo" com as provas do ano. Exemplos antigos
+// ainda bloqueados são trocados automaticamente.
 export const ONBOARDING_PERSONAL_DEMO_GROUP_ID =
-  "onboarding-personal-demo-v9";
+  "onboarding-personal-demo-v10";
 const ONBOARDING_PERSONAL_DEMO_GROUP_IDS = new Set([
   "onboarding-personal-demo-v1",
   "onboarding-personal-demo-v2",
@@ -198,6 +199,7 @@ const ONBOARDING_PERSONAL_DEMO_GROUP_IDS = new Set([
   "onboarding-personal-demo-v6",
   "onboarding-personal-demo-v7",
   "onboarding-personal-demo-v8",
+  "onboarding-personal-demo-v9",
   ONBOARDING_PERSONAL_DEMO_GROUP_ID,
 ]);
 
@@ -397,6 +399,7 @@ const DEMO_CATEGORY_IDS = {
   workEvents: "99999999-0001-4000-8000-000000000008",
   workMarketing: "99999999-0001-4000-8000-000000000009",
   workPerformance: "99999999-0001-4000-8000-000000000010",
+  triathlon: "99999999-0001-4000-8000-000000000011",
 } as const;
 
 const demoCategory = (
@@ -438,6 +441,14 @@ const getPersonalDemoCategories = (): CategoryItem[] => [
     ONBOARDING_PROFILE_IDS.personal,
     "Viagens",
     CATEGORY_COLOR_BASE_GREEN
+  ),
+  // A história do ano de exemplo: alguém que se prepara para um Ironman.
+  // As provas daqui guiam o treino da vitrine de Hábitos (contexto Triatlo).
+  demoCategory(
+    DEMO_CATEGORY_IDS.triathlon,
+    ONBOARDING_PROFILE_IDS.personal,
+    "Triatlo",
+    CATEGORY_COLOR_BASE_TEAL
   ),
   demoCategory(
     ONBOARDING_CATEGORY_IDS.birthday,
@@ -510,6 +521,69 @@ const getCarnivalRange = (year: number) => {
       toDemoIsoDate(year, 2, 18),
     ]
   );
+};
+
+// Prova é sempre num domingo: a partir da data de referência, o primeiro
+// domingo daquele ano.
+const demoSundayOnOrAfter = (year: number, month: number, day: number) => {
+  const date = new Date(Date.UTC(year, month - 1, day));
+  date.setUTCDate(date.getUTCDate() + ((7 - date.getUTCDay()) % 7));
+  return date;
+};
+const toDemoIsoFromDate = (date: Date, offsetDays = 0) => {
+  const shifted = new Date(date.getTime() + offsetDays * 24 * 60 * 60 * 1000);
+  return shifted.toISOString().slice(0, 10);
+};
+
+// Sprint no outono, 70.3 no fim do inverno e o Ironman na primavera, com
+// duas semanas de polimento antes de cada prova-alvo. A vitrine de Hábitos
+// lê estes títulos (ver buildOnboardingHabitShowcase): "polimento" reduz o
+// volume, a prova marca as três modalidades e os dias seguintes são de
+// recuperação.
+const getTriathlonDemoEvents = (year: number): PersonalDemoEventInput[] => {
+  const sprint = demoSundayOnOrAfter(year, 4, 12);
+  const halfIronman = demoSundayOnOrAfter(year, 8, 23);
+  const ironman = demoSundayOnOrAfter(year, 11, 29);
+  return [
+    {
+      key: "triathlon-ironman-signup",
+      title: "Inscrição no Ironman",
+      categoryId: DEMO_CATEGORY_IDS.triathlon,
+      startDate: toDemoIsoDate(year, 1, 20),
+    },
+    {
+      key: "triathlon-sprint",
+      title: "Triatlo sprint",
+      categoryId: DEMO_CATEGORY_IDS.triathlon,
+      startDate: toDemoIsoFromDate(sprint),
+    },
+    {
+      key: "triathlon-half-taper",
+      title: "Polimento para o 70.3",
+      categoryId: DEMO_CATEGORY_IDS.triathlon,
+      startDate: toDemoIsoFromDate(halfIronman, -13),
+      endDate: toDemoIsoFromDate(halfIronman, -1),
+    },
+    {
+      key: "triathlon-half-ironman",
+      title: "Ironman 70.3",
+      categoryId: DEMO_CATEGORY_IDS.triathlon,
+      startDate: toDemoIsoFromDate(halfIronman),
+    },
+    {
+      key: "triathlon-ironman-taper",
+      title: "Polimento para o Ironman",
+      categoryId: DEMO_CATEGORY_IDS.triathlon,
+      startDate: toDemoIsoFromDate(ironman, -13),
+      endDate: toDemoIsoFromDate(ironman, -1),
+    },
+    {
+      key: "triathlon-ironman",
+      title: "Ironman Florianópolis",
+      categoryId: DEMO_CATEGORY_IDS.triathlon,
+      startDate: toDemoIsoFromDate(ironman),
+    },
+  ];
 };
 
 type PersonalDemoEventInput = {
@@ -809,6 +883,7 @@ const getPersonalDemoEvents = (year: number): CalendarEvent[] => {
       startDate: toDemoIsoDate(year, 9, 5),
       endDate: toDemoIsoDate(year, 9, 7),
     },
+    ...getTriathlonDemoEvents(year),
     {
       key: "new-year-tiradentes",
       title: "Ano Novo em Tiradentes",
@@ -1128,7 +1203,9 @@ const getPersonalDemoEventsFor2025 = () => {
       (event) =>
         event.categoryId !== ONBOARDING_CATEGORY_IDS.birthday &&
         event.categoryId !== DEMO_CATEGORY_IDS.holidays &&
-        event.categoryId !== DEMO_CATEGORY_IDS.formula1
+        event.categoryId !== DEMO_CATEGORY_IDS.formula1 &&
+        // O triatlo começa com a inscrição de 2026: 2025 não tem provas.
+        event.categoryId !== DEMO_CATEGORY_IDS.triathlon
     )
     .map((event) => {
       const override = event.calendarPackEventKey

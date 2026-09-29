@@ -18,6 +18,31 @@
 - A escolha foco/"Todos" fica salva no aparelho (`desktopHabitView`). Na vitrine do guia inicial, o comportamento antigo segue valendo.
 - Os chips do desktop deixaram de ser filtros de visibilidade: em foco mostra um, em "Todos" mostra todos.
 
+## Onboarding: vitrine em dois contextos
+
+- **"Hábitos"** (genérico): Ler 20 minutos e Dormir cedo.
+- **"Triatlo"** (focado): Nadar, Pedalar, Correr e Treino de força, com um plano semanal plausível.
+  - A corrida é a modalidade mais frequente. No sábado, alterna entre pedal e o "brick" (pedal + corrida). Uma sessão se perde a cada poucas semanas.
+  - Em viagem, só entra corrida leve em dias alternados.
+  - Dormir cedo falha nas noites de evento do ano de exemplo.
+- O "Triatlo" existe só na tela, durante o guia: não é gravado nem sincronizado, e não pode ser editado. Um hábito criado com ele selecionado vai para o primeiro contexto real, e a tela acompanha.
+- É o primeiro passo de uma história única para o ano de exemplo, que é também a base de conteúdo: alguém que treina para um Ironman.
+
+### Provas nos Eventos, ligadas ao treino (exemplo v10)
+
+- A nova categoria **"Triatlo"** fica no contexto Pessoal do ano de exemplo. As provas caem sempre no domingo, e o polimento vem da data de cada prova.
+  - Inscrição no Ironman: 20/jan.
+  - Triatlo sprint: abril.
+  - Polimento + Ironman 70.3: agosto.
+  - Polimento + Ironman Florianópolis: fim de novembro.
+- 2025 não tem provas: a história começa com a inscrição.
+- A vitrine de Hábitos lê esses eventos:
+  - Antes da inscrição, só manutenção (corrida e força).
+  - No dia da prova, nadar, pedalar e correr.
+  - Nos dois dias seguintes, recuperação.
+  - No polimento, menos volume, sem força e dormindo cedo, menos na noite do "Show de fim de ano", que cai no meio dele.
+- O grupo do exemplo subiu para v10. Quem ainda está com o exemplo antigo bloqueado recebe o novo automaticamente.
+
 ## Modelo e sincronização
 
 - `HabitContext` em `lib/types.ts`; `Habit.contextId` é opcional, e sem ele o hábito fica no contexto padrão.
