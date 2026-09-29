@@ -790,28 +790,35 @@ test("demonstração monta dois contextos e categorias pessoais e profissionais"
   expect(snapshot.profiles.map((profile) => profile.name)).toEqual([
     "Pessoal",
     "Profissional",
+    "Triatlo",
   ]);
   expect(snapshot.categories.map((category) => category.name)).toEqual([
     "Geral",
     "Família",
     "Amigos",
     "Viagens",
-    "Triatlo",
     "Geral",
     "Rituais",
     "Projetos",
     "Marketing",
+    "Provas",
+    "Treino",
+    "Saúde",
+    "Viagens",
   ]);
   expect(snapshot.categories.map((category) => category.color)).toEqual([
     "#9CA6B4",
     "#EF8F8F",
     "#4F8FD6",
     "#58B76F",
-    "#55B5A8",
     "#58B76F",
     "#4F8FD6",
     "#E7B957",
     "#EE9275",
+    "#55B5A8",
+    "#CBD5E1",
+    "#EE9275",
+    "#58B76F",
   ]);
   expect(snapshot.events.length).toBeGreaterThan(150);
   expect(new Set(snapshot.events.map((event) => event.startDate.slice(5, 7))).size).toBe(12);
@@ -862,7 +869,9 @@ test("demonstração monta dois contextos e categorias pessoais e profissionais"
     .filter(
       (event) =>
         event.categoryId === productCategory?.id &&
-        event.calendarPackEventKey?.startsWith("2026:")
+        event.calendarPackEventKey?.startsWith("2026:") &&
+        // A semana do lançamento da campanha é um marco curto, não um período.
+        event.calendarPackEventKey !== "2026:smb-campaign-launch"
     )
     .toSorted((left, right) => left.startDate.localeCompare(right.startDate));
   expect(productPeriods).toHaveLength(4);
@@ -887,10 +896,10 @@ test("demonstração monta dois contextos e categorias pessoais e profissionais"
         event.categoryId === personalCategoryIds.get(name) &&
         event.calendarPackEventKey?.startsWith("2026:")
     ).length;
-  expect(countCategoryEvents("Geral")).toBe(15);
+  expect(countCategoryEvents("Geral")).toBe(16);
   expect(countCategoryEvents("Família")).toBe(17);
   expect(countCategoryEvents("Amigos")).toBe(19);
-  expect(countCategoryEvents("Viagens")).toBe(6);
+  expect(countCategoryEvents("Viagens")).toBe(5);
 
   const visiblePersonalCategoryIds = new Set(
     personalCategories
@@ -901,7 +910,7 @@ test("demonstração monta dois contextos e categorias pessoais e profissionais"
     (event) => visiblePersonalCategoryIds.has(event.categoryId)
   );
   expect(visiblePersonalEvents.length).toBeGreaterThanOrEqual(50);
-  expect(visiblePersonalEvents.length).toBeLessThanOrEqual(65);
+  expect(visiblePersonalEvents.length).toBeLessThanOrEqual(75);
 
   const authorCategoryIds = new Set(
     personalCategories
@@ -928,10 +937,10 @@ test("demonstração monta dois contextos e categorias pessoais e profissionais"
       expect.objectContaining({
         title: "Férias das crianças",
         startDate: "2026-07-20",
-        endDate: "2026-08-02",
+        endDate: "2026-07-24",
       }),
       expect.objectContaining({
-        title: "Férias em família — Maceió",
+        title: "Férias em Maceió",
         startDate: "2026-07-25",
         endDate: "2026-07-30",
       }),
@@ -954,9 +963,9 @@ test("demonstração conta uma história diferente entre 2025 e 2027", () => {
   );
 
   expect(eventsByYear.get(2024)).toEqual([]);
-  expect(eventsByYear.get(2025)).toHaveLength(84);
-  // 2026 inclui as 6 datas do triatlo (inscrição, provas e polimentos).
-  expect(eventsByYear.get(2026)).toHaveLength(83);
+  expect(eventsByYear.get(2025)).toHaveLength(85);
+  // 2026 inclui a história do triatlo: 13 datas no contexto Triatlo (provas, treino, saúde e viagem).
+  expect(eventsByYear.get(2026)).toHaveLength(91);
   expect(eventsByYear.get(2027)).toHaveLength(2);
   expect(eventsByYear.get(2028)).toHaveLength(0);
 
@@ -981,7 +990,6 @@ test("demonstração conta uma história diferente entre 2025 e 2027", () => {
   expect(eventsByYear.get(2025)?.map((event) => event.title)).toEqual(
     expect.arrayContaining([
       "Férias em Torres",
-      "Carnaval em Florianópolis",
       "Fim de semana em Buenos Aires",
       "Férias em família — Serra Gaúcha",
       "Pesquisa com pessoas usuárias",
@@ -992,8 +1000,7 @@ test("demonstração conta uma história diferente entre 2025 e 2027", () => {
   );
   expect(eventsByYear.get(2026)?.map((event) => event.title)).toEqual(
     expect.arrayContaining([
-      "Carnaval em Paraty",
-      "Férias em família — Maceió",
+      "Férias em Maceió",
       "Descoberta da experiência mobile",
       "Beta da experiência mobile",
       "Evolução do onboarding",
