@@ -165,7 +165,7 @@ test("mobile volta na última tela e preserva a sessão entre superfícies", asy
 
   await habits.getByRole("button", { name: "Criar novo hábito" }).click();
   await expect(
-    page.getByRole("dialog", { name: "Acompanhe mais de uma rotina" })
+    page.getByRole("dialog", { name: "Acompanhe todas as suas rotinas" })
   ).toBeVisible();
   await page.getByRole("button", { name: "Agora não" }).click();
   await expect(habits.getByRole("button", { name: "Ler", exact: true })).toHaveCount(0);
@@ -604,6 +604,27 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
   await page.getByRole("button", { name: "Mostrar hábitos" }).click();
   await expect(habits.locator('[data-year-grid-surface="habits"]')).toBeVisible();
   const completedDay = habits.locator('[data-day-cell][data-day-iso$="-01-01"]');
+  // Padrão igual ao mobile: um hábito em foco, marcado com um clique direto.
+  const focusedChip = habits.getByRole("button", { name: "Caminhar", exact: true });
+  await expect(focusedChip).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    habits.getByRole("button", { name: "Ler", exact: true })
+  ).toHaveAttribute("aria-pressed", "false");
+  await expect(completedDay.locator("[data-habit-marker]")).toHaveCount(1);
+  await expect(completedDay.locator("[data-habit-marker]")).toHaveAttribute(
+    "data-habit-marker",
+    "habit-1"
+  );
+  await completedDay.click();
+  await expect(completedDay.locator("[data-habit-marker]")).toHaveCount(0);
+  await expect(page.locator("[data-habit-day-picker]")).toHaveCount(0);
+  await completedDay.click();
+  await expect(completedDay.locator("[data-habit-marker]")).toHaveCount(1);
+
+  // "Todos" mostra a pilha de todos os hábitos do contexto.
+  const showAll = habits.getByRole("button", { name: "Todos", exact: true });
+  await showAll.click();
+  await expect(showAll).toHaveAttribute("aria-pressed", "true");
   await expect(completedDay.locator("[data-habit-marker]")).toHaveCount(4);
   for (const stackPosition of [1, 2, 3, 4]) {
     await expect(
@@ -692,7 +713,12 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
   await expect(walkingChoice).toBeFocused();
   const pickerBox = await dayPicker.boundingBox();
   const pickerViewport = page.viewportSize();
-  if (!pickerBox || !pickerViewport) throw new Error("Seletor diário não pôde ser medido.");
+  const pickerAnchorBox = await completedDay.boundingBox();
+  if (!pickerBox || !pickerViewport || !pickerAnchorBox) {
+    throw new Error("Seletor diário não pôde ser medido.");
+  }
+  // Abre embaixo do dia: os próximos dias do mesmo mês (à direita) ficam livres.
+  expect(pickerBox.y).toBeGreaterThanOrEqual(pickerAnchorBox.y + pickerAnchorBox.height);
   expect(pickerBox.x).toBeGreaterThanOrEqual(0);
   expect(pickerBox.y).toBeGreaterThanOrEqual(0);
   expect(pickerBox.x + pickerBox.width).toBeLessThanOrEqual(pickerViewport.width);
@@ -714,25 +740,23 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
   await expect(dayPicker).toHaveCount(0);
   await expect(completedDay).toBeFocused();
 
-  const hiddenFilter = habits.getByRole("button", { name: "Alongar", exact: true });
-  await hiddenFilter.click();
-  await expect(hiddenFilter).toHaveAttribute("aria-pressed", "false");
-  await expect(completedDay.locator("[data-habit-marker]")).toHaveCount(3);
-  // 3 hábitos visíveis: 30px + 3 bolinhas de 18px + 2 espaços + 4px.
-  await expect.poll(async () => (await completedDay.boundingBox())?.height).toBe(92);
-  await completedDay.click();
-  await expect(
-    page.locator("[data-habit-day-picker]").getByRole("button", {
-      name: "Desmarcar Alongar",
-    })
-  ).toBeVisible();
-  await page.keyboard.press("Escape");
+  // Clicar num hábito sai de "Todos" e põe ele em foco.
+  const stretchChip = habits.getByRole("button", { name: "Alongar", exact: true });
+  await stretchChip.click();
+  await expect(stretchChip).toHaveAttribute("aria-pressed", "true");
+  await expect(showAll).toHaveAttribute("aria-pressed", "false");
+  await expect(completedDay.locator("[data-habit-marker]")).toHaveCount(1);
+  await expect(completedDay.locator("[data-habit-marker]")).toHaveAttribute(
+    "data-habit-marker",
+    "habit-4"
+  );
   await expect.poll(async () => {
     const raw = await page.evaluate(() =>
       window.localStorage.getItem("doze52:habits-store:v1")
     );
-    return JSON.parse(raw ?? "{}").state?.visibleHabitIds ?? [];
-  }).not.toContain("habit-4");
+    const state = JSON.parse(raw ?? "{}").state ?? {};
+    return [state.desktopHabitView, state.selectedHabitId].join(",");
+  }).toBe("focus,habit-4");
   await expect(habits.locator('[data-day-cell][aria-disabled="true"]').first()).toBeVisible();
   await page.getByRole("link", { name: "Eventos" }).click();
   await expect(calendarRegion).toBeVisible();

@@ -9,6 +9,7 @@ import {
   getDesktopHabitRowMinHeight,
   getDesktopVisibleHabits,
   getHabitDayAction,
+  getHabitDayMarkers,
   getHabitCheckInKey,
   getHabitRetrospectiveDates,
   moveActiveHabit,
@@ -16,7 +17,18 @@ import {
   setHabitArchived,
 } from "../../lib/habits-prototype";
 import { getYearTransitionDirection } from "../../lib/calendar-year-transition";
-import { PLAN_LIMITS, PRO_UPGRADE_COPY } from "../../lib/entitlements";
+import {
+  isLimitReached,
+  PLAN_LIMITS,
+  PRO_UPGRADE_COPY,
+} from "../../lib/entitlements";
+import {
+  DEFAULT_HABIT_CONTEXT_ID,
+  filterHabitsByContext,
+  getHabitContexts,
+  resolveHabitContextId,
+  resolveSelectedHabitContextId,
+} from "../../lib/habit-contexts";
 import type { CalendarEvent, CategoryItem, Habit } from "../../lib/types";
 import {
   buildProductDestinationUrl,
@@ -241,12 +253,20 @@ test("ordena hábitos ativos e limita a apresentação desktop aos quatro primei
     "quatro",
     "cinco",
   ]);
+  // Sem teto de exibição: o Pro tem hábitos ilimitados.
   expect(getDesktopVisibleHabits(habits).map((item) => item.id)).toEqual([
     "um",
     "dois",
     "tres",
     "quatro",
+    "cinco",
   ]);
+});
+
+test("mostra até 4 marcações no dia e resume o resto em +N", () => {
+  expect(getHabitDayMarkers([1, 2, 3, 4])).toEqual({ visible: [1, 2, 3, 4], overflow: 0 });
+  expect(getHabitDayMarkers([1, 2, 3, 4, 5, 6])).toEqual({ visible: [1, 2, 3], overflow: 3 });
+  expect(getHabitDayMarkers([])).toEqual({ visible: [], overflow: 0 });
 });
 
 test("empilha apenas hábitos concluídos preservando a ordem visível", () => {
@@ -332,11 +352,51 @@ test("resolve a direção visual ao navegar entre anos", () => {
   expect(getYearTransitionDirection(2026, 2025)).toBe(-1);
 });
 
-test("define um hábito Free e quatro Pro com upgrade contextual", () => {
+test("define um hábito e um contexto no Free e ilimitados no Pro", () => {
   expect(PLAN_LIMITS.free.maxHabits).toBe(1);
-  expect(PLAN_LIMITS.pro.maxHabits).toBe(4);
+  expect(PLAN_LIMITS.free.maxHabitContexts).toBe(1);
+  expect(PLAN_LIMITS.pro.maxHabits).toBeNull();
+  expect(PLAN_LIMITS.pro.maxHabitContexts).toBeNull();
+  expect(isLimitReached(1, PLAN_LIMITS.free.maxHabits)).toBe(true);
+  expect(isLimitReached(500, PLAN_LIMITS.pro.maxHabits)).toBe(false);
   expect(PRO_UPGRADE_COPY.habits.description).toContain("1 hábito");
-  expect(PRO_UPGRADE_COPY.habits.description).toContain("4 hábitos");
+  expect(PRO_UPGRADE_COPY.habits.description).not.toMatch(/\b4\b/);
+  expect(PRO_UPGRADE_COPY["habit-contexts"].description).toContain("1 contexto");
+});
+
+test("contexto padrão virtual abriga hábitos antigos e órfãos", () => {
+  const habit = (id: string, contextId?: string): Habit => ({
+    id,
+    name: id,
+    color: "#2563eb",
+    icon: "circle-check",
+    contextId,
+    position: 0,
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+  });
+  const onlyDefault = getHabitContexts([]);
+  expect(onlyDefault.map((context) => [context.id, context.name])).toEqual([
+    [DEFAULT_HABIT_CONTEXT_ID, "Hábitos"],
+  ]);
+  expect(resolveHabitContextId(habit("antigo"), onlyDefault)).toBe(DEFAULT_HABIT_CONTEXT_ID);
+
+  const contexts = getHabitContexts([
+    { id: "saude", name: "Saúde", icon: "heart", position: 1, createdAt: "2026-02-01T00:00:00.000Z", updatedAt: "2026-02-01T00:00:00.000Z" },
+    { id: "estudos", name: "Estudos", icon: "book-open", position: 0, createdAt: "2026-02-01T00:00:00.000Z", updatedAt: "2026-02-01T00:00:00.000Z" },
+  ]);
+  expect(contexts.map((context) => context.id)).toEqual(["estudos", "saude"]);
+  // Sem o padrão na lista, o antigo e o de contexto excluído caem no primeiro.
+  const habits = [habit("antigo"), habit("treino", "saude"), habit("orfao", "apagado")];
+  expect(filterHabitsByContext(habits, "estudos", contexts).map((item) => item.id)).toEqual([
+    "antigo",
+    "orfao",
+  ]);
+  expect(filterHabitsByContext(habits, "saude", contexts).map((item) => item.id)).toEqual([
+    "treino",
+  ]);
+  expect(resolveSelectedHabitContextId("apagado", contexts)).toBe("estudos");
+  expect(resolveSelectedHabitContextId("saude", contexts)).toBe("saude");
 });
 
 test("expõe somente os destinos funcionais da navegação", () => {

@@ -20,7 +20,8 @@ export type PlanLimits = {
   maxProfiles: number | null;
   maxCategories: number | null;
   maxCalendarSubscriptions: number | null;
-  maxHabits: number;
+  maxHabits: number | null;
+  maxHabitContexts: number | null;
 };
 
 export type ProUpgradeReason =
@@ -29,6 +30,7 @@ export type ProUpgradeReason =
   | "calendar-subscriptions"
   | "calendar-import-export"
   | "habits"
+  | "habit-contexts"
   | "generic";
 
 export const PRO_SUBSCRIPTION_STATUSES = ["active", "trialing"] as const;
@@ -39,12 +41,17 @@ export const PLAN_LIMITS: Record<BillingPlan, PlanLimits> = {
     maxCategories: 3,
     maxCalendarSubscriptions: 1,
     maxHabits: 1,
+    maxHabitContexts: 1,
   },
   pro: {
     maxProfiles: null,
     maxCategories: null,
     maxCalendarSubscriptions: null,
-    maxHabits: 4,
+    // Ilimitado para a pessoa; o servidor ainda guarda um teto técnico contra
+    // abuso (ver continuity_plan_ceilings), como já faz com contextos e
+    // categorias dos Eventos.
+    maxHabits: null,
+    maxHabitContexts: null,
   },
 };
 
@@ -79,9 +86,15 @@ export const PRO_UPGRADE_COPY: Record<
     cta: "Assinar Pro",
   },
   habits: {
-    title: "Acompanhe mais de uma rotina",
+    title: "Acompanhe todas as suas rotinas",
     description:
-      "No plano gratuito você acompanha 1 hábito. Com o Pro, até 4 hábitos no mesmo ano.",
+      "No plano gratuito você acompanha 1 hábito. Com o Pro, quantos hábitos quiser no mesmo ano.",
+    cta: "Assinar Pro",
+  },
+  "habit-contexts": {
+    title: "Cada rotina no seu lugar",
+    description:
+      "No plano gratuito seus hábitos ficam em 1 contexto. Com o Pro, saúde, estudos e casa ganham o espaço de cada um.",
     cta: "Assinar Pro",
   },
   generic: {

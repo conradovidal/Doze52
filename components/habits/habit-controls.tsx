@@ -24,7 +24,6 @@ import { CSS } from "@dnd-kit/utilities";
 import {
   ChevronDown,
   ChevronRight,
-  CircleCheck,
   GripVertical,
   PencilLine,
   Plus,
@@ -35,7 +34,12 @@ import {
   GuidedToolbarNoticeCard,
   type GuidedToolbarNotice,
 } from "@/components/onboarding/guided-toolbar-notice";
-import { HabitEditList } from "@/components/habits/habit-edit-list";
+import {
+  HabitEditList,
+  SortableChipEditList,
+} from "@/components/habits/habit-edit-list";
+import { HabitContextIcon } from "@/components/habits/habit-context-icon";
+import { useScrollEdgeFade } from "@/lib/use-scroll-edge-fade";
 import { getCategoryColorToken } from "@/lib/category-palette";
 import {
   arraysEqual,
@@ -50,7 +54,7 @@ import {
   SORTABLE_ACCESSIBILITY,
 } from "@/lib/sortable-motion";
 import { useTheme } from "@/lib/theme";
-import type { Habit } from "@/lib/types";
+import type { Habit, HabitContext } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import {
   DESKTOP_CONTROL_MAX_WIDTH_CLASS,
@@ -60,7 +64,26 @@ import {
 const HABIT_CONTROLS_EXPANDED_STORAGE_KEY = "doze52:habit-controls:expanded";
 
 type HabitControlsProps = {
+  /** Contextos de hábitos em ordem (sempre ao menos o "Hábitos" padrão). */
+  contexts: HabitContext[];
+  selectedContextId: string;
+  onSelectContext: (contextId: string) => void;
+  /** Só no mobile em edição: criar/editar contexto vive junto da lista. */
+  onRequestCreateContext?: () => void;
+  onEditContext?: (contextId: string) => void;
+  onReorderContexts?: (orderedIds: string[]) => void;
+  /** Hábitos do contexto selecionado. */
   habits: Habit[];
+  /**
+   * Desktop fora da vitrine: um hábito em foco (seleção única, como no
+   * mobile) ou "Todos". Sem isto, os chips são filtros de visibilidade.
+   */
+  desktopView?: {
+    view: "focus" | "overview";
+    focusedHabitId: string | null;
+    onFocusHabit: (habitId: string) => void;
+    onShowAll: () => void;
+  };
   selectedHabit: Habit | null;
   visibleHabitIds?: ReadonlySet<string>;
   isEditing?: boolean;
@@ -82,6 +105,47 @@ type HabitControlsProps = {
 };
 
 type DragState = { id: string; width: number | null };
+
+// Mesmos chips de contexto do Eventos (ProfileBar): o ativo preenchido, os
+// outros em cartão. Com um contexto só, é o chip "Hábitos" de antes.
+function HabitContextChips({
+  contexts,
+  selectedContextId,
+  onSelectContext,
+}: {
+  contexts: HabitContext[];
+  selectedContextId: string;
+  onSelectContext: (contextId: string) => void;
+}) {
+  return (
+    <>
+      {contexts.map((context) => {
+        const selected = context.id === selectedContextId;
+        return (
+          <button
+            key={context.id}
+            type="button"
+            data-habit-context={context.id}
+            aria-pressed={selected}
+            title={context.name}
+            onClick={() => onSelectContext(context.id)}
+            className={cn(
+              "inline-flex h-8 max-w-[12rem] shrink-0 items-center overflow-hidden rounded-[10px] border text-[0.78rem] font-semibold shadow-none transition-[background-color,border-color,color,transform] duration-[160ms] ease-[cubic-bezier(0.22,1,0.36,1)] active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45",
+              selected
+                ? "border-primary bg-primary text-primary-foreground hover:bg-primary/90"
+                : "border-border bg-card text-foreground/72 hover:border-foreground/18 hover:bg-muted hover:text-foreground"
+            )}
+          >
+            <span className="inline-flex h-8 w-7 shrink-0 items-center justify-center" aria-hidden="true">
+              <HabitContextIcon icon={context.icon} size={14} className="shrink-0" />
+            </span>
+            <span className="min-w-0 truncate pr-2.5">{context.name}</span>
+          </button>
+        );
+      })}
+    </>
+  );
+}
 
 function EditHabitChip({
   habit,
@@ -225,7 +289,14 @@ function SortableHabitChip({
 }
 
 export function HabitControls({
+  contexts,
+  selectedContextId,
+  onSelectContext,
+  onRequestCreateContext,
+  onEditContext,
+  onReorderContexts,
   habits,
+  desktopView,
   selectedHabit,
   visibleHabitIds,
   isEditing = false,
@@ -242,6 +313,22 @@ export function HabitControls({
   forceCollapsed = false,
 }: HabitControlsProps) {
   const { mode: themeMode } = useTheme();
+  const { ref: mobileContextScrollFadeRef, style: mobileContextScrollFadeStyle } =
+    useScrollEdgeFade<HTMLDivElement>();
+  const mobileContextScrollNodeRef = React.useRef<HTMLDivElement | null>(null);
+  const mobileContextScrollRef = React.useCallback(
+    (node: HTMLDivElement | null) => {
+      mobileContextScrollNodeRef.current = node;
+      mobileContextScrollFadeRef(node);
+    },
+    [mobileContextScrollFadeRef]
+  );
+  // Com a linha rolando, o contexto ativo pode ficar fora da vista.
+  React.useEffect(() => {
+    mobileContextScrollNodeRef.current
+      ?.querySelector<HTMLElement>(`[data-habit-context="${selectedContextId}"]`)
+      ?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [selectedContextId]);
   const [expanded, setExpanded] = React.useState(() => {
     if (typeof window === "undefined") return true;
     try {
@@ -355,12 +442,35 @@ export function HabitControls({
     </button>
   ) : null;
 
+  const showAllChip =
+    !mobile && desktopView && habits.length > 1 ? (
+      <button
+        type="button"
+        aria-pressed={desktopView.view === "overview"}
+        data-habit-view-all
+        title="Ver todos os hábitos do contexto"
+        className={cn(
+          "inline-flex h-8 shrink-0 items-center rounded-[10px] border px-3 text-[0.78rem] font-semibold shadow-none transition-[background-color,border-color,color,transform] duration-[160ms] ease-[cubic-bezier(0.22,1,0.36,1)] active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45",
+          desktopView.view === "overview"
+            ? "border-foreground/30 bg-muted text-foreground"
+            : "border-border bg-card text-muted-foreground/75 hover:border-foreground/18 hover:bg-muted hover:text-foreground"
+        )}
+        onClick={desktopView.onShowAll}
+      >
+        Todos
+      </button>
+    ) : null;
+
   const habitChipButtons = (
     <>
+      {showAllChip}
       {habits.map((habit) => {
         const selected = mobile
           ? selectedHabit?.id === habit.id
-          : visibleHabitIds?.has(habit.id) ?? true;
+          : desktopView
+            ? desktopView.view === "overview" ||
+              desktopView.focusedHabitId === habit.id
+            : visibleHabitIds?.has(habit.id) ?? true;
         const colorToken = getCategoryColorToken(habit.color, themeMode);
 
         return (
@@ -390,6 +500,10 @@ export function HabitControls({
                 : undefined
             }
             onClick={() => {
+              if (!mobile && desktopView) {
+                desktopView.onFocusHabit(habit.id);
+                return;
+              }
               if (!mobile && onToggleHabitVisibility) {
                 onToggleHabitVisibility(habit.id);
                 return;
@@ -529,11 +643,18 @@ export function HabitControls({
         // mesmo "Hábitos" do desktop, espelhando o contexto selecionado) e o
         // chevron no mesmo lugar.
         <div className="m-[3px] flex h-10 w-[calc(100%-6px)] items-center gap-1 rounded-[8px] pl-1 pr-1.5">
-          <div className="inline-flex h-8 shrink-0 items-center overflow-hidden rounded-[10px] border border-primary bg-primary text-[0.78rem] font-semibold text-primary-foreground">
-            <span className="inline-flex h-8 w-7 items-center justify-center" aria-hidden="true">
-              <CircleCheck className="size-3.5" />
-            </span>
-            <span className="pr-2.5">Hábitos</span>
+          {/* Com muitos contextos a linha rola com fade, sem quebrar — igual
+              aos contextos do Eventos no mobile. */}
+          <div
+            ref={mobileContextScrollRef}
+            style={mobileContextScrollFadeStyle}
+            className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto doze52-scrollbar-none"
+          >
+            <HabitContextChips
+              contexts={contexts}
+              selectedContextId={selectedContextId}
+              onSelectContext={onSelectContext}
+            />
           </div>
           <span className="ml-auto flex shrink-0 items-center gap-1">
             <button
@@ -557,12 +678,11 @@ export function HabitControls({
       ) : (
         <div className="relative -mx-4 w-[calc(100%+2rem)] overflow-x-auto px-4 pb-0.5 doze52-scrollbar-none sm:mx-0 sm:w-full sm:px-0">
           <div className="flex w-max min-w-full flex-nowrap items-center justify-center gap-x-2 gap-y-1.5 sm:gap-x-2.5">
-            <div className="inline-flex h-8 shrink-0 items-center overflow-hidden rounded-[10px] border border-primary bg-primary text-[0.78rem] font-semibold text-primary-foreground">
-              <span className="inline-flex h-8 w-7 items-center justify-center" aria-hidden="true">
-                <CircleCheck className="size-3.5" />
-              </span>
-              <span className="pr-2.5">Hábitos</span>
-            </div>
+            <HabitContextChips
+              contexts={contexts}
+              selectedContextId={selectedContextId}
+              onSelectContext={onSelectContext}
+            />
             {!isEditing ? (
               <button
                 type="button"
@@ -614,6 +734,26 @@ export function HabitControls({
           )}
         >
           {isEditing ? (
+            <>
+            {onRequestCreateContext || onEditContext ? (
+              <div className="mb-2 border-b border-border/55 pb-2">
+                <SortableChipEditList
+                  habits={contexts}
+                  selectedId={selectedContextId}
+                  noun={{ noun: "contexto", createLabel: "Criar novo contexto", kind: "context" }}
+                  leading={(context) => (
+                    <HabitContextIcon icon={context.icon} size={13} className="shrink-0" />
+                  )}
+                  selectedTone="primary"
+                  mobile
+                  creationDisabled={!onRequestCreateContext}
+                  onSelectHabit={onSelectContext}
+                  onRequestCreate={() => onRequestCreateContext?.()}
+                  onEditHabit={onEditContext}
+                  onReorderHabits={onReorderContexts}
+                />
+              </div>
+            ) : null}
             <HabitEditList
               habits={habits}
               selectedHabit={selectedHabit}
@@ -624,6 +764,7 @@ export function HabitControls({
               onEditHabit={onEditHabit}
               onReorderHabits={onReorderHabits}
             />
+            </>
           ) : (
             habitButtons
           )}

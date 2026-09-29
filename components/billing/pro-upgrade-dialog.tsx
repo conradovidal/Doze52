@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  isProFeatureForReason,
   PRO_FEATURES,
   ProFeatureIcon,
   ProFeatureStack,
@@ -77,7 +78,7 @@ export function ProUpgradeDialog({
               key={feature.id}
               className={cn(
                 "flex items-center gap-2.5 text-sm leading-5",
-                feature.reason === reason
+                isProFeatureForReason(feature, reason)
                   ? "font-semibold text-foreground"
                   : "text-muted-foreground"
               )}
