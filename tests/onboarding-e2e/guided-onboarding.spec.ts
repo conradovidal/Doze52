@@ -189,11 +189,11 @@ const completePersonalOnboarding = async (
       "data-guided-toolbar-target",
       "habit"
     );
-    // A vitrine de hábitos (Exercício, Ler 20 minutos) monta/anima ao entrar
+    // A vitrine de hábitos (Ler 20 minutos, Dormir cedo) monta/anima ao entrar
     // em Hábitos — sem esperar por ela, o "+" ainda não tem o aria-label
     // certo e o clique não abre o formulário de criação.
     await expect(
-      page.getByRole("button", { name: "Exercício", exact: true })
+      page.getByRole("button", { name: "Dormir cedo", exact: true })
     ).toHaveAttribute("aria-pressed", "true");
     await page.getByRole("button", { name: "Criar novo hábito" }).click();
     await page.getByLabel("Nome do hábito").fill("Leitura");
@@ -227,7 +227,7 @@ const completePersonalOnboarding = async (
     // virada para Eventos só vem no "Finalizar guia".
     await expect(page).toHaveURL(/surface=habits/);
     await expect(
-      page.getByRole("button", { name: "Exercício", exact: true })
+      page.getByRole("button", { name: "Dormir cedo", exact: true })
     ).toBeVisible();
     await editControl.click();
   }
@@ -274,7 +274,7 @@ test("monta contexto Pessoal de forma incremental", async ({ page }, testInfo) =
   );
   await expect(panel.getByRole("button", { name: /Outro/ })).toHaveCount(0);
   await expect(page.locator("[data-onboarding-profile-id]")).toHaveCount(2);
-  await expect(page.locator("[data-onboarding-category-id]")).toHaveCount(4);
+  await expect(page.locator("[data-onboarding-category-id]")).toHaveCount(5);
   await expect(page.locator("[data-onboarding-connector]")).toHaveCount(0);
   await expect(panel).toContainText(
     "Escolha um contexto para começar."
@@ -748,7 +748,7 @@ test("mobile trava a Anual até a jornada de Hábitos terminar", async ({
   await habitCard.getByRole("button", { name: "Continuar" }).click();
 
   await expect(habitCard).toContainText("Passo 2 de 7");
-  await expect(habitCard).toContainText("Estes dois hábitos são exemplo.");
+  await expect(habitCard).toContainText("Estes hábitos são exemplo.");
   await expect(annualNav).toHaveAttribute("aria-disabled", "true");
   await page
     .locator('[data-habits-prototype] button[aria-label="Criar novo hábito"]')
@@ -1300,9 +1300,9 @@ test("o X libera o ano de exemplo e a decisão persiste após recarregar", async
     "Pessoal",
     "Profissional",
   ]);
-  // 4 categorias por contexto (Pessoal + Profissional), sem Feriados/F1 nem
+  // 5 categorias no Pessoal (com Triatlo) e 4 no Profissional, sem Feriados/F1 nem
   // Aniversários/Entregas (de fora do ano de exemplo desde #95).
-  expect(stored.categories).toHaveLength(8);
+  expect(stored.categories).toHaveLength(9);
   expect(stored.events?.length).toBeGreaterThan(150);
   await expect(page.locator("[data-demo-mode-badge]")).toContainText(
     "Ano de exemplo"
@@ -1341,8 +1341,8 @@ test("saída após criar contexto preserva o ano e convida após três criaçõe
   await page.reload();
   await expect(panel).toBeHidden();
   await expect(page.getByRole("button", { name: "Pessoal", exact: true })).toBeVisible();
-  // O contexto Pessoal já chega com 4 categorias de demonstração (#95).
-  await expect(page.locator("[data-onboarding-category-id]")).toHaveCount(4);
+  // O contexto Pessoal já chega com 5 categorias de demonstração (#95, +Triatlo).
+  await expect(page.locator("[data-onboarding-category-id]")).toHaveCount(5);
   const persistedStep = await page.evaluate(() =>
     JSON.parse(localStorage.getItem("doze52:onboarding:v2") ?? "null")
   );
@@ -1441,9 +1441,9 @@ test("substitui automaticamente um exemplo v3 ainda bloqueado", async ({
       })
     )
     // Feriados/F1 não vêm mais junto no ano de exemplo (#95) — a
-    // substituição automática troca só o grupo do próprio exemplo, agora v8
-    // (não mais v7).
-    .toEqual(["onboarding-personal-demo-v9"]);
+    // substituição automática troca só o grupo do próprio exemplo, agora
+    // v10 (com o triatlo).
+    .toEqual(["onboarding-personal-demo-v10"]);
 });
 
 test("sandbox convida após cinco alvos e retoma o onboarding limpo", async ({
@@ -1487,7 +1487,7 @@ test("sandbox convida após cinco alvos e retoma o onboarding limpo", async ({
     page.getByRole("region", { name: "Guia inicial do Doze 52" })
   ).toHaveAttribute("data-guided-onboarding-step", "context_selection");
   await expect(page.locator("[data-onboarding-profile-id]")).toHaveCount(2);
-  await expect(page.locator("[data-onboarding-category-id]")).toHaveCount(4);
+  await expect(page.locator("[data-onboarding-category-id]")).toHaveCount(5);
 });
 
 test("centraliza cards e mantém a instrução visível no cabeçalho fixo", async ({
@@ -1541,12 +1541,13 @@ test("centraliza cards e mantém a instrução visível no cabeçalho fixo", asy
   ]);
   // O guia compõe sobre o ano de exemplo em vez de partir de zero (ver
   // commit "Refina onboarding guiado: seed composto..." #95) — o contexto
-  // Pessoal já chega com 4 categorias e eventos de demonstração.
+  // Pessoal já chega com 5 categorias (com Triatlo) e eventos de demonstração.
   expect(cleanSnapshot.categories?.map((category) => category.name)).toEqual([
     "Geral",
     "Família",
     "Amigos",
     "Viagens",
+    "Triatlo",
   ]);
   expect(cleanSnapshot.events?.length).toBeGreaterThan(0);
   await panel.getByRole("button", { name: /Aniversários/ }).click();

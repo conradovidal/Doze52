@@ -796,6 +796,7 @@ test("demonstração monta dois contextos e categorias pessoais e profissionais"
     "Família",
     "Amigos",
     "Viagens",
+    "Triatlo",
     "Geral",
     "Rituais",
     "Projetos",
@@ -806,6 +807,7 @@ test("demonstração monta dois contextos e categorias pessoais e profissionais"
     "#EF8F8F",
     "#4F8FD6",
     "#58B76F",
+    "#55B5A8",
     "#58B76F",
     "#4F8FD6",
     "#E7B957",
@@ -953,7 +955,8 @@ test("demonstração conta uma história diferente entre 2025 e 2027", () => {
 
   expect(eventsByYear.get(2024)).toEqual([]);
   expect(eventsByYear.get(2025)).toHaveLength(84);
-  expect(eventsByYear.get(2026)).toHaveLength(77);
+  // 2026 inclui as 6 datas do triatlo (inscrição, provas e polimentos).
+  expect(eventsByYear.get(2026)).toHaveLength(83);
   expect(eventsByYear.get(2027)).toHaveLength(2);
   expect(eventsByYear.get(2028)).toHaveLength(0);
 

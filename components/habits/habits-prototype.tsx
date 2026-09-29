@@ -34,6 +34,7 @@ import {
   getHabitContexts,
   resolveHabitContextId,
   resolveSelectedHabitContextId,
+  withShowcaseContexts,
 } from "@/lib/habit-contexts";
 import { isLimitReached, type ProUpgradeReason } from "@/lib/entitlements";
 import {
@@ -180,10 +181,25 @@ export function HabitsPrototype({
   }, []);
 
   const contexts = React.useMemo(() => getHabitContexts(storedContexts), [storedContexts]);
+  // Na vitrine do guia, o "Triatlo" de exemplo aparece ao lado dos contextos
+  // reais — só na tela; nada dele é gravado.
+  const showcaseContexts = (showcase ?? showcaseDisplay)?.contexts;
+  const presentedContexts = React.useMemo(
+    () => withShowcaseContexts(contexts, showcaseContexts),
+    [contexts, showcaseContexts]
+  );
   const selectedContextId = resolveSelectedHabitContextId(
     storedSelectedContextId,
-    contexts
+    presentedContexts
   );
+  const selectedIsShowcaseContext = Boolean(
+    showcaseContexts?.some((context) => context.id === selectedContextId)
+  );
+  // Onde nasce um hábito novo: num contexto de exemplo não dá, então no
+  // primeiro contexto real.
+  const creationContextId = selectedIsShowcaseContext
+    ? resolveSelectedHabitContextId(null, contexts)
+    : selectedContextId;
   // O limite do plano conta todos os hábitos ativos; a tela mostra só os do
   // contexto selecionado, como o Eventos mostra só as categorias do contexto.
   const allActiveHabits = React.useMemo(
@@ -246,15 +262,17 @@ export function HabitsPrototype({
     () => new Set((displayShowcase?.habits ?? []).map((habit) => habit.id)),
     [displayShowcase]
   );
-  const presentedHabits = React.useMemo(
-    () =>
-      showcaseActive
-        ? (showcase?.habits ?? activeHabits)
-        : displayShowcase
-          ? [...displayShowcase.habits, ...activeHabits]
-          : activeHabits,
-    [activeHabits, displayShowcase, showcase, showcaseActive]
-  );
+  const presentedHabits = React.useMemo(() => {
+    const inContext = (list: Habit[]) =>
+      list.filter((habit) => habit.contextId === selectedContextId);
+    return showcaseActive
+      ? showcase
+        ? inContext(showcase.habits)
+        : activeHabits
+      : displayShowcase
+        ? [...inContext(displayShowcase.habits), ...activeHabits]
+        : activeHabits;
+  }, [activeHabits, displayShowcase, selectedContextId, showcase, showcaseActive]);
   const presentedCheckIns = React.useMemo(
     () =>
       showcaseActive
@@ -481,7 +499,7 @@ export function HabitsPrototype({
     }
     setDraftName("");
     setEditingHabitId(null);
-    setDraftContextId(selectedContextId);
+    setDraftContextId(creationContextId);
     setDraftColor(HABIT_COLORS[activeHabits.length % HABIT_COLORS.length]);
     setCreateDialogOpen(true);
   };
@@ -501,7 +519,7 @@ export function HabitsPrototype({
     const name = draftName.trim();
     if (!name) return;
 
-    const contextId = draftContextId || selectedContextId;
+    const contextId = draftContextId || creationContextId;
     if (editingHabitId) {
       updateHabitInStore(editingHabitId, { name, color: draftColor, contextId });
       // Mudou de contexto: acompanha o hábito até lá, senão ele "some".
@@ -611,7 +629,7 @@ export function HabitsPrototype({
         // (guidedNotice repassado ao HabitControls). Sem botão: chega já
         // convidando a criar, num só toque.
         target: "habit",
-        instruction: "Estes dois hábitos são exemplo. Toque no + e crie o seu.",
+        instruction: "Estes hábitos são exemplo. Toque no + e crie o seu.",
         stepLabel: getMobileHabitsOnboardingStepLabel("create_habit"),
       };
     }
@@ -660,7 +678,7 @@ export function HabitsPrototype({
       onArchive={editingHabitId ? archiveEditingHabit : undefined}
       checkInCount={editingHabitCheckIns}
       contexts={contexts}
-      contextId={draftContextId || selectedContextId}
+      contextId={draftContextId || creationContextId}
       onContextChange={setDraftContextId}
     />
   );
@@ -686,7 +704,7 @@ export function HabitsPrototype({
     return (
       <>
         <DesktopHabitsPrototype
-          contexts={contexts}
+          contexts={presentedContexts}
           selectedContextId={selectedContextId}
           onSelectContext={setSelectedContextId}
           year={year}
@@ -817,7 +835,7 @@ export function HabitsPrototype({
       className="mx-auto flex min-h-0 w-full max-w-[31rem] flex-1 flex-col overflow-hidden pt-12"
     >
       <HabitControls
-        contexts={contexts}
+        contexts={presentedContexts}
         selectedContextId={selectedContextId}
         onSelectContext={setSelectedContextId}
         onRequestCreateContext={
@@ -826,7 +844,10 @@ export function HabitsPrototype({
         onEditContext={
           showcaseActive || mobileOnboardingActive
             ? undefined
-            : (contextId) => setContextIntent({ mode: "edit", contextId })
+            : (contextId) => {
+                if (showcaseContexts?.some((context) => context.id === contextId)) return;
+                setContextIntent({ mode: "edit", contextId });
+              }
         }
         onReorderContexts={reorderContextsInStore}
         habits={presentedHabits}

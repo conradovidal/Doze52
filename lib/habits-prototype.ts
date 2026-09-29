@@ -9,14 +9,20 @@ import {
   startOfYear,
 } from "date-fns";
 import {
+  CATEGORY_COLOR_BASE_AMBER,
+  CATEGORY_COLOR_BASE_BLUE,
   CATEGORY_COLOR_BASE_CORAL,
+  CATEGORY_COLOR_BASE_INDIGO,
+  CATEGORY_COLOR_BASE_RED,
   CATEGORY_COLOR_BASE_TEAL,
 } from "@/lib/category-palette";
+import { DEFAULT_HABIT_CONTEXT_ID } from "@/lib/habit-contexts";
 import type {
   CalendarEvent,
   CategoryItem,
   Habit,
   HabitCheckIn,
+  HabitContext,
 } from "@/lib/types";
 
 // Quantas marcações cabem empilhadas num dia do Anual de hábitos. Acima
@@ -28,20 +34,68 @@ export type OnboardingHabitShowcase = {
   habits: Habit[];
   checkIns: Record<string, HabitCheckIn>;
   visibleHabitIds: string[];
+  /**
+   * Contextos que só existem na vitrine (hoje, "Triatlo"). Os hábitos
+   * genéricos moram no "Hábitos" padrão, que a pessoa já tem.
+   */
+  contexts: HabitContext[];
 };
 
-const ONBOARDING_HABIT_SHOWCASE_DEFINITIONS = [
+// A vitrine conta a história de uma pessoa só: alguém que treina para um
+// triatlo e, fora do treino, cuida do básico (ler, dormir cedo). O contexto
+// genérico mostra a rotina de todo mundo; o focado mostra que um objetivo
+// com várias modalidades vira um contexto próprio. As marcações seguem as
+// viagens e eventos do ano de exemplo — é o que liga Hábitos a Eventos.
+export const ONBOARDING_TRIATHLON_CONTEXT_ID = "onboarding-context-triathlon";
+
+const ONBOARDING_SHOWCASE_CONTEXTS = [
   {
-    id: "onboarding-habit-exercise",
-    name: "Exercício",
-    color: CATEGORY_COLOR_BASE_TEAL,
+    id: ONBOARDING_TRIATHLON_CONTEXT_ID,
+    name: "Triatlo",
+    icon: "dumbbell",
   },
+] as const;
+
+const ONBOARDING_HABIT_SHOWCASE_DEFINITIONS = [
   {
     id: "onboarding-habit-reading",
     name: "Ler 20 minutos",
     color: CATEGORY_COLOR_BASE_CORAL,
+    contextId: DEFAULT_HABIT_CONTEXT_ID,
+  },
+  {
+    id: "onboarding-habit-sleep",
+    name: "Dormir cedo",
+    color: CATEGORY_COLOR_BASE_INDIGO,
+    contextId: DEFAULT_HABIT_CONTEXT_ID,
+  },
+  {
+    id: "onboarding-habit-swim",
+    name: "Nadar",
+    color: CATEGORY_COLOR_BASE_BLUE,
+    contextId: ONBOARDING_TRIATHLON_CONTEXT_ID,
+  },
+  {
+    id: "onboarding-habit-bike",
+    name: "Pedalar",
+    color: CATEGORY_COLOR_BASE_AMBER,
+    contextId: ONBOARDING_TRIATHLON_CONTEXT_ID,
+  },
+  {
+    id: "onboarding-habit-run",
+    name: "Correr",
+    color: CATEGORY_COLOR_BASE_TEAL,
+    contextId: ONBOARDING_TRIATHLON_CONTEXT_ID,
+  },
+  {
+    id: "onboarding-habit-strength",
+    name: "Treino de força",
+    color: CATEGORY_COLOR_BASE_RED,
+    contextId: ONBOARDING_TRIATHLON_CONTEXT_ID,
   },
 ] as const;
+
+type ShowcaseHabitKey = "reading" | "sleep" | "swim" | "bike" | "run" | "strength";
 
 const normalizeShowcaseLabel = (value: string) =>
   value
@@ -78,20 +132,36 @@ export const buildOnboardingHabitShowcase = ({
   const yearEndIso = `${year}-12-31`;
   const cutoffIso = todayIso < yearEndIso ? todayIso : yearEndIso;
   const createdAt = `${yearStartIso}T12:00:00.000Z`;
-  const habits = ONBOARDING_HABIT_SHOWCASE_DEFINITIONS.map(
-    (definition, position): Habit => ({
+  const contexts = ONBOARDING_SHOWCASE_CONTEXTS.map(
+    (definition, index): HabitContext => ({
+      ...definition,
+      // Depois do "Hábitos" padrão (posição 0).
+      position: index + 1,
+      createdAt,
+      updatedAt: createdAt,
+    })
+  );
+  const positionInContext = new Map<string, number>();
+  const habits = ONBOARDING_HABIT_SHOWCASE_DEFINITIONS.map((definition): Habit => {
+    const position = positionInContext.get(definition.contextId) ?? 0;
+    positionInContext.set(definition.contextId, position + 1);
+    return {
       ...definition,
       icon: "circle-check",
       position,
       createdAt,
       updatedAt: createdAt,
-    })
-  );
+    };
+  });
+  const habitId = Object.fromEntries(
+    habits.map((habit) => [habit.id.replace("onboarding-habit-", ""), habit.id])
+  ) as Record<ShowcaseHabitKey, string>;
   if (cutoffIso < yearStartIso) {
     return {
       habits,
       checkIns: {},
       visibleHabitIds: habits.map((habit) => habit.id),
+      contexts,
     };
   }
 
@@ -100,7 +170,14 @@ export const buildOnboardingHabitShowcase = ({
   );
   const travelOrVacationDates = new Set<string>();
   const readingBoostDates = new Set<string>();
+  const lateNightDates = new Set<string>();
   const transitionDates = new Set<string>();
+  // Provas e fases do triatlo vindas dos Eventos (categoria "Triatlo" do
+  // ano de exemplo): é aqui que Hábitos e Eventos contam a mesma história.
+  const raceDates = new Set<string>();
+  const taperDates = new Set<string>();
+  const recoveryDates = new Set<string>();
+  let trainingStartIso: string | null = null;
 
   events.forEach((event) => {
     const title = normalizeShowcaseLabel(event.title);
@@ -112,6 +189,13 @@ export const buildOnboardingHabitShowcase = ({
       title.includes("fim de semana") ||
       title.includes("ano novo");
     const isReadingBoost = isTravelOrVacation || title.includes("feira do livro");
+    // Noite com amigos, festa ou show: dormir cedo não rola.
+    const isLateNight =
+      categoryName.includes("amigo") ||
+      title.includes("noite") ||
+      title.includes("festa") ||
+      title.includes("show") ||
+      title.includes("aniversario");
 
     if (isTravelOrVacation) {
       addEventDates(travelOrVacationDates, event, yearStartIso, cutoffIso);
@@ -125,6 +209,25 @@ export const buildOnboardingHabitShowcase = ({
     if (isReadingBoost) {
       addEventDates(readingBoostDates, event, yearStartIso, cutoffIso);
     }
+    if (isLateNight) {
+      addEventDates(lateNightDates, event, yearStartIso, cutoffIso);
+    }
+    if (categoryName.includes("triatlo")) {
+      if (title.includes("polimento")) {
+        addEventDates(taperDates, event, yearStartIso, cutoffIso);
+      } else if (title.includes("inscri")) {
+        // A temporada começa na inscrição; antes dela, só manutenção.
+        if (!trainingStartIso || event.startDate < trainingStartIso) {
+          trainingStartIso = event.startDate;
+        }
+      } else if (event.startDate === event.endDate) {
+        raceDates.add(event.startDate);
+        // Dois dias de recuperação depois de cada prova.
+        [1, 2].forEach((offset) =>
+          recoveryDates.add(format(addDays(parseISO(event.startDate), offset), "yyyy-MM-dd"))
+        );
+      }
+    }
   });
 
   const dates = eachDayOfInterval({
@@ -132,54 +235,86 @@ export const buildOnboardingHabitShowcase = ({
     end: parseISO(cutoffIso),
   }).map((date) => format(date, "yyyy-MM-dd"));
   const yearStartWeekOffset = (parseISO(yearStartIso).getDay() + 6) % 7;
-  const exercisePatterns: ReadonlyArray<ReadonlyArray<number>> = [
-    [1, 3, 5],
-    [1, 2, 4],
-    [2, 4, 6],
-    [1, 3, 5],
-  ] as const;
   const completions = new Map<string, Set<string>>();
   dates.forEach((dateIso, dayIndex) => {
-    const weekday = parseISO(dateIso).getDay();
+    const weekday = parseISO(dateIso).getDay(); // 0 = domingo
     const weekIndex = Math.floor((dayIndex + yearStartWeekOffset) / 7);
-    const exerciseDays = exercisePatterns[weekIndex % exercisePatterns.length];
     const completed = new Set<string>();
-    const blackout = transitionDates.has(dateIso);
-    if (!blackout) {
-      if (
-        exerciseDays.includes(weekday) &&
-        !travelOrVacationDates.has(dateIso) &&
-        !(weekIndex % 6 === 4 && weekday === exerciseDays[2])
-      ) {
-        completed.add(habits[0].id);
-      }
+    const traveling = travelOrVacationDates.has(dateIso);
+    // Dia de ida ou volta de viagem: nada acontece.
+    if (!transitionDates.has(dateIso)) {
+      // Ler: mais nas férias e na Feira do Livro, de vez em quando no resto.
       if (
         (readingBoostDates.has(dateIso) && dayIndex % 3 !== 1) ||
         (weekIndex % 3 === 0 && weekday === 2) ||
         (weekIndex % 5 === 2 && weekday === 0)
       ) {
-        completed.add(habits[1].id);
+        completed.add(habitId.reading);
+      }
+      // Dormir cedo: quase toda noite de semana; sexta e sábado raramente;
+      // nunca em noite de evento; nas férias, metade das noites.
+      const weekendNight = weekday === 5 || weekday === 6;
+      // Na véspera da prova e no polimento, dorme cedo sempre.
+      const racePrep =
+        taperDates.has(dateIso) ||
+        raceDates.has(format(addDays(parseISO(dateIso), 1), "yyyy-MM-dd"));
+      if (
+        !lateNightDates.has(dateIso) &&
+        (racePrep ||
+          (traveling
+            ? dayIndex % 2 === 0
+            : weekendNight
+              ? weekIndex % 4 === 1
+              : dayIndex % 9 !== 4))
+      ) {
+        completed.add(habitId.sleep);
+      }
+      // Triatlo: dia de prova tem as três modalidades; depois dela,
+      // recuperação; no polimento, volume menor e sem força; antes da
+      // inscrição, só manutenção. Fora disso, plano semanal de três
+      // modalidades + força. Viajando, só corrida leve em dias alternados.
+      if (raceDates.has(dateIso)) {
+        completed.add(habitId.swim);
+        completed.add(habitId.bike);
+        completed.add(habitId.run);
+      } else if (recoveryDates.has(dateIso)) {
+        // Descanso de verdade.
+      } else if (taperDates.has(dateIso)) {
+        if (weekday === 2 || weekday === 4) completed.add(habitId.swim);
+        if (weekday === 6) completed.add(habitId.bike);
+        if (weekday === 1 || weekday === 4) completed.add(habitId.run);
+      } else if (trainingStartIso && dateIso < trainingStartIso) {
+        if (weekday === 1 || weekday === 4) completed.add(habitId.run);
+        if (weekday === 5) completed.add(habitId.strength);
+      } else if (traveling) {
+        if (dayIndex % 2 === 1) completed.add(habitId.run);
+      } else {
+        // Uma sessão perdida a cada poucas semanas, como na vida real.
+        const skipped = weekIndex % 5 === 3 ? weekday : -1;
+        const plan: Array<[ShowcaseHabitKey, boolean]> = [
+          ["swim", weekday === 2 || weekday === 4 || (weekday === 6 && weekIndex % 3 === 0)],
+          ["bike", weekday === 3 || weekday === 6],
+          // Seg leve, qui intervalado, dom longão; sábado alterna o "brick"
+          // (pedal seguido de corrida).
+          ["run", weekday === 1 || weekday === 4 || weekday === 0 || (weekday === 6 && weekIndex % 2 === 1)],
+          ["strength", weekday === 1 || weekday === 5],
+        ];
+        plan.forEach(([key, scheduled], order) => {
+          if (!scheduled) return;
+          if (weekday === skipped && order === weekIndex % plan.length) return;
+          completed.add(habitId[key]);
+        });
       }
     }
     completions.set(dateIso, completed);
   });
 
-  if (dates.length >= 35) {
-    [0.04, 0.21, 0.39, 0.62, 0.83].forEach((ratio, markerCount) => {
-      const dateIso = dates[Math.min(dates.length - 1, Math.floor(dates.length * ratio))];
-      completions.set(
-        dateIso,
-        new Set(habits.slice(0, markerCount).map((habit) => habit.id))
-      );
-    });
-  }
-
   const checkIns: Record<string, HabitCheckIn> = {};
   completions.forEach((habitIds, dateIso) => {
-    habitIds.forEach((habitId) => {
-      const key = getHabitCheckInKey(habitId, dateIso);
+    habitIds.forEach((id) => {
+      const key = getHabitCheckInKey(id, dateIso);
       checkIns[key] = {
-        habitId,
+        habitId: id,
         date: dateIso,
         completed: true,
         updatedAt: `${dateIso}T12:00:00.000Z`,
@@ -191,6 +326,7 @@ export const buildOnboardingHabitShowcase = ({
     habits,
     checkIns,
     visibleHabitIds: habits.map((habit) => habit.id),
+    contexts,
   };
 };
 

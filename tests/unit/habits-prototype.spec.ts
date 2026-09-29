@@ -13,10 +13,12 @@ import {
   getHabitCheckInKey,
   getHabitRetrospectiveDates,
   moveActiveHabit,
+  ONBOARDING_TRIATHLON_CONTEXT_ID,
   orderActiveHabits,
   setHabitArchived,
 } from "../../lib/habits-prototype";
 import { getYearTransitionDirection } from "../../lib/calendar-year-transition";
+import { getOnboardingPersonalDemoSnapshot } from "../../lib/store";
 import {
   isLimitReached,
   PLAN_LIMITS,
@@ -79,7 +81,7 @@ test("gera chave de check-in estável por hábito e data", () => {
   );
 });
 
-test("monta dois hábitos demonstrativos coerentes com o ano de exemplo", () => {
+test("monta a vitrine em dois contextos coerente com o ano de exemplo", () => {
   const categories: CategoryItem[] = [
     { id: "travel", profileId: "personal", name: "Viagens", color: "#fff", visible: true },
     { id: "friends", profileId: "personal", name: "Amigos", color: "#fff", visible: true },
@@ -106,60 +108,66 @@ test("monta dois hábitos demonstrativos coerentes com o ano de exemplo", () => 
     event("social", "Noite de fondue", "friends", "2026-08-20"),
     event("books", "Feira do Livro", "events", "2026-10-30", "2026-11-15"),
   ];
-  const showcase = buildOnboardingHabitShowcase({
-    year: 2026,
-    todayIso: "2026-12-31",
-    events,
-    categories,
-  });
-  const repeated = buildOnboardingHabitShowcase({
-    year: 2026,
-    todayIso: "2026-12-31",
-    events,
-    categories,
-  });
+  const build = () =>
+    buildOnboardingHabitShowcase({ year: 2026, todayIso: "2026-12-31", events, categories });
+  const showcase = build();
 
-  expect(showcase).toEqual(repeated);
-  expect(showcase.habits.map((habit) => habit.name)).toEqual([
-    "Exercício",
-    "Ler 20 minutos",
+  expect(showcase).toEqual(build());
+  expect(showcase.contexts.map((context) => [context.id, context.name])).toEqual([
+    [ONBOARDING_TRIATHLON_CONTEXT_ID, "Triatlo"],
   ]);
-  expect(showcase.visibleHabitIds).toEqual(
-    showcase.habits.map((habit) => habit.id)
-  );
+  const namesIn = (contextId: string) =>
+    showcase.habits
+      .filter((habit) => habit.contextId === contextId)
+      .map((habit) => habit.name);
+  expect(namesIn(DEFAULT_HABIT_CONTEXT_ID)).toEqual(["Ler 20 minutos", "Dormir cedo"]);
+  expect(namesIn(ONBOARDING_TRIATHLON_CONTEXT_ID)).toEqual([
+    "Nadar",
+    "Pedalar",
+    "Correr",
+    "Treino de força",
+  ]);
+  expect(showcase.visibleHabitIds).toEqual(showcase.habits.map((habit) => habit.id));
 
-  const [exercise, reading] = showcase.habits;
-  const completed = (habitId: string, dateIso: string) =>
-    Boolean(showcase.checkIns[getHabitCheckInKey(habitId, dateIso)]?.completed);
-  for (const dateIso of ["2026-07-25", "2026-07-26", "2026-07-27", "2026-07-28", "2026-07-29", "2026-07-30"]) {
-    expect(completed(exercise.id, dateIso)).toBe(false);
+  const byName = (name: string) => showcase.habits.find((habit) => habit.name === name)!;
+  const completed = (name: string, dateIso: string) =>
+    Boolean(showcase.checkIns[getHabitCheckInKey(byName(name).id, dateIso)]?.completed);
+  const count = (name: string) =>
+    Object.values(showcase.checkIns).filter((checkIn) => checkIn.habitId === byName(name).id)
+      .length;
+  const trip = ["2026-07-25", "2026-07-26", "2026-07-27", "2026-07-28", "2026-07-29", "2026-07-30"];
+
+  // Viajando: sem piscina, bike nem academia; só corrida leve e leitura.
+  for (const dateIso of trip) {
+    expect(completed("Nadar", dateIso)).toBe(false);
+    expect(completed("Pedalar", dateIso)).toBe(false);
+    expect(completed("Treino de força", dateIso)).toBe(false);
   }
-  expect(
-    ["2026-07-25", "2026-07-26", "2026-07-27", "2026-07-28", "2026-07-29", "2026-07-30"].some(
-      (dateIso) => completed(reading.id, dateIso)
-    )
-  ).toBe(true);
+  expect(trip.some((dateIso) => completed("Correr", dateIso))).toBe(true);
+  expect(trip.some((dateIso) => completed("Ler 20 minutos", dateIso))).toBe(true);
+  // Noite de fondue: não dormiu cedo.
+  expect(completed("Dormir cedo", "2026-08-20")).toBe(false);
 
-  const exerciseCount = Object.values(showcase.checkIns).filter(
-    (checkIn) => checkIn.habitId === exercise.id
-  ).length;
-  const readingCount = Object.values(showcase.checkIns).filter(
-    (checkIn) => checkIn.habitId === reading.id
-  ).length;
-  expect(exerciseCount).toBeGreaterThan(readingCount);
-  expect(exerciseCount).toBeLessThan(160);
-  expect(readingCount).toBeLessThan(100);
+  // Um plano de treino plausível: corrida é a modalidade mais frequente.
+  expect(count("Correr")).toBeGreaterThan(count("Nadar"));
+  expect(count("Correr")).toBeLessThan(200);
+  expect(count("Dormir cedo")).toBeGreaterThan(count("Ler 20 minutos"));
 
-  const markerCounts = new Set<number>();
-  for (const dateIso of eachDayOfInterval({
-    start: new Date("2026-01-01T12:00:00Z"),
-    end: new Date("2026-12-31T12:00:00Z"),
-  }).map((date) => date.toISOString().slice(0, 10))) {
-    markerCounts.add(
-      showcase.habits.filter((habit) => completed(habit.id, dateIso)).length
+  // Por contexto, o dia nunca passa de 3 marcações: a pilha cabe no Anual.
+  for (const contextId of [DEFAULT_HABIT_CONTEXT_ID, ONBOARDING_TRIATHLON_CONTEXT_ID]) {
+    const inContext = showcase.habits.filter((habit) => habit.contextId === contextId);
+    const maxPerDay = Math.max(
+      ...eachDayOfInterval({
+        start: new Date("2026-01-01T12:00:00Z"),
+        end: new Date("2026-12-31T12:00:00Z"),
+      }).map(
+        (date) =>
+          inContext.filter((habit) => completed(habit.name, date.toISOString().slice(0, 10)))
+            .length
+      )
     );
+    expect(maxPerDay).toBeLessThanOrEqual(3);
   }
-  expect([...markerCounts].toSorted()).toEqual([0, 1, 2]);
 });
 
 test("não cria check-ins demonstrativos no futuro", () => {
@@ -435,4 +443,58 @@ test("atualiza somente o parâmetro da superfície no endereço", () => {
       "habits"
     )
   ).toBe("/?mobileUi=1&surface=habits#today");
+});
+
+test("o treino da vitrine segue as provas de triatlo do ano de exemplo", () => {
+  const demo = getOnboardingPersonalDemoSnapshot(2026);
+  const triathlon = demo.categories.find((category) => category.name === "Triatlo");
+  expect(triathlon).toBeDefined();
+  const races = demo.events
+    .filter((event) => event.categoryId === triathlon!.id)
+    .map((event) => [event.title, event.startDate, event.endDate]);
+  expect(races).toEqual([
+    ["Inscrição no Ironman", "2026-01-20", "2026-01-20"],
+    ["Triatlo sprint", "2026-04-12", "2026-04-12"],
+    ["Polimento para o 70.3", "2026-08-10", "2026-08-22"],
+    ["Ironman 70.3", "2026-08-23", "2026-08-23"],
+    ["Polimento para o Ironman", "2026-11-16", "2026-11-28"],
+    ["Ironman Florianópolis", "2026-11-29", "2026-11-29"],
+  ]);
+
+  const showcase = buildOnboardingHabitShowcase({
+    year: 2026,
+    todayIso: "2026-12-31",
+    events: demo.events,
+    categories: demo.categories,
+  });
+  const idOf = (name: string) => showcase.habits.find((habit) => habit.name === name)!.id;
+  const done = (name: string, dateIso: string) =>
+    Boolean(showcase.checkIns[getHabitCheckInKey(idOf(name), dateIso)]?.completed);
+  const inRange = (start: string, end: string) =>
+    eachDayOfInterval({
+      start: new Date(`${start}T12:00:00Z`),
+      end: new Date(`${end}T12:00:00Z`),
+    }).map((date) => date.toISOString().slice(0, 10));
+
+  // Dia de prova: nadar, pedalar e correr no mesmo dia.
+  for (const race of ["2026-04-12", "2026-08-23", "2026-11-29"]) {
+    expect(["Nadar", "Pedalar", "Correr"].every((name) => done(name, race))).toBe(true);
+    expect(done("Treino de força", race)).toBe(false);
+  }
+  // Recuperação: nada de treino nos dois dias seguintes.
+  for (const dateIso of ["2026-11-30", "2026-12-01"]) {
+    expect(
+      ["Nadar", "Pedalar", "Correr", "Treino de força"].some((name) => done(name, dateIso))
+    ).toBe(false);
+  }
+  // Polimento: sem força e dormindo cedo toda noite — menos a do "Show de
+  // fim de ano" (21/11), que cai bem no meio dele.
+  const taper = inRange("2026-11-16", "2026-11-28");
+  expect(taper.some((dateIso) => done("Treino de força", dateIso))).toBe(false);
+  expect(taper.filter((dateIso) => !done("Dormir cedo", dateIso))).toEqual(["2026-11-21"]);
+  // Antes da inscrição, só manutenção: sem piscina nem bike.
+  const preseason = inRange("2026-01-01", "2026-01-19");
+  expect(preseason.some((dateIso) => done("Nadar", dateIso) || done("Pedalar", dateIso))).toBe(
+    false
+  );
 });

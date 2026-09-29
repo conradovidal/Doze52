@@ -47,6 +47,7 @@ import {
   getHabitContexts,
   resolveHabitContextId,
   resolveSelectedHabitContextId,
+  withShowcaseContexts,
 } from "@/lib/habit-contexts";
 import { isLimitReached, type ProUpgradeReason } from "@/lib/entitlements";
 import { cn } from "@/lib/utils";
@@ -197,10 +198,22 @@ export function FilterEditPanel({
     () => getHabitContexts(storedContexts),
     [storedContexts]
   );
+  // Durante o guia, o "Triatlo" de exemplo aparece ao lado dos reais.
+  const presentedHabitContexts = React.useMemo(
+    () => withShowcaseContexts(habitContexts, habitShowcase?.contexts),
+    [habitContexts, habitShowcase]
+  );
   const selectedHabitContextId = resolveSelectedHabitContextId(
     storedSelectedContextId,
-    habitContexts
+    presentedHabitContexts
   );
+  const selectedIsShowcaseContext = Boolean(
+    habitShowcase?.contexts.some((context) => context.id === selectedHabitContextId)
+  );
+  // Hábito novo não nasce num contexto de exemplo: vai para o primeiro real.
+  const habitCreationContextId = selectedIsShowcaseContext
+    ? resolveSelectedHabitContextId(null, habitContexts)
+    : selectedHabitContextId;
 
   // Mesma regra da tela de Hábitos: o limite conta todos, a lista mostra só
   // os do contexto em edição.
@@ -225,10 +238,13 @@ export function FilterEditPanel({
   );
   const presentedHabits = React.useMemo(() => {
     if (!habitShowcase) return activeHabits;
+    const showcaseInContext = habitShowcase.habits.filter(
+      (habit) => habit.contextId === selectedHabitContextId
+    );
     return habitShowcaseLocked
-      ? habitShowcase.habits
-      : [...habitShowcase.habits, ...activeHabits];
-  }, [activeHabits, habitShowcase, habitShowcaseLocked]);
+      ? showcaseInContext
+      : [...showcaseInContext, ...activeHabits];
+  }, [activeHabits, habitShowcase, habitShowcaseLocked, selectedHabitContextId]);
 
   const [habitDialogOpen, setHabitDialogOpen] = React.useState(false);
   // Editar/criar categoria e contexto troca a tela dentro do próprio painel
@@ -312,7 +328,7 @@ export function FilterEditPanel({
     }
     setDraftName("");
     setEditingHabitId(null);
-    setDraftContextId(selectedHabitContextId);
+    setDraftContextId(habitCreationContextId);
     setDraftColor(HABIT_COLORS[activeHabits.length % HABIT_COLORS.length]);
     setHabitDialogOpen(true);
   };
@@ -346,7 +362,7 @@ export function FilterEditPanel({
     const name = draftName.trim();
     if (!name) return;
 
-    const contextId = draftContextId || selectedHabitContextId;
+    const contextId = draftContextId || habitCreationContextId;
     if (editingHabitId) {
       updateHabitInStore(editingHabitId, { name, color: draftColor, contextId });
       // Mudou de contexto: a lista acompanha o hábito até lá.
@@ -584,7 +600,7 @@ export function FilterEditPanel({
                 onArchive={editingHabitId ? archiveEditingHabit : undefined}
                 checkInCount={editingHabitCheckIns}
                 contexts={habitContexts}
-                contextId={draftContextId || selectedHabitContextId}
+                contextId={draftContextId || habitCreationContextId}
                 onContextChange={setDraftContextId}
                 onCancel={() => setHabitDialogOpen(false)}
               />
@@ -677,7 +693,7 @@ export function FilterEditPanel({
                   no contexto selecionado embaixo. */}
               <section>
                 <SortableChipEditList
-                  habits={habitContexts}
+                  habits={presentedHabitContexts}
                   selectedId={selectedHabitContextId}
                   noun={{ noun: "contexto", createLabel: "Criar novo contexto", kind: "context" }}
                   leading={(context) => (
@@ -687,9 +703,12 @@ export function FilterEditPanel({
                   creationDisabled={habitShowcaseLocked || creationUnavailable}
                   onSelectHabit={setSelectedContextId}
                   onRequestCreate={requestCreateHabitContext}
-                  onEditHabit={(contextId) =>
-                    setDetail({ kind: "habit-context", id: contextId })
-                  }
+                  // Mesma trava dos hábitos: o guia está montando a vitrine.
+                  locked={guidedOnboardingActive}
+                  onEditHabit={(contextId) => {
+                    if (habitShowcase?.contexts.some((context) => context.id === contextId)) return;
+                    setDetail({ kind: "habit-context", id: contextId });
+                  }}
                   onReorderHabits={reorderContextsInStore}
                 />
               </section>

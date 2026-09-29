@@ -83,12 +83,13 @@ test("desktop antecipa a demonstração de hábitos e reinicia o guia no ano", a
     throw new Error("Grades demonstrativas não puderam ser medidas.");
   }
   expect(Math.abs(habitsDemoFrameTop - annualDemoFrameTop)).toBeLessThanOrEqual(1);
-  // A vitrine de demonstração hoje traz só 2 hábitos (Exercício, Ler 20
-  // minutos) — ver ONBOARDING_HABIT_SHOWCASE_DEFINITIONS em
-  // lib/habits-prototype.ts.
-  for (const name of ["Exercício", "Ler 20 minutos"]) {
+  // A vitrine abre no contexto "Hábitos" (Ler 20 minutos, Dormir cedo); o
+  // "Triatlo" de exemplo fica no chip ao lado — ver
+  // ONBOARDING_HABIT_SHOWCASE_DEFINITIONS em lib/habits-prototype.ts.
+  for (const name of ["Dormir cedo", "Ler 20 minutos"]) {
     await expect(habits.getByRole("button", { name, exact: true })).toBeVisible();
   }
+  await expect(habits.locator("[data-habit-context]")).toHaveText(["Hábitos", "Triatlo"]);
   const habitDay = habits.locator("[data-day-cell]").first();
   // Mesma altura de um mês de Eventos (72px): comporta 2 hábitos por padrão
   // e só cresce a partir do 3º (ver getDesktopHabitRowMinHeight).
@@ -1070,7 +1071,7 @@ test("onboarding desktop apresenta o exemplo e termina no hábito real", async (
   );
   await expect(page.locator("[data-month-row]")).toHaveCount(12);
   // O passo isolado de vitrine travada ("habit-showcase") foi removido: a
-  // vitrine de exemplo (Exercício, Ler 20 minutos) já compõe o ano real
+  // vitrine de exemplo (Ler 20 minutos, Dormir cedo) já compõe o ano real
   // desde o primeiro instante em Hábitos, lado a lado com a criação do
   // hábito de verdade (ver commit "Refina onboarding guiado", #95).
   const habitNotice = page.locator(
@@ -1078,7 +1079,7 @@ test("onboarding desktop apresenta o exemplo e termina no hábito real", async (
   );
   await expect(habitNotice).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Exercício", exact: true })
+    page.getByRole("button", { name: "Dormir cedo", exact: true })
   ).toHaveAttribute("aria-pressed", "true");
   await expect(
     page.getByRole("button", { name: "Ler 20 minutos", exact: true })
