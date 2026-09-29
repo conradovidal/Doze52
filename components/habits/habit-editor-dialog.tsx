@@ -19,6 +19,15 @@ import {
 } from "@/components/ui/icon-action-button";
 import { Input } from "@/components/ui/input";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { HabitContextIcon } from "@/components/habits/habit-context-icon";
+import type { HabitContext } from "@/lib/types";
+import {
   CATEGORY_COLOR_BASE_BLUE,
   CATEGORY_COLOR_BASE_CORAL,
   CATEGORY_COLOR_BASE_GREEN,
@@ -36,7 +45,14 @@ export const HABIT_COLORS = [
   CATEGORY_COLOR_BASE_VIOLET,
 ] as const;
 
-type HabitEditorFieldsProps = {
+type HabitContextFieldProps = {
+  /** Com mais de um contexto, o editor mostra onde o hábito mora. */
+  contexts?: HabitContext[];
+  contextId?: string;
+  onContextChange?: (contextId: string) => void;
+};
+
+type HabitEditorFieldsProps = HabitContextFieldProps & {
   name: string;
   color: string;
   onNameChange: (name: string) => void;
@@ -67,6 +83,9 @@ export function HabitEditorFields({
   checkInCount = 0,
   onCancel,
   dialogSemantics = true,
+  contexts,
+  contextId,
+  onContextChange,
 }: HabitEditorFieldsProps) {
   const [confirmingDelete, setConfirmingDelete] = React.useState(false);
 
@@ -101,6 +120,27 @@ export function HabitEditorFields({
             onChange={(event) => onNameChange(event.target.value)}
           />
         </div>
+
+        {contexts && contexts.length > 1 && contextId && onContextChange ? (
+          <Select value={contextId} onValueChange={onContextChange}>
+            <SelectTrigger
+              aria-label="Contexto do hábito"
+              className="h-10 w-full rounded-xl border-border/80 bg-background shadow-sm"
+            >
+              <SelectValue placeholder="Contexto" />
+            </SelectTrigger>
+            <SelectContent>
+              {contexts.map((context) => (
+                <SelectItem key={context.id} value={context.id}>
+                  <span className="inline-flex items-center gap-2">
+                    <HabitContextIcon icon={context.icon} size={14} />
+                    {context.name}
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : null}
 
         {/* Mesma paleta completa da categoria: o hábito aparece no mesmo
             ano que as categorias, então as cores precisam conversar. */}
@@ -173,7 +213,10 @@ export function HabitEditorDialog({
   onDelete,
   onArchive,
   checkInCount,
-}: {
+  contexts,
+  contextId,
+  onContextChange,
+}: HabitContextFieldProps & {
   open: boolean;
   name: string;
   color: string;
@@ -200,6 +243,9 @@ export function HabitEditorDialog({
             onDelete={onDelete}
             onArchive={onArchive}
             checkInCount={checkInCount}
+            contexts={contexts}
+            contextId={contextId}
+            onContextChange={onContextChange}
             onCancel={() => onOpenChange(false)}
           />
         ) : null}

@@ -42,8 +42,35 @@ import { cn } from "@/lib/utils";
 
 type DragState = { id: string; width: number | null };
 
-function EditHabitChip({
+type EditListItem = { id: string; name: string };
+
+/** Textos que mudam entre a lista de hábitos e a de contextos. */
+type EditListNoun = {
+  noun: string;
+  createLabel: string;
+  /** Contextos não usam data-habit-edit-chip, que identifica hábitos. */
+  kind?: "habit" | "context";
+};
+
+const HABIT_NOUN: EditListNoun = { noun: "hábito", createLabel: "Criar novo hábito" };
+
+function HabitColorDot({ habit }: { habit: Habit }) {
+  const { mode: themeMode } = useTheme();
+  const colorToken = getCategoryColorToken(habit.color, themeMode);
+  return (
+    <span
+      className="size-2.5 shrink-0 rounded-full"
+      style={{ backgroundColor: colorToken.indicator }}
+      aria-hidden="true"
+    />
+  );
+}
+
+function EditHabitChip<T extends EditListItem>({
   habit,
+  noun,
+  leading,
+  selectedTone,
   selected,
   mobile,
   interactiveHandle,
@@ -57,7 +84,10 @@ function EditHabitChip({
   onSelect,
   onEdit,
 }: {
-  habit: Habit;
+  habit: T;
+  noun: EditListNoun;
+  leading: (item: T) => React.ReactNode;
+  selectedTone: "outline" | "primary";
   selected: boolean;
   mobile: boolean;
   interactiveHandle?: boolean;
@@ -71,18 +101,22 @@ function EditHabitChip({
   onSelect?: () => void;
   onEdit?: () => void;
 }) {
-  const { mode: themeMode } = useTheme();
-  const colorToken = getCategoryColorToken(habit.color, themeMode);
+  const primary = selected && selectedTone === "primary" && !isPlaceholder;
   return (
     <div
       ref={chipRef}
       style={style}
-      data-habit-edit-chip={habit.id}
+      data-habit-edit-chip={noun.kind === "context" ? undefined : habit.id}
+      data-habit-context-edit-chip={noun.kind === "context" ? habit.id : undefined}
       data-premium-sortable
       className={cn(
         "relative inline-flex h-8 shrink-0 items-center overflow-hidden rounded-[10px] border bg-card text-[0.78rem] font-semibold transition-[transform,background-color,border-color,box-shadow]",
         mobile && "h-10 max-w-full rounded-[8px]",
-        selected ? "border-foreground/30" : "border-border",
+        primary
+          ? "border-primary bg-primary text-primary-foreground"
+          : selected
+            ? "border-foreground/30"
+            : "border-border",
         isOverlay && "shadow-[0_18px_34px_-24px_rgba(15,23,42,0.36)]"
       )}
     >
@@ -92,10 +126,12 @@ function EditHabitChip({
       <button
         type="button"
         ref={setHandleRef}
-        aria-label={`Reordenar hábito ${habit.name}`}
-        title={`Reordenar hábito ${habit.name}`}
+        aria-label={`Reordenar ${noun.noun} ${habit.name}`}
+        title={`Reordenar ${noun.noun} ${habit.name}`}
         className={cn(
-          "grid h-full w-8 shrink-0 touch-none place-items-center text-muted-foreground active:cursor-grabbing focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/45",
+          "grid h-full w-8 shrink-0 touch-none place-items-center",
+          primary ? "text-primary-foreground/70" : "text-muted-foreground",
+          " active:cursor-grabbing focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/45",
           interactiveHandle && "cursor-grab",
           isPlaceholder && "invisible"
         )}
@@ -105,31 +141,29 @@ function EditHabitChip({
       </button>
       <button
         type="button"
-        aria-label={`Selecionar hábito ${habit.name}`}
+        aria-label={`Selecionar ${noun.noun} ${habit.name}`}
         className={cn(
           "flex h-full min-w-0 flex-1 items-center gap-2 px-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/45",
           isPlaceholder && "invisible"
         )}
         onClick={onSelect}
       >
-        <span
-          className="size-2.5 shrink-0 rounded-full"
-          style={{ backgroundColor: colorToken.indicator }}
-          aria-hidden="true"
-        />
+        {leading(habit)}
         <span className="min-w-0 truncate">{habit.name}</span>
       </button>
       <button
         type="button"
-        aria-label={`Editar hábito ${habit.name}`}
+        aria-label={`Editar ${noun.noun} ${habit.name}`}
         title={
           editLocked
             ? "Disponível quando o guia terminar"
-            : `Editar hábito ${habit.name}`
+            : `Editar ${noun.noun} ${habit.name}`
         }
         disabled={editLocked}
         className={cn(
-          "grid h-full w-8 shrink-0 cursor-pointer place-items-center text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/45",
+          "grid h-full w-8 shrink-0 cursor-pointer place-items-center",
+          primary ? "text-primary-foreground/70" : "text-muted-foreground",
+          " focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/45",
           isPlaceholder && "invisible",
           editLocked && "cursor-not-allowed text-muted-foreground/45"
         )}
@@ -141,8 +175,11 @@ function EditHabitChip({
   );
 }
 
-function SortableHabitChip({
+function SortableHabitChip<T extends EditListItem>({
   habit,
+  noun,
+  leading,
+  selectedTone,
   selected,
   mobile,
   dragEnabled,
@@ -150,7 +187,10 @@ function SortableHabitChip({
   onSelect,
   onEdit,
 }: {
-  habit: Habit;
+  habit: T;
+  noun: EditListNoun;
+  leading: (item: T) => React.ReactNode;
+  selectedTone: "outline" | "primary";
   selected: boolean;
   mobile: boolean;
   dragEnabled: boolean;
@@ -175,6 +215,9 @@ function SortableHabitChip({
   return (
     <EditHabitChip
       habit={habit}
+      noun={noun}
+      leading={leading}
+      selectedTone={selectedTone}
       selected={selected}
       mobile={mobile}
       interactiveHandle={dragEnabled}
@@ -197,6 +240,40 @@ function SortableHabitChip({
 export function HabitEditList({
   habits,
   selectedHabit,
+  ...props
+}: {
+  habits: Habit[];
+  selectedHabit: Habit | null;
+  mobile?: boolean;
+  creationDisabled: boolean;
+  locked?: boolean;
+  onSelectHabit: (habitId: string) => void;
+  onRequestCreate: () => void;
+  onEditHabit?: (habitId: string) => void;
+  onReorderHabits?: (orderedIds: string[]) => void;
+}) {
+  return (
+    <SortableChipEditList
+      habits={habits}
+      selectedId={selectedHabit?.id ?? null}
+      noun={HABIT_NOUN}
+      leading={(habit) => <HabitColorDot habit={habit} />}
+      selectedTone="outline"
+      {...props}
+    />
+  );
+}
+
+/**
+ * A mesma lista editável (arrastar, editar, "+") para qualquer item com nome:
+ * hábitos e, na mesma tela, os contextos de hábitos.
+ */
+export function SortableChipEditList<T extends EditListItem>({
+  habits,
+  selectedId,
+  noun,
+  leading,
+  selectedTone,
   mobile = false,
   creationDisabled,
   locked = false,
@@ -205,8 +282,11 @@ export function HabitEditList({
   onEditHabit,
   onReorderHabits,
 }: {
-  habits: Habit[];
-  selectedHabit: Habit | null;
+  habits: T[];
+  selectedId: string | null;
+  noun: EditListNoun;
+  leading: (item: T) => React.ReactNode;
+  selectedTone: "outline" | "primary";
   mobile?: boolean;
   creationDisabled: boolean;
   // Trava criação, edição e reordenação (ex.: guia de onboarding ainda
@@ -298,7 +378,10 @@ export function HabitEditList({
             <SortableHabitChip
               key={habit.id}
               habit={habit}
-              selected={selectedHabit?.id === habit.id}
+              noun={noun}
+              leading={leading}
+              selectedTone={selectedTone}
+              selected={selectedId === habit.id}
               mobile={mobile}
               dragEnabled={orderedHabits.length > 1 && !locked}
               editLocked={locked}
@@ -309,7 +392,7 @@ export function HabitEditList({
           {locked ? (
             <button
               type="button"
-              aria-label="Criar novo hábito"
+              aria-label={noun.createLabel}
               title="Disponível quando o guia terminar"
               disabled
               className={cn(
@@ -322,8 +405,8 @@ export function HabitEditList({
           ) : !creationDisabled ? (
             <button
               type="button"
-              aria-label="Criar novo hábito"
-              title="Criar novo hábito"
+              aria-label={noun.createLabel}
+              title={noun.createLabel}
               className={cn(
                 "inline-flex h-8 w-8 items-center justify-center rounded-[10px] border border-border bg-card",
                 mobile && "h-10 w-10 rounded-[8px]"
@@ -344,7 +427,10 @@ export function HabitEditList({
             >
               <EditHabitChip
                 habit={activeHabit}
-                selected={selectedHabit?.id === activeHabit.id}
+                noun={noun}
+                leading={leading}
+                selectedTone={selectedTone}
+                selected={selectedId === activeHabit.id}
                 mobile={mobile}
                 isOverlay
                 style={{ width: activeDrag?.width ?? undefined }}

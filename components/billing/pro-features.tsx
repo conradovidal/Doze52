@@ -29,15 +29,24 @@ export type ProFeature = {
   color: string;
   /** Motivo que destaca este benefício (o que a pessoa acabou de tentar). */
   reason: ProUpgradeReason;
+  /** Outros motivos que também destacam (ex.: contexto de hábitos). */
+  alsoFor?: readonly ProUpgradeReason[];
 };
+
+export const isProFeatureForReason = (
+  feature: Pick<ProFeature, "reason" | "alsoFor">,
+  reason: ProUpgradeReason | undefined
+) =>
+  reason !== undefined &&
+  (feature.reason === reason || Boolean(feature.alsoFor?.includes(reason)));
 
 // Mesma técnica visual da capa do onboarding: uma pilha de ícones nas cores
 // das categorias deixa o valor legível antes de qualquer texto.
 export const PRO_FEATURES: readonly ProFeature[] = [
-  { id: "profiles", label: "Contextos ilimitados", shortLabel: "Contextos", free: `${PLAN_LIMITS.free.maxProfiles}`, pro: "Ilimitados", Icon: Layers, color: CATEGORY_COLOR_BASE_INDIGO, reason: "profiles" },
+  { id: "profiles", label: "Contextos ilimitados", shortLabel: "Contextos", free: `${PLAN_LIMITS.free.maxProfiles}`, pro: "Ilimitados", Icon: Layers, color: CATEGORY_COLOR_BASE_INDIGO, reason: "profiles", alsoFor: ["habit-contexts"] },
   { id: "categories", label: "Categorias ilimitadas", shortLabel: "Categorias", free: `${PLAN_LIMITS.free.maxCategories}`, pro: "Ilimitadas", Icon: Tags, color: CATEGORY_COLOR_BASE_CORAL, reason: "categories" },
   { id: "calendars", label: "Calendários prontos ilimitados", shortLabel: "Calendários prontos", free: `${PLAN_LIMITS.free.maxCalendarSubscriptions}`, pro: "Ilimitados", Icon: CalendarDays, color: CATEGORY_COLOR_BASE_TEAL, reason: "calendar-subscriptions" },
-  { id: "habits", label: `Até ${PLAN_LIMITS.pro.maxHabits} hábitos`, shortLabel: "Hábitos", free: `${PLAN_LIMITS.free.maxHabits}`, pro: `${PLAN_LIMITS.pro.maxHabits}`, Icon: Repeat, color: CATEGORY_COLOR_BASE_VIOLET, reason: "habits" },
+  { id: "habits", label: "Hábitos ilimitados", shortLabel: "Hábitos", free: `${PLAN_LIMITS.free.maxHabits}`, pro: "Ilimitados", Icon: Repeat, color: CATEGORY_COLOR_BASE_VIOLET, reason: "habits" },
   { id: "spreadsheet", label: "Importar e exportar planilhas", shortLabel: "Importar e exportar planilhas", free: "—", pro: "Incluído", Icon: FileSpreadsheet, color: CATEGORY_COLOR_BASE_AMBER, reason: "calendar-import-export" },
 ];
 
@@ -77,9 +86,10 @@ export function ProFeatureStack({
   const small = size === "sm";
   return (
     <div className={cn("flex", small ? "-space-x-1.5" : "-space-x-2.5", className)}>
-      {PRO_FEATURES.map(({ id, Icon, color, reason: featureReason }, index) => {
+      {PRO_FEATURES.map((feature, index) => {
+        const { id, Icon, color } = feature;
         const token = getCategoryColorToken(color);
-        const featured = featureReason === reason;
+        const featured = isProFeatureForReason(feature, reason);
         return (
           <span
             key={id}

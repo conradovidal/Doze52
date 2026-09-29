@@ -19,7 +19,10 @@ import type {
   HabitCheckIn,
 } from "@/lib/types";
 
-export const HABITS_DESKTOP_MAX = 4;
+// Quantas marcações cabem empilhadas num dia do Anual de hábitos. Acima
+// disso o dia mostra HABIT_DAY_MARKER_SLOTS - 1 bolinhas e um "+N" no último
+// espaço (ver getHabitDayMarkers) — a altura do mês nunca passa de 4.
+export const HABIT_DAY_MARKER_SLOTS = 4;
 
 export type OnboardingHabitShowcase = {
   habits: Habit[];
@@ -212,7 +215,16 @@ export const orderActiveHabits = (habits: Habit[]) =>
     );
 
 export const getDesktopVisibleHabits = (habits: Habit[]) =>
-  orderActiveHabits(habits).slice(0, HABITS_DESKTOP_MAX);
+  orderActiveHabits(habits);
+
+/** Bolinhas de um dia: todas até caber; senão as primeiras e quantas sobraram. */
+export const getHabitDayMarkers = <T>(completed: T[]) =>
+  completed.length <= HABIT_DAY_MARKER_SLOTS
+    ? { visible: completed, overflow: 0 }
+    : {
+        visible: completed.slice(0, HABIT_DAY_MARKER_SLOTS - 1),
+        overflow: completed.length - (HABIT_DAY_MARKER_SLOTS - 1),
+      };
 
 export const moveActiveHabit = (
   habits: Habit[],
@@ -324,7 +336,7 @@ const HABIT_ROWS_BEFORE_GROWTH = 2;
 export const getDesktopHabitRowMinHeight = (visibleHabitCount: number) => {
   const count = Math.max(
     HABIT_ROWS_BEFORE_GROWTH,
-    Math.min(4, visibleHabitCount)
+    Math.min(HABIT_DAY_MARKER_SLOTS, visibleHabitCount)
   );
   const stackHeightPx =
     count * HABIT_DOT_MAX_PX + (count - 1) * HABIT_DOT_GAP_PX;

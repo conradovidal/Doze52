@@ -48,18 +48,21 @@ export function HabitDayPicker({
       const gap = 8;
       const anchorRect = anchor.getBoundingClientRect();
       const pickerRect = picker.getBoundingClientRect();
-      const canUseRight =
-        anchorRect.right + gap + pickerRect.width + edge <= window.innerWidth;
-      const preferredLeft = canUseRight
-        ? anchorRect.right + gap
-        : anchorRect.left - pickerRect.width - gap;
+      // Abre embaixo do dia, centralizado: no Anual os dias seguem na
+      // horizontal, então abrir ao lado tapava justamente o próximo dia a
+      // marcar. Embaixo cobre só o mês seguinte; sem espaço, abre em cima.
+      const fitsBelow =
+        anchorRect.bottom + gap + pickerRect.height + edge <= window.innerHeight;
+      const preferredTop = fitsBelow
+        ? anchorRect.bottom + gap
+        : anchorRect.top - pickerRect.height - gap;
       setPosition({
         left: Math.min(
-          Math.max(edge, preferredLeft),
+          Math.max(edge, anchorRect.left + (anchorRect.width - pickerRect.width) / 2),
           window.innerWidth - pickerRect.width - edge
         ),
         top: Math.min(
-          Math.max(edge, anchorRect.top + (anchorRect.height - pickerRect.height) / 2),
+          Math.max(edge, preferredTop),
           window.innerHeight - pickerRect.height - edge
         ),
       });
@@ -104,7 +107,9 @@ export function HabitDayPicker({
       role="dialog"
       aria-label={`Registrar hábitos em ${dateIso}`}
       data-habit-day-picker
-      className={`fixed z-[95] flex items-center gap-1.5 rounded-xl border border-border bg-card p-2 shadow-[0_18px_44px_-20px_rgba(15,23,42,0.7)] ${
+      // Com muitos hábitos o seletor quebra em linhas de até 6 bolinhas em
+      // vez de crescer para fora da tela.
+      className={`fixed z-[95] flex max-w-[calc(6*2rem+5*0.375rem+1rem+2px)] flex-wrap items-center gap-1.5 rounded-xl border border-border bg-card p-2 shadow-[0_18px_44px_-20px_rgba(15,23,42,0.7)] ${
         position ? "opacity-100" : "opacity-0"
       }`}
       style={position}

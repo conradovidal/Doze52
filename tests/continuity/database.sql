@@ -35,6 +35,24 @@ begin
   assert jsonb_array_length(public.pull_continuity_changes((a->2->>'change_seq')::bigint))=1, 'incremental deletion';
   b := public.apply_continuity_operation(op || '{"operationId":"b9520000-0000-4000-8000-000000000012","baseRevision":2,"restore":true}'::jsonb);
   assert b->>'status'='applied' and b->'record'->>'deleted_at' is null, 'explicit restore';
+  -- Habit contexts: a free account can create them (the plan gate lives in the app).
+  b := public.apply_continuity_operation('{"operationId":"b9520000-0000-4000-8000-000000000020","kind":"habit_context","entityId":"00000000-0000-4000-8000-000000000001","baseRevision":0,"payload":{"id":"00000000-0000-4000-8000-000000000001","name":"Hábitos","icon":"circle-check","position":0}}');
+  assert b->>'status'='applied', 'default habit context';
+  b := public.apply_continuity_operation('{"operationId":"b9520000-0000-4000-8000-000000000021","kind":"habit_context","entityId":"d9520000-0000-4000-8000-000000000001","baseRevision":0,"payload":{"id":"d9520000-0000-4000-8000-000000000001","name":"Saúde","icon":"heart","position":1}}');
+  assert b->>'status'='applied', 'second habit context';
+  b := public.apply_continuity_operation(op || '{"operationId":"b9520000-0000-4000-8000-000000000022","baseRevision":3}'::jsonb
+    || jsonb_build_object('payload', (op->'payload') || '{"contextId":"d9520000-0000-4000-8000-000000000001"}'::jsonb));
+  assert b->>'status'='applied' and b->'record'->'payload'->>'contextId'='d9520000-0000-4000-8000-000000000001', 'habit moves context';
+  begin
+    perform public.apply_continuity_operation(op || '{"operationId":"b9520000-0000-4000-8000-000000000023","baseRevision":4}'::jsonb
+      || jsonb_build_object('payload', (op->'payload') || '{"contextId":"not-a-context"}'::jsonb));
+    raise exception 'invalid context id accepted';
+  exception when invalid_parameter_value then null; end;
+  begin
+    perform public.apply_continuity_operation('{"operationId":"b9520000-0000-4000-8000-000000000024","kind":"habit_context","entityId":"d9520000-0000-4000-8000-000000000002","baseRevision":0,"payload":{"id":"d9520000-0000-4000-8000-000000000002","name":" ","icon":"heart","position":2}}');
+    raise exception 'blank habit context accepted';
+  exception when invalid_parameter_value then null; end;
+  assert public.continuity_habit_limit()=1, 'free habit limit';
   begin
     delete from public.continuity_records;
     raise exception 'direct write accepted';
