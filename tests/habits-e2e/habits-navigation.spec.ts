@@ -45,10 +45,9 @@ const expectLogoPosition = async (
   expect(Math.round(logoBox.x)).toBe(12);
 };
 
-test("desktop antecipa a demonstração de hábitos e reinicia o guia no ano", async ({
+test("desktop antecipa a demonstração de hábitos e reinicia o guia no ano", { tag: "@desktop" }, async ({
   page,
-}, testInfo) => {
-  test.skip(!testInfo.project.name.startsWith("desktop-"), "Cenário desktop");
+}) => {
 
   await page.addInitScript(() => {
     window.localStorage.setItem(
@@ -116,10 +115,9 @@ test("desktop antecipa a demonstração de hábitos e reinicia o guia no ano", a
   await expect(page.locator("[data-month-row]")).toHaveCount(12);
 });
 
-test("mobile volta na última tela e preserva a sessão entre superfícies", async ({
+test("mobile volta na última tela e preserva a sessão entre superfícies", { tag: "@mobile" }, async ({
   page,
-}, testInfo) => {
-  test.skip(!testInfo.project.name.startsWith("mobile-"), "Cenário mobile");
+}) => {
 
   await installCompletedOnboarding(page);
   // Quem já passou pelo onboarding não é empurrado para Hábitos: sem tela
@@ -232,10 +230,9 @@ test("mobile volta na última tela e preserva a sessão entre superfícies", asy
   ).toBeVisible();
 });
 
-test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
+test("desktop usa grade anual de hábitos e modal com retorno de foco", { tag: "@desktop" }, async ({
   page,
-}, testInfo) => {
-  test.skip(!testInfo.project.name.startsWith("desktop-"), "Cenário desktop");
+}) => {
 
   await installCompletedOnboarding(page);
   await page.addInitScript(() => {
@@ -771,10 +768,9 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
   await expect(panel.getByRole("button", { name: "Entrar", exact: true })).toBeVisible();
 });
 
-test("desktop restaura filtros de hábitos persistidos na sessão", async ({
+test("desktop restaura filtros de hábitos persistidos na sessão", { tag: "@desktop" }, async ({
   page,
-}, testInfo) => {
-  test.skip(!testInfo.project.name.startsWith("desktop-"), "Cenário desktop");
+}) => {
   await installCompletedOnboarding(page);
   await page.addInitScript(() => {
     if (window.sessionStorage.getItem("doze52:habits-filter-seeded")) return;
@@ -817,10 +813,9 @@ test("desktop restaura filtros de hábitos persistidos na sessão", async ({
   );
 });
 
-test("desktop mantém a grade anual disponível antes do primeiro hábito", async ({
+test("desktop mantém a grade anual disponível antes do primeiro hábito", { tag: "@desktop" }, async ({
   page,
-}, testInfo) => {
-  test.skip(!testInfo.project.name.startsWith("desktop-"), "Cenário desktop");
+}) => {
 
   await installCompletedOnboarding(page);
   await page.goto("/?surface=habits");
@@ -848,10 +843,9 @@ test("desktop mantém a grade anual disponível antes do primeiro hábito", asyn
   await expect(habits.locator('[data-day-cell][aria-disabled="true"]').first()).toBeVisible();
 });
 
-test("desktop edita e reordena hábitos nos controles contextuais", async ({
+test("desktop edita e reordena hábitos nos controles contextuais", { tag: "@desktop" }, async ({
   page,
-}, testInfo) => {
-  test.skip(!testInfo.project.name.startsWith("desktop-"), "Cenário desktop");
+}) => {
 
   await installCompletedOnboarding(page);
   await page.addInitScript(() => {
@@ -935,10 +929,9 @@ test("desktop edita e reordena hábitos nos controles contextuais", async ({
   await expect(page.locator('[data-habit-controls-layout="desktop"]')).toContainText("Corrida");
 });
 
-test("mobile reordena hábitos pelo mesmo DnD e persiste a posição", async ({
+test("mobile reordena hábitos pelo mesmo DnD e persiste a posição", { tag: "@mobile" }, async ({
   page,
-}, testInfo) => {
-  test.skip(!testInfo.project.name.startsWith("mobile-"), "Cenário mobile");
+}) => {
 
   await installCompletedOnboarding(page);
   await page.addInitScript(() => {
@@ -1012,10 +1005,9 @@ test("mobile reordena hábitos pelo mesmo DnD e persiste a posição", async ({
   ).toBeVisible();
 });
 
-test("onboarding desktop apresenta o exemplo e termina no hábito real", async ({
+test("onboarding desktop apresenta o exemplo e termina no hábito real", { tag: "@desktop" }, async ({
   page,
-}, testInfo) => {
-  test.skip(!testInfo.project.name.startsWith("desktop-"), "Cenário desktop");
+}) => {
 
   await page.addInitScript(() => {
     window.localStorage.setItem(
@@ -1170,10 +1162,9 @@ test("onboarding desktop apresenta o exemplo e termina no hábito real", async (
   ).toMatchObject({ step: "completed", habitCount: 1, checkInCount: 1 });
 });
 
-test("sessão antiga em passos que saíram do guia segue direto para Hábitos", async ({
+test("sessão antiga em passos que saíram do guia segue direto para Hábitos", { tag: "@desktop" }, async ({
   page,
-}, testInfo) => {
-  test.skip(!testInfo.project.name.startsWith("desktop-"), "Cenário desktop");
+}) => {
   // "Editar categoria" e "calendário pronto" deixaram de pausar o guia (o
   // calendário virou sugestão no resumo final). Uma sessão salva nesses
   // passos não pode ficar presa: o guia passa direto por eles.
@@ -1210,10 +1201,9 @@ test("sessão antiga em passos que saíram do guia segue direto para Hábitos", 
   ).toBe("habit_surface_instruction");
 });
 
-test("demonstração não apaga um hábito real já existente", async ({
+test("demonstração não apaga um hábito real já existente", { tag: "@desktop" }, async ({
   page,
-}, testInfo) => {
-  test.skip(!testInfo.project.name.startsWith("desktop-"), "Cenário desktop");
+}) => {
   await page.addInitScript(() => {
     const timestamp = new Date().toISOString();
     window.localStorage.setItem(
@@ -1273,8 +1263,7 @@ test("demonstração não apaga um hábito real já existente", async ({
   ).toEqual(["real-habit"]);
 });
 
-test("sessão v13 em Perfil é tratada como concluída", async ({ page }, testInfo) => {
-  test.skip(!testInfo.project.name.startsWith("desktop-"), "Cenário desktop");
+test("sessão v13 em Perfil é tratada como concluída", { tag: "@desktop" }, async ({ page }) => {
 
   await page.addInitScript(() => {
     window.localStorage.setItem(

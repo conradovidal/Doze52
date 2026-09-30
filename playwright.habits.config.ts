@@ -2,6 +2,9 @@ import { defineConfig, devices } from "@playwright/test";
 
 const mobileProjects = [320, 390, 430].map((width) => ({
   name: `mobile-${width}`,
+  // Cada cenário roda só no formato para o qual foi escrito (@desktop /
+  // @mobile no teste), em vez de ser pulado no outro.
+  grepInvert: /@desktop/,
   use: {
     ...devices["Desktop Chrome"],
     viewport: { width, height: 844 },
@@ -13,6 +16,7 @@ const mobileProjects = [320, 390, 430].map((width) => ({
 
 const desktopProjects = [768, 1024, 1440].map((width) => ({
   name: `desktop-${width}`,
+  grepInvert: /@mobile/,
   use: {
     ...devices["Desktop Chrome"],
     viewport: { width, height: 900 },
