@@ -428,18 +428,18 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
     defaultTeamCard.getByRole("button", { name: "Adicionar", exact: true })
   ).toBeVisible();
   await calendarGallery.getByRole("button", { name: "Voltar para as opções de categoria" }).click();
-  await expect(categoryChoice).toBeVisible();
-  // Escape fecha só o diálogo "Adicionar categoria", devolvendo ao painel
-  // Organizar (ainda modal — o botão do cabeçalho fica inacessível
-  // enquanto ele estiver aberto); um segundo Escape finaliza a organização.
-  await page.keyboard.press("Escape");
+  // O calendário pronto vem direto do painel Organizar (a escolha é uma
+  // tela dele): voltar devolve ao painel, que segue modal. Um Escape o fecha
+  // e finaliza a organização.
   const organizePanel = page.getByRole("dialog", { name: "Editar", exact: true });
   await expect(organizePanel).toBeVisible();
-  // A criação de categoria é uma tela dentro do próprio painel: espera a
-  // troca de tela assentar antes do segundo Escape (que fecha o painel).
-  await expect(page.getByRole("button", { name: /Criar minha categoria/ })).toHaveCount(0);
-  await page.keyboard.press("Escape");
-  await expect(organizePanel).toBeHidden();
+  await expect(calendarGallery).toHaveCount(0);
+  // O foco volta ao painel depois da troca de tela: repete o Escape até ele
+  // fechar, em vez de apostar no primeiro (em 768px chegava cedo demais).
+  await expect(async () => {
+    await page.keyboard.press("Escape");
+    await expect(organizePanel).toBeHidden({ timeout: 1500 });
+  }).toPass({ timeout: 10_000 });
   // Layout adaptivo usa aria-expanded no botão + colapso via CSS
   // (grid-cols-[0fr]/opacity-0), não mais aria-hidden na região em si.
   const categoryRegion = page.locator("#app-header-categories-inline");

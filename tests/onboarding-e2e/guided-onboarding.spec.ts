@@ -9,7 +9,11 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-const clickBehindGuidedPanel = async (page: Page, target: Locator) => {
+const clickBehindGuidedPanel = async (
+  page: Page,
+  target: Locator,
+  options?: Parameters<Locator["click"]>[0]
+) => {
   const panel = page.locator("[data-onboarding-panel]");
   await panel.evaluateAll((nodes) => {
     nodes.forEach((node) => {
@@ -17,7 +21,7 @@ const clickBehindGuidedPanel = async (page: Page, target: Locator) => {
     });
   });
   try {
-    await target.click();
+    await target.click(options);
   } finally {
     await panel.evaluateAll((nodes) => {
       nodes.forEach((node) => {
@@ -40,9 +44,14 @@ const selectGuidedDate = async (
       .click({ force: true });
     return;
   }
+  // O ano de exemplo tem faixas longas de fase ("Base para o sprint",
+  // "Construção") no meio da célula: clica no rodapé, abaixo das cápsulas.
+  const cell = page.locator(`[data-day-cell][data-day-iso="${dateIso}"]`);
+  const box = await cell.boundingBox();
   await clickBehindGuidedPanel(
     page,
-    page.locator(`[data-day-cell][data-day-iso="${dateIso}"]`)
+    cell,
+    box ? { position: { x: box.width / 2, y: box.height - 4 } } : undefined
   );
 };
 
@@ -161,7 +170,7 @@ const completePersonalOnboarding = async (
     page.locator("[data-guided-calendar-notice]")
   ).toContainText(/outra pessoa especial/i);
 
-  await selectGuidedDate(page, mobile, "2026-09-12");
+  await selectGuidedDate(page, mobile, "2026-09-02");
   await expect(eventDialog).toBeVisible();
   await eventDialog.getByLabel("Título do evento").fill("Aniversário do pai");
   await eventDialog.getByRole("button", { name: "Salvar", exact: true }).click();
@@ -273,8 +282,8 @@ test("monta contexto Pessoal de forma incremental", async ({ page }, testInfo) =
     "context_selection"
   );
   await expect(panel.getByRole("button", { name: /Outro/ })).toHaveCount(0);
-  await expect(page.locator("[data-onboarding-profile-id]")).toHaveCount(2);
-  await expect(page.locator("[data-onboarding-category-id]")).toHaveCount(5);
+  await expect(page.locator("[data-onboarding-profile-id]")).toHaveCount(3);
+  await expect(page.locator("[data-onboarding-category-id]")).toHaveCount(4);
   await expect(page.locator("[data-onboarding-connector]")).toHaveCount(0);
   await expect(panel).toContainText(
     "Escolha um contexto para começar."
@@ -1299,10 +1308,12 @@ test("o X libera o ano de exemplo e a decisão persiste após recarregar", async
   expect(stored.profiles?.map((profile) => profile.name)).toEqual([
     "Pessoal",
     "Profissional",
+    "Triatlo",
   ]);
-  // 5 categorias no Pessoal (com Triatlo) e 4 no Profissional, sem Feriados/F1 nem
-  // Aniversários/Entregas (de fora do ano de exemplo desde #95).
-  expect(stored.categories).toHaveLength(9);
+  // 4 categorias em cada contexto (Pessoal, Profissional e o Triatlo, que só
+  // existe no exemplo), sem Feriados/F1 nem Aniversários/Entregas (de fora
+  // do ano de exemplo desde #95).
+  expect(stored.categories).toHaveLength(12);
   expect(stored.events?.length).toBeGreaterThan(150);
   await expect(page.locator("[data-demo-mode-badge]")).toContainText(
     "Ano de exemplo"
@@ -1341,8 +1352,8 @@ test("saída após criar contexto preserva o ano e convida após três criaçõe
   await page.reload();
   await expect(panel).toBeHidden();
   await expect(page.getByRole("button", { name: "Pessoal", exact: true })).toBeVisible();
-  // O contexto Pessoal já chega com 5 categorias de demonstração (#95, +Triatlo).
-  await expect(page.locator("[data-onboarding-category-id]")).toHaveCount(5);
+  // O contexto Pessoal já chega com 4 categorias de demonstração (#95).
+  await expect(page.locator("[data-onboarding-category-id]")).toHaveCount(4);
   const persistedStep = await page.evaluate(() =>
     JSON.parse(localStorage.getItem("doze52:onboarding:v2") ?? "null")
   );
@@ -1486,8 +1497,8 @@ test("sandbox convida após cinco alvos e retoma o onboarding limpo", async ({
   await expect(
     page.getByRole("region", { name: "Guia inicial do Doze 52" })
   ).toHaveAttribute("data-guided-onboarding-step", "context_selection");
-  await expect(page.locator("[data-onboarding-profile-id]")).toHaveCount(2);
-  await expect(page.locator("[data-onboarding-category-id]")).toHaveCount(5);
+  await expect(page.locator("[data-onboarding-profile-id]")).toHaveCount(3);
+  await expect(page.locator("[data-onboarding-category-id]")).toHaveCount(4);
 });
 
 test("centraliza cards e mantém a instrução visível no cabeçalho fixo", async ({
@@ -1510,21 +1521,27 @@ test("centraliza cards e mantém a instrução visível no cabeçalho fixo", asy
     )
   ).toBe(true);
   if (!mobile) {
-    const panelBox = await panel.boundingBox();
     const viewport = page.viewportSize();
-    if (!panelBox || !viewport) throw new Error("Card inicial não renderizado");
+    if (!viewport) throw new Error("Viewport indisponível");
+    const panelBox = await panel.boundingBox();
+    if (!panelBox) throw new Error("Card inicial não renderizado");
     expect(
       Math.abs(panelBox.x + panelBox.width / 2 - viewport.width / 2)
     ).toBeLessThan(3);
     // Na vertical o card centraliza na parte visível da grade (não na
     // janela), para não cobrir o cabeçalho — ver guided-onboarding-panel.
-    const gridBox = await page.locator("[data-year-grid-frame]").first().boundingBox();
-    if (!gridBox) throw new Error("Grade não renderizada");
-    const visibleTop = Math.max(12, gridBox.y);
-    const visibleBottom = Math.min(viewport.height - 12, gridBox.y + gridBox.height);
-    expect(
-      Math.abs(panelBox.y + panelBox.height / 2 - (visibleTop + visibleBottom) / 2)
-    ).toBeLessThan(3);
+    // A grade ainda assenta (faixa de categorias, meses do ano de exemplo)
+    // logo depois da carga, então espera o centro estabilizar.
+    await expect
+      .poll(async () => {
+        const box = await panel.boundingBox();
+        const gridBox = await page.locator("[data-year-grid-frame]").first().boundingBox();
+        if (!box || !gridBox) return Number.POSITIVE_INFINITY;
+        const visibleTop = Math.max(12, gridBox.y);
+        const visibleBottom = Math.min(viewport.height - 12, gridBox.y + gridBox.height);
+        return Math.abs(box.y + box.height / 2 - (visibleTop + visibleBottom) / 2);
+      })
+      .toBeLessThan(3);
   }
 
   await panel.getByRole("button", { name: /Pessoal/ }).click();
@@ -1541,13 +1558,12 @@ test("centraliza cards e mantém a instrução visível no cabeçalho fixo", asy
   ]);
   // O guia compõe sobre o ano de exemplo em vez de partir de zero (ver
   // commit "Refina onboarding guiado: seed composto..." #95) — o contexto
-  // Pessoal já chega com 5 categorias (com Triatlo) e eventos de demonstração.
+  // Pessoal já chega com 4 categorias e eventos de demonstração.
   expect(cleanSnapshot.categories?.map((category) => category.name)).toEqual([
     "Geral",
     "Família",
     "Amigos",
     "Viagens",
-    "Triatlo",
   ]);
   expect(cleanSnapshot.events?.length).toBeGreaterThan(0);
   await panel.getByRole("button", { name: /Aniversários/ }).click();
