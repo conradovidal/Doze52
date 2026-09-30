@@ -9,7 +9,7 @@ import {
   PencilLine,
   Plus,
 } from "lucide-react";
-import { BrandLogo } from "@/components/brand-logo";
+import { BrandLogoWithUpdate } from "@/components/brand-logo-with-update";
 import {
   GuidedCalendarNotice,
   type GuidedSelectionNotice,
@@ -743,7 +743,7 @@ export function AppHeader({
               "flex items-center gap-2.5"
             )}
           >
-            <BrandLogo />
+            <BrandLogoWithUpdate />
             {showDemoYearBadge && !isMobileMode ? (
               <span
                 data-demo-mode-badge

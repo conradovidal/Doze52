@@ -14,6 +14,8 @@ type FeedbackTone = "success" | "error" | "info" | "loading";
 
 type FeedbackInput = {
   title: string;
+  /** Identifica um aviso que se atualiza no lugar (ex.: "sync"): um novo aviso com a mesma chave substitui o anterior. */
+  key?: string;
   description?: string;
   tone?: FeedbackTone;
   durationMs?: number;
@@ -28,13 +30,17 @@ type FeedbackToast = FeedbackInput & {
 
 type FeedbackContextValue = {
   notify: (input: FeedbackInput) => string;
-  dismiss: (id: string) => void;
+  /** Fecha um aviso pelo id devolvido por `notify` ou pela `key` dele. */
+  dismiss: (idOrKey: string) => void;
 };
 
-const FEEDBACK_DURATION_MS: Record<Exclude<FeedbackTone, "loading">, number> = {
+// Erro e carregando não somem sozinhos: o erro fica até a pessoa fechar no X,
+// o carregando até ser substituído pelo resultado.
+const FEEDBACK_DURATION_MS: Record<FeedbackTone, number> = {
   success: 2200,
   info: 2800,
-  error: 4200,
+  error: 0,
+  loading: 0,
 };
 
 const FeedbackContext = React.createContext<FeedbackContextValue | null>(null);
@@ -70,11 +76,11 @@ export function FeedbackProvider({ children }: { children: React.ReactNode }) {
       window.clearTimeout(timer);
       timersRef.current.delete(id);
     }
-    setToasts((current) => current.filter((toast) => toast.id !== id));
+    setToasts((current) => current.filter((toast) => toast.id !== id && toast.key !== id));
   }, []);
 
   const notify = React.useCallback(
-    ({ title, description, tone = "info", durationMs, action }: FeedbackInput) => {
+    ({ title, key, description, tone = "info", durationMs, action }: FeedbackInput) => {
       const id =
         typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
           ? crypto.randomUUID()
@@ -82,20 +88,22 @@ export function FeedbackProvider({ children }: { children: React.ReactNode }) {
       const nextToast: FeedbackToast = {
         id,
         title,
+        key,
         description,
         tone,
         durationMs,
         action,
       };
 
-      setToasts((current) => [...current.filter((toast) => toast.title !== title), nextToast].slice(-4));
+      setToasts((current) =>
+        [
+          ...current.filter((toast) => (key ? toast.key !== key : toast.title !== title)),
+          nextToast,
+        ].slice(-4)
+      );
 
       const resolvedDuration =
-        typeof durationMs === "number"
-          ? durationMs
-          : tone === "loading"
-            ? 0
-            : FEEDBACK_DURATION_MS[tone];
+        typeof durationMs === "number" ? durationMs : FEEDBACK_DURATION_MS[tone];
 
       if (resolvedDuration > 0) {
         const timer = window.setTimeout(() => {
@@ -128,7 +136,13 @@ export function FeedbackProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const visibleToasts = isMobile ? toasts.slice(-1) : toasts;
+  // Erro pesa mais que o resto: no celular, onde só cabe um aviso, ele não é
+  // escondido por um aviso mais novo.
+  const visibleToasts = isMobile
+    ? toasts.some((toast) => toast.tone === "error")
+      ? toasts.filter((toast) => toast.tone === "error").slice(-1)
+      : toasts.slice(-1)
+    : toasts;
 
   return (
     <FeedbackContext.Provider value={{ notify, dismiss }}>
@@ -136,15 +150,15 @@ export function FeedbackProvider({ children }: { children: React.ReactNode }) {
       <div
         aria-live="polite"
         aria-atomic="true"
-        className="pointer-events-none fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] z-[90] flex justify-center px-3 sm:bottom-4 sm:justify-end sm:px-6"
+        className="pointer-events-none fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] z-[90] flex justify-center px-3 sm:bottom-4 sm:px-6"
       >
-        <div className="flex w-full max-w-[20rem] flex-col gap-2 sm:w-[22rem] sm:max-w-none">
+        <div className="flex w-full max-w-[20rem] flex-col gap-2 sm:w-[24rem] sm:max-w-none">
           {visibleToasts.map((toast) => {
             const Icon = getToastIcon(toast.tone);
             return (
               <div
                 key={toast.id}
-                role="status"
+                role={toast.tone === "error" ? "alert" : "status"}
                 className={cn(
                   "pointer-events-auto flex items-start gap-2.5 rounded-[1.15rem] border px-3 py-2.5 shadow-[0_20px_45px_-30px_rgba(15,23,42,0.3)] backdrop-blur data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:gap-3 sm:rounded-2xl sm:px-3.5 sm:py-3",
                   getToastClasses(toast.tone)
@@ -175,7 +189,7 @@ export function FeedbackProvider({ children }: { children: React.ReactNode }) {
                       toast.action?.onClick();
                       dismiss(toast.id);
                     }}
-                    className="shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold underline-offset-2 transition-colors hover:bg-black/5 hover:underline dark:hover:bg-white/8"
+                    className="shrink-0 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold underline-offset-2 transition-colors hover:bg-black/5 hover:underline dark:hover:bg-white/8"
                   >
                     {toast.action.label}
                   </button>
