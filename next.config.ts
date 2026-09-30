@@ -2,6 +2,12 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   env: {
+    // Identifica o build que o navegador está rodando; /api/version devolve o
+    // do deploy atual para a app avisar quando há versão nova.
+    NEXT_PUBLIC_APP_BUILD_ID:
+      process.env.VERCEL_GIT_COMMIT_SHA ??
+      process.env.VERCEL_DEPLOYMENT_ID ??
+      "local",
     NEXT_PUBLIC_VERCEL_ENV:
       process.env.VERCEL_ENV ??
       (process.env.NODE_ENV === "development" ? "development" : "production"),

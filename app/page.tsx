@@ -19,10 +19,6 @@ import {
   type UtilityPanelSection,
 } from "@/components/navigation/adaptive-navigation";
 import { AppUtilityPanel } from "@/components/navigation/app-utility-panel";
-import {
-  SyncStatusOverlay,
-  type SyncOverlayStatus,
-} from "@/components/sync-status-overlay";
 import { AuthDialog } from "@/components/auth/auth-dialog";
 import { GlobalProUpgradeDialog } from "@/components/billing/pro-upgrade-dialog";
 import {
@@ -166,6 +162,7 @@ type RawSyncState =
       onRetry: () => void;
     };
 
+const SYNC_NOTICE_KEY = "sync";
 const PENDING_SYNC_STORAGE_PREFIX = "pending-sync:";
 
 const DESKTOP_VISIT_CONFIRMED_STORAGE_KEY = "doze52:desktop-visit-confirmed";
@@ -394,7 +391,7 @@ const mergeSnapshots = (
 
 export default function HomePage() {
   const { calendarPacks } = useCalendarCatalog();
-  const { notify } = useFeedback();
+  const { notify, dismiss } = useFeedback();
 
   const initialYear = React.useMemo(() => {
     const currentYear = new Date().getFullYear();
@@ -464,12 +461,6 @@ export default function HomePage() {
   const [isSyncing, setIsSyncing] = React.useState(false);
   const [isBootstrappingSync, setIsBootstrappingSync] = React.useState(false);
   const [hasQueuedSave, setHasQueuedSave] = React.useState(false);
-  const [syncOverlayStatus, setSyncOverlayStatus] =
-    React.useState<SyncOverlayStatus | null>(null);
-  const [isSyncOverlayVisible, setIsSyncOverlayVisible] =
-    React.useState(false);
-  const [isSyncOverlayErrorOpen, setIsSyncOverlayErrorOpen] =
-    React.useState(false);
   const [remoteReady, setRemoteReady] = React.useState(false);
   const [syncBlocked, setSyncBlocked] = React.useState(false);
   const [calendarCreateOnboarding, setCalendarCreateOnboarding] =
@@ -608,12 +599,9 @@ export default function HomePage() {
   const isSavingRef = React.useRef(false);
   const lastRemotePullAtRef = React.useRef(0);
   const saveTimerRef = React.useRef<number | null>(null);
-  const syncOverlayTimerRef = React.useRef<number | null>(null);
   const previousSessionUserIdRef = React.useRef<string | null>(null);
   const anonymousReconciliationHashRef = React.useRef("");
   const previousRawSyncStateRef = React.useRef<RawSyncState["state"]>("hidden");
-  const shouldHideSyncOverlayAfterCloseRef = React.useRef(false);
-  const syncOverlayErrorOpenRef = React.useRef(false);
   const profilesRef = React.useRef(profiles);
   const categoriesRef = React.useRef(categories);
   const eventsRef = React.useRef(events);
@@ -2504,6 +2492,9 @@ export default function HomePage() {
     void bootstrapRemote();
   }, [bootstrapRemote]);
 
+  const handleRetrySyncRef = React.useRef(handleRetrySync);
+  handleRetrySyncRef.current = handleRetrySync;
+
   const rawSyncState = React.useMemo<RawSyncState>(() => {
     if (!session?.user.id) {
       return { state: "hidden" };
@@ -2541,23 +2532,9 @@ export default function HomePage() {
     syncError,
   ]);
 
-  const clearSyncOverlayTimer = React.useCallback(() => {
-    if (syncOverlayTimerRef.current !== null) {
-      window.clearTimeout(syncOverlayTimerRef.current);
-      syncOverlayTimerRef.current = null;
-    }
-  }, []);
-
-  const handleSyncOverlayErrorOpenChange = React.useCallback((open: boolean) => {
-    syncOverlayErrorOpenRef.current = open;
-    setIsSyncOverlayErrorOpen(open);
-
-    if (!open && shouldHideSyncOverlayAfterCloseRef.current) {
-      shouldHideSyncOverlayAfterCloseRef.current = false;
-      setIsSyncOverlayVisible(false);
-    }
-  }, []);
-
+  // O estado de sincronização vai para o mesmo lugar dos demais avisos (centro
+  // inferior): carregando enquanto salva, erro fixo até a pessoa fechar no X,
+  // e "Sincronizado" que some sozinho.
   React.useEffect(() => {
     if (windowContext !== "main") return;
 
@@ -2565,75 +2542,49 @@ export default function HomePage() {
     previousRawSyncStateRef.current = rawSyncState.state;
 
     if (rawSyncState.state === "hidden") {
-      clearSyncOverlayTimer();
-      shouldHideSyncOverlayAfterCloseRef.current = false;
-      syncOverlayErrorOpenRef.current = false;
-      setIsSyncOverlayErrorOpen(false);
-      setIsSyncOverlayVisible(false);
-      setSyncOverlayStatus(null);
+      dismiss(SYNC_NOTICE_KEY);
       return;
     }
 
     if (rawSyncState.state === "loading" || rawSyncState.state === "saving") {
-      clearSyncOverlayTimer();
-      shouldHideSyncOverlayAfterCloseRef.current = false;
-      syncOverlayErrorOpenRef.current = false;
-      setIsSyncOverlayErrorOpen(false);
-      setSyncOverlayStatus(rawSyncState);
-      setIsSyncOverlayVisible(true);
+      notify({ key: SYNC_NOTICE_KEY, tone: "loading", title: "Sincronizando..." });
       return;
     }
 
     if (rawSyncState.state === "error") {
-      clearSyncOverlayTimer();
-      shouldHideSyncOverlayAfterCloseRef.current = false;
-      syncOverlayErrorOpenRef.current = false;
-      setIsSyncOverlayErrorOpen(false);
-      setSyncOverlayStatus(rawSyncState);
-      setIsSyncOverlayVisible(true);
-
-      syncOverlayTimerRef.current = window.setTimeout(() => {
-        if (syncOverlayErrorOpenRef.current) {
-          shouldHideSyncOverlayAfterCloseRef.current = true;
-          return;
-        }
-
-        setIsSyncOverlayVisible(false);
-      }, 6000);
-
+      // Já mostrado (ou fechado pela pessoa): não reabrir só porque o retry mudou.
+      if (previousState === "error") return;
+      notify({
+        key: SYNC_NOTICE_KEY,
+        tone: "error",
+        title: "Erro ao sincronizar",
+        description: [rawSyncState.message, rawSyncState.detail]
+          .filter(Boolean)
+          .join(" · "),
+        action: {
+          label: "Tentar novamente",
+          onClick: () => handleRetrySyncRef.current(),
+        },
+      });
       return;
     }
 
-    if (rawSyncState.state === "synced") {
-      const shouldShowSuccess =
-        previousState === "loading" ||
-        previousState === "saving" ||
-        previousState === "error";
+    const shouldShowSuccess =
+      previousState === "loading" ||
+      previousState === "saving" ||
+      previousState === "error";
 
-      clearSyncOverlayTimer();
-      shouldHideSyncOverlayAfterCloseRef.current = false;
-      syncOverlayErrorOpenRef.current = false;
-      setIsSyncOverlayErrorOpen(false);
-
-      if (!shouldShowSuccess) {
-        setIsSyncOverlayVisible(false);
-        return;
-      }
-
-      setSyncOverlayStatus(rawSyncState);
-      setIsSyncOverlayVisible(true);
-
-      syncOverlayTimerRef.current = window.setTimeout(() => {
-        setIsSyncOverlayVisible(false);
-      }, 1000);
+    if (shouldShowSuccess) {
+      notify({
+        key: SYNC_NOTICE_KEY,
+        tone: "success",
+        title: "Sincronizado",
+        durationMs: 1000,
+      });
+    } else {
+      dismiss(SYNC_NOTICE_KEY);
     }
-  }, [clearSyncOverlayTimer, rawSyncState, windowContext]);
-
-  React.useEffect(() => {
-    return () => {
-      clearSyncOverlayTimer();
-    };
-  }, [clearSyncOverlayTimer]);
+  }, [dismiss, notify, rawSyncState, windowContext]);
 
   React.useEffect(() => {
     if (!highlightedEventId) return;
@@ -3154,13 +3105,6 @@ export default function HomePage() {
           />
         </>
       ) : null}
-
-      <SyncStatusOverlay
-        status={syncOverlayStatus}
-        visible={isSyncOverlayVisible}
-        errorPopoverOpen={isSyncOverlayErrorOpen}
-        onErrorPopoverOpenChange={handleSyncOverlayErrorOpenChange}
-      />
 
       <div className="z-30 shrink-0 bg-background pb-0">
         <AppHeader
