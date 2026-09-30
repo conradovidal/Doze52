@@ -350,7 +350,17 @@ export function useAccountContinuity(
         cache.preferences = {
           selectedHabitId: state.selectedHabitId,
           visibleHabitIds: state.visibleHabitIds,
+          selectedContextId: state.selectedContextId,
         };
+        for (const context of state.contexts)
+          if (
+            JSON.stringify(context) !==
+            JSON.stringify(previous.contexts.find((c) => c.id === context.id))
+          )
+            queueOperation(cache, "habit_context", context.id, context);
+        for (const context of previous.contexts)
+          if (!state.contexts.some((c) => c.id === context.id))
+            queueOperation(cache, "habit_context", context.id, context, true);
         for (const habit of state.habits)
           if (
             JSON.stringify(habit) !==

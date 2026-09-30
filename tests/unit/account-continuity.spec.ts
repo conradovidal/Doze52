@@ -135,3 +135,27 @@ test("example categories never consume account limits or remove a chosen calenda
   expect(result.events).toEqual([]);
   expect(result.profiles).toEqual(demo.profiles);
 });
+test("habit contexts sync as their own records and survive a draft import", () => {
+  const context = {
+    id: "00000000-0000-4000-8000-000000000001",
+    name: "Rotina",
+    icon: "circle-check" as const,
+    position: 0,
+    createdAt: "2026-09-29",
+    updatedAt: "2026-09-29",
+  };
+  const draft = emptyContinuityCache();
+  queueOperation(draft, "habit_context", context.id, context);
+  queueOperation(draft, "habit", "h1", { ...habit, contextId: context.id });
+  const view = materializeContinuity(draft);
+  expect(view.contexts).toEqual([context]);
+  expect(view.habits[0].contextId).toBe(context.id);
+
+  const account = emptyContinuityCache();
+  importHabitView(account, view, new Set(["h1"]));
+  expect(account.pending.map((op) => op.kind)).toEqual(["habit_context", "habit"]);
+
+  // Deleting a context is a tombstone, like a habit.
+  queueOperation(account, "habit_context", context.id, context, true);
+  expect(materializeContinuity(account).contexts).toEqual([]);
+});

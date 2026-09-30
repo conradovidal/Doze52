@@ -55,12 +55,31 @@ export type AnchorPoint = {
   y: number;
 };
 
+/** Ícone de um contexto de hábitos: o "Hábitos" padrão ou um dos contextos de Eventos. */
+export type HabitContextIconId = "circle-check" | ProfileIconId;
+
+/**
+ * Agrupa hábitos na tela de Hábitos, como o contexto agrupa categorias nos
+ * Eventos. Separado dos contextos de Eventos de propósito: "Pessoal" e
+ * "Profissional" organizam datas, não rotinas.
+ */
+export type HabitContext = {
+  id: string;
+  name: string;
+  icon: HabitContextIconId;
+  position: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type Habit = {
   id: string;
   userId?: string;
   name: string;
   color: string;
   icon: "circle-check";
+  /** Sem valor (hábitos anteriores aos contextos) = contexto padrão. */
+  contextId?: string;
   position: number;
   archivedAt?: string;
   createdAt: string;

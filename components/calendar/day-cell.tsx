@@ -3,6 +3,7 @@
 import {
   getCompletedHabitsForDate,
   getHabitDayAction,
+  getHabitDayMarkers,
   getHabitCheckInKey,
 } from "@/lib/habits-prototype";
 import type { Habit, HabitCheckIn } from "@/lib/types";
@@ -19,7 +20,15 @@ export type DayCellHabitPresentation = {
   readOnly?: boolean;
   retrospectiveDates?: ReadonlySet<string>;
   retrospectiveHighlighted?: boolean;
+  /**
+   * Foco num hábito só: o dia marcado vira um círculo na cor dele, ligado aos
+   * dias vizinhos também marcados — a mesma sequência do mobile.
+   */
+  streak?: boolean;
 };
+
+const toIsoDate = (value: Date) =>
+  `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
 
 const ACCESSIBLE_DATE_FORMATTER = new Intl.DateTimeFormat("pt-BR", {
   dateStyle: "full",
@@ -109,6 +118,22 @@ export function DayCell({
         ]?.completed
       )
     : false;
+  // Sequência: só liga vizinhos do mesmo mês — o mês seguinte é outra linha.
+  const streakHabit =
+    habitPresentation?.streak && !isFuture ? habitPresentation.selectedHabit : null;
+  const streakCompleted = Boolean(streakHabit) && selectedHabitCompleted;
+  const isStreakNeighborDone = (offset: -1 | 1) => {
+    if (!streakHabit || !habitPresentation) return false;
+    const neighbor = new Date(date.getFullYear(), date.getMonth(), date.getDate() + offset);
+    if (neighbor.getMonth() !== date.getMonth()) return false;
+    const neighborIso = toIsoDate(neighbor);
+    if (neighborIso > todayIso) return false;
+    return Boolean(
+      habitPresentation.checkIns[getHabitCheckInKey(streakHabit.id, neighborIso)]?.completed
+    );
+  };
+  const streakJoinLeft = streakCompleted && isStreakNeighborDone(-1);
+  const streakJoinRight = streakCompleted && isStreakNeighborDone(1);
   const completedNames = completedHabits.map((habit) => habit.name).join(", ");
   const registeredHabitCount =
     habitPresentation?.allHabits?.length ?? habitPresentation?.habits.length ?? 0;
@@ -255,8 +280,36 @@ export function DayCell({
           </span>
         </div>
       ) : null}
+      {streakCompleted && streakHabit ? (
+        <>
+          {streakJoinLeft ? (
+            <span
+              aria-hidden="true"
+              data-habit-streak-join="left"
+              className="pointer-events-none absolute -left-px top-4 h-2.5 w-1/2 -translate-y-1/2"
+              style={{ backgroundColor: streakHabit.color }}
+            />
+          ) : null}
+          {streakJoinRight ? (
+            <span
+              aria-hidden="true"
+              data-habit-streak-join="right"
+              className="pointer-events-none absolute -right-px top-4 h-2.5 w-1/2 -translate-y-1/2"
+              style={{ backgroundColor: streakHabit.color }}
+            />
+          ) : null}
+          <span
+            aria-hidden="true"
+            data-habit-marker={streakHabit.id}
+            className="pointer-events-none absolute left-1/2 top-4 size-[clamp(20px,1.7vw,24px)] -translate-x-1/2 -translate-y-1/2 rounded-full"
+            style={{ backgroundColor: streakHabit.color }}
+          />
+        </>
+      ) : null}
       <div
-        className={`grid h-6 w-full flex-none place-items-center px-0.5 text-[12px] ${dayNumberToneClass} ${
+        className={`relative grid h-6 w-full flex-none place-items-center px-0.5 text-[12px] ${
+          streakCompleted && !today ? "text-neutral-950" : dayNumberToneClass
+        } ${
           showCreateCue ? "pointer-events-none" : ""
         }`}
       >
@@ -265,20 +318,22 @@ export function DayCell({
           className={`grid h-5 min-w-5 place-items-center rounded-full px-1 text-[12px] font-semibold leading-none tabular-nums transition-colors ${
             today
               ? "bg-[#b2554c] text-white ring-1 ring-[#b2554c]"
-              : "group-hover:text-foreground dark:group-hover:text-white"
+              : streakCompleted
+                ? ""
+                : "group-hover:text-foreground dark:group-hover:text-white"
           }`}
         >
           {date.getDate()}
         </span>
       </div>
       <div className="mt-1 flex-1" />
-      {habitPresentation && completedHabits.length > 0 ? (
+      {habitPresentation && !habitPresentation.streak && completedHabits.length > 0 ? (
         <div
           data-day-habit-markers
           className="pointer-events-none absolute inset-x-0 top-[30px] bottom-1 flex flex-col items-center justify-start gap-0.5 overflow-visible"
           aria-hidden="true"
         >
-          {completedHabits.map((habit, completedIndex) => {
+          {getHabitDayMarkers(completedHabits).visible.map((habit, completedIndex) => {
             return (
               <span
                 key={habit.id}
@@ -289,6 +344,16 @@ export function DayCell({
               />
             );
           })}
+          {getHabitDayMarkers(completedHabits).overflow > 0 ? (
+            // Mais hábitos no dia do que a pilha comporta: o último espaço
+            // vira a contagem do resto (os nomes estão no aria-label do dia).
+            <span
+              data-habit-marker-overflow
+              className="grid h-[clamp(12px,1.1vw,18px)] min-w-[clamp(12px,1.1vw,18px)] shrink-0 place-items-center rounded-full bg-foreground/12 px-0.5 text-[9px] font-semibold leading-none tabular-nums text-foreground/75"
+            >
+              +{getHabitDayMarkers(completedHabits).overflow}
+            </span>
+          ) : null}
         </div>
       ) : null}
       {showCreateCue ? (

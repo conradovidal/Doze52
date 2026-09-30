@@ -13,6 +13,7 @@ import {
   CATEGORY_COLOR_BASE_LIME,
   CATEGORY_COLOR_BASE_ORANGE,
   CATEGORY_COLOR_BASE_RED,
+  CATEGORY_COLOR_BASE_SLATE,
   CATEGORY_COLOR_BASE_TEAL,
   CATEGORY_COLOR_BASE_TERRA,
   CATEGORY_COLOR_BASE_VIOLET,
@@ -165,6 +166,8 @@ export const ONBOARDING_PROFILE_IDS = {
   professional: "44444444-4444-4444-8444-444444444441",
   personal: "44444444-4444-4444-8444-444444444442",
   family: "44444444-4444-4444-8444-444444444443",
+  // Só existe no ano de exemplo (ver DEMO_TRIATHLON_PROFILE_ID).
+  triathlon: "44444444-4444-4444-8444-444444444444",
 } as const;
 
 export const ONBOARDING_DEFAULT_PROFILE_ID = ONBOARDING_PROFILE_IDS.personal;
@@ -186,9 +189,10 @@ export const ONBOARDING_CATEGORY_IDS = {
 
 export const ONBOARDING_DEFAULT_CATEGORY_ID = ONBOARDING_CATEGORY_IDS.events;
 // v9: categoria padrão "Eventos" virou "Geral" (não colide com a tela
-// Eventos). Exemplos antigos ainda bloqueados são trocados automaticamente.
+// Eventos). v10: história do triatlo (categorias "Triatlo" e "Treino"). Exemplos antigos
+// ainda bloqueados são trocados automaticamente.
 export const ONBOARDING_PERSONAL_DEMO_GROUP_ID =
-  "onboarding-personal-demo-v9";
+  "onboarding-personal-demo-v10";
 const ONBOARDING_PERSONAL_DEMO_GROUP_IDS = new Set([
   "onboarding-personal-demo-v1",
   "onboarding-personal-demo-v2",
@@ -198,6 +202,7 @@ const ONBOARDING_PERSONAL_DEMO_GROUP_IDS = new Set([
   "onboarding-personal-demo-v6",
   "onboarding-personal-demo-v7",
   "onboarding-personal-demo-v8",
+  "onboarding-personal-demo-v9",
   ONBOARDING_PERSONAL_DEMO_GROUP_ID,
 ]);
 
@@ -266,6 +271,13 @@ const getPersonalDemoProfiles = (): CalendarProfile[] => [
     color: DEFAULT_PROFILE_COLOR,
     icon: "briefcase",
     position: 1,
+  },
+  {
+    id: DEMO_TRIATHLON_PROFILE_ID,
+    name: "Triatlo",
+    color: DEFAULT_PROFILE_COLOR,
+    icon: "dumbbell",
+    position: 2,
   },
 ];
 
@@ -397,7 +409,23 @@ const DEMO_CATEGORY_IDS = {
   workEvents: "99999999-0001-4000-8000-000000000008",
   workMarketing: "99999999-0001-4000-8000-000000000009",
   workPerformance: "99999999-0001-4000-8000-000000000010",
+  // Contexto "Triatlo" (perfil próprio no ano de exemplo).
+  triathlon: "99999999-0001-4000-8000-000000000011",
+  training: "99999999-0001-4000-8000-000000000012",
+  health: "99999999-0001-4000-8000-000000000013",
+  triathlonTravel: "99999999-0001-4000-8000-000000000014",
 } as const;
+
+// A história do Ironman ganhou corpo demais para caber no Pessoal: vira um
+// terceiro contexto, só do ano de exemplo (o guia continua oferecendo
+// Pessoal e Profissional, e o Triatlo some junto com o exemplo).
+const DEMO_TRIATHLON_PROFILE_ID = ONBOARDING_PROFILE_IDS.triathlon;
+const TRIATHLON_DEMO_CATEGORY_IDS = new Set<string>([
+  DEMO_CATEGORY_IDS.triathlon,
+  DEMO_CATEGORY_IDS.training,
+  DEMO_CATEGORY_IDS.health,
+  DEMO_CATEGORY_IDS.triathlonTravel,
+]);
 
 const demoCategory = (
   id: string,
@@ -492,24 +520,151 @@ const getPersonalDemoCategories = (): CategoryItem[] => [
     ONBOARDING_PROFILE_IDS.professional,
     "Entregas",
     CATEGORY_COLOR_BASE_ORANGE
+  ),  // Contexto Triatlo: a história de quem se prepara para um Ironman. As
+  // provas guiam o treino da vitrine de Hábitos (ver habits-prototype).
+  demoCategory(
+    DEMO_CATEGORY_IDS.triathlon,
+    DEMO_TRIATHLON_PROFILE_ID,
+    "Provas",
+    CATEGORY_COLOR_BASE_TEAL
+  ),
+  demoCategory(
+    DEMO_CATEGORY_IDS.training,
+    DEMO_TRIATHLON_PROFILE_ID,
+    "Treino",
+    CATEGORY_COLOR_BASE_SLATE
+  ),
+  demoCategory(
+    DEMO_CATEGORY_IDS.health,
+    DEMO_TRIATHLON_PROFILE_ID,
+    "Saúde",
+    CATEGORY_COLOR_BASE_CORAL
+  ),
+  demoCategory(
+    DEMO_CATEGORY_IDS.triathlonTravel,
+    DEMO_TRIATHLON_PROFILE_ID,
+    "Viagens",
+    CATEGORY_COLOR_BASE_GREEN
   ),
 ];
 
 const toDemoIsoDate = (year: number, month: number, day: number) =>
   `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 
-const getCarnivalRange = (year: number) => {
-  const ranges: Record<number, [string, string]> = {
-    2025: ["2025-03-01", "2025-03-05"],
-    2026: ["2026-02-14", "2026-02-18"],
-    2027: ["2027-02-06", "2027-02-10"],
-  };
-  return (
-    ranges[year] ?? [
-      toDemoIsoDate(year, 2, 14),
-      toDemoIsoDate(year, 2, 18),
-    ]
-  );
+// Datas de referência do ano de exemplo caem sempre no dia da semana certo:
+// a partir da data, o primeiro dia com aquele dia da semana (0 = domingo).
+const demoWeekdayOnOrAfter = (
+  year: number,
+  month: number,
+  day: number,
+  weekday: number
+) => {
+  const date = new Date(Date.UTC(year, month - 1, day));
+  date.setUTCDate(date.getUTCDate() + ((weekday - date.getUTCDay() + 7) % 7));
+  return date;
+};
+const demoSundayOnOrAfter = (year: number, month: number, day: number) =>
+  demoWeekdayOnOrAfter(year, month, day, 0);
+const toDemoIsoFromDate = (date: Date, offsetDays = 0) => {
+  const shifted = new Date(date.getTime() + offsetDays * 24 * 60 * 60 * 1000);
+  return shifted.toISOString().slice(0, 10);
+};
+
+// A história do ano: alguém que se inscreve num Ironman em janeiro, faz um
+// triatlo sprint de teste em abril e chega à prova em novembro, com uma
+// lesão (fisioterapia) e a volta gradual no meio do caminho. Tudo deriva de
+// duas âncoras de domingo (sprint e Ironman). Só os pontos de virada viram
+// evento (no máximo 2 por dia no ano de exemplo): as bases entre eles a
+// vitrine de Hábitos deduz das provas (ver buildOnboardingHabitShowcase).
+const getTriathlonDemoEvents = (year: number): PersonalDemoEventInput[] => {
+  const sprint = demoSundayOnOrAfter(year, 4, 12);
+  const ironman = demoSundayOnOrAfter(year, 11, 8);
+  const signupIso = toDemoIsoDate(year, 1, 20);
+  const from = (anchor: Date, startOffset: number, endOffset: number) => ({
+    startDate: toDemoIsoFromDate(anchor, startOffset),
+    endDate: toDemoIsoFromDate(anchor, endOffset),
+  });
+  const training = DEMO_CATEGORY_IDS.training;
+  return [
+    {
+      key: "triathlon-ironman-signup",
+      title: "Inscrição no Ironman",
+      categoryId: DEMO_CATEGORY_IDS.triathlon,
+      startDate: signupIso,
+    },
+    {
+      key: "health-physical-assessment",
+      title: "Avaliação física",
+      categoryId: DEMO_CATEGORY_IDS.health,
+      startDate: toDemoIsoDate(year, 1, 27),
+    },
+    {
+      key: "triathlon-sprint",
+      title: "Triatlo sprint",
+      categoryId: DEMO_CATEGORY_IDS.triathlon,
+      startDate: toDemoIsoFromDate(sprint),
+    },
+    {
+      key: "training-sprint-recovery",
+      title: "Recuperação",
+      categoryId: training,
+      ...from(sprint, 1, 14),
+    },
+    {
+      key: "health-orthopedist",
+      title: "Consulta com ortopedista",
+      categoryId: DEMO_CATEGORY_IDS.health,
+      startDate: toDemoIsoDate(year, 5, 19),
+    },
+    {
+      key: "training-physio",
+      title: "Fisioterapia",
+      categoryId: DEMO_CATEGORY_IDS.health,
+      ...from(ironman, -167, -147),
+    },
+    {
+      key: "health-physio-discharge",
+      title: "Alta da fisioterapia",
+      categoryId: DEMO_CATEGORY_IDS.health,
+      startDate: toDemoIsoFromDate(ironman, -147),
+    },
+    {
+      key: "training-return-to-running",
+      title: "Volta gradual à corrida",
+      categoryId: training,
+      ...from(ironman, -146, -133),
+    },
+    {
+      key: "training-build",
+      title: "Construção",
+      categoryId: training,
+      ...from(ironman, -132, -21),
+    },
+    {
+      key: "training-ironman-taper",
+      title: "Polimento para o Ironman",
+      categoryId: training,
+      ...from(ironman, -20, -1),
+    },
+    {
+      key: "training-race-trip",
+      title: "Viagem da prova",
+      categoryId: DEMO_CATEGORY_IDS.triathlonTravel,
+      ...from(ironman, -2, 1),
+    },
+    {
+      key: "triathlon-ironman",
+      title: "Ironman",
+      categoryId: DEMO_CATEGORY_IDS.triathlon,
+      startDate: toDemoIsoFromDate(ironman),
+    },
+    {
+      key: "training-ironman-recovery",
+      title: "Recuperação",
+      categoryId: training,
+      ...from(ironman, 1, 21),
+    },
+  ];
 };
 
 type PersonalDemoEventInput = {
@@ -549,7 +704,6 @@ const toPersonalDemoEvent = (
 };
 
 const getPersonalDemoEvents = (year: number): CalendarEvent[] => {
-  const [carnivalStart, carnivalEnd] = getCarnivalRange(year);
   const eventInputs: PersonalDemoEventInput[] = [
     {
       key: "summer-festival",
@@ -616,7 +770,7 @@ const getPersonalDemoEvents = (year: number): CalendarEvent[] => {
       key: "design-fair",
       title: "Feira de design",
       categoryId: ONBOARDING_CATEGORY_IDS.events,
-      startDate: toDemoIsoDate(year, 9, 5),
+      startDate: toDemoIsoDate(year, 9, 1),
     },
     {
       key: "museum-talk",
@@ -628,8 +782,8 @@ const getPersonalDemoEvents = (year: number): CalendarEvent[] => {
       key: "book-fair",
       title: "Feira do Livro",
       categoryId: ONBOARDING_CATEGORY_IDS.events,
-      startDate: toDemoIsoDate(year, 10, 30),
-      endDate: toDemoIsoDate(year, 11, 15),
+      startDate: toDemoIsoDate(year, 10, 1),
+      endDate: toDemoIsoDate(year, 10, 11),
     },
     {
       key: "year-end-concert",
@@ -660,7 +814,7 @@ const getPersonalDemoEvents = (year: number): CalendarEvent[] => {
       key: "school-year-start",
       title: "Volta às aulas",
       categoryId: DEMO_CATEGORY_IDS.family,
-      startDate: toDemoIsoDate(year, 2, 18),
+      startDate: toDemoIsoDate(year, 2, 23),
     },
     {
       key: "family-march-lunch",
@@ -703,7 +857,7 @@ const getPersonalDemoEvents = (year: number): CalendarEvent[] => {
       title: "Férias das crianças",
       categoryId: DEMO_CATEGORY_IDS.family,
       startDate: toDemoIsoDate(year, 7, 20),
-      endDate: toDemoIsoDate(year, 8, 2),
+      endDate: toDemoIsoDate(year, 7, 24),
     },
     {
       key: "school-second-semester",
@@ -759,7 +913,7 @@ const getPersonalDemoEvents = (year: number): CalendarEvent[] => {
       [4, 23, "Encontro da faculdade"],
       [5, 13, "Jantar em casa"],
       [5, 28, "Bar com a turma"],
-      [6, 13, "Casamento da Ana e do Lucas"],
+      [9, 12, "Casamento da Ana e do Lucas"],
       [6, 26, "Arraiá dos amigos"],
       [7, 8, "Café com a Júlia"],
       [7, 18, "Piquenique no parque"],
@@ -772,15 +926,11 @@ const getPersonalDemoEvents = (year: number): CalendarEvent[] => {
       key: `friends-${index + 1}`,
       title: String(title),
       categoryId: DEMO_CATEGORY_IDS.friends,
-      startDate: toDemoIsoDate(year, Number(month), Number(day)),
+      // Casamento sempre no sábado (12/09 em 2026).
+      startDate: String(title).startsWith("Casamento")
+        ? toDemoIsoFromDate(demoWeekdayOnOrAfter(year, Number(month), Number(day), 6))
+        : toDemoIsoDate(year, Number(month), Number(day)),
     })),
-    {
-      key: "carnival-paraty",
-      title: "Carnaval em Paraty",
-      categoryId: ONBOARDING_CATEGORY_IDS.travel,
-      startDate: carnivalStart,
-      endDate: carnivalEnd,
-    },
     {
       key: "bento-goncalves-weekend",
       title: "Fim de semana em Bento Gonçalves",
@@ -797,7 +947,7 @@ const getPersonalDemoEvents = (year: number): CalendarEvent[] => {
     },
     {
       key: "maceio-family-holidays",
-      title: "Férias em família — Maceió",
+      title: "Férias em Maceió",
       categoryId: ONBOARDING_CATEGORY_IDS.travel,
       startDate: toDemoIsoDate(year, 7, 25),
       endDate: toDemoIsoDate(year, 7, 30),
@@ -808,6 +958,13 @@ const getPersonalDemoEvents = (year: number): CalendarEvent[] => {
       categoryId: ONBOARDING_CATEGORY_IDS.travel,
       startDate: toDemoIsoDate(year, 9, 5),
       endDate: toDemoIsoDate(year, 9, 7),
+    },
+    ...getTriathlonDemoEvents(year),
+    {
+      key: "year-review",
+      title: "Revisão do ano",
+      categoryId: ONBOARDING_CATEGORY_IDS.events,
+      startDate: toDemoIsoDate(year, 12, 20),
     },
     {
       key: "new-year-tiradentes",
@@ -902,6 +1059,13 @@ const getPersonalDemoEvents = (year: number): CalendarEvent[] => {
       categoryId: ONBOARDING_CATEGORY_IDS.workTrips,
       startDate: toDemoIsoDate(year, 9, 14),
       endDate: toDemoIsoDate(year, 10, 23),
+    },
+    {
+      key: "smb-campaign-launch",
+      title: "Lançamento da campanha para PMEs",
+      categoryId: ONBOARDING_CATEGORY_IDS.workTrips,
+      startDate: toDemoIsoDate(year, 8, 17),
+      endDate: toDemoIsoDate(year, 8, 21),
     },
     ...[
       [4, 27, 6, 5, "Campanha de lançamento mobile"],
@@ -1026,14 +1190,6 @@ const getPersonalDemoEventsFor2025 = () => {
     Pick<CalendarEvent, "title" | "startDate" | "endDate">
   >([
     [
-      "2025:carnival-paraty",
-      {
-        title: "Carnaval em Florianópolis",
-        startDate: "2025-03-01",
-        endDate: "2025-03-05",
-      },
-    ],
-    [
       "2025:bento-goncalves-weekend",
       {
         title: "Fim de semana em Buenos Aires",
@@ -1128,7 +1284,10 @@ const getPersonalDemoEventsFor2025 = () => {
       (event) =>
         event.categoryId !== ONBOARDING_CATEGORY_IDS.birthday &&
         event.categoryId !== DEMO_CATEGORY_IDS.holidays &&
-        event.categoryId !== DEMO_CATEGORY_IDS.formula1
+        event.categoryId !== DEMO_CATEGORY_IDS.formula1 &&
+        // O triatlo começa com a inscrição de 2026: 2025 não tem provas nem
+        // fases de treino.
+        !TRIATHLON_DEMO_CATEGORY_IDS.has(event.categoryId)
     )
     .map((event) => {
       const override = event.calendarPackEventKey
@@ -1348,7 +1507,7 @@ export const isOnboardingPersonalDemoSnapshot = (
 
   return (
     demoCategories.length >= 6 &&
-    demoCategories.length <= 14 &&
+    demoCategories.length <= 20 &&
     demoEvents.length > 0
   );
 };

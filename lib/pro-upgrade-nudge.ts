@@ -46,7 +46,7 @@ const LAST_SLOT_MESSAGES: Partial<
   },
   habits: {
     title: "Seu hábito gratuito está no ar",
-    description: "Com o Pro, você acompanha até 4 rotinas no mesmo ano.",
+    description: "Com o Pro, você acompanha quantos hábitos quiser, em contextos.",
   },
 };
 

@@ -11,12 +11,19 @@ import {
   DESKTOP_CONTROL_FIXED_HEIGHT_CLASS,
   DESKTOP_CONTROL_GRID_GAP_CLASS,
 } from "@/lib/desktop-control-layout";
-import type { Habit, HabitCheckIn } from "@/lib/types";
+import type { Habit, HabitCheckIn, HabitContext } from "@/lib/types";
 import type { GuidedToolbarNotice } from "@/components/onboarding/guided-toolbar-notice";
+import type { ComponentProps } from "react";
+
+type DesktopHabitView = NonNullable<ComponentProps<typeof HabitControls>["desktopView"]>;
 
 const noop = () => undefined;
 
 export function DesktopHabitsPrototype({
+  desktopView,
+  contexts,
+  selectedContextId,
+  onSelectContext,
   year,
   todayIso,
   habits,
@@ -42,6 +49,10 @@ export function DesktopHabitsPrototype({
   onDismissGuidedNotice,
   onGuidedNoticeAction,
 }: {
+  desktopView?: DesktopHabitView;
+  contexts: HabitContext[];
+  selectedContextId: string;
+  onSelectContext: (contextId: string) => void;
   year: number;
   todayIso: string;
   habits: Habit[];
@@ -120,7 +131,11 @@ export function DesktopHabitsPrototype({
         }
       >
         <HabitControls
+          contexts={contexts}
+          selectedContextId={selectedContextId}
+          onSelectContext={onSelectContext}
           habits={habits}
+          desktopView={desktopView}
           selectedHabit={selectedHabit}
           visibleHabitIds={visibleHabitIds}
           creationDisabled={creationDisabled}
@@ -167,6 +182,7 @@ export function DesktopHabitsPrototype({
             readOnly,
             retrospectiveDates,
             retrospectiveHighlighted,
+            streak: desktopView?.view === "focus",
           }}
         />
       </div>

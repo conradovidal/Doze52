@@ -9,7 +9,11 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-const clickBehindGuidedPanel = async (page: Page, target: Locator) => {
+const clickBehindGuidedPanel = async (
+  page: Page,
+  target: Locator,
+  options?: Parameters<Locator["click"]>[0]
+) => {
   const panel = page.locator("[data-onboarding-panel]");
   await panel.evaluateAll((nodes) => {
     nodes.forEach((node) => {
@@ -17,7 +21,7 @@ const clickBehindGuidedPanel = async (page: Page, target: Locator) => {
     });
   });
   try {
-    await target.click();
+    await target.click(options);
   } finally {
     await panel.evaluateAll((nodes) => {
       nodes.forEach((node) => {
@@ -40,9 +44,14 @@ const selectGuidedDate = async (
       .click({ force: true });
     return;
   }
+  // O ano de exemplo tem faixas longas de fase ("Base para o sprint",
+  // "Construção") no meio da célula: clica no rodapé, abaixo das cápsulas.
+  const cell = page.locator(`[data-day-cell][data-day-iso="${dateIso}"]`);
+  const box = await cell.boundingBox();
   await clickBehindGuidedPanel(
     page,
-    page.locator(`[data-day-cell][data-day-iso="${dateIso}"]`)
+    cell,
+    box ? { position: { x: box.width / 2, y: box.height - 4 } } : undefined
   );
 };
 
@@ -161,7 +170,7 @@ const completePersonalOnboarding = async (
     page.locator("[data-guided-calendar-notice]")
   ).toContainText(/outra pessoa especial/i);
 
-  await selectGuidedDate(page, mobile, "2026-09-12");
+  await selectGuidedDate(page, mobile, "2026-09-02");
   await expect(eventDialog).toBeVisible();
   await eventDialog.getByLabel("Título do evento").fill("Aniversário do pai");
   await eventDialog.getByRole("button", { name: "Salvar", exact: true }).click();
@@ -189,11 +198,11 @@ const completePersonalOnboarding = async (
       "data-guided-toolbar-target",
       "habit"
     );
-    // A vitrine de hábitos (Exercício, Ler 20 minutos) monta/anima ao entrar
+    // A vitrine de hábitos (Ler 20 minutos, Dormir cedo) monta/anima ao entrar
     // em Hábitos — sem esperar por ela, o "+" ainda não tem o aria-label
     // certo e o clique não abre o formulário de criação.
     await expect(
-      page.getByRole("button", { name: "Exercício", exact: true })
+      page.getByRole("button", { name: "Dormir cedo", exact: true })
     ).toHaveAttribute("aria-pressed", "true");
     await page.getByRole("button", { name: "Criar novo hábito" }).click();
     await page.getByLabel("Nome do hábito").fill("Leitura");
@@ -227,7 +236,7 @@ const completePersonalOnboarding = async (
     // virada para Eventos só vem no "Finalizar guia".
     await expect(page).toHaveURL(/surface=habits/);
     await expect(
-      page.getByRole("button", { name: "Exercício", exact: true })
+      page.getByRole("button", { name: "Dormir cedo", exact: true })
     ).toBeVisible();
     await editControl.click();
   }
@@ -253,9 +262,8 @@ const createRegularEvent = async (
   await expect(dialog).toBeHidden();
 };
 
-test("monta contexto Pessoal de forma incremental", async ({ page }, testInfo) => {
+test("monta contexto Pessoal de forma incremental", { tag: "@desktop" }, async ({ page }, testInfo) => {
   const mobile = testInfo.project.name === "mobile-chromium";
-  test.skip(mobile, "O onboarding guiado começa exclusivamente no desktop");
   const regionRequests: string[] = [];
   page.on("request", (request) => {
     if (request.url().includes("/api/onboarding/region")) {
@@ -273,7 +281,7 @@ test("monta contexto Pessoal de forma incremental", async ({ page }, testInfo) =
     "context_selection"
   );
   await expect(panel.getByRole("button", { name: /Outro/ })).toHaveCount(0);
-  await expect(page.locator("[data-onboarding-profile-id]")).toHaveCount(2);
+  await expect(page.locator("[data-onboarding-profile-id]")).toHaveCount(3);
   await expect(page.locator("[data-onboarding-category-id]")).toHaveCount(4);
   await expect(page.locator("[data-onboarding-connector]")).toHaveCount(0);
   await expect(panel).toContainText(
@@ -327,13 +335,9 @@ test("monta contexto Pessoal de forma incremental", async ({ page }, testInfo) =
   ).toBe(true);
 });
 
-test("motion premium preserva progresso, escala e editor contextual", async ({
+test("motion premium preserva progresso, escala e editor contextual", { tag: "@desktop" }, async ({
   page,
-}, testInfo) => {
-  test.skip(
-    testInfo.project.name === "mobile-chromium",
-    "O controle de escala e o popover contextual são exclusivos do desktop"
-  );
+}) => {
 
   await page.goto("/?mobileUi=0");
   const panel = page.getByRole("region", { name: "Guia inicial do Doze 52" });
@@ -437,13 +441,9 @@ test("motion premium preserva progresso, escala e editor contextual", async ({
   expect(mobileEditorBox!.x + mobileEditorBox!.width).toBeLessThanOrEqual(390);
 });
 
-test("ano de exemplo gerencia Feriados do RS e Corridas F1 sem duplicar", async ({
+test("ano de exemplo gerencia Feriados do RS e Corridas F1 sem duplicar", { tag: "@desktop" }, async ({
   page,
-}, testInfo) => {
-  test.skip(
-    testInfo.project.name === "mobile-chromium",
-    "Catálogo completo do exemplo validado no desktop"
-  );
+}) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto("/?mobileUi=0");
   await page
@@ -592,13 +592,9 @@ test("ano de exemplo gerencia Feriados do RS e Corridas F1 sem duplicar", async 
   await expect(formulaCard.getByRole("button", { name: "Remover" })).toBeVisible();
 });
 
-test("seletor de destino integra o card de mover eventos", async ({
+test("seletor de destino integra o card de mover eventos", { tag: "@desktop" }, async ({
   page,
-}, testInfo) => {
-  test.skip(
-    testInfo.project.name === "mobile-chromium",
-    "Responsividade do diálogo validada no mesmo viewport controlado"
-  );
+}) => {
   await page.goto("/?mobileUi=0");
   await page.getByRole("button", { name: "Encerrar guia inicial" }).click();
   await page.evaluate(() => {
@@ -704,13 +700,9 @@ test("seletor de destino integra o card de mover eventos", async ({
   await deleteDialog.getByRole("button", { name: "Cancelar" }).click();
 });
 
-test("mobile trava a Anual até a jornada de Hábitos terminar", async ({
+test("mobile trava a Anual até a jornada de Hábitos terminar", { tag: "@mobile" }, async ({
   page,
-}, testInfo) => {
-  test.skip(
-    testInfo.project.name !== "mobile-chromium",
-    "Entrada desktop-first validada no viewport mobile"
-  );
+}) => {
 
   // Um link direto para `?surface=annual` não vale para quem nunca passou
   // pela jornada de Hábitos — ela é redirecionada de volta, mesmo por URL.
@@ -748,7 +740,7 @@ test("mobile trava a Anual até a jornada de Hábitos terminar", async ({
   await habitCard.getByRole("button", { name: "Continuar" }).click();
 
   await expect(habitCard).toContainText("Passo 2 de 7");
-  await expect(habitCard).toContainText("Estes dois hábitos são exemplo.");
+  await expect(habitCard).toContainText("Estes hábitos são exemplo.");
   await expect(annualNav).toHaveAttribute("aria-disabled", "true");
   await page
     .locator('[data-habits-prototype] button[aria-label="Criar novo hábito"]')
@@ -858,13 +850,9 @@ test("mobile trava a Anual até a jornada de Hábitos terminar", async ({
   ).toHaveCount(0);
 });
 
-test("mobile preserva progresso parcial e recomenda continuar no desktop", async ({
+test("mobile preserva progresso parcial e recomenda continuar no desktop", { tag: "@mobile" }, async ({
   page,
-}, testInfo) => {
-  test.skip(
-    testInfo.project.name !== "mobile-chromium",
-    "Retomada desktop-first validada no viewport mobile"
-  );
+}) => {
 
   await page.goto("/?mobileUi=0");
   const panel = page.getByRole("region", {
@@ -897,11 +885,9 @@ test("mobile preserva progresso parcial e recomenda continuar no desktop", async
   expect(persisted.onboarding?.step).toBe("date_category_selection");
 });
 
-test("categorias recolhidas liberam espaço e o ano leva de volta a hoje", async ({
+test("categorias recolhidas liberam espaço e o ano leva de volta a hoje", { tag: "@desktop" }, async ({
   page,
-}, testInfo) => {
-  const mobile = testInfo.project.name === "mobile-chromium";
-  test.skip(mobile, "Comportamento do cabeçalho coberto no desktop");
+}) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto("/?mobileUi=0");
   await page.getByRole("button", { name: "Encerrar guia inicial" }).click();
@@ -980,13 +966,9 @@ test("categorias recolhidas liberam espaço e o ano leva de volta a hoje", async
     page.getByRole("button", { name: "Minimizar contextos e categorias" })
   ).toHaveAttribute("aria-pressed", "false");
 });
-test("primeira visita segue o sistema e o onboarding usa superfície inversa", async ({
+test("primeira visita segue o sistema e o onboarding usa superfície inversa", { tag: "@desktop" }, async ({
   page,
-}, testInfo) => {
-  test.skip(
-    testInfo.project.name === "mobile-chromium",
-    "Aparência adaptativa coberta no desktop"
-  );
+}) => {
   await page.emulateMedia({ colorScheme: "dark" });
   await page.goto("/?mobileUi=0");
   await expect(page.locator("html")).toHaveClass(/dark/);
@@ -1006,11 +988,7 @@ test("primeira visita segue o sistema e o onboarding usa superfície inversa", a
   ).toBe("rgb(38, 38, 38)");
 });
 
-test("aplicação permanece interativa atrás do primeiro card", async ({ page }, testInfo) => {
-  test.skip(
-    testInfo.project.name === "mobile-chromium",
-    "A jornada guiada começa no desktop"
-  );
+test("aplicação permanece interativa atrás do primeiro card", { tag: "@desktop" }, async ({ page }) => {
   // Ver nota em "sandbox convida após cinco alvos...": o cabeçalho desktop só
   // fica travado expandido a partir de date_category_selection — no passo
   // inicial (context_selection), abaixo de 860px de altura ele se
@@ -1272,13 +1250,9 @@ test("edição preserva categoria não inicial no desktop e no mobile", async ({
     });
 });
 
-test("o X libera o ano de exemplo e a decisão persiste após recarregar", async ({
+test("o X libera o ano de exemplo e a decisão persiste após recarregar", { tag: "@desktop" }, async ({
   page,
-}, testInfo) => {
-  test.skip(
-    testInfo.project.name === "mobile-chromium",
-    "O encerramento do guia acontece no desktop"
-  );
+}) => {
   await page.goto("/?mobileUi=0");
   const panel = page.getByRole("region", {
     name: "Guia inicial do Doze 52",
@@ -1299,10 +1273,12 @@ test("o X libera o ano de exemplo e a decisão persiste após recarregar", async
   expect(stored.profiles?.map((profile) => profile.name)).toEqual([
     "Pessoal",
     "Profissional",
+    "Triatlo",
   ]);
-  // 4 categorias por contexto (Pessoal + Profissional), sem Feriados/F1 nem
-  // Aniversários/Entregas (de fora do ano de exemplo desde #95).
-  expect(stored.categories).toHaveLength(8);
+  // 4 categorias em cada contexto (Pessoal, Profissional e o Triatlo, que só
+  // existe no exemplo), sem Feriados/F1 nem Aniversários/Entregas (de fora
+  // do ano de exemplo desde #95).
+  expect(stored.categories).toHaveLength(12);
   expect(stored.events?.length).toBeGreaterThan(150);
   await expect(page.locator("[data-demo-mode-badge]")).toContainText(
     "Ano de exemplo"
@@ -1314,13 +1290,9 @@ test("o X libera o ano de exemplo e a decisão persiste após recarregar", async
   await expect(page.locator("[data-demo-mode-badge]")).toBeVisible();
 });
 
-test("saída após criar contexto preserva o ano e convida após três criações", async ({
+test("saída após criar contexto preserva o ano e convida após três criações", { tag: "@desktop" }, async ({
   page,
-}, testInfo) => {
-  test.skip(
-    testInfo.project.name === "mobile-chromium",
-    "O encerramento da montagem guiada acontece no desktop"
-  );
+}) => {
   // Ver nota em "sandbox convida após cinco alvos...": fora de uma jornada
   // guiada travada, abaixo de 860px de altura o cabeçalho desktop se
   // auto-minimiza e esconde o chip de perfil verificado adiante.
@@ -1379,13 +1351,9 @@ test("saída após criar contexto preserva o ano e convida após três criaçõe
   await expect(accountHero).toBeVisible();
 });
 
-test("substitui automaticamente um exemplo v3 ainda bloqueado", async ({
+test("substitui automaticamente um exemplo v3 ainda bloqueado", { tag: "@desktop" }, async ({
   page,
-}, testInfo) => {
-  test.skip(
-    testInfo.project.name === "mobile-chromium",
-    "Compatibilidade do armazenamento coberta no desktop"
-  );
+}) => {
   await page.goto("/?mobileUi=0");
   await expect(
     page.locator('[data-onboarding-category-id][title="Viagens"]')
@@ -1441,16 +1409,15 @@ test("substitui automaticamente um exemplo v3 ainda bloqueado", async ({
       })
     )
     // Feriados/F1 não vêm mais junto no ano de exemplo (#95) — a
-    // substituição automática troca só o grupo do próprio exemplo, agora v8
-    // (não mais v7).
-    .toEqual(["onboarding-personal-demo-v9"]);
+    // substituição automática troca só o grupo do próprio exemplo, agora
+    // v10 (com o triatlo).
+    .toEqual(["onboarding-personal-demo-v10"]);
 });
 
-test("sandbox convida após cinco alvos e retoma o onboarding limpo", async ({
+test("sandbox convida após cinco alvos e retoma o onboarding limpo", { tag: "@desktop" }, async ({
   page,
 }, testInfo) => {
   const mobile = testInfo.project.name === "mobile-chromium";
-  test.skip(mobile, "Entrada no sandbox coberta no desktop");
   if (!mobile) {
     // Abaixo de 860px de altura o cabeçalho desktop se auto-minimiza fora de
     // uma jornada guiada travada (`headerMinimized`, ver app/page.tsx), o que
@@ -1486,15 +1453,14 @@ test("sandbox convida após cinco alvos e retoma o onboarding limpo", async ({
   await expect(
     page.getByRole("region", { name: "Guia inicial do Doze 52" })
   ).toHaveAttribute("data-guided-onboarding-step", "context_selection");
-  await expect(page.locator("[data-onboarding-profile-id]")).toHaveCount(2);
+  await expect(page.locator("[data-onboarding-profile-id]")).toHaveCount(3);
   await expect(page.locator("[data-onboarding-category-id]")).toHaveCount(4);
 });
 
-test("centraliza cards e mantém a instrução visível no cabeçalho fixo", async ({
+test("centraliza cards e mantém a instrução visível no cabeçalho fixo", { tag: "@desktop" }, async ({
   page,
 }, testInfo) => {
   const mobile = testInfo.project.name === "mobile-chromium";
-  test.skip(mobile, "Os cards guiados não são exibidos no mobile");
   await page.goto(mobile ? "/?mobileUi=1" : "/?mobileUi=0");
   const panel = page.getByRole("region", {
     name: "Guia inicial do Doze 52",
@@ -1510,21 +1476,27 @@ test("centraliza cards e mantém a instrução visível no cabeçalho fixo", asy
     )
   ).toBe(true);
   if (!mobile) {
-    const panelBox = await panel.boundingBox();
     const viewport = page.viewportSize();
-    if (!panelBox || !viewport) throw new Error("Card inicial não renderizado");
+    if (!viewport) throw new Error("Viewport indisponível");
+    const panelBox = await panel.boundingBox();
+    if (!panelBox) throw new Error("Card inicial não renderizado");
     expect(
       Math.abs(panelBox.x + panelBox.width / 2 - viewport.width / 2)
     ).toBeLessThan(3);
     // Na vertical o card centraliza na parte visível da grade (não na
     // janela), para não cobrir o cabeçalho — ver guided-onboarding-panel.
-    const gridBox = await page.locator("[data-year-grid-frame]").first().boundingBox();
-    if (!gridBox) throw new Error("Grade não renderizada");
-    const visibleTop = Math.max(12, gridBox.y);
-    const visibleBottom = Math.min(viewport.height - 12, gridBox.y + gridBox.height);
-    expect(
-      Math.abs(panelBox.y + panelBox.height / 2 - (visibleTop + visibleBottom) / 2)
-    ).toBeLessThan(3);
+    // A grade ainda assenta (faixa de categorias, meses do ano de exemplo)
+    // logo depois da carga, então espera o centro estabilizar.
+    await expect
+      .poll(async () => {
+        const box = await panel.boundingBox();
+        const gridBox = await page.locator("[data-year-grid-frame]").first().boundingBox();
+        if (!box || !gridBox) return Number.POSITIVE_INFINITY;
+        const visibleTop = Math.max(12, gridBox.y);
+        const visibleBottom = Math.min(viewport.height - 12, gridBox.y + gridBox.height);
+        return Math.abs(box.y + box.height / 2 - (visibleTop + visibleBottom) / 2);
+      })
+      .toBeLessThan(3);
   }
 
   await panel.getByRole("button", { name: /Pessoal/ }).click();
@@ -1635,13 +1607,9 @@ test("centraliza cards e mantém a instrução visível no cabeçalho fixo", asy
   }
 });
 
-test("dois eventos espontâneos abrem a Conta em modo cadastro", async ({
+test("dois eventos espontâneos abrem a Conta em modo cadastro", { tag: "@desktop" }, async ({
   page,
-}, testInfo) => {
-  test.skip(
-    testInfo.project.name === "mobile-chromium",
-    "Criação normal coberta no desktop"
-  );
+}) => {
   await page.goto("/?mobileUi=0");
   await completePersonalOnboarding(page, false);
 
@@ -1665,13 +1633,9 @@ test("dois eventos espontâneos abrem a Conta em modo cadastro", async ({
   await expect(accountHero).toBeHidden();
 });
 
-test("resumo mantém o ano de exemplo e o teto de 3 vale também pelo +", async ({
+test("resumo mantém o ano de exemplo e o teto de 3 vale também pelo +", { tag: "@desktop" }, async ({
   page,
-}, testInfo) => {
-  test.skip(
-    testInfo.project.name === "mobile-chromium",
-    "O guia completo roda no desktop"
-  );
+}) => {
   const readCategories = () =>
     page.evaluate(() => {
       const raw = window.localStorage.getItem("yiv-store");
@@ -1791,13 +1755,9 @@ test("resumo mantém o ano de exemplo e o teto de 3 vale também pelo +", async 
   for (const pack of packEventCounts) expect(pack.events).toBeGreaterThan(0);
 });
 
-test("recarregar depois do guia mantém só as categorias escolhidas", async ({
+test("recarregar depois do guia mantém só as categorias escolhidas", { tag: "@desktop" }, async ({
   page,
-}, testInfo) => {
-  test.skip(
-    testInfo.project.name === "mobile-chromium",
-    "O guia completo roda no desktop"
-  );
+}) => {
   await page.goto("/?mobileUi=0");
   await completePersonalOnboarding(page, false);
 
@@ -1826,11 +1786,7 @@ test("recarregar depois do guia mantém só as categorias escolhidas", async ({
   expect(await readCategories()).toEqual(before);
 });
 
-test("spotlight respeita redução de movimento", async ({ page }, testInfo) => {
-  test.skip(
-    testInfo.project.name === "mobile-chromium",
-    "Preferência de movimento coberta no desktop"
-  );
+test("spotlight respeita redução de movimento", { tag: "@desktop" }, async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/?mobileUi=0");
   const panel = page.getByRole("region", {
@@ -1867,13 +1823,9 @@ test("spotlight respeita redução de movimento", async ({ page }, testInfo) => 
   await expect(habitsDestination).toHaveCSS("animation-name", "none");
 });
 
-test("Profissional permite categorias específica e genérica", async ({
+test("Profissional permite categorias específica e genérica", { tag: "@desktop" }, async ({
   page,
-}, testInfo) => {
-  test.skip(
-    testInfo.project.name === "mobile-chromium",
-    "Variações de contexto cobertas no desktop"
-  );
+}) => {
   await page.goto("/?mobileUi=0");
   const panel = page.getByRole("region", {
     name: "Guia inicial do Doze 52",

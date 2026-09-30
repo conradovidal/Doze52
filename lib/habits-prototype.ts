@@ -9,36 +9,96 @@ import {
   startOfYear,
 } from "date-fns";
 import {
+  CATEGORY_COLOR_BASE_AMBER,
+  CATEGORY_COLOR_BASE_BLUE,
   CATEGORY_COLOR_BASE_CORAL,
+  CATEGORY_COLOR_BASE_INDIGO,
+  CATEGORY_COLOR_BASE_RED,
   CATEGORY_COLOR_BASE_TEAL,
 } from "@/lib/category-palette";
+import { DEFAULT_HABIT_CONTEXT_ID } from "@/lib/habit-contexts";
 import type {
   CalendarEvent,
   CategoryItem,
   Habit,
   HabitCheckIn,
+  HabitContext,
 } from "@/lib/types";
 
-export const HABITS_DESKTOP_MAX = 4;
+// Quantas marcações cabem empilhadas num dia do Anual de hábitos. Acima
+// disso o dia mostra HABIT_DAY_MARKER_SLOTS - 1 bolinhas e um "+N" no último
+// espaço (ver getHabitDayMarkers) — a altura do mês nunca passa de 4.
+export const HABIT_DAY_MARKER_SLOTS = 4;
 
 export type OnboardingHabitShowcase = {
   habits: Habit[];
   checkIns: Record<string, HabitCheckIn>;
   visibleHabitIds: string[];
+  /**
+   * Contextos que só existem na vitrine (hoje, "Triatlo"). Os hábitos
+   * genéricos moram no "Hábitos" padrão, que a pessoa já tem.
+   */
+  contexts: HabitContext[];
 };
 
-const ONBOARDING_HABIT_SHOWCASE_DEFINITIONS = [
+// A vitrine conta a mesma história do ano de exemplo dos Eventos: alguém
+// que se prepara para um Ironman em 2026 e, fora do treino, cuida do básico
+// (ler, dormir cedo). O contexto genérico mostra a rotina de todo mundo; o
+// focado mostra que um objetivo com várias modalidades vira um contexto
+// próprio. As marcações são lidas das fases dos Eventos (categorias
+// "Provas", "Treino" e "Saúde", pelo título): base, polimento, recuperação,
+// fisioterapia, volta gradual, construção e as provas — é o que liga Hábitos
+// a Eventos. As datas são contrato do conteúdo: veja os testes.
+export const ONBOARDING_TRIATHLON_CONTEXT_ID = "onboarding-context-triathlon";
+
+const ONBOARDING_SHOWCASE_CONTEXTS = [
   {
-    id: "onboarding-habit-exercise",
-    name: "Exercício",
-    color: CATEGORY_COLOR_BASE_TEAL,
+    id: ONBOARDING_TRIATHLON_CONTEXT_ID,
+    name: "Triatlo",
+    icon: "dumbbell",
   },
+] as const;
+
+const ONBOARDING_HABIT_SHOWCASE_DEFINITIONS = [
   {
     id: "onboarding-habit-reading",
     name: "Ler 20 minutos",
     color: CATEGORY_COLOR_BASE_CORAL,
+    contextId: DEFAULT_HABIT_CONTEXT_ID,
+  },
+  {
+    id: "onboarding-habit-sleep",
+    name: "Dormir cedo",
+    color: CATEGORY_COLOR_BASE_INDIGO,
+    contextId: DEFAULT_HABIT_CONTEXT_ID,
+  },
+  {
+    id: "onboarding-habit-swim",
+    name: "Nadar",
+    color: CATEGORY_COLOR_BASE_BLUE,
+    contextId: ONBOARDING_TRIATHLON_CONTEXT_ID,
+  },
+  {
+    id: "onboarding-habit-bike",
+    name: "Pedalar",
+    color: CATEGORY_COLOR_BASE_AMBER,
+    contextId: ONBOARDING_TRIATHLON_CONTEXT_ID,
+  },
+  {
+    id: "onboarding-habit-run",
+    name: "Correr",
+    color: CATEGORY_COLOR_BASE_TEAL,
+    contextId: ONBOARDING_TRIATHLON_CONTEXT_ID,
+  },
+  {
+    id: "onboarding-habit-strength",
+    name: "Treino de força",
+    color: CATEGORY_COLOR_BASE_RED,
+    contextId: ONBOARDING_TRIATHLON_CONTEXT_ID,
   },
 ] as const;
+
+type ShowcaseHabitKey = "reading" | "sleep" | "swim" | "bike" | "run" | "strength";
 
 const normalizeShowcaseLabel = (value: string) =>
   value
@@ -75,40 +135,81 @@ export const buildOnboardingHabitShowcase = ({
   const yearEndIso = `${year}-12-31`;
   const cutoffIso = todayIso < yearEndIso ? todayIso : yearEndIso;
   const createdAt = `${yearStartIso}T12:00:00.000Z`;
-  const habits = ONBOARDING_HABIT_SHOWCASE_DEFINITIONS.map(
-    (definition, position): Habit => ({
+  const contexts = ONBOARDING_SHOWCASE_CONTEXTS.map(
+    (definition, index): HabitContext => ({
+      ...definition,
+      // Depois do "Hábitos" padrão (posição 0).
+      position: index + 1,
+      createdAt,
+      updatedAt: createdAt,
+    })
+  );
+  const positionInContext = new Map<string, number>();
+  const habits = ONBOARDING_HABIT_SHOWCASE_DEFINITIONS.map((definition): Habit => {
+    const position = positionInContext.get(definition.contextId) ?? 0;
+    positionInContext.set(definition.contextId, position + 1);
+    return {
       ...definition,
       icon: "circle-check",
       position,
       createdAt,
       updatedAt: createdAt,
-    })
-  );
+    };
+  });
+  const habitId = Object.fromEntries(
+    habits.map((habit) => [habit.id.replace("onboarding-habit-", ""), habit.id])
+  ) as Record<ShowcaseHabitKey, string>;
   if (cutoffIso < yearStartIso) {
     return {
       habits,
       checkIns: {},
       visibleHabitIds: habits.map((habit) => habit.id),
+      contexts,
     };
   }
 
   const categoryNameById = new Map(
     categories.map((category) => [category.id, normalizeShowcaseLabel(category.name)])
   );
+  const iso = (date: Date) => format(date, "yyyy-MM-dd");
+  const shift = (dateIso: string, days: number) =>
+    iso(addDays(parseISO(dateIso), days));
   const travelOrVacationDates = new Set<string>();
   const readingBoostDates = new Set<string>();
+  const lateNightDates = new Set<string>();
   const transitionDates = new Set<string>();
+  // Fases e provas vindas dos Eventos.
+  const raceDates = new Set<string>();
+  const buildDates = new Set<string>();
+  const taperDates = new Set<string>();
+  const ironmanTaperDates = new Set<string>();
+  const physioDates = new Set<string>();
+  const returnToRunningDates = new Set<string>();
+  const launchWeekDates = new Set<string>();
+  const weddingDates = new Set<string>();
+  const recoveryStartByDate = new Map<string, string>();
+  let signupIso: string | null = null;
+  let finalRecovery: { startDate: string; endDate: string } | null = null;
+  let carnivalTuesdayIso: string | null = null;
 
   events.forEach((event) => {
     const title = normalizeShowcaseLabel(event.title);
     const categoryName = categoryNameById.get(event.categoryId) ?? "";
+    // Viagem é a categoria Viagens, férias e Ano Novo. Carnaval e fim de
+    // semana no título não bastam (o feriado "Terça-feira de Carnaval" não
+    // é viagem).
     const isTravelOrVacation =
       categoryName.includes("viagen") ||
       title.includes("ferias") ||
-      title.includes("carnaval") ||
-      title.includes("fim de semana") ||
       title.includes("ano novo");
     const isReadingBoost = isTravelOrVacation || title.includes("feira do livro");
+    // Noite com amigos, festa ou show: dormir cedo não rola.
+    const isLateNight =
+      categoryName.includes("amigo") ||
+      title.includes("noite") ||
+      title.includes("festa") ||
+      title.includes("show") ||
+      title.includes("aniversario");
 
     if (isTravelOrVacation) {
       addEventDates(travelOrVacationDates, event, yearStartIso, cutoffIso);
@@ -122,61 +223,311 @@ export const buildOnboardingHabitShowcase = ({
     if (isReadingBoost) {
       addEventDates(readingBoostDates, event, yearStartIso, cutoffIso);
     }
+    if (isLateNight) {
+      addEventDates(lateNightDates, event, yearStartIso, cutoffIso);
+    }
+    if (title.includes("terca-feira de carnaval") && event.startDate.startsWith(String(year))) {
+      carnivalTuesdayIso = event.startDate;
+    }
+    if (title.includes("lancamento da campanha")) {
+      // Só de segunda a sexta: o fim de semana volta ao padrão da fase.
+      const week = new Set<string>();
+      addEventDates(week, event, yearStartIso, cutoffIso);
+      week.forEach((dateIso) => {
+        const weekday = parseISO(dateIso).getDay();
+        if (weekday >= 1 && weekday <= 5) launchWeekDates.add(dateIso);
+      });
+    }
+    if (title.includes("casamento")) {
+      addEventDates(weddingDates, event, yearStartIso, cutoffIso);
+    }
+    const isTriathlon = categoryName.includes("prova");
+    if (isTriathlon) {
+      // Prova: evento de um dia só (a inscrição não conta).
+      if (title.includes("inscri")) {
+        if (!signupIso || event.startDate < signupIso) signupIso = event.startDate;
+      } else if (event.startDate === event.endDate) {
+        raceDates.add(event.startDate);
+      }
+    } else if (categoryName.includes("treino") || categoryName.includes("saude")) {
+      if (title.includes("recuperacao")) {
+        recoveryStartByDate.set(event.startDate, event.endDate);
+        if (!finalRecovery || event.endDate > finalRecovery.endDate) {
+          finalRecovery = { startDate: event.startDate, endDate: event.endDate };
+        }
+      } else if (title.includes("polimento")) {
+        addEventDates(taperDates, event, yearStartIso, cutoffIso);
+        if (title.includes("ironman")) {
+          addEventDates(ironmanTaperDates, event, yearStartIso, cutoffIso);
+        }
+      } else if (title.startsWith("fisioterapia")) {
+        addEventDates(physioDates, event, yearStartIso, cutoffIso);
+      } else if (title.includes("volta gradual")) {
+        addEventDates(returnToRunningDates, event, yearStartIso, cutoffIso);
+      } else if (title.includes("construcao")) {
+        addEventDates(buildDates, event, yearStartIso, cutoffIso);
+      }
+    }
   });
+
+  // Recuperação: os 7 primeiros dias sem nada do triatlo, depois só o
+  // básico (nadar na terça, correr na quinta). A última é a final, depois
+  // da prova principal; as datas de cada uma vêm do próprio evento.
+  const recoveryDayOf = new Map<string, number>();
+  recoveryStartByDate.forEach((endDate, startDate) => {
+    eachDayOfInterval({ start: parseISO(startDate), end: parseISO(endDate) }).forEach(
+      (date, offset) => recoveryDayOf.set(iso(date), offset)
+    );
+  });
+  const finalRecoveryEndIso = finalRecovery
+    ? (finalRecovery as { endDate: string }).endDate
+    : null;
+
+  // Bloco de Carnaval: do sábado antes da terça até a Quarta de Cinzas. Usa
+  // o feriado do pacote; sem ele, a Páscoa menos 47 dias.
+  const easterIso = (() => {
+    const a = year % 19;
+    const b = Math.floor(year / 100);
+    const c = year % 100;
+    const d = Math.floor(b / 4);
+    const e = b % 4;
+    const f = Math.floor((b + 8) / 25);
+    const g = Math.floor((b - f + 1) / 3);
+    const h = (19 * a + b - d - g + 15) % 30;
+    const i = Math.floor(c / 4);
+    const k = c % 4;
+    const l = (32 + 2 * e + 2 * i - h - k) % 7;
+    const m = Math.floor((a + 11 * h + 22 * l) / 451);
+    const month = Math.floor((h + l - 7 * m + 114) / 31);
+    const day = ((h + l - 7 * m + 114) % 31) + 1;
+    return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  })();
+  const carnivalTuesday = carnivalTuesdayIso ?? shift(easterIso, -47);
+  const carnivalPlan = new Map<
+    string,
+    { train: ShowcaseHabitKey[]; read: boolean }
+  >([
+    [shift(carnivalTuesday, -3), { train: ["bike"], read: true }],
+    [shift(carnivalTuesday, -2), { train: ["run"], read: true }],
+    [shift(carnivalTuesday, -1), { train: ["swim", "strength"], read: true }],
+    [carnivalTuesday, { train: ["bike", "run"], read: true }],
+    [shift(carnivalTuesday, 1), { train: ["swim"], read: false }],
+  ]);
+
+  const hasPhases = buildDates.size > 0 || raceDates.size > 0 || signupIso !== null;
+  // As bases não são eventos: a de antes do sprint começa na primeira
+  // segunda-feira depois da inscrição; a de antes do Ironman é o que sobra
+  // depois do sprint e da primeira recuperação, até a próxima fase.
+  const sortedRaces = [...raceDates].sort();
+  const firstRaceIso = sortedRaces[0] ?? null;
+  const sprintBaseStartIso = (() => {
+    if (!signupIso) return null;
+    const signup = parseISO(signupIso);
+    return iso(addDays(signup, ((8 - signup.getDay()) % 7) || 7));
+  })();
+
+  // Plano semanal de cada fase (0 = domingo). A "sessão perdida" de vez em
+  // quando fica em applyMissedSession, só nas bases e na construção.
+  type Phase = "pre" | "sprintBase" | "ironmanBase" | "build" | "taper" | "physio" | "returnToRunning" | "final";
+  const weeklyPlan = (
+    phase: Phase,
+    weekday: number,
+    weekIndex: number
+  ): ShowcaseHabitKey[] => {
+    const keys: ShowcaseHabitKey[] = [];
+    const swim = [2, 4, 6];
+    const bike = [3, 6];
+    const run = [1, 4, 0];
+    switch (phase) {
+      case "pre":
+        if ([1, 4].includes(weekday)) keys.push("run");
+        break;
+      case "sprintBase":
+        if ([2, 4].includes(weekday)) keys.push("swim");
+        if ([3, 6].includes(weekday)) keys.push("bike");
+        if (run.includes(weekday)) keys.push("run");
+        // A intenção era força 2x por semana; na prática some.
+        if (weekday === 1 && weekIndex % 3 === 0) keys.push("strength");
+        break;
+      case "ironmanBase":
+      case "build":
+      case "returnToRunning":
+      case "physio":
+        if (swim.includes(weekday)) keys.push("swim");
+        if (bike.includes(weekday)) keys.push("bike");
+        if (phase === "returnToRunning") {
+          if ([2, 6].includes(weekday)) keys.push("run");
+        } else if (phase !== "physio" && run.includes(weekday)) {
+          keys.push("run");
+        }
+        if (phase === "build") {
+          if (weekday === 5) keys.push("strength");
+        } else if (phase === "physio") {
+          if ([1, 3, 5].includes(weekday)) keys.push("strength");
+        } else if ([1, 5].includes(weekday)) {
+          keys.push("strength");
+        }
+        break;
+      case "taper":
+        if ([2, 4].includes(weekday)) keys.push("swim");
+        if (weekday === 6) keys.push("bike");
+        if ([1, 4].includes(weekday)) keys.push("run");
+        break;
+      case "final":
+        if (weekday === 3) keys.push("swim");
+        if ([2, 6].includes(weekday)) keys.push("run");
+        if ([1, 4].includes(weekday)) keys.push("strength");
+        break;
+    }
+    return keys;
+  };
+  const phaseOf = (dateIso: string): Phase => {
+    if (taperDates.has(dateIso)) return "taper";
+    if (physioDates.has(dateIso)) return "physio";
+    if (returnToRunningDates.has(dateIso)) return "returnToRunning";
+    if (buildDates.has(dateIso)) return "build";
+    if (finalRecoveryEndIso && dateIso > finalRecoveryEndIso) return "final";
+    if (firstRaceIso && dateIso > firstRaceIso) return "ironmanBase";
+    if (sprintBaseStartIso && dateIso >= sprintBaseStartIso) return "sprintBase";
+    if (!hasPhases) return "build";
+    return "pre";
+  };
+  // Uma sessão perdida a cada poucas semanas, só nas bases e na construção.
+  // É uma sessão só (a força fica de fora): nunca duas em sequência.
+  const missedSessionOfWeek = (
+    weekStartIso: string,
+    weekIndex: number
+  ): { dateIso: string; key: ShowcaseHabitKey } | null => {
+    if (weekIndex % 5 !== 3) return null;
+    const sessions: Array<{ dateIso: string; key: ShowcaseHabitKey }> = [];
+    for (let offset = 0; offset < 7; offset += 1) {
+      const dateIso = shift(weekStartIso, offset);
+      const phase = phaseOf(dateIso);
+      if (phase !== "sprintBase" && phase !== "ironmanBase" && phase !== "build") continue;
+      if (launchWeekDates.has(dateIso) || weddingDates.has(dateIso)) continue;
+      weeklyPlan(phase, parseISO(dateIso).getDay(), weekIndex).forEach((key) => {
+        if (key !== "strength") sessions.push({ dateIso, key });
+      });
+    }
+    return sessions.length ? sessions[(weekIndex * 3) % sessions.length] : null;
+  };
 
   const dates = eachDayOfInterval({
     start: parseISO(yearStartIso),
     end: parseISO(cutoffIso),
-  }).map((date) => format(date, "yyyy-MM-dd"));
+  }).map((date) => iso(date));
   const yearStartWeekOffset = (parseISO(yearStartIso).getDay() + 6) % 7;
-  const exercisePatterns: ReadonlyArray<ReadonlyArray<number>> = [
-    [1, 3, 5],
-    [1, 2, 4],
-    [2, 4, 6],
-    [1, 3, 5],
-  ] as const;
   const completions = new Map<string, Set<string>>();
   dates.forEach((dateIso, dayIndex) => {
-    const weekday = parseISO(dateIso).getDay();
+    const weekday = parseISO(dateIso).getDay(); // 0 = domingo
     const weekIndex = Math.floor((dayIndex + yearStartWeekOffset) / 7);
-    const exerciseDays = exercisePatterns[weekIndex % exercisePatterns.length];
+    const weekStartIso = shift(dateIso, -((weekday + 6) % 7));
     const completed = new Set<string>();
-    const blackout = transitionDates.has(dateIso);
-    if (!blackout) {
-      if (
-        exerciseDays.includes(weekday) &&
-        !travelOrVacationDates.has(dateIso) &&
-        !(weekIndex % 6 === 4 && weekday === exerciseDays[2])
-      ) {
-        completed.add(habits[0].id);
+    const mark = (...keys: ShowcaseHabitKey[]) =>
+      keys.forEach((key) => completed.add(habitId[key]));
+    const isRaceDay = raceDates.has(dateIso);
+    const carnival = carnivalPlan.get(dateIso);
+    const inBuild = buildDates.has(dateIso) && !physioDates.has(dateIso);
+    const isLaunchDay = launchWeekDates.has(dateIso);
+    const isWedding = weddingDates.has(dateIso);
+    const afterWedding = weddingDates.has(shift(dateIso, -1));
+    const raceEve = raceDates.has(shift(dateIso, 1));
+    const recoveryDay = recoveryDayOf.get(dateIso);
+    const traveling = travelOrVacationDates.has(dateIso);
+    // Dia de ida ou volta de viagem: nada acontece — salvo nos dias que já
+    // têm plano próprio (prova, Carnaval, fases especiais).
+    const special =
+      isRaceDay ||
+      Boolean(carnival) ||
+      recoveryDay !== undefined ||
+      taperDates.has(dateIso) ||
+      physioDates.has(dateIso) ||
+      returnToRunningDates.has(dateIso) ||
+      isLaunchDay ||
+      isWedding ||
+      afterWedding;
+    const blank = transitionDates.has(dateIso) && !special;
+
+    // --- Treino ---
+    if (isRaceDay) {
+      mark("swim", "bike", "run");
+    } else if (carnival) {
+      mark(...carnival.train);
+    } else if (recoveryDay !== undefined) {
+      if (recoveryDay >= 7) {
+        if (weekday === 2) mark("swim");
+        if (weekday === 4) mark("run");
       }
-      if (
-        (readingBoostDates.has(dateIso) && dayIndex % 3 !== 1) ||
-        (weekIndex % 3 === 0 && weekday === 2) ||
-        (weekIndex % 5 === 2 && weekday === 0)
-      ) {
-        completed.add(habits[1].id);
+    } else if (taperDates.has(dateIso)) {
+      mark(...weeklyPlan("taper", weekday, weekIndex));
+    } else if (physioDates.has(dateIso)) {
+      mark(...weeklyPlan("physio", weekday, weekIndex));
+    } else if (returnToRunningDates.has(dateIso)) {
+      mark(...weeklyPlan("returnToRunning", weekday, weekIndex));
+    } else if (isLaunchDay) {
+      // Semana do lançamento: só duas corridas.
+      if (weekday === 2 || weekday === 4) mark("run");
+    } else if (isWedding) {
+      // Sábado do casamento: nada.
+    } else if (afterWedding) {
+      mark("bike");
+    } else if (blank) {
+      // Ida ou volta da viagem.
+    } else if (traveling) {
+      if (dayIndex % 2 === 1) mark("run");
+    } else {
+      const phase = phaseOf(dateIso);
+      const missed = missedSessionOfWeek(weekStartIso, weekIndex);
+      weeklyPlan(phase, weekday, weekIndex).forEach((key) => {
+        if (missed && missed.dateIso === dateIso && missed.key === key) return;
+        mark(key);
+      });
+    }
+
+    // --- Hábitos do contexto padrão ---
+    if (carnival) {
+      mark("sleep");
+      if (carnival.read) mark("reading");
+    } else if (!blank) {
+      // Ler: seg, ter, qui e dom; na construção, só o domingo; nas viagens,
+      // na Feira do Livro, no polimento do Ironman e depois da recuperação
+      // final, quase todo dia.
+      const afterFinalRecovery = Boolean(finalRecoveryEndIso && dateIso > finalRecoveryEndIso);
+      const boosted =
+        readingBoostDates.has(dateIso) ||
+        ironmanTaperDates.has(dateIso) ||
+        afterFinalRecovery;
+      const standardReading = inBuild ? weekday === 0 : [1, 2, 4, 0].includes(weekday);
+      if (!isWedding && !isLaunchDay && ((boosted && dayIndex % 3 !== 1) || standardReading)) {
+        mark("reading");
       }
+    }
+    if (!carnival) {
+      // Dormir cedo: noite de semana sim, fim de semana raro, nunca em noite
+      // com amigos, festa, show ou aniversário. Na construção, toda noite;
+      // no polimento e na véspera da prova, sempre. Na semana do lançamento,
+      // só segunda e quarta; no sábado do casamento, nenhuma.
+      const weekendNight = weekday === 5 || weekday === 6;
+      const alwaysEarly = taperDates.has(dateIso) || raceEve || inBuild;
+      let sleeps: boolean;
+      if (isWedding) sleeps = false;
+      else if (isLaunchDay) sleeps = weekday === 1 || weekday === 3;
+      else if (alwaysEarly) sleeps = true;
+      else if (blank) sleeps = false;
+      else if (traveling) sleeps = dayIndex % 2 === 0;
+      else if (weekendNight) sleeps = weekIndex % 4 === 1;
+      else sleeps = dayIndex % 9 !== 4;
+      if (sleeps && !lateNightDates.has(dateIso)) mark("sleep");
     }
     completions.set(dateIso, completed);
   });
 
-  if (dates.length >= 35) {
-    [0.04, 0.21, 0.39, 0.62, 0.83].forEach((ratio, markerCount) => {
-      const dateIso = dates[Math.min(dates.length - 1, Math.floor(dates.length * ratio))];
-      completions.set(
-        dateIso,
-        new Set(habits.slice(0, markerCount).map((habit) => habit.id))
-      );
-    });
-  }
-
   const checkIns: Record<string, HabitCheckIn> = {};
   completions.forEach((habitIds, dateIso) => {
-    habitIds.forEach((habitId) => {
-      const key = getHabitCheckInKey(habitId, dateIso);
+    habitIds.forEach((id) => {
+      const key = getHabitCheckInKey(id, dateIso);
       checkIns[key] = {
-        habitId,
+        habitId: id,
         date: dateIso,
         completed: true,
         updatedAt: `${dateIso}T12:00:00.000Z`,
@@ -188,6 +539,7 @@ export const buildOnboardingHabitShowcase = ({
     habits,
     checkIns,
     visibleHabitIds: habits.map((habit) => habit.id),
+    contexts,
   };
 };
 
@@ -212,7 +564,16 @@ export const orderActiveHabits = (habits: Habit[]) =>
     );
 
 export const getDesktopVisibleHabits = (habits: Habit[]) =>
-  orderActiveHabits(habits).slice(0, HABITS_DESKTOP_MAX);
+  orderActiveHabits(habits);
+
+/** Bolinhas de um dia: todas até caber; senão as primeiras e quantas sobraram. */
+export const getHabitDayMarkers = <T>(completed: T[]) =>
+  completed.length <= HABIT_DAY_MARKER_SLOTS
+    ? { visible: completed, overflow: 0 }
+    : {
+        visible: completed.slice(0, HABIT_DAY_MARKER_SLOTS - 1),
+        overflow: completed.length - (HABIT_DAY_MARKER_SLOTS - 1),
+      };
 
 export const moveActiveHabit = (
   habits: Habit[],
@@ -324,7 +685,7 @@ const HABIT_ROWS_BEFORE_GROWTH = 2;
 export const getDesktopHabitRowMinHeight = (visibleHabitCount: number) => {
   const count = Math.max(
     HABIT_ROWS_BEFORE_GROWTH,
-    Math.min(4, visibleHabitCount)
+    Math.min(HABIT_DAY_MARKER_SLOTS, visibleHabitCount)
   );
   const stackHeightPx =
     count * HABIT_DOT_MAX_PX + (count - 1) * HABIT_DOT_GAP_PX;

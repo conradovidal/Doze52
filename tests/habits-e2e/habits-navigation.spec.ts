@@ -45,10 +45,9 @@ const expectLogoPosition = async (
   expect(Math.round(logoBox.x)).toBe(12);
 };
 
-test("desktop antecipa a demonstração de hábitos e reinicia o guia no ano", async ({
+test("desktop antecipa a demonstração de hábitos e reinicia o guia no ano", { tag: "@desktop" }, async ({
   page,
-}, testInfo) => {
-  test.skip(!testInfo.project.name.startsWith("desktop-"), "Cenário desktop");
+}) => {
 
   await page.addInitScript(() => {
     window.localStorage.setItem(
@@ -83,12 +82,13 @@ test("desktop antecipa a demonstração de hábitos e reinicia o guia no ano", a
     throw new Error("Grades demonstrativas não puderam ser medidas.");
   }
   expect(Math.abs(habitsDemoFrameTop - annualDemoFrameTop)).toBeLessThanOrEqual(1);
-  // A vitrine de demonstração hoje traz só 2 hábitos (Exercício, Ler 20
-  // minutos) — ver ONBOARDING_HABIT_SHOWCASE_DEFINITIONS em
-  // lib/habits-prototype.ts.
-  for (const name of ["Exercício", "Ler 20 minutos"]) {
+  // A vitrine abre no contexto "Hábitos" (Ler 20 minutos, Dormir cedo); o
+  // "Triatlo" de exemplo fica no chip ao lado — ver
+  // ONBOARDING_HABIT_SHOWCASE_DEFINITIONS em lib/habits-prototype.ts.
+  for (const name of ["Dormir cedo", "Ler 20 minutos"]) {
     await expect(habits.getByRole("button", { name, exact: true })).toBeVisible();
   }
+  await expect(habits.locator("[data-habit-context]")).toHaveText(["Hábitos", "Triatlo"]);
   const habitDay = habits.locator("[data-day-cell]").first();
   // Mesma altura de um mês de Eventos (72px): comporta 2 hábitos por padrão
   // e só cresce a partir do 3º (ver getDesktopHabitRowMinHeight).
@@ -115,10 +115,9 @@ test("desktop antecipa a demonstração de hábitos e reinicia o guia no ano", a
   await expect(page.locator("[data-month-row]")).toHaveCount(12);
 });
 
-test("mobile volta na última tela e preserva a sessão entre superfícies", async ({
+test("mobile volta na última tela e preserva a sessão entre superfícies", { tag: "@mobile" }, async ({
   page,
-}, testInfo) => {
-  test.skip(!testInfo.project.name.startsWith("mobile-"), "Cenário mobile");
+}) => {
 
   await installCompletedOnboarding(page);
   // Quem já passou pelo onboarding não é empurrado para Hábitos: sem tela
@@ -165,7 +164,7 @@ test("mobile volta na última tela e preserva a sessão entre superfícies", asy
 
   await habits.getByRole("button", { name: "Criar novo hábito" }).click();
   await expect(
-    page.getByRole("dialog", { name: "Acompanhe mais de uma rotina" })
+    page.getByRole("dialog", { name: "Acompanhe todas as suas rotinas" })
   ).toBeVisible();
   await page.getByRole("button", { name: "Agora não" }).click();
   await expect(habits.getByRole("button", { name: "Ler", exact: true })).toHaveCount(0);
@@ -231,10 +230,9 @@ test("mobile volta na última tela e preserva a sessão entre superfícies", asy
   ).toBeVisible();
 });
 
-test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
+test("desktop usa grade anual de hábitos e modal com retorno de foco", { tag: "@desktop" }, async ({
   page,
-}, testInfo) => {
-  test.skip(!testInfo.project.name.startsWith("desktop-"), "Cenário desktop");
+}) => {
 
   await installCompletedOnboarding(page);
   await page.addInitScript(() => {
@@ -427,18 +425,18 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
     defaultTeamCard.getByRole("button", { name: "Adicionar", exact: true })
   ).toBeVisible();
   await calendarGallery.getByRole("button", { name: "Voltar para as opções de categoria" }).click();
-  await expect(categoryChoice).toBeVisible();
-  // Escape fecha só o diálogo "Adicionar categoria", devolvendo ao painel
-  // Organizar (ainda modal — o botão do cabeçalho fica inacessível
-  // enquanto ele estiver aberto); um segundo Escape finaliza a organização.
-  await page.keyboard.press("Escape");
+  // O calendário pronto vem direto do painel Organizar (a escolha é uma
+  // tela dele): voltar devolve ao painel, que segue modal. Um Escape o fecha
+  // e finaliza a organização.
   const organizePanel = page.getByRole("dialog", { name: "Editar", exact: true });
   await expect(organizePanel).toBeVisible();
-  // A criação de categoria é uma tela dentro do próprio painel: espera a
-  // troca de tela assentar antes do segundo Escape (que fecha o painel).
-  await expect(page.getByRole("button", { name: /Criar minha categoria/ })).toHaveCount(0);
-  await page.keyboard.press("Escape");
-  await expect(organizePanel).toBeHidden();
+  await expect(calendarGallery).toHaveCount(0);
+  // O foco volta ao painel depois da troca de tela: repete o Escape até ele
+  // fechar, em vez de apostar no primeiro (em 768px chegava cedo demais).
+  await expect(async () => {
+    await page.keyboard.press("Escape");
+    await expect(organizePanel).toBeHidden({ timeout: 1500 });
+  }).toPass({ timeout: 10_000 });
   // Layout adaptivo usa aria-expanded no botão + colapso via CSS
   // (grid-cols-[0fr]/opacity-0), não mais aria-hidden na região em si.
   const categoryRegion = page.locator("#app-header-categories-inline");
@@ -604,6 +602,27 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
   await page.getByRole("button", { name: "Mostrar hábitos" }).click();
   await expect(habits.locator('[data-year-grid-surface="habits"]')).toBeVisible();
   const completedDay = habits.locator('[data-day-cell][data-day-iso$="-01-01"]');
+  // Padrão igual ao mobile: um hábito em foco, marcado com um clique direto.
+  const focusedChip = habits.getByRole("button", { name: "Caminhar", exact: true });
+  await expect(focusedChip).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    habits.getByRole("button", { name: "Ler", exact: true })
+  ).toHaveAttribute("aria-pressed", "false");
+  await expect(completedDay.locator("[data-habit-marker]")).toHaveCount(1);
+  await expect(completedDay.locator("[data-habit-marker]")).toHaveAttribute(
+    "data-habit-marker",
+    "habit-1"
+  );
+  await completedDay.click();
+  await expect(completedDay.locator("[data-habit-marker]")).toHaveCount(0);
+  await expect(page.locator("[data-habit-day-picker]")).toHaveCount(0);
+  await completedDay.click();
+  await expect(completedDay.locator("[data-habit-marker]")).toHaveCount(1);
+
+  // "Todos" mostra a pilha de todos os hábitos do contexto.
+  const showAll = habits.getByRole("button", { name: "Todos", exact: true });
+  await showAll.click();
+  await expect(showAll).toHaveAttribute("aria-pressed", "true");
   await expect(completedDay.locator("[data-habit-marker]")).toHaveCount(4);
   for (const stackPosition of [1, 2, 3, 4]) {
     await expect(
@@ -692,7 +711,12 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
   await expect(walkingChoice).toBeFocused();
   const pickerBox = await dayPicker.boundingBox();
   const pickerViewport = page.viewportSize();
-  if (!pickerBox || !pickerViewport) throw new Error("Seletor diário não pôde ser medido.");
+  const pickerAnchorBox = await completedDay.boundingBox();
+  if (!pickerBox || !pickerViewport || !pickerAnchorBox) {
+    throw new Error("Seletor diário não pôde ser medido.");
+  }
+  // Abre embaixo do dia: os próximos dias do mesmo mês (à direita) ficam livres.
+  expect(pickerBox.y).toBeGreaterThanOrEqual(pickerAnchorBox.y + pickerAnchorBox.height);
   expect(pickerBox.x).toBeGreaterThanOrEqual(0);
   expect(pickerBox.y).toBeGreaterThanOrEqual(0);
   expect(pickerBox.x + pickerBox.width).toBeLessThanOrEqual(pickerViewport.width);
@@ -714,25 +738,23 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
   await expect(dayPicker).toHaveCount(0);
   await expect(completedDay).toBeFocused();
 
-  const hiddenFilter = habits.getByRole("button", { name: "Alongar", exact: true });
-  await hiddenFilter.click();
-  await expect(hiddenFilter).toHaveAttribute("aria-pressed", "false");
-  await expect(completedDay.locator("[data-habit-marker]")).toHaveCount(3);
-  // 3 hábitos visíveis: 30px + 3 bolinhas de 18px + 2 espaços + 4px.
-  await expect.poll(async () => (await completedDay.boundingBox())?.height).toBe(92);
-  await completedDay.click();
-  await expect(
-    page.locator("[data-habit-day-picker]").getByRole("button", {
-      name: "Desmarcar Alongar",
-    })
-  ).toBeVisible();
-  await page.keyboard.press("Escape");
+  // Clicar num hábito sai de "Todos" e põe ele em foco.
+  const stretchChip = habits.getByRole("button", { name: "Alongar", exact: true });
+  await stretchChip.click();
+  await expect(stretchChip).toHaveAttribute("aria-pressed", "true");
+  await expect(showAll).toHaveAttribute("aria-pressed", "false");
+  await expect(completedDay.locator("[data-habit-marker]")).toHaveCount(1);
+  await expect(completedDay.locator("[data-habit-marker]")).toHaveAttribute(
+    "data-habit-marker",
+    "habit-4"
+  );
   await expect.poll(async () => {
     const raw = await page.evaluate(() =>
       window.localStorage.getItem("doze52:habits-store:v1")
     );
-    return JSON.parse(raw ?? "{}").state?.visibleHabitIds ?? [];
-  }).not.toContain("habit-4");
+    const state = JSON.parse(raw ?? "{}").state ?? {};
+    return [state.desktopHabitView, state.selectedHabitId].join(",");
+  }).toBe("focus,habit-4");
   await expect(habits.locator('[data-day-cell][aria-disabled="true"]').first()).toBeVisible();
   await page.getByRole("link", { name: "Eventos" }).click();
   await expect(calendarRegion).toBeVisible();
@@ -746,10 +768,9 @@ test("desktop usa grade anual de hábitos e modal com retorno de foco", async ({
   await expect(panel.getByRole("button", { name: "Entrar", exact: true })).toBeVisible();
 });
 
-test("desktop restaura filtros de hábitos persistidos na sessão", async ({
+test("desktop restaura filtros de hábitos persistidos na sessão", { tag: "@desktop" }, async ({
   page,
-}, testInfo) => {
-  test.skip(!testInfo.project.name.startsWith("desktop-"), "Cenário desktop");
+}) => {
   await installCompletedOnboarding(page);
   await page.addInitScript(() => {
     if (window.sessionStorage.getItem("doze52:habits-filter-seeded")) return;
@@ -792,10 +813,9 @@ test("desktop restaura filtros de hábitos persistidos na sessão", async ({
   );
 });
 
-test("desktop mantém a grade anual disponível antes do primeiro hábito", async ({
+test("desktop mantém a grade anual disponível antes do primeiro hábito", { tag: "@desktop" }, async ({
   page,
-}, testInfo) => {
-  test.skip(!testInfo.project.name.startsWith("desktop-"), "Cenário desktop");
+}) => {
 
   await installCompletedOnboarding(page);
   await page.goto("/?surface=habits");
@@ -823,10 +843,9 @@ test("desktop mantém a grade anual disponível antes do primeiro hábito", asyn
   await expect(habits.locator('[data-day-cell][aria-disabled="true"]').first()).toBeVisible();
 });
 
-test("desktop edita e reordena hábitos nos controles contextuais", async ({
+test("desktop edita e reordena hábitos nos controles contextuais", { tag: "@desktop" }, async ({
   page,
-}, testInfo) => {
-  test.skip(!testInfo.project.name.startsWith("desktop-"), "Cenário desktop");
+}) => {
 
   await installCompletedOnboarding(page);
   await page.addInitScript(() => {
@@ -910,10 +929,9 @@ test("desktop edita e reordena hábitos nos controles contextuais", async ({
   await expect(page.locator('[data-habit-controls-layout="desktop"]')).toContainText("Corrida");
 });
 
-test("mobile reordena hábitos pelo mesmo DnD e persiste a posição", async ({
+test("mobile reordena hábitos pelo mesmo DnD e persiste a posição", { tag: "@mobile" }, async ({
   page,
-}, testInfo) => {
-  test.skip(!testInfo.project.name.startsWith("mobile-"), "Cenário mobile");
+}) => {
 
   await installCompletedOnboarding(page);
   await page.addInitScript(() => {
@@ -987,10 +1005,9 @@ test("mobile reordena hábitos pelo mesmo DnD e persiste a posição", async ({
   ).toBeVisible();
 });
 
-test("onboarding desktop apresenta o exemplo e termina no hábito real", async ({
+test("onboarding desktop apresenta o exemplo e termina no hábito real", { tag: "@desktop" }, async ({
   page,
-}, testInfo) => {
-  test.skip(!testInfo.project.name.startsWith("desktop-"), "Cenário desktop");
+}) => {
 
   await page.addInitScript(() => {
     window.localStorage.setItem(
@@ -1046,7 +1063,7 @@ test("onboarding desktop apresenta o exemplo e termina no hábito real", async (
   );
   await expect(page.locator("[data-month-row]")).toHaveCount(12);
   // O passo isolado de vitrine travada ("habit-showcase") foi removido: a
-  // vitrine de exemplo (Exercício, Ler 20 minutos) já compõe o ano real
+  // vitrine de exemplo (Ler 20 minutos, Dormir cedo) já compõe o ano real
   // desde o primeiro instante em Hábitos, lado a lado com a criação do
   // hábito de verdade (ver commit "Refina onboarding guiado", #95).
   const habitNotice = page.locator(
@@ -1054,7 +1071,7 @@ test("onboarding desktop apresenta o exemplo e termina no hábito real", async (
   );
   await expect(habitNotice).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Exercício", exact: true })
+    page.getByRole("button", { name: "Dormir cedo", exact: true })
   ).toHaveAttribute("aria-pressed", "true");
   await expect(
     page.getByRole("button", { name: "Ler 20 minutos", exact: true })
@@ -1145,10 +1162,9 @@ test("onboarding desktop apresenta o exemplo e termina no hábito real", async (
   ).toMatchObject({ step: "completed", habitCount: 1, checkInCount: 1 });
 });
 
-test("sessão antiga em passos que saíram do guia segue direto para Hábitos", async ({
+test("sessão antiga em passos que saíram do guia segue direto para Hábitos", { tag: "@desktop" }, async ({
   page,
-}, testInfo) => {
-  test.skip(!testInfo.project.name.startsWith("desktop-"), "Cenário desktop");
+}) => {
   // "Editar categoria" e "calendário pronto" deixaram de pausar o guia (o
   // calendário virou sugestão no resumo final). Uma sessão salva nesses
   // passos não pode ficar presa: o guia passa direto por eles.
@@ -1185,10 +1201,9 @@ test("sessão antiga em passos que saíram do guia segue direto para Hábitos", 
   ).toBe("habit_surface_instruction");
 });
 
-test("demonstração não apaga um hábito real já existente", async ({
+test("demonstração não apaga um hábito real já existente", { tag: "@desktop" }, async ({
   page,
-}, testInfo) => {
-  test.skip(!testInfo.project.name.startsWith("desktop-"), "Cenário desktop");
+}) => {
   await page.addInitScript(() => {
     const timestamp = new Date().toISOString();
     window.localStorage.setItem(
@@ -1248,8 +1263,7 @@ test("demonstração não apaga um hábito real já existente", async ({
   ).toEqual(["real-habit"]);
 });
 
-test("sessão v13 em Perfil é tratada como concluída", async ({ page }, testInfo) => {
-  test.skip(!testInfo.project.name.startsWith("desktop-"), "Cenário desktop");
+test("sessão v13 em Perfil é tratada como concluída", { tag: "@desktop" }, async ({ page }) => {
 
   await page.addInitScript(() => {
     window.localStorage.setItem(

@@ -1,4 +1,4 @@
-import type { Habit, HabitCheckIn } from "./types";
+import type { Habit, HabitCheckIn, HabitContext } from "./types";
 import type { GuidedOnboardingState } from "./onboarding";
 
 export type AnnualProgress = {
@@ -9,9 +9,13 @@ export type AnnualProgress = {
   firstHabitAt?: string;
   firstCheckInAt?: string;
 };
-export type ContinuityPayload = Habit | HabitCheckIn | AnnualProgress;
+export type ContinuityPayload =
+  | Habit
+  | HabitCheckIn
+  | HabitContext
+  | AnnualProgress;
 export type ContinuityRecord = {
-  kind: "habit" | "checkin" | "onboarding";
+  kind: "habit" | "checkin" | "habit_context" | "onboarding";
   entity_id: string;
   payload: ContinuityPayload;
   revision: number;
@@ -35,6 +39,9 @@ export type SyncResult = {
 export type HabitView = {
   habits: Habit[];
   checkIns: Record<string, HabitCheckIn>;
+  /** Opcional: rascunhos antigos (antes dos contextos) não têm. */
+  contexts?: HabitContext[];
+  selectedContextId?: string | null;
   selectedHabitId: string | null;
   visibleHabitIds: string[];
 };
@@ -43,7 +50,10 @@ export type ContinuityCache = {
   records: ContinuityRecord[];
   pending: ContinuityOperation[];
   conflicts: ContinuityOperation[];
-  preferences: Pick<HabitView, "selectedHabitId" | "visibleHabitIds">;
+  preferences: Pick<
+    HabitView,
+    "selectedHabitId" | "visibleHabitIds" | "selectedContextId"
+  >;
 };
 export const emptyContinuityCache = (): ContinuityCache => ({
   records: [],
@@ -96,6 +106,9 @@ export function materializeContinuity(cache: ContinuityCache): HabitView {
   const habits = records
     .filter((r) => r.kind === "habit" && !r.deleted_at)
     .map((r) => r.payload as Habit);
+  const contexts = records
+    .filter((r) => r.kind === "habit_context" && !r.deleted_at)
+    .map((r) => r.payload as HabitContext);
   const ids = new Set(habits.map((h) => h.id));
   const checkIns = Object.fromEntries(
     records
@@ -113,6 +126,8 @@ export function materializeContinuity(cache: ContinuityCache): HabitView {
   return {
     habits,
     checkIns,
+    contexts,
+    selectedContextId: cache.preferences.selectedContextId ?? null,
     selectedHabitId: ids.has(cache.preferences.selectedHabitId ?? "")
       ? cache.preferences.selectedHabitId
       : (habits[0]?.id ?? null),
@@ -166,6 +181,18 @@ export function importHabitView(
   view: HabitView,
   activeIds: Set<string>,
 ) {
+  for (const context of view.contexts ?? []) {
+    if (
+      cache.records.some(
+        (r) => r.kind === "habit_context" && r.entity_id === context.id,
+      ) ||
+      cache.pending.some(
+        (p) => p.kind === "habit_context" && p.entityId === context.id,
+      )
+    )
+      continue;
+    queueOperation(cache, "habit_context", context.id, context);
+  }
   for (const habit of view.habits) {
     if (
       cache.records.some(

@@ -8,6 +8,10 @@ import { X } from "lucide-react";
 import { ProUpgradeDialog } from "@/components/billing/pro-upgrade-dialog";
 import { DesktopHabitsPrototype } from "@/components/habits/desktop-habits-prototype";
 import { HabitControls } from "@/components/habits/habit-controls";
+import {
+  HabitContextManager,
+  type HabitContextIntent,
+} from "@/components/habits/habit-context-manager";
 import { HabitDayPicker } from "@/components/habits/habit-day-picker";
 import { HABIT_COLORS, HabitEditorDialog } from "@/components/habits/habit-editor-dialog";
 import { useHabitCheckInCount, useHabitRemoval } from "@/components/habits/use-habit-removal";
@@ -25,6 +29,14 @@ import {
   type OnboardingHabitShowcase,
 } from "@/lib/habits-prototype";
 import { useHabitsStore } from "@/lib/habits-store";
+import {
+  filterHabitsByContext,
+  getHabitContexts,
+  resolveHabitContextId,
+  resolveSelectedHabitContextId,
+  withShowcaseContexts,
+} from "@/lib/habit-contexts";
+import { isLimitReached, type ProUpgradeReason } from "@/lib/entitlements";
 import {
   getMobileHabitsOnboardingStepLabel,
   readMobileHabitsOnboardingStep,
@@ -117,6 +129,12 @@ export function HabitsPrototype({
     useBilling();
   const habits = useHabitsStore((s) => s.habits);
   const checkIns = useHabitsStore((s) => s.checkIns);
+  const storedContexts = useHabitsStore((s) => s.contexts);
+  const storedSelectedContextId = useHabitsStore((s) => s.selectedContextId);
+  const setSelectedContextId = useHabitsStore((s) => s.setSelectedContextId);
+  const reorderContextsInStore = useHabitsStore((s) => s.reorderContexts);
+  const storedDesktopHabitView = useHabitsStore((s) => s.desktopHabitView);
+  const setDesktopHabitView = useHabitsStore((s) => s.setDesktopHabitView);
   const selectedHabitId = useHabitsStore((s) => s.selectedHabitId);
   const visibleHabitIds = useHabitsStore((s) => s.visibleHabitIds);
   const setSelectedHabitId = useHabitsStore((s) => s.setSelectedHabitId);
@@ -137,6 +155,9 @@ export function HabitsPrototype({
   const [editingHabitId, setEditingHabitId] = React.useState<string | null>(null);
   const editingHabitCheckIns = useHabitCheckInCount(editingHabitId);
   const [upgradeOpen, setUpgradeOpen] = React.useState(false);
+  const [upgradeReason, setUpgradeReason] = React.useState<ProUpgradeReason>("habits");
+  const [contextIntent, setContextIntent] = React.useState<HabitContextIntent | null>(null);
+  const [draftContextId, setDraftContextId] = React.useState<string>("");
   const [createHintDismissed, setCreateHintDismissed] = React.useState(false);
   const [markHintDismissed, setMarkHintDismissed] = React.useState(false);
   const [desktopHintDismissed, setDesktopHintDismissed] = React.useState(true);
@@ -159,9 +180,35 @@ export function HabitsPrototype({
     });
   }, []);
 
-  const activeHabits = React.useMemo(
+  const contexts = React.useMemo(() => getHabitContexts(storedContexts), [storedContexts]);
+  // Na vitrine do guia, o "Triatlo" de exemplo aparece ao lado dos contextos
+  // reais — só na tela; nada dele é gravado.
+  const showcaseContexts = (showcase ?? showcaseDisplay)?.contexts;
+  const presentedContexts = React.useMemo(
+    () => withShowcaseContexts(contexts, showcaseContexts),
+    [contexts, showcaseContexts]
+  );
+  const selectedContextId = resolveSelectedHabitContextId(
+    storedSelectedContextId,
+    presentedContexts
+  );
+  const selectedIsShowcaseContext = Boolean(
+    showcaseContexts?.some((context) => context.id === selectedContextId)
+  );
+  // Onde nasce um hábito novo: num contexto de exemplo não dá, então no
+  // primeiro contexto real.
+  const creationContextId = selectedIsShowcaseContext
+    ? resolveSelectedHabitContextId(null, contexts)
+    : selectedContextId;
+  // O limite do plano conta todos os hábitos ativos; a tela mostra só os do
+  // contexto selecionado, como o Eventos mostra só as categorias do contexto.
+  const allActiveHabits = React.useMemo(
     () => orderActiveHabits(habits),
     [habits]
+  );
+  const activeHabits = React.useMemo(
+    () => filterHabitsByContext(allActiveHabits, selectedContextId, contexts),
+    [allActiveHabits, contexts, selectedContextId]
   );
 
   // Jornada curta e própria do mobile: só corre para quem chega anônimo,
@@ -215,15 +262,17 @@ export function HabitsPrototype({
     () => new Set((displayShowcase?.habits ?? []).map((habit) => habit.id)),
     [displayShowcase]
   );
-  const presentedHabits = React.useMemo(
-    () =>
-      showcaseActive
-        ? (showcase?.habits ?? activeHabits)
-        : displayShowcase
-          ? [...displayShowcase.habits, ...activeHabits]
-          : activeHabits,
-    [activeHabits, displayShowcase, showcase, showcaseActive]
-  );
+  const presentedHabits = React.useMemo(() => {
+    const inContext = (list: Habit[]) =>
+      list.filter((habit) => habit.contextId === selectedContextId);
+    return showcaseActive
+      ? showcase
+        ? inContext(showcase.habits)
+        : activeHabits
+      : displayShowcase
+        ? [...inContext(displayShowcase.habits), ...activeHabits]
+        : activeHabits;
+  }, [activeHabits, displayShowcase, selectedContextId, showcase, showcaseActive]);
   const presentedCheckIns = React.useMemo(
     () =>
       showcaseActive
@@ -283,6 +332,27 @@ export function HabitsPrototype({
     () => getDesktopVisibleHabits(presentedHabits),
     [presentedHabits]
   );
+  // Fora do guia, o desktop segue o mobile: um hábito em foco, com a
+  // sequência à vista e marcação num clique. "Todos" (só com 2+ hábitos no
+  // contexto) mostra as bolinhas de todos e marca pelo seletor do dia. Na
+  // vitrine do guia vale o comportamento antigo, que o tour ensina.
+  const desktopViewMode: "focus" | "overview" | null =
+    displayShowcase || activeHabits.length === 0
+      ? null
+      : activeHabits.length > 1
+        ? storedDesktopHabitView
+        : "focus";
+  const desktopView = desktopViewMode
+    ? {
+        view: desktopViewMode,
+        focusedHabitId: selectedHabit?.id ?? null,
+        onFocusHabit: (habitId: string) => {
+          setSelectedHabitId(habitId);
+          setDesktopHabitView("focus");
+        },
+        onShowAll: () => setDesktopHabitView("overview"),
+      }
+    : undefined;
   const desktopSelectedHabit = React.useMemo(() => {
     // Durante o tour, a vitrine soma hábitos decorativos aos reais na tela —
     // mas só o hábito real pode ser marcado, e no plano Free só existe um.
@@ -300,7 +370,7 @@ export function HabitsPrototype({
     [guidedNotice?.target, todayIso, year]
   );
   const creationUnavailable = isBillingLoading || Boolean(billingError);
-  const reachedHabitLimit = activeHabits.length >= limits.maxHabits;
+  const reachedHabitLimit = isLimitReached(allActiveHabits.length, limits.maxHabits);
   const creationDisabled = showcaseActive ||
     creationUnavailable || (isPro && reachedHabitLimit);
   // Enquanto só a vitrine está visível (nenhum hábito real ainda), os dias
@@ -422,21 +492,26 @@ export function HabitsPrototype({
       return;
     }
     if (reachedHabitLimit) {
-      if (!isPro) {
-        setUpgradeOpen(true);
-      } else {
-        notify({
-          tone: "info",
-          title: "Limite de hábitos atingido",
-          description: "O plano Pro permite acompanhar até 4 hábitos.",
-        });
-      }
+      // Só o Free chega aqui: o Pro não tem limite de hábitos.
+      setUpgradeReason("habits");
+      setUpgradeOpen(true);
       return;
     }
     setDraftName("");
     setEditingHabitId(null);
+    setDraftContextId(creationContextId);
     setDraftColor(HABIT_COLORS[activeHabits.length % HABIT_COLORS.length]);
     setCreateDialogOpen(true);
+  };
+
+  const requestCreateContext = () => {
+    if (creationUnavailable) return;
+    if (!isPro && isLimitReached(contexts.length, limits.maxHabitContexts)) {
+      setUpgradeReason("habit-contexts");
+      setUpgradeOpen(true);
+      return;
+    }
+    setContextIntent({ mode: "create" });
   };
 
   const createHabit = (event: React.FormEvent<HTMLFormElement>) => {
@@ -444,18 +519,22 @@ export function HabitsPrototype({
     const name = draftName.trim();
     if (!name) return;
 
+    const contextId = draftContextId || creationContextId;
     if (editingHabitId) {
-      updateHabitInStore(editingHabitId, { name, color: draftColor });
+      updateHabitInStore(editingHabitId, { name, color: draftColor, contextId });
+      // Mudou de contexto: acompanha o hábito até lá, senão ele "some".
+      if (contextId !== selectedContextId) setSelectedContextId(contextId);
       setCreateDialogOpen(false);
       setEditingHabitId(null);
       return;
     }
-    createHabitInStore({ name, color: draftColor });
+    createHabitInStore({ name, color: draftColor, contextId });
+    if (contextId !== selectedContextId) setSelectedContextId(contextId);
     setCreateDialogOpen(false);
     if (!mobileOnboardingActive && !showcaseActive) {
       nudgeProAtLastFreeSlot({
         reason: "habits",
-        countAfter: activeHabits.length + 1,
+        countAfter: allActiveHabits.length + 1,
         limit: limits.maxHabits,
         isPro,
         notify,
@@ -473,6 +552,7 @@ export function HabitsPrototype({
     setEditingHabitId(habit.id);
     setDraftName(habit.name);
     setDraftColor(habit.color);
+    setDraftContextId(resolveHabitContextId(habit, contexts));
     setCreateDialogOpen(true);
   };
 
@@ -549,7 +629,7 @@ export function HabitsPrototype({
         // (guidedNotice repassado ao HabitControls). Sem botão: chega já
         // convidando a criar, num só toque.
         target: "habit",
-        instruction: "Estes dois hábitos são exemplo. Toque no + e crie o seu.",
+        instruction: "Estes hábitos são exemplo. Toque no + e crie o seu.",
         stepLabel: getMobileHabitsOnboardingStepLabel("create_habit"),
       };
     }
@@ -597,6 +677,26 @@ export function HabitsPrototype({
       onDelete={editingHabitId ? deleteEditingHabit : undefined}
       onArchive={editingHabitId ? archiveEditingHabit : undefined}
       checkInCount={editingHabitCheckIns}
+      contexts={contexts}
+      contextId={draftContextId || creationContextId}
+      onContextChange={setDraftContextId}
+    />
+  );
+  const contextDialog = (
+    <HabitContextManager
+      open={Boolean(contextIntent)}
+      onOpenChange={(open) => {
+        if (!open) setContextIntent(null);
+      }}
+      intent={contextIntent}
+    />
+  );
+  const upgradeDialog = (
+    <ProUpgradeDialog
+      open={upgradeOpen}
+      onOpenChange={setUpgradeOpen}
+      reason={upgradeReason}
+      onRequireAuth={onRequireAuth}
     />
   );
 
@@ -604,18 +704,45 @@ export function HabitsPrototype({
     return (
       <>
         <DesktopHabitsPrototype
+          contexts={presentedContexts}
+          selectedContextId={selectedContextId}
+          onSelectContext={setSelectedContextId}
           year={year}
           todayIso={todayIso}
+          desktopView={desktopView}
           habits={desktopAllHabits}
-          visibleHabits={desktopHabits}
-          allHabits={desktopAllHabits}
+          visibleHabits={
+            desktopViewMode === "focus"
+              ? selectedHabit
+                ? [selectedHabit]
+                : []
+              : desktopViewMode === "overview"
+                ? activeHabits
+                : desktopHabits
+          }
+          allHabits={
+            desktopViewMode === "focus" && selectedHabit
+              ? [selectedHabit]
+              : desktopViewMode === "overview"
+                ? activeHabits
+                : desktopAllHabits
+          }
           checkIns={presentedCheckIns}
-          selectedHabit={desktopSelectedHabit}
+          selectedHabit={
+            desktopViewMode === "focus"
+              ? selectedHabit
+              : desktopViewMode === "overview"
+                ? null
+                : desktopSelectedHabit
+          }
           visibleHabitIds={presentedVisibleHabitIdSet}
           creationDisabled={creationDisabled}
           onSelectHabit={toggleHabitVisibility}
           onToggleDay={(dateIso) =>
-            toggleHabitDay(desktopSelectedHabit, dateIso)
+            toggleHabitDay(
+              desktopViewMode === "focus" ? selectedHabit : desktopSelectedHabit,
+              dateIso
+            )
           }
           onOpenDayPicker={(dateIso, anchor) => {
             if (!dayInteractionBlocked) setDayPicker({ dateIso, anchor });
@@ -646,12 +773,7 @@ export function HabitsPrototype({
           />
         ) : null}
         {createDialog}
-        <ProUpgradeDialog
-          open={upgradeOpen}
-          onOpenChange={setUpgradeOpen}
-          reason="habits"
-          onRequireAuth={onRequireAuth}
-        />
+        {upgradeDialog}
       </>
     );
   }
@@ -713,6 +835,21 @@ export function HabitsPrototype({
       className="mx-auto flex min-h-0 w-full max-w-[31rem] flex-1 flex-col overflow-hidden pt-12"
     >
       <HabitControls
+        contexts={presentedContexts}
+        selectedContextId={selectedContextId}
+        onSelectContext={setSelectedContextId}
+        onRequestCreateContext={
+          showcaseActive || mobileOnboardingActive ? undefined : requestCreateContext
+        }
+        onEditContext={
+          showcaseActive || mobileOnboardingActive
+            ? undefined
+            : (contextId) => {
+                if (showcaseContexts?.some((context) => context.id === contextId)) return;
+                setContextIntent({ mode: "edit", contextId });
+              }
+        }
+        onReorderContexts={reorderContextsInStore}
         habits={presentedHabits}
         selectedHabit={presentedSelectedHabit}
         mobile
@@ -1032,12 +1169,8 @@ export function HabitsPrototype({
       </div>
 
       {createDialog}
-      <ProUpgradeDialog
-        open={upgradeOpen}
-        onOpenChange={setUpgradeOpen}
-        reason="habits"
-        onRequireAuth={onRequireAuth}
-      />
+      {upgradeDialog}
+      {contextDialog}
 
       <span className="sr-only" aria-live="polite">
         Visualização mobile de hábitos

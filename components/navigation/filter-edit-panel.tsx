@@ -10,7 +10,12 @@ import { ProfileManager } from "@/components/profile-manager";
 import { ArchivedItemsSection } from "@/components/archived-items-section";
 import { CollapsibleControlRegion } from "@/components/ui/collapsible-control-region";
 import { ViewSwap } from "@/components/ui/view-swap";
-import { HabitEditList } from "@/components/habits/habit-edit-list";
+import {
+  HabitEditList,
+  SortableChipEditList,
+} from "@/components/habits/habit-edit-list";
+import { HabitContextIcon } from "@/components/habits/habit-context-icon";
+import { HabitContextManager } from "@/components/habits/habit-context-manager";
 import { useHabitCheckInCount, useHabitRemoval } from "@/components/habits/use-habit-removal";
 import {
   HABIT_COLORS,
@@ -37,6 +42,14 @@ import {
   type OnboardingHabitShowcase,
 } from "@/lib/habits-prototype";
 import { useBilling } from "@/lib/use-billing";
+import {
+  filterHabitsByContext,
+  getHabitContexts,
+  resolveHabitContextId,
+  resolveSelectedHabitContextId,
+  withShowcaseContexts,
+} from "@/lib/habit-contexts";
+import { isLimitReached, type ProUpgradeReason } from "@/lib/entitlements";
 import { cn } from "@/lib/utils";
 import { nudgeProAtLastFreeSlot } from "@/lib/pro-upgrade-nudge";
 import type { AnchorPoint } from "@/lib/types";
@@ -58,6 +71,8 @@ const DETAIL_TITLES = {
   "category-choice": "Adicionar categoria",
   "category-new": "Nova categoria",
   "profile-new": "Novo contexto",
+  "habit-context": "Editar contexto",
+  "habit-context-new": "Novo contexto",
 } as const;
 
 type FilterEditPanelProps = {
@@ -175,8 +190,39 @@ export function FilterEditPanel({
   const toggleHabitVisibilityInStore = useHabitsStore(
     (s) => s.toggleHabitVisibility
   );
+  const storedContexts = useHabitsStore((s) => s.contexts);
+  const storedSelectedContextId = useHabitsStore((s) => s.selectedContextId);
+  const setSelectedContextId = useHabitsStore((s) => s.setSelectedContextId);
+  const reorderContextsInStore = useHabitsStore((s) => s.reorderContexts);
+  const habitContexts = React.useMemo(
+    () => getHabitContexts(storedContexts),
+    [storedContexts]
+  );
+  // Durante o guia, o "Triatlo" de exemplo aparece ao lado dos reais.
+  const presentedHabitContexts = React.useMemo(
+    () => withShowcaseContexts(habitContexts, habitShowcase?.contexts),
+    [habitContexts, habitShowcase]
+  );
+  const selectedHabitContextId = resolveSelectedHabitContextId(
+    storedSelectedContextId,
+    presentedHabitContexts
+  );
+  const selectedIsShowcaseContext = Boolean(
+    habitShowcase?.contexts.some((context) => context.id === selectedHabitContextId)
+  );
+  // Hábito novo não nasce num contexto de exemplo: vai para o primeiro real.
+  const habitCreationContextId = selectedIsShowcaseContext
+    ? resolveSelectedHabitContextId(null, habitContexts)
+    : selectedHabitContextId;
 
-  const activeHabits = React.useMemo(() => orderActiveHabits(habits), [habits]);
+  // Mesma regra da tela de Hábitos: o limite conta todos, a lista mostra só
+  // os do contexto em edição.
+  const allActiveHabits = React.useMemo(() => orderActiveHabits(habits), [habits]);
+  const activeHabits = React.useMemo(
+    () =>
+      filterHabitsByContext(allActiveHabits, selectedHabitContextId, habitContexts),
+    [allActiveHabits, habitContexts, selectedHabitContextId]
+  );
   const selectedHabit = React.useMemo(
     () => activeHabits.find((habit) => habit.id === selectedHabitId) ?? null,
     [activeHabits, selectedHabitId]
@@ -192,10 +238,13 @@ export function FilterEditPanel({
   );
   const presentedHabits = React.useMemo(() => {
     if (!habitShowcase) return activeHabits;
+    const showcaseInContext = habitShowcase.habits.filter(
+      (habit) => habit.contextId === selectedHabitContextId
+    );
     return habitShowcaseLocked
-      ? habitShowcase.habits
-      : [...habitShowcase.habits, ...activeHabits];
-  }, [activeHabits, habitShowcase, habitShowcaseLocked]);
+      ? showcaseInContext
+      : [...showcaseInContext, ...activeHabits];
+  }, [activeHabits, habitShowcase, habitShowcaseLocked, selectedHabitContextId]);
 
   const [habitDialogOpen, setHabitDialogOpen] = React.useState(false);
   // Editar/criar categoria e contexto troca a tela dentro do próprio painel
@@ -206,6 +255,8 @@ export function FilterEditPanel({
     | { kind: "category-choice" }
     | { kind: "category-new" }
     | { kind: "profile-new"; previousSelectedProfileIds: string[] }
+    | { kind: "habit-context"; id: string }
+    | { kind: "habit-context-new" }
     | null
   >(null);
   const detailId = detail && "id" in detail ? detail.id : null;
@@ -230,7 +281,19 @@ export function FilterEditPanel({
   const editingHabitCheckIns = useHabitCheckInCount(editingHabitId);
   const [draftName, setDraftName] = React.useState("");
   const [draftColor, setDraftColor] = React.useState<string>(HABIT_COLORS[0]);
+  const [draftContextId, setDraftContextId] = React.useState("");
   const [upgradeOpen, setUpgradeOpen] = React.useState(false);
+  const [upgradeReason, setUpgradeReason] = React.useState<ProUpgradeReason>("habits");
+  const habitContextIntent = React.useMemo(
+    () =>
+      detail?.kind === "habit-context" && detailId
+        ? ({ mode: "edit", contextId: detailId } as const)
+        : detail?.kind === "habit-context-new"
+          ? ({ mode: "create" } as const)
+          : null,
+    // Estável por identidade, pelo mesmo motivo de profileIntent.
+    [detail?.kind, detailId]
+  );
 
   React.useEffect(() => {
     // Fechar o painel inteiro (Escape, clique fora) não deve deixar a
@@ -243,7 +306,7 @@ export function FilterEditPanel({
   }, [open]);
 
   const creationUnavailable = isBillingLoading || Boolean(billingError);
-  const reachedHabitLimit = activeHabits.length >= limits.maxHabits;
+  const reachedHabitLimit = isLimitReached(allActiveHabits.length, limits.maxHabits);
   const habitCreationDisabled =
     habitShowcaseLocked || creationUnavailable || (isPro && reachedHabitLimit);
 
@@ -258,21 +321,30 @@ export function FilterEditPanel({
       return;
     }
     if (reachedHabitLimit) {
-      if (!isPro) {
-        setUpgradeOpen(true);
-      } else {
-        notify({
-          tone: "info",
-          title: "Limite de hábitos atingido",
-          description: "O plano Pro permite acompanhar até 4 hábitos.",
-        });
-      }
+      // Só o Free chega aqui: o Pro não tem limite de hábitos.
+      setUpgradeReason("habits");
+      setUpgradeOpen(true);
       return;
     }
     setDraftName("");
     setEditingHabitId(null);
+    setDraftContextId(habitCreationContextId);
     setDraftColor(HABIT_COLORS[activeHabits.length % HABIT_COLORS.length]);
     setHabitDialogOpen(true);
+  };
+
+  const requestCreateHabitContext = () => {
+    if (creationUnavailable) return;
+    if (
+      !bypassLimits &&
+      !isPro &&
+      isLimitReached(habitContexts.length, limits.maxHabitContexts)
+    ) {
+      setUpgradeReason("habit-contexts");
+      setUpgradeOpen(true);
+      return;
+    }
+    setDetail({ kind: "habit-context-new" });
   };
 
   const requestEditHabit = (habitId: string) => {
@@ -281,6 +353,7 @@ export function FilterEditPanel({
     setEditingHabitId(habit.id);
     setDraftName(habit.name);
     setDraftColor(habit.color);
+    setDraftContextId(resolveHabitContextId(habit, habitContexts));
     setHabitDialogOpen(true);
   };
 
@@ -289,18 +362,22 @@ export function FilterEditPanel({
     const name = draftName.trim();
     if (!name) return;
 
+    const contextId = draftContextId || habitCreationContextId;
     if (editingHabitId) {
-      updateHabitInStore(editingHabitId, { name, color: draftColor });
+      updateHabitInStore(editingHabitId, { name, color: draftColor, contextId });
+      // Mudou de contexto: a lista acompanha o hábito até lá.
+      if (contextId !== selectedHabitContextId) setSelectedContextId(contextId);
       setHabitDialogOpen(false);
       setEditingHabitId(null);
       return;
     }
-    createHabitInStore({ name, color: draftColor });
+    createHabitInStore({ name, color: draftColor, contextId });
+    if (contextId !== selectedHabitContextId) setSelectedContextId(contextId);
     setHabitDialogOpen(false);
     if (!guidedOnboardingActive) {
       nudgeProAtLastFreeSlot({
         reason: "habits",
-        countAfter: activeHabits.length + 1,
+        countAfter: allActiveHabits.length + 1,
         limit: limits.maxHabits,
         isPro,
         notify,
@@ -500,6 +577,16 @@ export function FilterEditPanel({
                   onProfileCreated?.(profileId);
                 }}
               />
+            ) : detail?.kind === "habit-context" ||
+              detail?.kind === "habit-context-new" ? (
+              <HabitContextManager
+                embedded
+                open
+                onOpenChange={(next) => {
+                  if (!next) closeDetail();
+                }}
+                intent={habitContextIntent}
+              />
             ) : habitDialogOpen ? (
               <HabitEditorFields
                 dialogSemantics={false}
@@ -512,6 +599,9 @@ export function FilterEditPanel({
                 onDelete={editingHabitId ? deleteEditingHabit : undefined}
                 onArchive={editingHabitId ? archiveEditingHabit : undefined}
                 checkInCount={editingHabitCheckIns}
+                contexts={habitContexts}
+                contextId={draftContextId || habitCreationContextId}
+                onContextChange={setDraftContextId}
                 onCancel={() => setHabitDialogOpen(false)}
               />
             ) : section === "annual" ? (
@@ -598,7 +688,31 @@ export function FilterEditPanel({
                 </section>
               </>
             ) : (
+              <>
+              {/* Mesmo arranjo da aba Eventos: contextos em cima, o que mora
+                  no contexto selecionado embaixo. */}
               <section>
+                <SortableChipEditList
+                  habits={presentedHabitContexts}
+                  selectedId={selectedHabitContextId}
+                  noun={{ noun: "contexto", createLabel: "Criar novo contexto", kind: "context" }}
+                  leading={(context) => (
+                    <HabitContextIcon icon={context.icon} size={13} className="shrink-0" />
+                  )}
+                  selectedTone="primary"
+                  creationDisabled={habitShowcaseLocked || creationUnavailable}
+                  onSelectHabit={setSelectedContextId}
+                  onRequestCreate={requestCreateHabitContext}
+                  // Mesma trava dos hábitos: o guia está montando a vitrine.
+                  locked={guidedOnboardingActive}
+                  onEditHabit={(contextId) => {
+                    if (habitShowcase?.contexts.some((context) => context.id === contextId)) return;
+                    setDetail({ kind: "habit-context", id: contextId });
+                  }}
+                  onReorderHabits={reorderContextsInStore}
+                />
+              </section>
+              <section className="relative mt-6 border-t border-border/55 pt-5">
                 <HabitEditList
                   habits={presentedHabits}
                   selectedHabit={selectedHabit}
@@ -610,6 +724,7 @@ export function FilterEditPanel({
                   onReorderHabits={reorderHabits}
                 />
               </section>
+              </>
             )}
             </ViewSwap>
             {!viewIsDetail && archivedCount > 0 ? (
@@ -658,7 +773,7 @@ export function FilterEditPanel({
       <ProUpgradeDialog
         open={upgradeOpen}
         onOpenChange={setUpgradeOpen}
-        reason="habits"
+        reason={upgradeReason}
         onRequireAuth={onRequireAuth}
       />
     </Dialog>
