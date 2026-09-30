@@ -19,10 +19,14 @@ export default defineConfig({
   projects: [
     {
       name: "desktop-chromium",
+      // Cada cenário roda só no formato para o qual foi escrito (@desktop /
+      // @mobile no teste), em vez de ser pulado no outro.
+      grepInvert: /@mobile/,
       use: { ...devices["Desktop Chrome"] },
     },
     {
       name: "mobile-chromium",
+      grepInvert: /@desktop/,
       use: {
         ...devices["Desktop Chrome"],
         viewport: { width: 390, height: 844 },
