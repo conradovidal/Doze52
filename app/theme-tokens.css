@@ -35,9 +35,9 @@
   --cal-cell-weekday: 0 0% 100%;
   --cal-cell-weekend: 0 0% 98%;
   --cal-cell-outside: 0 0% 96.1%;
-  --cal-cell-weekday-past: 0 0% 91%;
-  --cal-cell-weekend-past: 0 0% 88.5%;
-  --cal-cell-outside-past: 0 0% 89%;
+  --cal-cell-weekday-past: 0 0% 93.5%;
+  --cal-cell-weekend-past: 0 0% 91.5%;
+  --cal-cell-outside-past: 0 0% 95%;
   --premium: #c9a13c;
   --premium-foreground: #8a6318;
   --premium-soft: #c9a13c26;
@@ -78,10 +78,10 @@
   --sidebar-ring: #a3a3a3;
   --cal-cell-weekday: 0 0% 24%;
   --cal-cell-weekend: 0 0% 21%;
-  --cal-cell-outside: 0 0% 16%;
-  --cal-cell-weekday-past: 0 0% 15%;
-  --cal-cell-weekend-past: 0 0% 13%;
-  --cal-cell-outside-past: 0 0% 11%;
+  --cal-cell-outside: 0 0% 19%;
+  --cal-cell-weekday-past: 0 0% 16.5%;
+  --cal-cell-weekend-past: 0 0% 14%;
+  --cal-cell-outside-past: 0 0% 15.5%;
   --premium: #d4b06a;
   --premium-foreground: #e8cd91;
   --premium-soft: #d4b06a26;

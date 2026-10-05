@@ -47,6 +47,7 @@ export function DayCell({
   isRangeStart,
   isRangeEnd,
   isInMonth,
+  isOutsidePast = false,
   isDropActive = false,
   showCreateCue = false,
   onDayHover,
@@ -62,6 +63,8 @@ export function DayCell({
   isRangeStart: boolean;
   isRangeEnd: boolean;
   isInMonth: boolean;
+  /** Célula fora do mês: esquerda passa a ser passado quando o mês começa, direita quando termina. */
+  isOutsidePast?: boolean;
   isDropActive?: boolean;
   showCreateCue?: boolean;
   onDayHover?: (dateIso: string) => void;
@@ -77,9 +80,9 @@ export function DayCell({
       <div
         data-day-iso={dateIso}
         className={`w-full transition-colors ${
-          isPast
-            ? "bg-neutral-200/70 dark:bg-[hsl(var(--cal-cell-outside-past))]"
-            : "bg-neutral-50/45 dark:bg-[hsl(var(--cal-cell-outside))]"
+          isOutsidePast
+            ? "bg-[hsl(var(--cal-cell-outside-past))]"
+            : "bg-[hsl(var(--cal-cell-outside))]"
         } ${isDropActive ? "ring-1 ring-inset ring-border/70 bg-foreground/6" : ""}`}
         style={{ minHeight: `${minHeightPx}px` }}
         onDragOver={(e) => {
@@ -159,11 +162,11 @@ export function DayCell({
     : undefined;
   const dayToneClass = isPast
     ? isWeekend
-      ? "bg-neutral-300/62 dark:bg-[hsl(var(--cal-cell-weekend-past))]"
-      : "bg-neutral-200/82 dark:bg-[hsl(var(--cal-cell-weekday-past))]"
+      ? "bg-[hsl(var(--cal-cell-weekend-past))]"
+      : "bg-[hsl(var(--cal-cell-weekday-past))]"
     : isWeekend
-      ? "bg-neutral-100/78 dark:bg-[hsl(var(--cal-cell-weekend))]"
-      : "bg-white dark:bg-[hsl(var(--cal-cell-weekday))]";
+      ? "bg-[hsl(var(--cal-cell-weekend))]"
+      : "bg-[hsl(var(--cal-cell-weekday))]";
   // O passado recua pelo fundo, não pelo número: o número precisa manter
   // contraste AA (>= 4.5:1) porque dias passados continuam editáveis. O
   // futuro sobe um tom para seguir mais forte que o passado.
