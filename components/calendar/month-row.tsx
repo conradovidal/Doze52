@@ -220,6 +220,14 @@ export function MonthRow({
     inMonth: isSameMonth(date, monthStart),
   }));
   const inMonthDays = dayInfos.filter((d) => d.inMonth);
+  // Vazios seguem o relógio do mês: à esquerda do dia 1 viram passado quando o
+  // mês começa; à direita do último dia, só quando o mês seguinte começa.
+  const monthFirstIso = inMonthDays[0]?.iso;
+  const monthLastIso = inMonthDays[inMonthDays.length - 1]?.iso;
+  const isOutsidePast = (day: { inMonth: boolean; iso: string }) => {
+    if (day.inMonth || !monthFirstIso || !monthLastIso) return false;
+    return day.iso < monthFirstIso ? monthFirstIso <= todayIso : monthLastIso < todayIso;
+  };
   const monthLabel = fmtMonthLabel(monthStart);
 
   const globallyVisibleEvents = React.useMemo(
@@ -729,6 +737,7 @@ export function MonthRow({
                 isRangeStart={!!rangeBounds && day.iso === rangeBounds.startIso}
                 isRangeEnd={!!rangeBounds && day.iso === rangeBounds.endIso}
                 isInMonth={day.inMonth}
+                isOutsidePast={isOutsidePast(day)}
                 isDropActive={isDraggingAny && dragState.hoverDateIso === day.iso}
                 showCreateCue={!isMobileInteractionMode && !isHabitMode && day.inMonth}
                 onDayHover={onDayHover}
