@@ -85,3 +85,41 @@ test("nada específico do usuário entra no cache e o shell não depende de cook
     expect(pathname === "/" || /^\/(_next\/static|icons)\//.test(pathname) || pathname === "/icon.svg" || pathname === "/manifest.webmanifest", url).toBe(true);
   }
 });
+
+for (const tag of ["@desktop", "@mobile"] as const) {
+  test(`${tag.slice(1)} selo Atualizar ativa o service worker novo antes de recarregar`, { tag }, async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await waitForControllingServiceWorker(page);
+    const activeScript = () =>
+      page.evaluate(async () => (await navigator.serviceWorker.getRegistration())?.active?.scriptURL);
+
+    // Simula um deploy: o Playwright não intercepta a busca do script do SW,
+    // então registramos o mesmo código sob outra URL no mesmo escopo (o
+    // navegador instala como versão nova e a deixa esperando) e fazemos
+    // /api/version responder com outro id de build.
+    await page.evaluate(() =>
+      navigator.serviceWorker.register("/sw.js?v=e2e-next", { scope: "/", updateViaCache: "none" })
+    );
+    await page.evaluate(async () => {
+      const registration = await navigator.serviceWorker.getRegistration();
+      while (!registration?.waiting) await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+    await page.route("**/api/version", (route) =>
+      route.fulfill({ json: { buildId: "e2e-next" } })
+    );
+    await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+
+    // Enquanto a pessoa não aceita, a versão antiga segue ativa.
+    const badge = page.locator("[data-app-update-badge]");
+    await expect(badge).toBeVisible();
+    expect(await activeScript()).not.toContain("e2e-next");
+
+    await Promise.all([page.waitForEvent("load"), badge.click()]);
+
+    await waitForControllingServiceWorker(page);
+    await expect.poll(activeScript).toContain("e2e-next");
+    await expect(page.locator("[data-brand-logo-position]")).toBeVisible();
+  });
+}

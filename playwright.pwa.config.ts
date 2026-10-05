@@ -25,7 +25,7 @@ export default defineConfig({
   ],
   webServer: {
     command:
-      "VERCEL_ENV=preview NEXT_PUBLIC_APP_ENV=local npx next build --webpack && VERCEL_ENV=preview NEXT_PUBLIC_APP_ENV=local npm run start -- --hostname 127.0.0.1 --port 3201",
+      "VERCEL_GIT_COMMIT_SHA=e2e-current VERCEL_ENV=preview NEXT_PUBLIC_APP_ENV=local npx next build --webpack && VERCEL_ENV=preview NEXT_PUBLIC_APP_ENV=local npm run start -- --hostname 127.0.0.1 --port 3201",
     url: "http://127.0.0.1:3201",
     reuseExistingServer: false,
     timeout: 180_000,
