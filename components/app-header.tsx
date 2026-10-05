@@ -728,7 +728,7 @@ export function AppHeader({
           className={cn(
             "relative min-h-9 md:min-h-10",
             useAdaptiveNavigation && isMobileMode
-              ? "fixed inset-x-0 top-0 z-40 flex h-12 items-center justify-between bg-background/92 px-3 pt-[env(safe-area-inset-top,0px)] backdrop-blur"
+              ? "fixed inset-x-0 top-0 z-40 flex h-12 items-center justify-between bg-background/92 pt-[env(safe-area-inset-top,0px)] pr-[max(0.75rem,env(safe-area-inset-right,0px))] pl-[max(0.75rem,env(safe-area-inset-left,0px))] backdrop-blur"
               : useAdaptiveNavigation
                 ? "flex items-center justify-between md:grid md:grid-cols-[1fr_auto_1fr]"
                 : "grid grid-cols-[auto_minmax(0,1fr)] items-start gap-2.5 md:grid-cols-[minmax(0,1fr)_auto] md:items-center md:gap-4"

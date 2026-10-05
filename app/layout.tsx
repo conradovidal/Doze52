@@ -45,6 +45,10 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
+  // Sem `cover` os env(safe-area-inset-*) já usados no app valem sempre 0:
+  // é o que permite à barra inferior respeitar o indicador de início do iOS
+  // e às laterais respeitarem o notch com o celular deitado.
+  viewportFit: "cover",
   colorScheme: "light dark",
   themeColor: [
     {
@@ -73,7 +77,7 @@ export default function RootLayout({
               <AuthProvider>
                 <BillingProvider>
                   <CalendarCatalogProvider>
-                    <div className="flex h-dvh flex-col overflow-hidden">
+                    <div className="flex h-dvh flex-col overflow-hidden pr-[env(safe-area-inset-right,0px)] pl-[env(safe-area-inset-left,0px)]">
                       <div className="min-h-0 flex-1 overflow-auto">
                         {children}
                       </div>

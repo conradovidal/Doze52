@@ -319,6 +319,11 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* Instalado, o app rola dentro do próprio contêiner: sem isso o
+       pull-to-refresh do Chrome recarrega a página e o iOS "estica" a tela. */
+    overscroll-behavior: none;
+    /* Tira o atraso do toque duplo mas mantém o zoom por pinça. */
+    touch-action: manipulation;
     font-size: 14px;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
