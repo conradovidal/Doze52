@@ -14,6 +14,7 @@ import { FeedbackProvider } from "@/components/ui/feedback-provider";
 import { ThemeInitScript } from "@/components/theme-init-script";
 import { CalendarCatalogProvider } from "@/lib/calendar-catalog/runtime";
 import { MotionProvider } from "@/components/ui/motion-provider";
+import { ServiceWorkerRegister } from "@/components/pwa/service-worker-register";
 
 export const metadata: Metadata = {
   applicationName: "Doze 52",
@@ -88,6 +89,7 @@ export default function RootLayout({
             </FeedbackProvider>
           </MotionProvider>
         </ThemeProvider>
+        <ServiceWorkerRegister />
         <Analytics />
       </body>
     </html>
