@@ -12,19 +12,19 @@ test("modal de calendarios permanece alinhado no mobile", async ({ page }) => {
   await installVercelBypass(page);
   await openQaApp(page);
   await expectAuthenticated(page);
-  await page
-    .getByRole("button", {
-      name: "Adicionar ou gerenciar calendários.",
-    })
-    .click();
+  // No mobile "Editar" liga a edição inline (sem o painel do desktop): a
+  // categoria nova parte direto do "+" e o catálogo é uma das duas opções.
+  await page.getByRole("button", { name: "Editar", exact: true }).first().click();
+  await page.getByRole("button", { name: "Criar nova categoria" }).click();
+  await page.getByRole("button", { name: /^Adicionar calendário pronto/ }).click();
 
   const dialog = page.getByRole("dialog", { name: "Calendários" });
   const cards = dialog.getByRole("article");
   await expect(cards).toHaveCount(4);
   await expect(cards.getByRole("heading")).toHaveText([
-    "Feriados",
-    "Jogos do seu time",
-    "Copa do Mundo 2026",
+    "Feriados nacionais + estaduais",
+    "Jogos do Grêmio",
+    "Copa do Mundo de 2026",
     "Corridas F1",
   ]);
 
@@ -91,6 +91,6 @@ test("sem rede avisa que os dados ficam no aparelho e volta a sincronizar sozinh
   ).toBeVisible();
 
   await context.setOffline(false);
-  await waitForSyncReady(page);
   await expect(notice).toHaveCount(0);
+  await waitForSyncReady(page);
 });
