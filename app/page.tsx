@@ -106,6 +106,13 @@ import {
   ensureSnapshotCoverage,
   materializeUserOwnedSnapshot,
 } from "@/lib/snapshot-ownership";
+import { useIsOffline } from "@/lib/use-online-status";
+import {
+  clearPendingSyncSnapshot,
+  readPendingSyncSnapshot,
+  refreshPendingSyncSnapshot,
+  writePendingSyncSnapshot,
+} from "@/lib/pending-sync";
 import { cn } from "@/lib/utils";
 import type { AnchorPoint } from "@/lib/types";
 import { trackOnboardingRegion } from "@/lib/onboarding-region";
@@ -139,19 +146,12 @@ type SyncUiError = {
   rawMessage?: string | null;
 };
 
-type PendingSyncPayload = {
-  savedAt: string;
-  snapshot: CalendarSnapshot;
-  // Content key of the server state this snapshot was based on. Without it the
-  // snapshot cannot be told apart from a stale one and is never replayed.
-  baseKey?: string;
-};
-
 // Minimum gap between refetches triggered by focus/visibility/online events.
 const REMOTE_PULL_MIN_INTERVAL_MS = 10_000;
 
 type RawSyncState =
   | { state: "hidden" }
+  | { state: "offline" }
   | { state: "loading" }
   | { state: "saving" }
   | { state: "synced" }
@@ -163,7 +163,6 @@ type RawSyncState =
     };
 
 const SYNC_NOTICE_KEY = "sync";
-const PENDING_SYNC_STORAGE_PREFIX = "pending-sync:";
 
 const DESKTOP_VISIT_CONFIRMED_STORAGE_KEY = "doze52:desktop-visit-confirmed";
 
@@ -223,75 +222,6 @@ const writeDesktopFirstNoticeDismissed = () => {
   }
 };
 
-const cloneSnapshot = (snapshot: CalendarSnapshot): CalendarSnapshot => ({
-  profiles: snapshot.profiles.map((profile) => ({ ...profile })),
-  categories: snapshot.categories.map((category) => ({ ...category })),
-  events: snapshot.events.map((event) => ({ ...event })),
-});
-
-const getPendingSyncStorageKey = (userId: string) =>
-  `${PENDING_SYNC_STORAGE_PREFIX}${userId}`;
-
-const isCalendarSnapshotLike = (value: unknown): value is CalendarSnapshot => {
-  if (typeof value !== "object" || value === null) return false;
-  const record = value as Record<string, unknown>;
-
-  return (
-    Array.isArray(record.profiles) &&
-    Array.isArray(record.categories) &&
-    Array.isArray(record.events)
-  );
-};
-
-const readPendingSyncSnapshot = (
-  userId: string
-): { snapshot: CalendarSnapshot; baseKey?: string } | null => {
-  if (typeof window === "undefined") return null;
-
-  const key = getPendingSyncStorageKey(userId);
-
-  try {
-    const raw = window.localStorage.getItem(key);
-    if (!raw) return null;
-
-    const parsed = JSON.parse(raw) as unknown;
-    const payload = parsed as Partial<PendingSyncPayload>;
-    const snapshot = payload?.snapshot ?? parsed;
-
-    if (!isCalendarSnapshotLike(snapshot)) {
-      window.localStorage.removeItem(key);
-      return null;
-    }
-
-    return {
-      snapshot: ensureSnapshotCoverage(snapshot),
-      baseKey: typeof payload?.baseKey === "string" ? payload.baseKey : undefined,
-    };
-  } catch {
-    window.localStorage.removeItem(key);
-    return null;
-  }
-};
-
-const writePendingSyncSnapshot = (
-  userId: string,
-  snapshot: CalendarSnapshot,
-  baseKey?: string
-) => {
-  if (typeof window === "undefined") return;
-
-  const payload: PendingSyncPayload = {
-    savedAt: new Date().toISOString(),
-    snapshot: cloneSnapshot(snapshot),
-    baseKey,
-  };
-
-  window.localStorage.setItem(
-    getPendingSyncStorageKey(userId),
-    JSON.stringify(payload)
-  );
-};
-
 // Keeps a copy of a local draft that could not be imported, so it is never
 // silently lost when the account's own calendar takes its place.
 const backupDiscardedDraft = (userId: string, snapshot: CalendarSnapshot) => {
@@ -305,11 +235,6 @@ const backupDiscardedDraft = (userId: string, snapshot: CalendarSnapshot) => {
   } catch {
     // Storage full or unavailable: the draft is dropped, the sync must not fail.
   }
-};
-
-const clearPendingSyncSnapshot = (userId: string) => {
-  if (typeof window === "undefined") return;
-  window.localStorage.removeItem(getPendingSyncStorageKey(userId));
 };
 
 const formatSyncDebugDetail = (error: SyncUiError) => {
@@ -463,6 +388,7 @@ export default function HomePage() {
   const [hasQueuedSave, setHasQueuedSave] = React.useState(false);
   const [remoteReady, setRemoteReady] = React.useState(false);
   const [syncBlocked, setSyncBlocked] = React.useState(false);
+  const isOffline = useIsOffline();
   const [calendarCreateOnboarding, setCalendarCreateOnboarding] =
     React.useState<ProductOnboardingState | null>(null);
   const [guidedOnboarding, setGuidedOnboarding] =
@@ -2495,9 +2421,41 @@ export default function HomePage() {
   const handleRetrySyncRef = React.useRef(handleRetrySync);
   handleRetrySyncRef.current = handleRetrySync;
 
+  // Edições feitas com o sync travado (normalmente sem rede) só existem no
+  // store local; o retry reenvia o snapshot pendente, então ele acompanha cada
+  // edição. Sem isso, reconectar ou recarregar trazia de volta a versão do
+  // momento da primeira falha.
+  React.useEffect(() => {
+    if (windowContext !== "main" || !session?.user.id || !syncBlocked) return;
+    refreshPendingSyncSnapshot(session.user.id, { profiles, categories, events });
+  }, [categories, events, profiles, session?.user.id, syncBlocked, windowContext]);
+
+  // Falha de rede não pede ação da pessoa: quando a conexão volta (ou a tela
+  // volta ao primeiro plano com rede), o próprio app tenta de novo.
+  const shouldAutoRetrySync = syncBlocked && syncError?.kind === "network";
+  React.useEffect(() => {
+    if (!shouldAutoRetrySync) return;
+    const retry = () => handleRetrySyncRef.current();
+    const retryIfVisible = () => {
+      if (document.visibilityState === "visible" && navigator.onLine) retry();
+    };
+    window.addEventListener("online", retry);
+    document.addEventListener("visibilitychange", retryIfVisible);
+    return () => {
+      window.removeEventListener("online", retry);
+      document.removeEventListener("visibilitychange", retryIfVisible);
+    };
+  }, [shouldAutoRetrySync]);
+
   const rawSyncState = React.useMemo<RawSyncState>(() => {
     if (!session?.user.id) {
       return { state: "hidden" };
+    }
+
+    // Sem rede o app segue de pé com os dados deste aparelho; o que importa
+    // dizer é isso, não um "erro ao sincronizar".
+    if (isOffline) {
+      return { state: "offline" };
     }
 
     if (syncError || syncBlocked) {
@@ -2524,6 +2482,7 @@ export default function HomePage() {
     handleRetrySync,
     hasQueuedSave,
     isBootstrappingSync,
+    isOffline,
     isSyncing,
     remoteReady,
     session?.user.id,
@@ -2543,6 +2502,18 @@ export default function HomePage() {
 
     if (rawSyncState.state === "hidden") {
       dismiss(SYNC_NOTICE_KEY);
+      return;
+    }
+
+    if (rawSyncState.state === "offline") {
+      notify({
+        key: SYNC_NOTICE_KEY,
+        tone: "info",
+        title: "Sem conexão",
+        description:
+          "Suas alterações ficam neste aparelho e sincronizam quando a internet voltar.",
+        durationMs: 0,
+      });
       return;
     }
 
@@ -2570,6 +2541,7 @@ export default function HomePage() {
     }
 
     const shouldShowSuccess =
+      previousState === "offline" ||
       previousState === "loading" ||
       previousState === "saving" ||
       previousState === "error";
