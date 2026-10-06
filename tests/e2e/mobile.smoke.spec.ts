@@ -1,6 +1,8 @@
 import { expect, test } from "@playwright/test";
 
 import {
+  createCustomCategoryMobile,
+  dismissOnboardingIfVisible,
   expectAuthenticated,
   installVercelBypass,
   openAuthenticatedSettings,
@@ -93,4 +95,73 @@ test("sem rede avisa que os dados ficam no aparelho e volta a sincronizar sozinh
   await context.setOffline(false);
   await expect(notice).toHaveCount(0);
   await waitForSyncReady(page);
+});
+
+const IPHONE_SAFARI =
+  "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
+
+// Simula o que o Chrome entrega quando o app é instalável.
+const dispatchInstallPrompt = (page: import("@playwright/test").Page) =>
+  page.evaluate(() => {
+    const event = new Event("beforeinstallprompt") as Event & {
+      prompt: () => Promise<void>;
+      userChoice: Promise<{ outcome: string }>;
+    };
+    event.prompt = async () => {
+      (window as unknown as { __installPrompted?: boolean }).__installPrompted = true;
+    };
+    event.userChoice = Promise.resolve({ outcome: "dismissed" });
+    window.dispatchEvent(event);
+  });
+
+test("quem já usa o app recebe o convite de instalação uma única vez", { tag: "@mobile" }, async ({
+  page,
+}) => {
+  await installVercelBypass(page);
+  await openQaApp(page);
+  await expectAuthenticated(page);
+  await dismissOnboardingIfVisible(page);
+  // O convite espera a pessoa ter montado algo dela.
+  await createCustomCategoryMobile(page, `QA Install ${Date.now()}`);
+
+  await dispatchInstallPrompt(page);
+  const invite = page.getByRole("status").filter({ hasText: "Instale o Doze 52" });
+  await expect(invite).toBeVisible({ timeout: 12_000 });
+  await invite.getByRole("button", { name: "Instalar" }).click();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as unknown as { __installPrompted?: boolean }).__installPrompted === true
+      )
+    )
+    .toBe(true);
+
+  // Registrado ao mostrar: depois de recarregar não volta (intervalo de 30 dias).
+  await openQaApp(page);
+  await expectAuthenticated(page);
+  await dispatchInstallPrompt(page);
+  await page.waitForTimeout(6000);
+  await expect(page.getByRole("status").filter({ hasText: "Instale o Doze 52" })).toHaveCount(0);
+});
+
+test.describe("iOS", () => {
+  test.use({ userAgent: IPHONE_SAFARI });
+
+  test("logado e sincronizado, o perfil ensina a adicionar à tela de início", { tag: "@mobile" }, async ({
+    page,
+  }) => {
+    await installVercelBypass(page);
+    await openQaApp(page);
+    await expectAuthenticated(page);
+
+    await page.getByRole("button", { name: /Abrir (perfil|conta)/ }).click();
+    await page.getByRole("button", { name: /^Instalar app/ }).click();
+
+    const guide = page.getByRole("dialog", { name: "Instalar o Doze 52" });
+    await expect(guide).toBeVisible();
+    await expect(guide).toContainText("Compartilhar");
+    await expect(guide).toContainText("Adicionar à Tela de Início");
+    await guide.getByRole("button", { name: "Entendi" }).click();
+    await expect(guide).toBeHidden();
+  });
 });
