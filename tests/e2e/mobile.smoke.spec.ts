@@ -5,6 +5,7 @@ import {
   installVercelBypass,
   openAuthenticatedSettings,
   openQaApp,
+  waitForSyncReady,
 } from "./support/browser";
 
 test("modal de calendarios permanece alinhado no mobile", async ({ page }) => {
@@ -72,4 +73,24 @@ test("exportacao permanece utilizavel no mobile", async ({ page }) => {
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
   ).toBe(true);
+});
+
+test("sem rede avisa que os dados ficam no aparelho e volta a sincronizar sozinho", { tag: "@mobile" }, async ({
+  page,
+  context,
+}) => {
+  await installVercelBypass(page);
+  await openQaApp(page);
+  await expectAuthenticated(page);
+
+  await context.setOffline(true);
+  const notice = page.getByText("Sem conexão", { exact: true });
+  await expect(notice).toBeVisible();
+  await expect(
+    page.getByText("Suas alterações ficam neste aparelho e sincronizam quando a internet voltar.")
+  ).toBeVisible();
+
+  await context.setOffline(false);
+  await waitForSyncReady(page);
+  await expect(notice).toHaveCount(0);
 });
