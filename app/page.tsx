@@ -2506,6 +2506,8 @@ export default function HomePage() {
     }
 
     if (rawSyncState.state === "offline") {
+      // Já mostrado (ou fechado pela pessoa): não reabrir a cada edição.
+      if (previousState === "offline") return;
       notify({
         key: SYNC_NOTICE_KEY,
         tone: "info",
