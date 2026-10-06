@@ -150,7 +150,11 @@ export function FeedbackProvider({ children }: { children: React.ReactNode }) {
       <div
         aria-live="polite"
         aria-atomic="true"
-        className="pointer-events-none fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] z-[90] flex justify-center px-3 sm:bottom-4 sm:px-6"
+        data-feedback-region
+        // No mobile (< md) os avisos ficam acima da barra de navegação, por
+        // cima do calendário, em vez de cobrir a barra: 3.75rem é a altura
+        // dela (adaptive-navigation) somada ao recuo do indicador do iOS.
+        className="pointer-events-none fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+3.75rem+0.75rem)] z-[90] flex justify-center px-3 sm:px-6 md:bottom-4"
       >
         <div className="flex w-full max-w-[20rem] flex-col gap-2 sm:w-[24rem] sm:max-w-none">
           {visibleToasts.map((toast) => {
