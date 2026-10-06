@@ -32,10 +32,13 @@ export const metadata: Metadata = {
         type: "image/svg+xml",
       },
     ],
+    // O iOS ignora SVG no apple-touch-icon; precisa ser PNG de 180px. Declarado
+    // aqui porque `icons` explícito desliga a convenção de arquivo apple-icon.
     apple: [
       {
-        url: "/icon.svg",
-        type: "image/svg+xml",
+        url: "/icons/apple-touch-icon.png",
+        sizes: "180x180",
+        type: "image/png",
       },
     ],
   },
