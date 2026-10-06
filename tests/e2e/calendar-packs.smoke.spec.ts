@@ -1,11 +1,15 @@
 import { expect, test } from "@playwright/test";
 
 import {
+  closeEditWorkspace,
+  createCustomCategory,
   dismissOnboardingIfVisible,
   expectAuthenticated,
   installVercelBypass,
   observeRuntimeIssues,
   openQaApp,
+  openReadyCalendars,
+  showCategories,
   waitForSyncReady,
   waitForSupabaseWrite,
 } from "./support/browser";
@@ -15,35 +19,23 @@ test("contexto, sincronizacao e calendario pronto funcionam de ponta a ponta", a
 }) => {
   await installVercelBypass(page);
   const runtime = observeRuntimeIssues(page);
+  // Nome único por execução: a conta de QA guarda as categorias de rodadas
+  // anteriores, e um nome fixo apareceria em duplicata.
+  const categoryName = `QA Smoke ${Date.now()}`;
 
   await openQaApp(page);
   await expect(page).toHaveTitle("Doze 52 | Seu ano em uma página");
   await expectAuthenticated(page);
   await dismissOnboardingIfVisible(page);
 
-  await page.getByRole("button", { name: "Editar contextos e categorias" }).click();
-  await page.getByRole("button", { name: "Criar nova categoria" }).click();
-  const categoryDialog = page.getByRole("dialog", { name: "Nova categoria" });
-  await categoryDialog.getByLabel("Nome da categoria").fill("QA Smoke");
-  const categorySaved = waitForSupabaseWrite(page, "categories", ["POST"]);
-  await categoryDialog.getByRole("button", { name: "Criar", exact: true }).click();
-  await expect(categoryDialog).toBeHidden();
-  await page
-    .getByRole("button", { name: "Finalizar edição de contextos e categorias" })
-    .click();
-  await categorySaved;
-  await waitForSyncReady(page);
+  await createCustomCategory(page, categoryName);
 
   await openQaApp(page);
   await expectAuthenticated(page);
-  await expect(page.getByRole("button", { name: "QA Smoke", exact: true })).toBeVisible();
+  await showCategories(page);
+  await expect(page.getByRole("button", { name: categoryName, exact: true })).toBeVisible();
 
-  await page
-    .getByRole("button", {
-      name: "Adicionar ou gerenciar calendários.",
-    })
-    .click();
-  const calendarsDialog = page.getByRole("dialog", { name: "Calendários" });
+  const calendarsDialog = await openReadyCalendars(page);
   await expect(
     calendarsDialog.getByRole("combobox", { name: /Estado para/ })
   ).toContainText("São Paulo (SP)");
@@ -52,27 +44,18 @@ test("contexto, sincronizacao e calendario pronto funcionam de ponta a ponta", a
   ).toContainText("Grêmio");
   const teamCard = calendarsDialog
     .getByRole("article")
-    .filter({ hasText: "Jogos do seu time favorito" });
-  await teamCard.getByRole("button", { name: "Adicionar calendário" }).click();
-  const targetProfile = teamCard.getByRole("combobox", {
-    name: "Contexto para Jogos do Grêmio",
-  });
-  const targetProfileName = (await targetProfile.textContent())?.trim();
-  expect(targetProfileName, "O calendário deve herdar o contexto ativo.").toBeTruthy();
+    .filter({ has: page.getByRole("combobox", { name: /Time para/ }) });
   const eventsImported = waitForSupabaseWrite(page, "events", ["POST"]);
-  await teamCard
-    .getByRole("button", {
-      name: `Adicionar calendário Jogos do Grêmio ao contexto ${targetProfileName}`,
-    })
-    .click();
-  await expect(teamCard.getByRole("button", { name: "Remover" })).toBeVisible();
-  await page.keyboard.press("Escape");
+  await teamCard.getByRole("button", { name: "Adicionar", exact: true }).click();
+  // Importado o calendário, o fluxo volta para o painel Editar.
+  await closeEditWorkspace(page);
 
   await expect(page.getByRole("button", { name: "Grêmio 5 x 3 Botafogo" })).toBeVisible();
   await eventsImported;
   await waitForSyncReady(page);
   await openQaApp(page);
   await expectAuthenticated(page);
+  await showCategories(page);
   await expect(page.getByText("Jogos do Grêmio", { exact: true })).toBeVisible();
   const managedEvent = page.getByRole("button", { name: "Grêmio 5 x 3 Botafogo" });
   await expect(managedEvent).toBeVisible();
@@ -80,7 +63,7 @@ test("contexto, sincronizacao e calendario pronto funcionam de ponta a ponta", a
 
   const eventDetails = page.getByRole("dialog", { name: "Detalhes do evento" });
   await expect(eventDetails.getByLabel("Título do evento")).toBeDisabled();
-  await expect(eventDetails.getByLabel("Data de início")).toBeDisabled();
+  await expect(eventDetails.getByRole("button", { name: /^Data:/ })).toBeDisabled();
   await expect(eventDetails.getByRole("button", { name: "Fechar" })).toBeVisible();
   await expect(eventDetails.getByRole("button", { name: "Excluir" })).toHaveCount(0);
   await expect(eventDetails.getByRole("button", { name: "Salvar" })).toHaveCount(0);
@@ -108,28 +91,22 @@ test("contexto, sincronizacao e calendario pronto funcionam de ponta a ponta", a
   await page.keyboard.press("Escape");
   await personalEventDialog.getByRole("button", { name: "Close" }).click();
 
-  await page
-    .getByRole("button", {
-      name: "Adicionar ou gerenciar calendários.",
-    })
-    .click();
-  const removeCard = page
-    .getByRole("dialog", { name: "Calendários" })
+  const removeDialog = await openReadyCalendars(page);
+  const removeCard = removeDialog
     .getByRole("article")
-    .filter({ hasText: "Jogos do seu time favorito" });
+    .filter({ has: page.getByRole("combobox", { name: /Time para/ }) });
   const eventsRemoved = waitForSupabaseWrite(page, "events", ["DELETE"]);
-  await removeCard.getByRole("button", { name: "Remover" }).click();
+  await removeCard.getByRole("button", { name: /^Remover/ }).click();
   await eventsRemoved;
-  const availableTeamCard = calendarsDialog
-    .getByRole("article")
-    .filter({ hasText: "Jogos do seu time favorito" });
   await expect(
-    availableTeamCard.getByRole("combobox", { name: /Time para/ })
+    removeCard.getByRole("combobox", { name: /Time para/ })
   ).toContainText("Grêmio");
   await expect(
-    availableTeamCard.getByRole("button", { name: "Adicionar calendário" })
+    removeCard.getByRole("button", { name: "Adicionar", exact: true })
   ).toBeEnabled();
+  // Escape sai do catálogo e volta para o painel Editar, que fecha em seguida.
   await page.keyboard.press("Escape");
+  await closeEditWorkspace(page);
   await expect(page.getByText("Jogos do Grêmio", { exact: true })).toHaveCount(0);
   await waitForSyncReady(page);
 

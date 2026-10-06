@@ -36,10 +36,13 @@ export const openQaApp = async (page: Page) => {
   await waitForSyncReady(page);
 };
 
+// O aviso "Sincronizado" dura 1s: curto demais para esperar por ele. O que
+// importa é que nada esteja sincronizando e que não haja erro.
 export const waitForSyncReady = async (page: Page) => {
-  await expect(page.getByText("Sincronizado", { exact: true })).toBeVisible({
+  await expect(page.getByText("Sincronizando...", { exact: true })).toHaveCount(0, {
     timeout: 15_000,
   });
+  await expect(page.getByText("Erro ao sincronizar", { exact: true })).toHaveCount(0);
 };
 
 export const waitForRemoteBootstrapAfterLogin = async (page: Page) => {
@@ -162,4 +165,51 @@ export const observeRuntimeIssues = (page: Page) => {
       ).toEqual([]);
     },
   };
+};
+
+/** Abre o painel "Editar" (contextos e categorias) e devolve o diálogo. */
+export const openEditWorkspace = async (page: Page) => {
+  await page.getByRole("button", { name: "Editar", exact: true }).first().click();
+  const workspace = page.getByRole("dialog", { name: "Editar" });
+  await expect(workspace).toBeVisible();
+  return workspace;
+};
+
+export const closeEditWorkspace = async (page: Page) => {
+  const workspace = page.getByRole("dialog", { name: "Editar" });
+  await workspace.getByRole("button", { name: "Close" }).click();
+  await expect(workspace).toBeHidden();
+};
+
+/** Cria uma categoria própria pelo painel Editar e espera ela ir para o Supabase. */
+export const createCustomCategory = async (page: Page, name: string) => {
+  const workspace = await openEditWorkspace(page);
+  await workspace.getByRole("button", { name: "Criar nova categoria" }).click();
+  await page.getByRole("button", { name: /^Criar minha categoria/ }).click();
+  const categoryDialog = page.getByRole("dialog", { name: "Nova categoria" });
+  await categoryDialog.getByLabel("Nome da categoria").fill(name);
+  const categorySaved = waitForSupabaseWrite(page, "categories", ["POST"]);
+  await categoryDialog.getByRole("button", { name: "Criar", exact: true }).click();
+  // Criada a categoria, o fluxo volta para o painel Editar.
+  await expect(workspace).toBeVisible();
+  await expect(categoryDialog).toBeHidden();
+  await closeEditWorkspace(page);
+  await categorySaved;
+  await waitForSyncReady(page);
+};
+
+/** Abre o catálogo de calendários prontos (Editar → Criar nova categoria → Adicionar calendário pronto). */
+export const openReadyCalendars = async (page: Page) => {
+  const workspace = await openEditWorkspace(page);
+  await workspace.getByRole("button", { name: "Criar nova categoria" }).click();
+  await page.getByRole("button", { name: /^Adicionar calendário pronto/ }).click();
+  const calendars = page.getByRole("dialog", { name: "Calendários" });
+  await expect(calendars).toBeVisible();
+  return calendars;
+};
+
+/** Depois de recarregar, a barra de contextos e categorias pode voltar recolhida. */
+export const showCategories = async (page: Page) => {
+  const toggle = page.getByRole("button", { name: "Mostrar contextos e categorias" });
+  if (await toggle.isVisible().catch(() => false)) await toggle.click();
 };
