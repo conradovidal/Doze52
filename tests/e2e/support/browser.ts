@@ -213,3 +213,22 @@ export const showCategories = async (page: Page) => {
   const toggle = page.getByRole("button", { name: "Mostrar contextos e categorias" });
   if (await toggle.isVisible().catch(() => false)) await toggle.click();
 };
+
+/**
+ * Cria uma categoria própria no mobile, onde "Editar" liga a edição inline (sem
+ * o painel do desktop), e espera ela ir para o Supabase. Serve para a conta de
+ * QA ter algo seu, como quem já usa o app.
+ */
+export const createCustomCategoryMobile = async (page: Page, name: string) => {
+  await page.getByRole("button", { name: "Editar", exact: true }).first().click();
+  await page.getByRole("button", { name: "Criar nova categoria" }).click();
+  await page.getByRole("button", { name: /^Criar minha categoria/ }).click();
+  const categoryDialog = page.getByRole("dialog", { name: "Nova categoria" });
+  await categoryDialog.getByLabel("Nome da categoria").fill(name);
+  const categorySaved = waitForSupabaseWrite(page, "categories", ["POST"]);
+  await categoryDialog.getByRole("button", { name: "Criar", exact: true }).click();
+  await expect(categoryDialog).toBeHidden();
+  await page.getByRole("button", { name: "Finalizar edição" }).first().click();
+  await categorySaved;
+  await waitForSyncReady(page);
+};

@@ -28,6 +28,7 @@ import {
   MoonStar,
   PencilLine,
   ShieldCheck,
+  Smartphone,
   Sparkles,
   SunMedium,
   Trash2,
@@ -68,6 +69,7 @@ import { FOUNDER_PRICE_LABEL, isCalendarSpreadsheetProGateEnabled, PRO_UPGRADE_C
 import { logDevError, logProdError } from "@/lib/safe-log";
 import { useStore } from "@/lib/store";
 import { useTheme } from "@/lib/theme";
+import { useInstall } from "@/components/pwa/install-provider";
 import { saveSnapshot } from "@/lib/sync";
 import { useBilling } from "@/lib/use-billing";
 import { cn } from "@/lib/utils";
@@ -275,6 +277,31 @@ function ThemePanelRow() {
       description={isDark ? "Escuro · toque para usar o claro" : "Claro · toque para usar o escuro"}
       trailing={false}
       onClick={toggle}
+    />
+  );
+}
+
+// "Instalar app": só aparece quando dá para instalar (ver getInstallOption).
+function InstallAppRow({ onDone }: { onDone: () => void }) {
+  const { option, install } = useInstall();
+  if (!option) return null;
+  return (
+    <PanelRow
+      icon={Smartphone}
+      color={CATEGORY_COLOR_BASE_INDIGO}
+      title="Instalar app"
+      description={
+        option === "prompt"
+          ? "Abra o Doze 52 direto da tela inicial, como um app."
+          : "Veja como adicionar à tela de início."
+      }
+      trailing={false}
+      onClick={() => {
+        // O prompt do navegador tem que sair do próprio toque; o painel fecha
+        // em seguida para não ficar por baixo do guia do iOS.
+        void install();
+        onDone();
+      }}
     />
   );
 }
@@ -596,6 +623,7 @@ export function AppUtilityPanel({
             )}
 
             <PanelList className="mt-4 w-full text-left">
+              <InstallAppRow onDone={() => onOpenChange(false)} />
               {canChangePassword ? (
                 <PanelRow
                   icon={KeyRound}
@@ -655,6 +683,7 @@ export function AppUtilityPanel({
                       {topic.id === "plan" ? <ThemePanelRow /> : null}
                     </React.Fragment>
                   ))}
+                <InstallAppRow onDone={() => onOpenChange(false)} />
               </PanelList>
             ) : null}
           </div>

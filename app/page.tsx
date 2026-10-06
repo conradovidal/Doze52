@@ -107,6 +107,8 @@ import {
   materializeUserOwnedSnapshot,
 } from "@/lib/snapshot-ownership";
 import { useIsOffline } from "@/lib/use-online-status";
+import { useInstall } from "@/components/pwa/install-provider";
+import { InstallInvite } from "@/components/pwa/install-invite";
 import {
   clearPendingSyncSnapshot,
   readPendingSyncSnapshot,
@@ -389,6 +391,7 @@ export default function HomePage() {
   const [remoteReady, setRemoteReady] = React.useState(false);
   const [syncBlocked, setSyncBlocked] = React.useState(false);
   const isOffline = useIsOffline();
+  const { setAccountSynced } = useInstall();
   const [calendarCreateOnboarding, setCalendarCreateOnboarding] =
     React.useState<ProductOnboardingState | null>(null);
   const [guidedOnboarding, setGuidedOnboarding] =
@@ -2430,6 +2433,15 @@ export default function HomePage() {
     refreshPendingSyncSnapshot(session.user.id, { profiles, categories, events });
   }, [categories, events, profiles, session?.user.id, syncBlocked, windowContext]);
 
+  // O iOS só recebe o guia de instalação com conta logada e tudo sincronizado:
+  // o app instalado lá começa com armazenamento separado do Safari.
+  const accountSynced = Boolean(
+    session?.user.id && remoteReady && !syncBlocked && !syncError && !isBootstrappingSync
+  );
+  React.useEffect(() => {
+    setAccountSynced(accountSynced);
+  }, [accountSynced, setAccountSynced]);
+
   // Falha de rede não pede ação da pessoa: quando a conexão volta (ou a tela
   // volta ao primeiro plano com rede), o próprio app tenta de novo.
   const shouldAutoRetrySync = syncBlocked && syncError?.kind === "network";
@@ -3533,6 +3545,20 @@ export default function HomePage() {
           }
         }}
         anchorPoint={authDialogAnchorPoint}
+      />
+
+      <InstallInvite
+        ready={Boolean(
+          windowContext === "main" &&
+            isMobileCalendarUi === true &&
+            !guidedOnboardingEligible &&
+            hasEstablishedSetup &&
+            (mobileHabitsOnboardingStep === null ||
+              mobileHabitsOnboardingStep === "completed" ||
+              mobileHabitsOnboardingStep === "dismissed") &&
+            !syncBlocked &&
+            !syncError
+        )}
       />
 
       {isDetailedSyncDiagnosticsEnabled ? (
