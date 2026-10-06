@@ -69,6 +69,12 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+// A versão nova fica esperando até a pessoa aceitar (aviso "Atualizar" na
+// página): ativar sozinha trocaria o código por baixo de quem está usando.
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "SKIP_WAITING") self.skipWaiting();
+});
+
 const networkFirstShell = async (request) => {
   const cache = await caches.open(CACHE);
   const cached = await cache.match(SHELL_URL);
