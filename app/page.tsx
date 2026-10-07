@@ -106,6 +106,7 @@ import {
 import {
   ensureSnapshotCoverage,
   materializeUserOwnedSnapshot,
+  withoutUnusedProfiles,
 } from "@/lib/snapshot-ownership";
 import { useIsOffline } from "@/lib/use-online-status";
 import { useInstall } from "@/components/pwa/install-provider";
@@ -220,26 +221,15 @@ const filterAnonymousDraft = (
       events: [],
     };
   }
-  const draft = stripOnboardingPersonalDemo({
-    profiles: snapshot.profiles.filter((profile) => !profile.userId),
-    categories: snapshot.categories.filter((category) => !category.userId),
-    events: snapshot.events.filter((event) => !event.userId),
-  });
-  // O contexto "Triatlo" só existe no ano de exemplo. Sai do exemplo junto com
-  // as categorias dele, mas o perfil ficava para trás e seguia para a conta da
-  // pessoa como se fosse dela. (Aqui, no login, e não ao sair do exemplo: com o
-  // perfil e sem categorias o app volta a semear o exemplo.)
-  const triathlonInUse = draft.categories.some(
-    (category) => category.profileId === ONBOARDING_PROFILE_IDS.triathlon
+  // Contextos sem categoria (os padrões do exemplo, o Triatlo) ficam de fora:
+  // no plano Free a conta aceita 1 contexto e o servidor recusaria o rascunho.
+  return withoutUnusedProfiles(
+    stripOnboardingPersonalDemo({
+      profiles: snapshot.profiles.filter((profile) => !profile.userId),
+      categories: snapshot.categories.filter((category) => !category.userId),
+      events: snapshot.events.filter((event) => !event.userId),
+    })
   );
-  return triathlonInUse
-    ? draft
-    : {
-        ...draft,
-        profiles: draft.profiles.filter(
-          (profile) => profile.id !== ONBOARDING_PROFILE_IDS.triathlon
-        ),
-      };
 };
 
 const hasRelevantLocalDraft = (snapshot: CalendarSnapshot) =>

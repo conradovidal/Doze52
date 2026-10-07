@@ -100,3 +100,17 @@ export const withoutOnboardingExamples = (snapshot: CalendarSnapshot): CalendarS
   const ids = new Set(categories.map((c) => c.id));
   return { ...snapshot, categories, events: snapshot.events.filter((e) => ids.has(e.categoryId) && !isOnboardingPersonalDemoGroup(e.calendarPackGroupId)) };
 };
+
+/**
+ * Contextos (perfis) que nenhuma categoria usa não são conteúdo da pessoa: são
+ * os padrões do exemplo (Pessoal e Profissional, mais o Triatlo). No plano Free
+ * a conta aceita 1 contexto, e levar os vazios fazia o servidor recusar o
+ * rascunho inteiro (free_snapshot_profile_limit): o app então o descartava e a
+ * conta ficava sem as categorias escolhidas. Sempre sobra ao menos um contexto.
+ */
+export const withoutUnusedProfiles = (snapshot: CalendarSnapshot): CalendarSnapshot => {
+  const used = new Set(snapshot.categories.map((category) => category.profileId));
+  const kept = snapshot.profiles.filter((profile) => used.has(profile.id));
+  if (kept.length === 0 || kept.length === snapshot.profiles.length) return snapshot;
+  return { ...snapshot, profiles: kept };
+};
