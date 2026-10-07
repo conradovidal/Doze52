@@ -9,6 +9,11 @@ export const EMAIL_CONFIRMATION_STORAGE_KEY = "doze52:pending-email-confirmation
 export const EMAIL_LINK_VALIDITY_MINUTES = 60;
 export const EMAIL_RESEND_COOLDOWN_SECONDS = 30;
 
+// O link do e-mail leva a uma página simples, que não carrega o app (ver
+// app/auth/confirmed): quem entra é a aba onde a pessoa se cadastrou.
+export const emailConfirmationRedirectTo = (origin: string) =>
+  `${origin}/auth/callback?next=${encodeURIComponent("/auth/confirmed")}`;
+
 export type PendingEmailConfirmation = { email: string; sentAt: number };
 
 export class EmailConfirmationRequiredError extends Error {
