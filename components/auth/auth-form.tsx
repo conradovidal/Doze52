@@ -450,6 +450,9 @@ export function AuthForm({
             {EMAIL_LINK_VALIDITY_MINUTES} minutos. Até lá, você segue sem conta e o que montar
             fica só neste aparelho.
           </p>
+          <p className="mt-2 text-xs leading-5 text-muted-foreground">
+            Não achou? Veja também a caixa de spam ou lixo eletrônico.
+          </p>
         </div>
         {error ? (
           <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">

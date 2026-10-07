@@ -43,6 +43,7 @@ test("cadastro sem sessão mostra o cartão de confirmação, que sobrevive a fe
   await expect(card).toBeVisible();
   await expect(card).toContainText(email);
   await expect(card).toContainText("60 minutos");
+  await expect(card).toContainText("caixa de spam");
   // Recém-enviado: o reenvio espera o intervalo.
   await expect(card.getByRole("button", { name: /^Reenviar e-mail \(\d+s\)$/ })).toBeDisabled();
 
