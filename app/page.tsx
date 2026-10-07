@@ -77,6 +77,7 @@ import {
   readProductOnboardingState,
   resetAllProductOnboarding,
   shouldPresentOnboardingHabitShowcase,
+  isMobileJourneyPastExample,
   shouldDiscardAnonymousSandbox,
   shouldShowGuidedOnboarding,
   type GuidedOnboardingAction,
@@ -219,11 +220,26 @@ const filterAnonymousDraft = (
       events: [],
     };
   }
-  return stripOnboardingPersonalDemo({
+  const draft = stripOnboardingPersonalDemo({
     profiles: snapshot.profiles.filter((profile) => !profile.userId),
     categories: snapshot.categories.filter((category) => !category.userId),
     events: snapshot.events.filter((event) => !event.userId),
   });
+  // O contexto "Triatlo" só existe no ano de exemplo. Sai do exemplo junto com
+  // as categorias dele, mas o perfil ficava para trás e seguia para a conta da
+  // pessoa como se fosse dela. (Aqui, no login, e não ao sair do exemplo: com o
+  // perfil e sem categorias o app volta a semear o exemplo.)
+  const triathlonInUse = draft.categories.some(
+    (category) => category.profileId === ONBOARDING_PROFILE_IDS.triathlon
+  );
+  return triathlonInUse
+    ? draft
+    : {
+        ...draft,
+        profiles: draft.profiles.filter(
+          (profile) => profile.id !== ONBOARDING_PROFILE_IDS.triathlon
+        ),
+      };
 };
 
 const hasRelevantLocalDraft = (snapshot: CalendarSnapshot) =>
@@ -1597,8 +1613,14 @@ export default function HomePage() {
   );
   const isInitialMobileOnboarding =
     guidedOnboarding?.step === "context_selection";
+  // Com a continuidade de conta ligada o guia do desktop nunca "assenta" para
+  // quem não tem conta (hasAuthorEvents é ignorado), e o guia no valor inicial
+  // mantinha o ano de exemplo em tela mesmo depois de a jornada mobile pedir
+  // para organizar as categorias: o lápis ficava desabilitado no passo 6.
   const isMobileExamplePreview = Boolean(
-    isMobileOnboardingPending && isInitialMobileOnboarding
+    isMobileOnboardingPending &&
+      isInitialMobileOnboarding &&
+      !isMobileJourneyPastExample(mobileHabitsOnboardingStep)
   );
   // Conta já estabelecida: com dados reais confirmados pelo servidor (ano
   // montado, categorias criadas). `hasEstablishedSetup` só é confiável aqui

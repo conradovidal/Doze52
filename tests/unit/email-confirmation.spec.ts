@@ -4,6 +4,7 @@ import {
   EMAIL_RESEND_COOLDOWN_SECONDS,
   clearPendingEmailConfirmation,
   isEmailNotConfirmedMessage,
+  isEmailRateLimitMessage,
   readPendingEmailConfirmation,
   resendSecondsLeft,
   writePendingEmailConfirmation,
@@ -47,4 +48,10 @@ test("o reenvio libera depois do intervalo", () => {
   expect(resendSecondsLeft(sentAt, sentAt + 10_000)).toBe(EMAIL_RESEND_COOLDOWN_SECONDS - 10);
   expect(resendSecondsLeft(sentAt, sentAt + EMAIL_RESEND_COOLDOWN_SECONDS * 1000)).toBe(0);
   expect(resendSecondsLeft(sentAt, sentAt + 999_999)).toBe(0);
+});
+
+test("reconhece o limite de envio de e-mails do Supabase", () => {
+  expect(isEmailRateLimitMessage("email rate limit exceeded")).toBe(true);
+  expect(isEmailRateLimitMessage("over_email_send_rate_limit")).toBe(true);
+  expect(isEmailRateLimitMessage("Invalid login credentials")).toBe(false);
 });

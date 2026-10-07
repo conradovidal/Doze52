@@ -1059,9 +1059,16 @@ const MOBILE_STEPS_WITH_USER_CONTENT: ReadonlySet<string> = new Set([
   "dismissed",
 ]);
 
+/**
+ * A jornada mobile já saiu do ano de exemplo (o exemplo some ao fim de
+ * `annual_explore`): daí em diante a pessoa está montando o ano dela.
+ */
+export const isMobileJourneyPastExample = (mobileStep: string | null) =>
+  mobileStep !== null && MOBILE_STEPS_WITH_USER_CONTENT.has(mobileStep);
+
 export const shouldDiscardAnonymousSandbox = (
   guidedStep: GuidedOnboardingState["step"],
   mobileStep: string | null
 ) =>
   (guidedStep === "demo_exploration" || guidedStep === "context_selection") &&
-  !(mobileStep !== null && MOBILE_STEPS_WITH_USER_CONTENT.has(mobileStep));
+  !isMobileJourneyPastExample(mobileStep);

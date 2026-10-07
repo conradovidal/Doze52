@@ -11,6 +11,7 @@ import {
   EmailConfirmationRequiredError,
   clearPendingEmailConfirmation,
   isEmailNotConfirmedMessage,
+  isEmailRateLimitMessage,
   readPendingEmailConfirmation,
   resendSecondsLeft,
   writePendingEmailConfirmation,
@@ -317,6 +318,9 @@ export function AuthForm({
     const msg = raw.toLowerCase();
     if (msg.includes("invalid login credentials")) return "Email ou senha invalidos.";
     if (msg.includes("user already registered")) return "Este email ja esta cadastrado.";
+    if (isEmailRateLimitMessage(raw)) {
+      return "Muitos e-mails enviados em pouco tempo. Aguarde alguns minutos e tente de novo.";
+    }
     if (isEmailNotConfirmedMessage(raw)) {
       return `Seu e-mail ainda não foi confirmado. Abra o link que enviamos (vale por ${EMAIL_LINK_VALIDITY_MINUTES} minutos) ou reenvie.`;
     }
