@@ -94,6 +94,41 @@ export function AuthForm({
     return () => window.clearInterval(timer);
   }, [resendSeconds]);
 
+  // Enquanto espera o e-mail, percebe sozinho que a conta foi confirmada (o link
+  // abre noutra janela, que compartilha a sessão): ao voltar para esta aba e a
+  // cada poucos segundos. Só esta aba entra, com o rascunho dela.
+  const confirmationWaiting = pendingConfirmation !== null && open;
+  React.useEffect(() => {
+    if (!confirmationWaiting) return;
+    let cancelled = false;
+    let inFlight = false;
+    const check = async () => {
+      if (cancelled || inFlight || document.visibilityState === "hidden") return;
+      inFlight = true;
+      try {
+        const next = await refreshSessionFromClient();
+        if (next && !cancelled) {
+          clearPendingEmailConfirmation(window.localStorage);
+          notify({ tone: "success", title: "E-mail confirmado", description: "Sua conta está ativa.", durationMs: 2500 });
+          onSuccess?.();
+        }
+      } finally {
+        inFlight = false;
+      }
+    };
+    const timer = window.setInterval(() => void check(), 3000);
+    window.addEventListener("focus", check);
+    window.addEventListener("pageshow", check);
+    document.addEventListener("visibilitychange", check);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      window.removeEventListener("focus", check);
+      window.removeEventListener("pageshow", check);
+      document.removeEventListener("visibilitychange", check);
+    };
+  }, [confirmationWaiting, notify, onSuccess, refreshSessionFromClient]);
+
   const markConfirmationPending = (pending: PendingEmailConfirmation) => {
     writePendingEmailConfirmation(window.localStorage, pending);
     setPendingConfirmation(pending);

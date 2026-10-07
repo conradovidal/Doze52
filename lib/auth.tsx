@@ -6,6 +6,7 @@ import { getSupabaseBrowserClient, hasSupabaseEnv } from "@/lib/supabase";
 import {
   EmailConfirmationRequiredError,
   clearPendingEmailConfirmation,
+  emailConfirmationRedirectTo,
 } from "@/lib/email-confirmation";
 
 export type AuthSession = {
@@ -150,7 +151,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       password,
       // O link do e-mail volta para esta mesma origem (preview, produção…) e
       // não para o "Site URL" do projeto. Precisa estar em Redirect URLs.
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+      options: { emailRedirectTo: emailConfirmationRedirectTo(window.location.origin) },
     });
     if (error) throw error;
     if (data.session) {
@@ -169,7 +170,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { error } = await getSupabaseBrowserClient().auth.resend({
       type: "signup",
       email: email.trim(),
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+      options: { emailRedirectTo: emailConfirmationRedirectTo(window.location.origin) },
     });
     if (error) throw error;
   };
