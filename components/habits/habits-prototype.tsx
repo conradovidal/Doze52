@@ -2,7 +2,6 @@
 
 import { isAccountContinuityEnabled } from "@/lib/feature-flags";
 import * as React from "react";
-import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
 import { ProUpgradeDialog } from "@/components/billing/pro-upgrade-dialog";
@@ -54,7 +53,6 @@ import {
 import { getTodayWeekScrollTop } from "@/lib/week-scroll";
 import { nudgeProAtLastFreeSlot } from "@/lib/pro-upgrade-nudge";
 
-const MOBILE_DESKTOP_HINT_STORAGE_KEY = "doze52:mobile-onboarding:desktop-hint-dismissed";
 const ACCESSIBLE_DATE_FORMATTER = new Intl.DateTimeFormat("pt-BR", {
   dateStyle: "full",
   timeZone: "UTC",
@@ -70,7 +68,6 @@ export function HabitsPrototype({
   todayIso,
   isMobile,
   onRequireAuth,
-  onRequestSignup,
   isAuthenticated = false,
   isEditing = false,
   onYearChange,
@@ -91,7 +88,6 @@ export function HabitsPrototype({
   todayIso: string;
   isMobile: boolean;
   onRequireAuth?: () => void;
-  onRequestSignup?: (trigger: HTMLElement) => void;
   isAuthenticated?: boolean;
   isEditing?: boolean;
   onYearChange: (year: number) => void;
@@ -160,7 +156,6 @@ export function HabitsPrototype({
   const [draftContextId, setDraftContextId] = React.useState<string>("");
   const [createHintDismissed, setCreateHintDismissed] = React.useState(false);
   const [markHintDismissed, setMarkHintDismissed] = React.useState(false);
-  const [desktopHintDismissed, setDesktopHintDismissed] = React.useState(true);
   const [draftName, setDraftName] = React.useState("");
   const [draftColor, setDraftColor] = React.useState<string>(HABIT_COLORS[0]);
   const scrollRegionRef = React.useRef<HTMLDivElement | null>(null);
@@ -460,26 +455,6 @@ export function HabitsPrototype({
     setShowcaseVisibleHabitIds(showcase?.visibleHabitIds ?? []);
   }, [showcase]);
 
-  React.useEffect(() => {
-    if (!isMobile || showcaseActive) return;
-    try {
-      setDesktopHintDismissed(
-        window.localStorage.getItem(MOBILE_DESKTOP_HINT_STORAGE_KEY) === "true"
-      );
-    } catch {
-      setDesktopHintDismissed(false);
-    }
-  }, [isMobile, showcaseActive]);
-
-  const dismissDesktopHint = React.useCallback(() => {
-    setDesktopHintDismissed(true);
-    try {
-      window.localStorage.setItem(MOBILE_DESKTOP_HINT_STORAGE_KEY, "true");
-    } catch {
-      // Reaparece na próxima visita se o storage falhar; sem impacto funcional.
-    }
-  }, []);
-
   const requestCreateHabit = () => {
     if (showcaseActive) return;
     if (creationUnavailable) {
@@ -661,8 +636,7 @@ export function HabitsPrototype({
     // continuam funcionando normalmente, só sem avisos.
     setCreateHintDismissed(true);
     setMarkHintDismissed(true);
-    dismissDesktopHint();
-  }, [dismissDesktopHint, setMobileOnboardingStep]);
+  }, [setMobileOnboardingStep]);
 
   const createDialog = (
     <HabitEditorDialog
@@ -808,26 +782,7 @@ export function HabitsPrototype({
               message: "Toque num dia para marcar.",
               onDismiss: () => setMarkHintDismissed(true),
             }
-          : hasCompletedAnyCheckIn && !desktopHintDismissed
-            ? {
-                message:
-                  "Isso é só o começo. O ano completo mora no computador. Aqui, você continua o dia a dia.",
-                onDismiss: dismissDesktopHint,
-                anchoredToNav: true,
-                action:
-                  !isAuthenticated && onRequestSignup
-                    ? {
-                        label: "Criar conta",
-                        onClick: () => {
-                          const trigger = document.querySelector<HTMLElement>(
-                            "[data-onboarding-auth-entry]"
-                          );
-                          if (trigger) onRequestSignup(trigger);
-                        },
-                      }
-                    : undefined,
-              }
-            : null;
+          : null;
 
   return (
     <section
@@ -906,7 +861,7 @@ export function HabitsPrototype({
         )
       ) : null}
 
-      {onboardingBanner && !onboardingBanner.anchoredToNav ? (
+      {onboardingBanner ? (
         <div
           data-mobile-habits-onboarding-hint
           className="inverse-product-surface mt-2 flex items-start gap-2 rounded-[10px] border border-border bg-card px-3 py-2.5 shadow-[0_18px_36px_-24px_rgba(15,23,42,0.45)]"
@@ -927,43 +882,6 @@ export function HabitsPrototype({
           </button>
         </div>
       ) : null}
-
-      {onboardingBanner && onboardingBanner.anchoredToNav && typeof document !== "undefined"
-        ? createPortal(
-            <div
-              data-mobile-habits-onboarding-hint
-              className="inverse-product-surface fixed inset-x-3 z-40 flex items-start gap-2 rounded-[10px] border border-border bg-card px-3 py-2.5 shadow-[0_18px_36px_-24px_rgba(15,23,42,0.45)]"
-              style={{
-                bottom: "calc(4.4rem + env(safe-area-inset-bottom, 0px))",
-              }}
-            >
-              <div className="min-w-0 flex-1">
-                <p className="text-[13px] leading-5 text-card-foreground">
-                  {onboardingBanner.message}
-                </p>
-                {onboardingBanner.action ? (
-                  <button
-                    type="button"
-                    className="mt-1.5 text-[13px] font-semibold text-primary underline underline-offset-2"
-                    onClick={onboardingBanner.action.onClick}
-                  >
-                    {onboardingBanner.action.label}
-                  </button>
-                ) : null}
-              </div>
-              <button
-                type="button"
-                aria-label="Dispensar"
-                title="Dispensar"
-                className="grid size-6 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-card-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45"
-                onClick={onboardingBanner.onDismiss}
-              >
-                <X className="size-3.5" />
-              </button>
-            </div>,
-            document.body
-          )
-        : null}
 
       <div
         data-mobile-habits-grid

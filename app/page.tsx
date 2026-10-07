@@ -27,7 +27,6 @@ import {
   type GuidedCalendarDraft,
 } from "@/components/onboarding/guided-onboarding-panel";
 import { DemoExplorationInvite } from "@/components/onboarding/demo-exploration-invite";
-import { MobileDesktopFirstNotice } from "@/components/onboarding/mobile-desktop-first-notice";
 import { OnboardingExitDialog } from "@/components/onboarding/onboarding-exit-dialog";
 import {
   GuidedToolbarNoticeCard,
@@ -78,6 +77,7 @@ import {
   readProductOnboardingState,
   resetAllProductOnboarding,
   shouldPresentOnboardingHabitShowcase,
+  shouldDiscardAnonymousSandbox,
   shouldShowGuidedOnboarding,
   type GuidedOnboardingAction,
   type GuidedOnboardingState,
@@ -166,27 +166,6 @@ type RawSyncState =
 
 const SYNC_NOTICE_KEY = "sync";
 
-const DESKTOP_VISIT_CONFIRMED_STORAGE_KEY = "doze52:desktop-visit-confirmed";
-
-const readDesktopVisitConfirmed = () => {
-  if (typeof window === "undefined") return false;
-  try {
-    return window.localStorage.getItem(DESKTOP_VISIT_CONFIRMED_STORAGE_KEY) === "true";
-  } catch {
-    return false;
-  }
-};
-
-const writeDesktopVisitConfirmed = () => {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(DESKTOP_VISIT_CONFIRMED_STORAGE_KEY, "true");
-  } catch {
-    // Sem persistência entre navegações se o storage falhar; a Anual mobile
-    // pode voltar a pedir o onboarding no desktop na próxima visita.
-  }
-};
-
 const isDetailedSyncDiagnosticsEnabled =
   process.env.NODE_ENV !== "production" ||
   process.env.NEXT_PUBLIC_APP_ENV === "local" ||
@@ -199,31 +178,6 @@ const HabitsPrototype = dynamic(() =>
   ),
   { ssr: false }
 );
-const MOBILE_DESKTOP_FIRST_NOTICE_STORAGE_KEY =
-  "doze52:mobile-desktop-first-notice:dismissed";
-
-const readDesktopFirstNoticeDismissed = () => {
-  if (typeof window === "undefined") return false;
-
-  try {
-    return (
-      window.localStorage.getItem(MOBILE_DESKTOP_FIRST_NOTICE_STORAGE_KEY) ===
-      "true"
-    );
-  } catch {
-    return false;
-  }
-};
-
-const writeDesktopFirstNoticeDismissed = () => {
-  try {
-    window.localStorage.setItem(MOBILE_DESKTOP_FIRST_NOTICE_STORAGE_KEY, "true");
-  } catch {
-    // A faixa volta na próxima visita se o storage falhar; ela é dispensável,
-    // então reaparecer é bem menos grave do que travar a tela.
-  }
-};
-
 // Keeps a copy of a local draft that could not be imported, so it is never
 // silently lost when the account's own calendar takes its place.
 const backupDiscardedDraft = (userId: string, snapshot: CalendarSnapshot) => {
@@ -426,13 +380,6 @@ export default function HomePage() {
   const [annualHelpOpen, setAnnualHelpOpen] = React.useState(false);
   const [annualGuideRequested, setAnnualGuideRequested] = React.useState(false);
   React.useEffect(() => setAnnualGuideRequested(false), [session?.user.id]);
-  const [hasConfirmedDesktopVisit, setHasConfirmedDesktopVisit] =
-    React.useState(readDesktopVisitConfirmed);
-  React.useEffect(() => {
-    if (isMobileCalendarUi !== false || hasConfirmedDesktopVisit) return;
-    writeDesktopVisitConfirmed();
-    setHasConfirmedDesktopVisit(true);
-  }, [isMobileCalendarUi, hasConfirmedDesktopVisit]);
   // Espelho do passo salvo por HabitsPrototype (lib/mobile-habits-onboarding.ts)
   // — a fonte da verdade continua lá; isto só existe para travar/destacar o
   // botão Anual da navegação, que não é filho daquele componente. Começa
@@ -505,8 +452,6 @@ export default function HomePage() {
   const [utilityPanelAuthMode, setUtilityPanelAuthMode] = React.useState<
     "login" | "signup"
   >("login");
-  const [desktopFirstNoticeDismissed, setDesktopFirstNoticeDismissed] =
-    React.useState(readDesktopFirstNoticeDismissed);
   const [mobileActiveDateIso, setMobileActiveDateIso] = React.useState(() =>
     format(new Date(), "yyyy-MM-dd")
   );
@@ -1283,8 +1228,10 @@ export default function HomePage() {
             categories: categoriesRef.current,
             events: eventsRef.current,
           }),
-          currentGuidedStep === "demo_exploration" ||
-            currentGuidedStep === "context_selection"
+          shouldDiscardAnonymousSandbox(
+            currentGuidedStep,
+            readMobileHabitsOnboardingStep()
+          )
         );
 
         const pendingSaved = readPendingSyncSnapshot(userId);
@@ -1653,55 +1600,11 @@ export default function HomePage() {
   const isMobileExamplePreview = Boolean(
     isMobileOnboardingPending && isInitialMobileOnboarding
   );
-  // Anual mobile is a read/consult surface, not a place to build the year —
-  // that lives on desktop. Established mobile users (e.g. someone who signed
-  // up and started habits from their phone) fall outside guidedOnboarding
-  // once they have real content, so the notice greets them too until this
-  // browser has confirmed at least one non-mobile visit. This is a local,
-  // per-browser heuristic (no server-side "completed desktop onboarding" flag
-  // exists yet), so it can re-trigger on a new device/browser even for
-  // someone who already did this on desktop elsewhere — acceptable for now,
-  // revisit if that turns out to be common.
-  //
-  // Isso já foi um Dialog sem saída (sem botão de fechar, com Escape e
-  // clique-fora cancelados), que deixava `pointer-events: none` no body e
-  // impedia até rolar o ano. Agora é uma faixa em fluxo no topo da Anual:
-  // a mensagem continua, o bloqueio não.
-  //
-  // Dois públicos precisam da faixa: quem chega neste navegador sem nunca ter
-  // visto o desktop, e quem começou a montar o ano no desktop e voltou ao
-  // celular com o guia pela metade — esse segundo já marcou a visita, então
-  // `hasConfirmedDesktopVisit` sozinho o deixaria de fora.
-  //
-  // Mas `hasConfirmedDesktopVisit` é uma heurística por NAVEGADOR — uma conta
-  // autenticada com dados reais já confirmados pelo servidor (ano montado,
-  // categorias criadas) não pode ver essa faixa só porque é a primeira vez
-  // que ESTE navegador específico abre a Anual. A fonte da verdade da conta é
-  // o servidor, não um flag local; `hasEstablishedSetup` só é confiável aqui
+  // Conta já estabelecida: com dados reais confirmados pelo servidor (ano
+  // montado, categorias criadas). `hasEstablishedSetup` só é confiável aqui
   // depois que `remoteReady` confirma que os dados já foram sincronizados.
   const isEstablishedAccount = Boolean(
     session?.user.id && remoteReady && hasEstablishedSetup
-  );
-  // Enquanto a continuação da jornada mobile está no ar na Anual (ver
-  // mobileAnnualOnboardingNotice), essa faixa fica de fora — os dois juntos
-  // disputariam o mesmo espaço no topo. Ela volta a fazer sentido só depois
-  // que a jornada termina de verdade (variant "onboarding", abaixo).
-  const mobileAnnualOnboardingActive = Boolean(
-    mobileHabitsOnboardingStep &&
-      mobileHabitsOnboardingStep !== "intro" &&
-      mobileHabitsOnboardingStep !== "create_habit" &&
-      mobileHabitsOnboardingStep !== "mark_day" &&
-      mobileHabitsOnboardingStep !== "goto_annual" &&
-      mobileHabitsOnboardingStep !== "completed" &&
-      mobileHabitsOnboardingStep !== "dismissed"
-  );
-  const showMobileDesktopFirstNotice = Boolean(
-    isMobileCalendarUi === true &&
-      !authLoading &&
-      !desktopFirstNoticeDismissed &&
-      !isEstablishedAccount &&
-      !mobileAnnualOnboardingActive &&
-      (!hasConfirmedDesktopVisit || isMobileOnboardingPending)
   );
   const isDemoExploration =
     guidedOnboarding?.step === "demo_exploration" && !session?.user.id;
@@ -2025,13 +1928,6 @@ export default function HomePage() {
       // mobile — a jornada própria de Hábitos (Parte 3) ficava travada no
       // que já tivesse sido salvo antes (ex.: "completed" de um teste
       // anterior) e caía direto na dica antiga em vez de reabrir do passo 1.
-      window.localStorage.removeItem("doze52:desktop-visit-confirmed");
-      window.localStorage.removeItem(
-        "doze52:mobile-desktop-first-notice:dismissed"
-      );
-      window.localStorage.removeItem(
-        "doze52:mobile-onboarding:desktop-hint-dismissed"
-      );
     } catch {
       // Recarrega mesmo assim; sem storage disponível não há o que limpar.
     }
@@ -2967,7 +2863,8 @@ export default function HomePage() {
       // isso deixaria a etapa que mais importa (categorias) opcional.
       return {
         target: "mobile-organize",
-        instruction: "Aqui você organiza contextos e categorias.",
+        instruction: "Toque no lápis para organizar contextos e categorias.",
+        leadingIcon: "pencil" as const,
         stepLabel: getMobileHabitsOnboardingStepLabel("annual_organize"),
       };
     }
@@ -3203,9 +3100,6 @@ export default function HomePage() {
             setAuthDialogAnchorPoint(undefined);
             setAuthDialogOpen(true);
           }}
-          onRequestSignup={(trigger) => {
-            handleOpenUtilityPanel("account", trigger);
-          }}
           isAuthenticated={Boolean(session)}
           guidedNotice={
             guidedToolbarNotice?.target === "habit-showcase" ||
@@ -3283,37 +3177,6 @@ export default function HomePage() {
           guidedSelectionRange={guidedDraft}
           onGuidedDaySelect={handleMobileGuidedDaySelect}
           scrollToTodayRequestKey={scrollToTodayRequestKey}
-          notice={
-            showMobileDesktopFirstNotice ? (
-              <MobileDesktopFirstNotice
-                variant={
-                  // "completed" só acontece por dois caminhos: uma conta já
-                  // estabelecida (excluída de showMobileDesktopFirstNotice
-                  // via isEstablishedAccount, então nunca chega aqui assim)
-                  // ou quem acabou de terminar a jornada de Hábitos e tocou
-                  // em Anual de propósito — é sempre essa segunda pessoa.
-                  mobileHabitsOnboardingStep === "completed"
-                    ? "onboarding"
-                    : isInitialMobileOnboarding && !hasEstablishedSetup
-                      ? "example"
-                      : "resuming"
-                }
-                onOpenLogin={() => {
-                  setAuthDialogInitialMode(
-                    mobileHabitsOnboardingStep === "completed"
-                      ? "signup"
-                      : "login"
-                  );
-                  setAuthDialogAnchorPoint(undefined);
-                  setAuthDialogOpen(true);
-                }}
-                onDismiss={() => {
-                  writeDesktopFirstNoticeDismissed();
-                  setDesktopFirstNoticeDismissed(true);
-                }}
-              />
-            ) : null
-          }
         />
       ) : (
         <div
@@ -3451,6 +3314,13 @@ export default function HomePage() {
             mobileAnnualOnboardingNotice.target === "mobile-explore"
               ? "bottom"
               : "top"
+          }
+          // O lápis fica na ponta do cabeçalho: o card cola nele, em vez de
+          // flutuar mais abaixo, longe do botão que explica.
+          mobilePointer={
+            mobileAnnualOnboardingNotice.target === "mobile-organize"
+              ? "header-end"
+              : undefined
           }
         />
       ) : null}
