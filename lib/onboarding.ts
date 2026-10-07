@@ -1041,3 +1041,27 @@ export const resetAllProductOnboarding = () => {
   }
   window.dispatchEvent(new CustomEvent(PRODUCT_ONBOARDING_RESET_EVENT));
 };
+
+/**
+ * No login, o que está no aparelho vale como "sandbox" de demonstração (e é
+ * descartado) enquanto o guia do desktop ainda está em demo/seleção de
+ * contexto. Só que a jornada própria do mobile não mexe nesse guia: ele fica no
+ * valor inicial (`context_selection`) mesmo depois de a pessoa ter escolhido
+ * as categorias dela em `annual_organize`, e o login jogava tudo fora.
+ *
+ * Passou do exemplo (o ano de demonstração sai ao fim de `annual_explore`), o
+ * que está no aparelho é da pessoa e vai para a conta.
+ */
+const MOBILE_STEPS_WITH_USER_CONTENT: ReadonlySet<string> = new Set([
+  "annual_organize",
+  "goto_profile",
+  "completed",
+  "dismissed",
+]);
+
+export const shouldDiscardAnonymousSandbox = (
+  guidedStep: GuidedOnboardingState["step"],
+  mobileStep: string | null
+) =>
+  (guidedStep === "demo_exploration" || guidedStep === "context_selection") &&
+  !(mobileStep !== null && MOBILE_STEPS_WITH_USER_CONTENT.has(mobileStep));

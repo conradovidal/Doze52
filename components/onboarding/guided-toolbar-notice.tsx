@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { createPortal } from "react-dom";
-import { Check, X } from "lucide-react";
+import { Check, PencilLine, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -32,6 +32,9 @@ export type GuidedToolbarNotice = {
   instruction: string;
   actionLabel?: string;
   stepLabel?: string;
+  // Ícone do controle que o passo manda tocar, mostrado ao lado do texto para a
+  // pessoa reconhecê-lo na tela (hoje só o lápis de Editar).
+  leadingIcon?: "pencil";
   // Só preenchido no passo de resumo (target "wrap-up"): categorias-exemplo
   // que a pessoa pode arrastar para o ano dela.
   categorySuggestions?: { id: string; name: string; color: string }[];
@@ -94,6 +97,7 @@ export function GuidedToolbarNoticeCard({
   portalTargetSelector,
   inline = false,
   mobilePlacement = "top",
+  mobilePointer,
   surface = "inverse",
 }: {
   notice: GuidedToolbarNotice;
@@ -129,6 +133,12 @@ export function GuidedToolbarNoticeCard({
    * grudado no topo criaria distância entre a explicação e o que ela aponta.
    */
   mobilePlacement?: "top" | "bottom";
+  /**
+   * No mobile, cola o card logo abaixo do cabeçalho, alinhado à direita, com
+   * uma setinha para o controle da ponta do cabeçalho (o lápis de Editar).
+   * Sem isso o card flutua mais abaixo, longe do botão que ele explica.
+   */
+  mobilePointer?: "header-end";
   /**
    * "inverse" (padrão): o card inverte claro/escuro em relação à página —
    * pensado para flutuar sobre o próprio produto (a grade do ano, a lista de
@@ -265,7 +275,9 @@ export function GuidedToolbarNoticeCard({
                 : "fixed left-3 w-[min(22rem,calc(100vw-1.5rem))] md:absolute",
               mobilePlacement === "bottom"
                 ? "bottom-[calc(env(safe-area-inset-bottom,0px)+4.5rem)]"
-                : "top-[calc(env(safe-area-inset-top,0px)+4.6rem)]",
+                : mobilePointer === "header-end"
+                  ? "top-[calc(env(safe-area-inset-top,0px)+3.5rem)] max-md:right-3 max-md:left-auto"
+                  : "top-[calc(env(safe-area-inset-top,0px)+4.6rem)]",
               aboveOverlay ? "z-[90]" : "z-40",
               anchorSelector && portaled
                 ? cn(
@@ -292,23 +304,40 @@ export function GuidedToolbarNoticeCard({
           : undefined
       }
     >
+      {mobilePointer === "header-end" && !inline ? (
+        <span
+          aria-hidden="true"
+          data-guided-notice-pointer
+          className={cn(
+            "absolute -top-1.5 right-[1.1rem] size-3 rotate-45 border-t border-l md:hidden",
+            surface === "inverse" ? "border-border bg-card" : "border-border/70 bg-muted"
+          )}
+        />
+      ) : null}
       <div className="pr-7">
         <div
           key={`${notice.target}:${notice.instruction}`}
-          className="min-w-0 animate-in fade-in slide-in-from-bottom-1 duration-300 motion-reduce:animate-none"
+          className="flex min-w-0 items-start gap-3 animate-in fade-in slide-in-from-bottom-1 duration-300 motion-reduce:animate-none"
         >
-          {notice.stepLabel ? (
-            <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-primary">
-              {notice.stepLabel}
-            </p>
+          {notice.leadingIcon === "pencil" ? (
+            <span className="mt-0.5 grid size-9 shrink-0 place-items-center rounded-xl bg-muted text-foreground">
+              <PencilLine className="size-[18px]" aria-hidden="true" />
+            </span>
           ) : null}
-          {/* font-semibold, não font-medium: texto claro em peso médio sobre
-              o card escuro (inverse-product-surface) lê como "apagado" mesmo
-              com contraste correto — um efeito óptico conhecido de texto
-              claro sobre fundo escuro, não um problema de cor. */}
-          <p className="whitespace-pre-line text-[15px] font-semibold leading-6 tracking-[-0.005em]">
-            {notice.instruction}
-          </p>
+          <div className="min-w-0">
+            {notice.stepLabel ? (
+              <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-primary">
+                {notice.stepLabel}
+              </p>
+            ) : null}
+            {/* font-semibold, não font-medium: texto claro em peso médio sobre
+                o card escuro (inverse-product-surface) lê como "apagado" mesmo
+                com contraste correto — um efeito óptico conhecido de texto
+                claro sobre fundo escuro, não um problema de cor. */}
+            <p className="whitespace-pre-line text-[15px] font-semibold leading-6 tracking-[-0.005em]">
+              {notice.instruction}
+            </p>
+          </div>
         </div>
       </div>
       <Button

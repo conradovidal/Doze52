@@ -806,35 +806,10 @@ test("mobile trava a Anual até a jornada de Hábitos terminar", { tag: "@mobile
   );
   expect(mobileStepAfterProfile).toBe("completed");
 
-  // A faixa da Anual reaparece agora com a variante de quem acabou de
-  // terminar a jornada inteira.
+  // Terminada a jornada, a Anual não empurra mais ninguém para o desktop: o
+  // convite de conta é o do próprio Perfil (aberto acima já em Cadastro).
   const notice = page.locator("[data-mobile-desktop-first-notice]");
-  await expect(notice).toBeVisible();
-  await expect(notice).toContainText("desktop");
-
-  await notice.getByRole("button", { name: "Entrar na minha conta" }).click();
-  const authDialog = page.getByRole("dialog", { name: "Entrar" });
-  await expect(authDialog).toBeVisible();
-  // Quem terminou a jornada de Hábitos ainda não tem conta — abre direto em
-  // Cadastro, não em Login.
-  await expect(
-    authDialog.getByRole("heading", { name: "Criar conta", exact: true })
-  ).toBeVisible();
-  await authDialog.getByRole("button", { name: "Cancelar" }).click();
-
-  await notice.getByRole("button", { name: "Dispensar" }).click();
   await expect(notice).toHaveCount(0);
-
-  const persisted = await page.evaluate(() => ({
-    noticeDismissed: window.localStorage.getItem(
-      "doze52:mobile-desktop-first-notice:dismissed"
-    ),
-    mobileHabitsStep: window.localStorage.getItem(
-      "doze52:mobile-habits-onboarding:v1"
-    ),
-  }));
-  expect(persisted.noticeDismissed).toBe("true");
-  expect(persisted.mobileHabitsStep).toBe("completed");
 
   await page.reload();
   await expect(notice).toHaveCount(0);
@@ -850,7 +825,7 @@ test("mobile trava a Anual até a jornada de Hábitos terminar", { tag: "@mobile
   ).toHaveCount(0);
 });
 
-test("mobile preserva progresso parcial e recomenda continuar no desktop", { tag: "@mobile" }, async ({
+test("mobile preserva o progresso parcial do desktop sem empurrar a pessoa para lá", { tag: "@mobile" }, async ({
   page,
 }) => {
 
@@ -865,24 +840,19 @@ test("mobile preserva progresso parcial e recomenda continuar no desktop", { tag
   );
 
   await page.goto("/?mobileUi=1&surface=annual");
-  const notice = page.locator("[data-mobile-desktop-first-notice]");
-  // Variante "retomando": quem começou o guia no desktop é lembrado de que
-  // o ano completo aparece lá (mobile-desktop-first-notice.tsx).
-  await expect(notice).toContainText("aparece completo no desktop");
+  // Não há mais faixa "o ano completo aparece no desktop" na Anual mobile.
+  await expect(page.locator("[data-mobile-desktop-first-notice]")).toHaveCount(0);
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.locator("body")).toHaveCSS("pointer-events", "auto");
   await expect(panel).toHaveCount(0);
 
-  const persisted = await page.evaluate(() => ({
-    noticeDismissed: window.localStorage.getItem(
-      "doze52:mobile-desktop-first-notice:dismissed"
-    ),
-    onboarding: JSON.parse(
-      window.localStorage.getItem("doze52:onboarding:v2") ?? "null"
-    ) as { step?: string } | null,
-  }));
-  expect(persisted.noticeDismissed).toBeNull();
-  expect(persisted.onboarding?.step).toBe("date_category_selection");
+  const onboarding = await page.evaluate(
+    () =>
+      JSON.parse(window.localStorage.getItem("doze52:onboarding:v2") ?? "null") as {
+        step?: string;
+      } | null
+  );
+  expect(onboarding?.step).toBe("date_category_selection");
 });
 
 test("categorias recolhidas liberam espaço e o ano leva de volta a hoje", { tag: "@desktop" }, async ({
