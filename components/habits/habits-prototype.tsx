@@ -847,15 +847,22 @@ export function HabitsPrototype({
             notice={mobileOnboardingNotice}
             onClose={dismissMobileOnboarding}
             mobilePlacement="bottom"
+            mobilePointer="nav-events"
           />
         ) : (
           // "habit"/"habit-created" (create_habit/mark_day): avançam
           // sozinhos ao criar o hábito/marcar o dia — sem botão no card.
-          <div className="mt-2" ref={inlineOnboardingNoticeRef}>
+          <div
+            className={mobileOnboardingNotice.target === "habit" ? "mt-3.5" : "mt-2"}
+            ref={inlineOnboardingNoticeRef}
+          >
             <GuidedToolbarNoticeCard
               notice={mobileOnboardingNotice}
               onClose={dismissMobileOnboarding}
               inline
+              mobilePointer={
+                mobileOnboardingNotice.target === "habit" ? "habit-add" : undefined
+              }
             />
           </div>
         )

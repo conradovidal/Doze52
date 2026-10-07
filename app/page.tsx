@@ -3332,7 +3332,9 @@ export default function HomePage() {
           mobilePointer={
             mobileAnnualOnboardingNotice.target === "mobile-organize"
               ? "header-end"
-              : undefined
+              : mobileAnnualOnboardingNotice.target === "profile"
+                ? "nav-profile"
+                : undefined
           }
         />
       ) : null}

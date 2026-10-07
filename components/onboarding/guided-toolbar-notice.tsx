@@ -74,6 +74,26 @@ const useLayeredAboveOverlay = (anchorSelector?: string) => {
   return aboveOverlay;
 };
 
+// Alvo que a setinha do card aponta no mobile. "header-end" (o lápis de Editar,
+// na ponta do cabeçalho) tem posição fixa; os demais são medidos no DOM para a
+// setinha cair no centro do controle de cada passo.
+export type MobilePointer = "header-end" | "nav-events" | "nav-profile" | "habit-add";
+
+const MOBILE_POINTER_TARGETS: Record<
+  Exclude<MobilePointer, "header-end">,
+  { side: "top" | "bottom"; selector: string }
+> = {
+  "nav-events": { side: "bottom", selector: 'a[data-product-destination="annual"]' },
+  "nav-profile": { side: "bottom", selector: "[data-onboarding-auth-entry]" },
+  "habit-add": { side: "top", selector: '[aria-label="Criar novo hábito"]' },
+};
+
+const findVisible = (selector: string) =>
+  Array.from(document.querySelectorAll<HTMLElement>(selector)).find((element) => {
+    const rect = element.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0;
+  });
+
 type AnchorPlacement =
   | "below-start"
   | "below-center"
@@ -134,11 +154,12 @@ export function GuidedToolbarNoticeCard({
    */
   mobilePlacement?: "top" | "bottom";
   /**
-   * No mobile, cola o card logo abaixo do cabeçalho, alinhado à direita, com
-   * uma setinha para o controle da ponta do cabeçalho (o lápis de Editar).
-   * Sem isso o card flutua mais abaixo, longe do botão que ele explica.
+   * No mobile, o card ganha uma setinha para o controle que o passo manda
+   * tocar. "header-end" também cola o card logo abaixo do cabeçalho (o lápis
+   * de Editar); os demais apontam para a nav inferior ou o "+" de hábitos.
+   * Em todos os casos o card tem a mesma largura (a da tela, menos margens).
    */
-  mobilePointer?: "header-end";
+  mobilePointer?: MobilePointer;
   /**
    * "inverse" (padrão): o card inverte claro/escuro em relação à página —
    * pensado para flutuar sobre o próprio produto (a grade do ano, a lista de
@@ -152,8 +173,38 @@ export function GuidedToolbarNoticeCard({
   const [mounted, setMounted] = React.useState(false);
   const cardRef = React.useRef<HTMLElement | null>(null);
   const [anchorPosition, setAnchorPosition] = React.useState<React.CSSProperties | null>(null);
+  const [pointerLeft, setPointerLeft] = React.useState<number | null>(null);
   const aboveOverlay = useLayeredAboveOverlay(anchorSelector);
   React.useEffect(() => setMounted(true), []);
+
+  const measuredPointer =
+    mobilePointer && mobilePointer !== "header-end"
+      ? MOBILE_POINTER_TARGETS[mobilePointer]
+      : null;
+  React.useLayoutEffect(() => {
+    const cardElement = cardRef.current;
+    if (!mounted || !measuredPointer || !cardElement) return;
+    const update = () => {
+      const target = findVisible(measuredPointer.selector);
+      if (!target) {
+        setPointerLeft(null);
+        return;
+      }
+      const cardRect = cardElement.getBoundingClientRect();
+      const targetRect = target.getBoundingClientRect();
+      const center = targetRect.left + targetRect.width / 2 - cardRect.left;
+      // Mantém a setinha dentro dos cantos arredondados do card.
+      setPointerLeft(Math.min(Math.max(center, 20), cardRect.width - 20));
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(cardElement);
+    window.addEventListener("resize", update);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", update);
+    };
+  }, [mounted, measuredPointer]);
 
   React.useLayoutEffect(() => {
     if (!mounted || !anchorSelector || !portaled) return;
@@ -270,13 +321,17 @@ export function GuidedToolbarNoticeCard({
           : cn(
               // Passo "criar hábito" pede um card mais estreito (texto curto
               // em duas linhas) — os demais mantêm a largura padrão.
+              // No mobile todos os cards fixos ocupam a largura da tela
+              // (12px de margem de cada lado, como o card inline); só o
+              // desktop distingue a largura do passo "habit".
+              "fixed left-3 max-md:right-3 max-md:w-auto md:absolute",
               notice.target === "habit"
-                ? "fixed left-3 w-[min(18rem,calc(100vw-1.5rem))] md:absolute"
-                : "fixed left-3 w-[min(22rem,calc(100vw-1.5rem))] md:absolute",
+                ? "md:w-[min(18rem,calc(100vw-1.5rem))]"
+                : "md:w-[min(22rem,calc(100vw-1.5rem))]",
               mobilePlacement === "bottom"
                 ? "bottom-[calc(env(safe-area-inset-bottom,0px)+4.5rem)]"
                 : mobilePointer === "header-end"
-                  ? "top-[calc(env(safe-area-inset-top,0px)+3.5rem)] max-md:right-3 max-md:left-auto"
+                  ? "top-[calc(env(safe-area-inset-top,0px)+3.5rem)]"
                   : "top-[calc(env(safe-area-inset-top,0px)+4.6rem)]",
               aboveOverlay ? "z-[90]" : "z-40",
               anchorSelector && portaled
@@ -304,6 +359,20 @@ export function GuidedToolbarNoticeCard({
           : undefined
       }
     >
+      {measuredPointer && pointerLeft !== null ? (
+        <span
+          aria-hidden="true"
+          data-guided-notice-pointer={mobilePointer}
+          style={{ left: pointerLeft - 6 }}
+          className={cn(
+            "absolute size-3 rotate-45 md:hidden",
+            measuredPointer.side === "top"
+              ? "-top-1.5 border-t border-l"
+              : "-bottom-1.5 border-r border-b",
+            surface === "inverse" ? "border-border bg-card" : "border-border/70 bg-muted"
+          )}
+        />
+      ) : null}
       {mobilePointer === "header-end" && !inline ? (
         <span
           aria-hidden="true"
