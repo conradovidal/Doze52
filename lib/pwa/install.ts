@@ -64,12 +64,13 @@ export const shouldShowInvite = (shownAt: number | null, now: number) =>
 export type InstallOption = "prompt" | "ios-guide" | null;
 
 /**
- * Como a pessoa pode instalar agora, se puder:
+ * Como a pessoa pode instalar agora, se puder. A oferta só vem **depois do
+ * login**, com e-mail confirmado e tudo sincronizado: instalar é o passo
+ * seguinte a ter conta, não parte do cadastro.
  * - "prompt": o navegador entregou o `beforeinstallprompt` (Chrome/Edge/Android)
  * - "ios-guide": iOS, onde só dá para instruir (Compartilhar → Tela de Início).
  *   O app instalado no iOS tem armazenamento separado do Safari: quem usa sem
- *   conta perderia o que está só neste aparelho. Por isso só oferecemos a quem
- *   está logado e com tudo já sincronizado.
+ *   conta perderia o que está só neste aparelho.
  */
 export const getInstallOption = (input: {
   standalone: boolean;
@@ -79,7 +80,8 @@ export const getInstallOption = (input: {
   accountSynced: boolean;
 }): InstallOption => {
   if (input.standalone || input.installed) return null;
+  if (!input.accountSynced) return null;
   if (input.hasPromptEvent) return "prompt";
-  if (input.isIos && input.accountSynced) return "ios-guide";
+  if (input.isIos) return "ios-guide";
   return null;
 };

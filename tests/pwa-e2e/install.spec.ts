@@ -26,53 +26,16 @@ const openProfile = async (page: Page) => {
 test.describe("Android/Chrome", () => {
   test.use({ userAgent: ANDROID_CHROME });
 
-  test("o prompt do navegador vira a linha Instalar app no perfil", { tag: "@mobile" }, async ({
+  test("sem conta não há convite nem linha Instalar app, mesmo com o prompt do navegador", { tag: "@mobile" }, async ({
     page,
   }) => {
     await page.goto("/");
     await page.waitForLoadState("networkidle");
     await dispatchInstallPrompt(page);
 
-    await openProfile(page);
-    const row = page.getByRole("button", { name: /^Instalar app/ });
-    await expect(row).toBeVisible();
-    await row.click();
-
-    await expect
-      .poll(() =>
-        page.evaluate(
-          () => (window as unknown as { __installPrompted?: boolean }).__installPrompted === true
-        )
-      )
-      .toBe(true);
-    // O prompt só vale uma vez: a linha some depois de usado.
-    await page.getByRole("button", { name: "Abrir perfil" }).first().click();
-    await expect(page.getByRole("button", { name: /^Plano/ })).toBeVisible();
-    await expect(page.getByRole("button", { name: /^Instalar app/ })).toHaveCount(0);
-  });
-
-  test("no app já instalado (display-mode standalone) não há o que instalar", { tag: "@mobile" }, async ({
-    page,
-  }) => {
-    await page.addInitScript(() => {
-      const original = window.matchMedia.bind(window);
-      window.matchMedia = (query: string) =>
-        query.includes("display-mode: standalone")
-          ? ({
-              matches: true,
-              media: query,
-              onchange: null,
-              addEventListener: () => undefined,
-              removeEventListener: () => undefined,
-              addListener: () => undefined,
-              removeListener: () => undefined,
-              dispatchEvent: () => false,
-            } as MediaQueryList)
-          : original(query);
-    });
-    await page.goto("/");
-    await page.waitForLoadState("networkidle");
-    await dispatchInstallPrompt(page);
+    // O convite espera ~4s depois de estar pronto: dá tempo de ele aparecer, se fosse aparecer.
+    await page.waitForTimeout(5000);
+    await expect(page.getByRole("status").filter({ hasText: "Instale o Doze 52" })).toHaveCount(0);
 
     await openProfile(page);
     await expect(page.getByRole("button", { name: /^Instalar app/ })).toHaveCount(0);

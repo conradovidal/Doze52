@@ -15,22 +15,27 @@ const base = {
   accountSynced: false,
 };
 
-test("Chrome/Android: oferece quando o navegador entregou o prompt", () => {
-  expect(getInstallOption({ ...base, hasPromptEvent: true })).toBe("prompt");
+test("Chrome/Android: oferece quando o navegador entregou o prompt e há conta sincronizada", () => {
+  expect(getInstallOption({ ...base, hasPromptEvent: true, accountSynced: true })).toBe("prompt");
+});
+
+test("sem conta sincronizada não oferece nada, nem com o prompt do navegador", () => {
+  expect(getInstallOption({ ...base, hasPromptEvent: true })).toBeNull();
+  expect(getInstallOption({ ...base, isIos: true })).toBeNull();
 });
 
 test("já instalado ou em modo app: não oferece nada", () => {
-  expect(getInstallOption({ ...base, hasPromptEvent: true, standalone: true })).toBeNull();
-  expect(getInstallOption({ ...base, hasPromptEvent: true, installed: true })).toBeNull();
-  expect(getInstallOption({ ...base, isIos: true, accountSynced: true, standalone: true })).toBeNull();
+  const synced = { ...base, accountSynced: true };
+  expect(getInstallOption({ ...synced, hasPromptEvent: true, standalone: true })).toBeNull();
+  expect(getInstallOption({ ...synced, hasPromptEvent: true, installed: true })).toBeNull();
+  expect(getInstallOption({ ...synced, isIos: true, standalone: true })).toBeNull();
 });
 
-test("iOS só recebe o guia com conta logada e sincronizada", () => {
-  expect(getInstallOption({ ...base, isIos: true })).toBeNull();
+test("iOS recebe o guia com conta sincronizada", () => {
   expect(getInstallOption({ ...base, isIos: true, accountSynced: true })).toBe("ios-guide");
 });
 
-test("sem prompt e fora do iOS não há o que oferecer", () => {
+test("sem prompt e fora do iOS não há o que oferecer, mesmo com conta", () => {
   expect(getInstallOption({ ...base, accountSynced: true })).toBeNull();
 });
 

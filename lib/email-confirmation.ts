@@ -62,6 +62,12 @@ export const clearPendingEmailConfirmation = (
 export const isEmailNotConfirmedMessage = (raw: string) =>
   raw.toLowerCase().includes("email not confirmed");
 
+/** O Supabase limita quantos e-mails de confirmação/redefinição ele envia por hora. */
+export const isEmailRateLimitMessage = (raw: string) => {
+  const message = raw.toLowerCase();
+  return message.includes("rate limit") || message.includes("over_email_send_rate_limit");
+};
+
 /** Segundos que faltam para liberar o reenvio (0 = liberado). */
 export const resendSecondsLeft = (sentAt: number, now: number) =>
   Math.max(0, Math.ceil((sentAt + EMAIL_RESEND_COOLDOWN_SECONDS * 1000 - now) / 1000));
