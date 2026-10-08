@@ -16,7 +16,7 @@ há release válido, Supabase está indisponível ou a resposta remota é rejeit
      `CALENDAR_PACK_REFRESH_SECRET`.
 4. Confirme no Supabase Cron os jobs `doze52-calendar-packs-midnight` e
    `doze52-calendar-packs-closing`.
-5. Cadastre os operadores em `public.product_admins`. O painel fica em
+5. Cadastre os operadores em `public.product_feedback_admins`. O painel fica em
    `/admin/calendar-packs`.
 
 Antes de tirar uma fonte de `pending` ou `shadow`, confirme no ambiente de produção

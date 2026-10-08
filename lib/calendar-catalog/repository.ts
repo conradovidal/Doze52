@@ -52,7 +52,7 @@ export const listRunnableSources = async () => {
 
 export const isProductAdmin = async (userId: string) => {
   const { data, error } = await getSupabaseAdminClient()
-    .from("product_admins")
+    .from("product_feedback_admins")
     .select("user_id")
     .eq("user_id", userId)
     .maybeSingle();

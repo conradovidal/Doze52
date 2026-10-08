@@ -18,25 +18,16 @@ export async function GET() {
   }
 
   const admin = getSupabaseAdminClient();
-  const [feedbackResult, calendarPacksResult] = await Promise.all([
-    admin
-      .from("product_feedback_admins")
-      .select("user_id")
-      .eq("user_id", user.id)
-      .maybeSingle(),
-    admin
-      .from("product_admins")
-      .select("user_id")
-      .eq("user_id", user.id)
-      .maybeSingle(),
-  ]);
+  // Uma só tabela de operadores vale para o feedback e para os calendários.
+  const { data, error } = await admin
+    .from("product_feedback_admins")
+    .select("user_id")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  const isAdmin = !error && Boolean(data);
 
   return NextResponse.json(
-    {
-      feedback: !feedbackResult.error && Boolean(feedbackResult.data),
-      calendarPacks:
-        !calendarPacksResult.error && Boolean(calendarPacksResult.data),
-    },
+    { feedback: isAdmin, calendarPacks: isAdmin },
     { headers: { "Cache-Control": "private, no-store" } }
   );
 }
