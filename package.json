@@ -12,6 +12,7 @@
     "qa:provision:dev": "node scripts/qa/provision-dev.mjs",
     "qa:reset:dev": "node scripts/qa/reset-dev.mjs",
     "qa:smoke": "playwright test",
+    "test:pwa": "playwright test --config=playwright.pwa.config.ts",
     "test:onboarding": "playwright test --config=playwright.unit.config.ts",
     "test:spreadsheet": "playwright test --config=playwright.spreadsheet.config.ts",
     "test:onboarding:e2e": "playwright test --config=playwright.onboarding.config.ts",

@@ -16,7 +16,7 @@ há release válido, Supabase está indisponível ou a resposta remota é rejeit
      `CALENDAR_PACK_REFRESH_SECRET`.
 4. Confirme no Supabase Cron os jobs `doze52-calendar-packs-midnight` e
    `doze52-calendar-packs-closing`.
-5. Cadastre os operadores em `public.product_admins`. O painel fica em
+5. Cadastre os operadores em `public.product_feedback_admins`. O painel fica em
    `/admin/calendar-packs`.
 
 Antes de tirar uma fonte de `pending` ou `shadow`, confirme no ambiente de produção
@@ -26,6 +26,42 @@ visíveis como falha/quarentena; nunca desative a validação TLS para contorná
 
 Os jobs verificam o horário local a cada hora. Eles disparam exatamente às 00:00 e
 04:00 em `America/Sao_Paulo`, mesmo se a relação com UTC mudar no futuro.
+
+## Ambiente DEV
+
+O refresh agendado também precisa rodar no DEV (`jbdukjmbtffcgklsxjml`), senão o catálogo
+fica parado na release `bootstrap`. O DEV não herda nada da produção; configure assim:
+
+1. **Migrations:** o DEV precisa ter todas as migrations do catálogo, em especial
+   `harden_calendar_source_refresh` (cria `claim_calendar_pack_refresh` e a tabela de
+   lease). Sem ela, o refresh falha logo no início, sem criar run, com `errorType:
+   'UnknownError'` nos logs.
+2. **Domínio fixo:** o alias `doze52-git-dev-*.vercel.app` pode ficar preso a um deploy
+   antigo. Use o domínio `dev.doze52.com.br`, atribuído à branch `dev` em Settings,
+   Domains (CNAME `dev` para o valor que a Vercel indicar).
+3. **Segredo:** crie `CALENDAR_PACK_REFRESH_SECRET` na Vercel com escopo Preview e
+   branch `dev`, com um valor próprio do DEV (`openssl rand -hex 32`). Depois faça
+   redeploy da `dev`.
+4. **Deployment Protection:** o preview exige login da Vercel e bloquearia o cron. Gere
+   um segredo em Settings, Deployment Protection, Protection Bypass for Automation, e
+   passe-o como parâmetro da URL do Vault.
+5. **Vault do DEV:**
+   - `calendar_pack_refresh_url`:
+     `https://dev.doze52.com.br/api/internal/calendar-packs/refresh?x-vercel-protection-bypass=<bypass>`;
+   - `calendar_pack_refresh_secret`: o mesmo valor do passo 3, sem espaços nem quebra de
+     linha. Use `vault.create_secret` na primeira vez e `vault.update_secret` depois.
+6. **Operador:** cadastre o usuário em `public.product_feedback_admins` do DEV.
+7. **Fontes:** o DEV nasce com as fontes de futebol em `shadow`, que nunca publicam. Para
+   espelhar a produção, ponha em `active` as de `cbf-*` e `conmebol-*`.
+
+Para validar sem esperar 00:00 ou 04:00, rode no SQL Editor do DEV o mesmo `net.http_post`
+do job e leia `net._http_response`. O pg_net desiste depois de 5s e grava `status_code`
+nulo com "Timeout"; isso é esperado, pois o refresh leva dezenas de segundos. Confirme
+pelo run novo com gatilho `scheduled_midnight` em `calendar_pack_update_runs`. Um `403
+"Origem inválida"` indica que o segredo do Vault difere do da Vercel.
+
+A CBF devolve HTTP 429 se for consultada várias vezes em poucos minutos (vários refreshes
+manuais seguidos). O release publicado é preservado e o próximo ciclo se recupera.
 
 ## Limites e concorrência
 

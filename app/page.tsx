@@ -27,7 +27,6 @@ import {
   type GuidedCalendarDraft,
 } from "@/components/onboarding/guided-onboarding-panel";
 import { DemoExplorationInvite } from "@/components/onboarding/demo-exploration-invite";
-import { MobileDesktopFirstNotice } from "@/components/onboarding/mobile-desktop-first-notice";
 import { OnboardingExitDialog } from "@/components/onboarding/onboarding-exit-dialog";
 import {
   GuidedToolbarNoticeCard,
@@ -78,6 +77,8 @@ import {
   readProductOnboardingState,
   resetAllProductOnboarding,
   shouldPresentOnboardingHabitShowcase,
+  isMobileJourneyPastExample,
+  shouldDiscardAnonymousSandbox,
   shouldShowGuidedOnboarding,
   type GuidedOnboardingAction,
   type GuidedOnboardingState,
@@ -105,7 +106,17 @@ import {
 import {
   ensureSnapshotCoverage,
   materializeUserOwnedSnapshot,
+  withoutUnusedProfiles,
 } from "@/lib/snapshot-ownership";
+import { useIsOffline } from "@/lib/use-online-status";
+import { useInstall } from "@/components/pwa/install-provider";
+import { InstallInvite } from "@/components/pwa/install-invite";
+import {
+  clearPendingSyncSnapshot,
+  readPendingSyncSnapshot,
+  refreshPendingSyncSnapshot,
+  writePendingSyncSnapshot,
+} from "@/lib/pending-sync";
 import { cn } from "@/lib/utils";
 import type { AnchorPoint } from "@/lib/types";
 import { trackOnboardingRegion } from "@/lib/onboarding-region";
@@ -139,19 +150,12 @@ type SyncUiError = {
   rawMessage?: string | null;
 };
 
-type PendingSyncPayload = {
-  savedAt: string;
-  snapshot: CalendarSnapshot;
-  // Content key of the server state this snapshot was based on. Without it the
-  // snapshot cannot be told apart from a stale one and is never replayed.
-  baseKey?: string;
-};
-
 // Minimum gap between refetches triggered by focus/visibility/online events.
 const REMOTE_PULL_MIN_INTERVAL_MS = 10_000;
 
 type RawSyncState =
   | { state: "hidden" }
+  | { state: "offline" }
   | { state: "loading" }
   | { state: "saving" }
   | { state: "synced" }
@@ -163,28 +167,6 @@ type RawSyncState =
     };
 
 const SYNC_NOTICE_KEY = "sync";
-const PENDING_SYNC_STORAGE_PREFIX = "pending-sync:";
-
-const DESKTOP_VISIT_CONFIRMED_STORAGE_KEY = "doze52:desktop-visit-confirmed";
-
-const readDesktopVisitConfirmed = () => {
-  if (typeof window === "undefined") return false;
-  try {
-    return window.localStorage.getItem(DESKTOP_VISIT_CONFIRMED_STORAGE_KEY) === "true";
-  } catch {
-    return false;
-  }
-};
-
-const writeDesktopVisitConfirmed = () => {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(DESKTOP_VISIT_CONFIRMED_STORAGE_KEY, "true");
-  } catch {
-    // Sem persistência entre navegações se o storage falhar; a Anual mobile
-    // pode voltar a pedir o onboarding no desktop na próxima visita.
-  }
-};
 
 const isDetailedSyncDiagnosticsEnabled =
   process.env.NODE_ENV !== "production" ||
@@ -198,100 +180,6 @@ const HabitsPrototype = dynamic(() =>
   ),
   { ssr: false }
 );
-const MOBILE_DESKTOP_FIRST_NOTICE_STORAGE_KEY =
-  "doze52:mobile-desktop-first-notice:dismissed";
-
-const readDesktopFirstNoticeDismissed = () => {
-  if (typeof window === "undefined") return false;
-
-  try {
-    return (
-      window.localStorage.getItem(MOBILE_DESKTOP_FIRST_NOTICE_STORAGE_KEY) ===
-      "true"
-    );
-  } catch {
-    return false;
-  }
-};
-
-const writeDesktopFirstNoticeDismissed = () => {
-  try {
-    window.localStorage.setItem(MOBILE_DESKTOP_FIRST_NOTICE_STORAGE_KEY, "true");
-  } catch {
-    // A faixa volta na próxima visita se o storage falhar; ela é dispensável,
-    // então reaparecer é bem menos grave do que travar a tela.
-  }
-};
-
-const cloneSnapshot = (snapshot: CalendarSnapshot): CalendarSnapshot => ({
-  profiles: snapshot.profiles.map((profile) => ({ ...profile })),
-  categories: snapshot.categories.map((category) => ({ ...category })),
-  events: snapshot.events.map((event) => ({ ...event })),
-});
-
-const getPendingSyncStorageKey = (userId: string) =>
-  `${PENDING_SYNC_STORAGE_PREFIX}${userId}`;
-
-const isCalendarSnapshotLike = (value: unknown): value is CalendarSnapshot => {
-  if (typeof value !== "object" || value === null) return false;
-  const record = value as Record<string, unknown>;
-
-  return (
-    Array.isArray(record.profiles) &&
-    Array.isArray(record.categories) &&
-    Array.isArray(record.events)
-  );
-};
-
-const readPendingSyncSnapshot = (
-  userId: string
-): { snapshot: CalendarSnapshot; baseKey?: string } | null => {
-  if (typeof window === "undefined") return null;
-
-  const key = getPendingSyncStorageKey(userId);
-
-  try {
-    const raw = window.localStorage.getItem(key);
-    if (!raw) return null;
-
-    const parsed = JSON.parse(raw) as unknown;
-    const payload = parsed as Partial<PendingSyncPayload>;
-    const snapshot = payload?.snapshot ?? parsed;
-
-    if (!isCalendarSnapshotLike(snapshot)) {
-      window.localStorage.removeItem(key);
-      return null;
-    }
-
-    return {
-      snapshot: ensureSnapshotCoverage(snapshot),
-      baseKey: typeof payload?.baseKey === "string" ? payload.baseKey : undefined,
-    };
-  } catch {
-    window.localStorage.removeItem(key);
-    return null;
-  }
-};
-
-const writePendingSyncSnapshot = (
-  userId: string,
-  snapshot: CalendarSnapshot,
-  baseKey?: string
-) => {
-  if (typeof window === "undefined") return;
-
-  const payload: PendingSyncPayload = {
-    savedAt: new Date().toISOString(),
-    snapshot: cloneSnapshot(snapshot),
-    baseKey,
-  };
-
-  window.localStorage.setItem(
-    getPendingSyncStorageKey(userId),
-    JSON.stringify(payload)
-  );
-};
-
 // Keeps a copy of a local draft that could not be imported, so it is never
 // silently lost when the account's own calendar takes its place.
 const backupDiscardedDraft = (userId: string, snapshot: CalendarSnapshot) => {
@@ -305,11 +193,6 @@ const backupDiscardedDraft = (userId: string, snapshot: CalendarSnapshot) => {
   } catch {
     // Storage full or unavailable: the draft is dropped, the sync must not fail.
   }
-};
-
-const clearPendingSyncSnapshot = (userId: string) => {
-  if (typeof window === "undefined") return;
-  window.localStorage.removeItem(getPendingSyncStorageKey(userId));
 };
 
 const formatSyncDebugDetail = (error: SyncUiError) => {
@@ -338,11 +221,15 @@ const filterAnonymousDraft = (
       events: [],
     };
   }
-  return stripOnboardingPersonalDemo({
-    profiles: snapshot.profiles.filter((profile) => !profile.userId),
-    categories: snapshot.categories.filter((category) => !category.userId),
-    events: snapshot.events.filter((event) => !event.userId),
-  });
+  // Contextos sem categoria (os padrões do exemplo, o Triatlo) ficam de fora:
+  // no plano Free a conta aceita 1 contexto e o servidor recusaria o rascunho.
+  return withoutUnusedProfiles(
+    stripOnboardingPersonalDemo({
+      profiles: snapshot.profiles.filter((profile) => !profile.userId),
+      categories: snapshot.categories.filter((category) => !category.userId),
+      events: snapshot.events.filter((event) => !event.userId),
+    })
+  );
 };
 
 const hasRelevantLocalDraft = (snapshot: CalendarSnapshot) =>
@@ -463,6 +350,8 @@ export default function HomePage() {
   const [hasQueuedSave, setHasQueuedSave] = React.useState(false);
   const [remoteReady, setRemoteReady] = React.useState(false);
   const [syncBlocked, setSyncBlocked] = React.useState(false);
+  const isOffline = useIsOffline();
+  const { setAccountSynced } = useInstall();
   const [calendarCreateOnboarding, setCalendarCreateOnboarding] =
     React.useState<ProductOnboardingState | null>(null);
   const [guidedOnboarding, setGuidedOnboarding] =
@@ -497,13 +386,6 @@ export default function HomePage() {
   const [annualHelpOpen, setAnnualHelpOpen] = React.useState(false);
   const [annualGuideRequested, setAnnualGuideRequested] = React.useState(false);
   React.useEffect(() => setAnnualGuideRequested(false), [session?.user.id]);
-  const [hasConfirmedDesktopVisit, setHasConfirmedDesktopVisit] =
-    React.useState(readDesktopVisitConfirmed);
-  React.useEffect(() => {
-    if (isMobileCalendarUi !== false || hasConfirmedDesktopVisit) return;
-    writeDesktopVisitConfirmed();
-    setHasConfirmedDesktopVisit(true);
-  }, [isMobileCalendarUi, hasConfirmedDesktopVisit]);
   // Espelho do passo salvo por HabitsPrototype (lib/mobile-habits-onboarding.ts)
   // — a fonte da verdade continua lá; isto só existe para travar/destacar o
   // botão Anual da navegação, que não é filho daquele componente. Começa
@@ -576,8 +458,6 @@ export default function HomePage() {
   const [utilityPanelAuthMode, setUtilityPanelAuthMode] = React.useState<
     "login" | "signup"
   >("login");
-  const [desktopFirstNoticeDismissed, setDesktopFirstNoticeDismissed] =
-    React.useState(readDesktopFirstNoticeDismissed);
   const [mobileActiveDateIso, setMobileActiveDateIso] = React.useState(() =>
     format(new Date(), "yyyy-MM-dd")
   );
@@ -1354,8 +1234,10 @@ export default function HomePage() {
             categories: categoriesRef.current,
             events: eventsRef.current,
           }),
-          currentGuidedStep === "demo_exploration" ||
-            currentGuidedStep === "context_selection"
+          shouldDiscardAnonymousSandbox(
+            currentGuidedStep,
+            readMobileHabitsOnboardingStep()
+          )
         );
 
         const pendingSaved = readPendingSyncSnapshot(userId);
@@ -1721,58 +1603,20 @@ export default function HomePage() {
   );
   const isInitialMobileOnboarding =
     guidedOnboarding?.step === "context_selection";
+  // Com a continuidade de conta ligada o guia do desktop nunca "assenta" para
+  // quem não tem conta (hasAuthorEvents é ignorado), e o guia no valor inicial
+  // mantinha o ano de exemplo em tela mesmo depois de a jornada mobile pedir
+  // para organizar as categorias: o lápis ficava desabilitado no passo 6.
   const isMobileExamplePreview = Boolean(
-    isMobileOnboardingPending && isInitialMobileOnboarding
+    isMobileOnboardingPending &&
+      isInitialMobileOnboarding &&
+      !isMobileJourneyPastExample(mobileHabitsOnboardingStep)
   );
-  // Anual mobile is a read/consult surface, not a place to build the year —
-  // that lives on desktop. Established mobile users (e.g. someone who signed
-  // up and started habits from their phone) fall outside guidedOnboarding
-  // once they have real content, so the notice greets them too until this
-  // browser has confirmed at least one non-mobile visit. This is a local,
-  // per-browser heuristic (no server-side "completed desktop onboarding" flag
-  // exists yet), so it can re-trigger on a new device/browser even for
-  // someone who already did this on desktop elsewhere — acceptable for now,
-  // revisit if that turns out to be common.
-  //
-  // Isso já foi um Dialog sem saída (sem botão de fechar, com Escape e
-  // clique-fora cancelados), que deixava `pointer-events: none` no body e
-  // impedia até rolar o ano. Agora é uma faixa em fluxo no topo da Anual:
-  // a mensagem continua, o bloqueio não.
-  //
-  // Dois públicos precisam da faixa: quem chega neste navegador sem nunca ter
-  // visto o desktop, e quem começou a montar o ano no desktop e voltou ao
-  // celular com o guia pela metade — esse segundo já marcou a visita, então
-  // `hasConfirmedDesktopVisit` sozinho o deixaria de fora.
-  //
-  // Mas `hasConfirmedDesktopVisit` é uma heurística por NAVEGADOR — uma conta
-  // autenticada com dados reais já confirmados pelo servidor (ano montado,
-  // categorias criadas) não pode ver essa faixa só porque é a primeira vez
-  // que ESTE navegador específico abre a Anual. A fonte da verdade da conta é
-  // o servidor, não um flag local; `hasEstablishedSetup` só é confiável aqui
+  // Conta já estabelecida: com dados reais confirmados pelo servidor (ano
+  // montado, categorias criadas). `hasEstablishedSetup` só é confiável aqui
   // depois que `remoteReady` confirma que os dados já foram sincronizados.
   const isEstablishedAccount = Boolean(
     session?.user.id && remoteReady && hasEstablishedSetup
-  );
-  // Enquanto a continuação da jornada mobile está no ar na Anual (ver
-  // mobileAnnualOnboardingNotice), essa faixa fica de fora — os dois juntos
-  // disputariam o mesmo espaço no topo. Ela volta a fazer sentido só depois
-  // que a jornada termina de verdade (variant "onboarding", abaixo).
-  const mobileAnnualOnboardingActive = Boolean(
-    mobileHabitsOnboardingStep &&
-      mobileHabitsOnboardingStep !== "intro" &&
-      mobileHabitsOnboardingStep !== "create_habit" &&
-      mobileHabitsOnboardingStep !== "mark_day" &&
-      mobileHabitsOnboardingStep !== "goto_annual" &&
-      mobileHabitsOnboardingStep !== "completed" &&
-      mobileHabitsOnboardingStep !== "dismissed"
-  );
-  const showMobileDesktopFirstNotice = Boolean(
-    isMobileCalendarUi === true &&
-      !authLoading &&
-      !desktopFirstNoticeDismissed &&
-      !isEstablishedAccount &&
-      !mobileAnnualOnboardingActive &&
-      (!hasConfirmedDesktopVisit || isMobileOnboardingPending)
   );
   const isDemoExploration =
     guidedOnboarding?.step === "demo_exploration" && !session?.user.id;
@@ -2096,13 +1940,6 @@ export default function HomePage() {
       // mobile — a jornada própria de Hábitos (Parte 3) ficava travada no
       // que já tivesse sido salvo antes (ex.: "completed" de um teste
       // anterior) e caía direto na dica antiga em vez de reabrir do passo 1.
-      window.localStorage.removeItem("doze52:desktop-visit-confirmed");
-      window.localStorage.removeItem(
-        "doze52:mobile-desktop-first-notice:dismissed"
-      );
-      window.localStorage.removeItem(
-        "doze52:mobile-onboarding:desktop-hint-dismissed"
-      );
     } catch {
       // Recarrega mesmo assim; sem storage disponível não há o que limpar.
     }
@@ -2495,9 +2332,50 @@ export default function HomePage() {
   const handleRetrySyncRef = React.useRef(handleRetrySync);
   handleRetrySyncRef.current = handleRetrySync;
 
+  // Edições feitas com o sync travado (normalmente sem rede) só existem no
+  // store local; o retry reenvia o snapshot pendente, então ele acompanha cada
+  // edição. Sem isso, reconectar ou recarregar trazia de volta a versão do
+  // momento da primeira falha.
+  React.useEffect(() => {
+    if (windowContext !== "main" || !session?.user.id || !syncBlocked) return;
+    refreshPendingSyncSnapshot(session.user.id, { profiles, categories, events });
+  }, [categories, events, profiles, session?.user.id, syncBlocked, windowContext]);
+
+  // O iOS só recebe o guia de instalação com conta logada e tudo sincronizado:
+  // o app instalado lá começa com armazenamento separado do Safari.
+  const accountSynced = Boolean(
+    session?.user.id && remoteReady && !syncBlocked && !syncError && !isBootstrappingSync
+  );
+  React.useEffect(() => {
+    setAccountSynced(accountSynced);
+  }, [accountSynced, setAccountSynced]);
+
+  // Falha de rede não pede ação da pessoa: quando a conexão volta (ou a tela
+  // volta ao primeiro plano com rede), o próprio app tenta de novo.
+  const shouldAutoRetrySync = syncBlocked && syncError?.kind === "network";
+  React.useEffect(() => {
+    if (!shouldAutoRetrySync) return;
+    const retry = () => handleRetrySyncRef.current();
+    const retryIfVisible = () => {
+      if (document.visibilityState === "visible" && navigator.onLine) retry();
+    };
+    window.addEventListener("online", retry);
+    document.addEventListener("visibilitychange", retryIfVisible);
+    return () => {
+      window.removeEventListener("online", retry);
+      document.removeEventListener("visibilitychange", retryIfVisible);
+    };
+  }, [shouldAutoRetrySync]);
+
   const rawSyncState = React.useMemo<RawSyncState>(() => {
     if (!session?.user.id) {
       return { state: "hidden" };
+    }
+
+    // Sem rede o app segue de pé com os dados deste aparelho; o que importa
+    // dizer é isso, não um "erro ao sincronizar".
+    if (isOffline) {
+      return { state: "offline" };
     }
 
     if (syncError || syncBlocked) {
@@ -2524,6 +2402,7 @@ export default function HomePage() {
     handleRetrySync,
     hasQueuedSave,
     isBootstrappingSync,
+    isOffline,
     isSyncing,
     remoteReady,
     session?.user.id,
@@ -2543,6 +2422,20 @@ export default function HomePage() {
 
     if (rawSyncState.state === "hidden") {
       dismiss(SYNC_NOTICE_KEY);
+      return;
+    }
+
+    if (rawSyncState.state === "offline") {
+      // Já mostrado (ou fechado pela pessoa): não reabrir a cada edição.
+      if (previousState === "offline") return;
+      notify({
+        key: SYNC_NOTICE_KEY,
+        tone: "info",
+        title: "Sem conexão",
+        description:
+          "Suas alterações ficam neste aparelho e sincronizam quando a internet voltar.",
+        durationMs: 0,
+      });
       return;
     }
 
@@ -2570,6 +2463,7 @@ export default function HomePage() {
     }
 
     const shouldShowSuccess =
+      previousState === "offline" ||
       previousState === "loading" ||
       previousState === "saving" ||
       previousState === "error";
@@ -2981,7 +2875,8 @@ export default function HomePage() {
       // isso deixaria a etapa que mais importa (categorias) opcional.
       return {
         target: "mobile-organize",
-        instruction: "Aqui você organiza contextos e categorias.",
+        instruction: "Toque no lápis para organizar contextos e categorias.",
+        leadingIcon: "pencil" as const,
         stepLabel: getMobileHabitsOnboardingStepLabel("annual_organize"),
       };
     }
@@ -3217,9 +3112,6 @@ export default function HomePage() {
             setAuthDialogAnchorPoint(undefined);
             setAuthDialogOpen(true);
           }}
-          onRequestSignup={(trigger) => {
-            handleOpenUtilityPanel("account", trigger);
-          }}
           isAuthenticated={Boolean(session)}
           guidedNotice={
             guidedToolbarNotice?.target === "habit-showcase" ||
@@ -3297,37 +3189,6 @@ export default function HomePage() {
           guidedSelectionRange={guidedDraft}
           onGuidedDaySelect={handleMobileGuidedDaySelect}
           scrollToTodayRequestKey={scrollToTodayRequestKey}
-          notice={
-            showMobileDesktopFirstNotice ? (
-              <MobileDesktopFirstNotice
-                variant={
-                  // "completed" só acontece por dois caminhos: uma conta já
-                  // estabelecida (excluída de showMobileDesktopFirstNotice
-                  // via isEstablishedAccount, então nunca chega aqui assim)
-                  // ou quem acabou de terminar a jornada de Hábitos e tocou
-                  // em Anual de propósito — é sempre essa segunda pessoa.
-                  mobileHabitsOnboardingStep === "completed"
-                    ? "onboarding"
-                    : isInitialMobileOnboarding && !hasEstablishedSetup
-                      ? "example"
-                      : "resuming"
-                }
-                onOpenLogin={() => {
-                  setAuthDialogInitialMode(
-                    mobileHabitsOnboardingStep === "completed"
-                      ? "signup"
-                      : "login"
-                  );
-                  setAuthDialogAnchorPoint(undefined);
-                  setAuthDialogOpen(true);
-                }}
-                onDismiss={() => {
-                  writeDesktopFirstNoticeDismissed();
-                  setDesktopFirstNoticeDismissed(true);
-                }}
-              />
-            ) : null
-          }
         />
       ) : (
         <div
@@ -3466,6 +3327,15 @@ export default function HomePage() {
               ? "bottom"
               : "top"
           }
+          // O lápis fica na ponta do cabeçalho: o card cola nele, em vez de
+          // flutuar mais abaixo, longe do botão que explica.
+          mobilePointer={
+            mobileAnnualOnboardingNotice.target === "mobile-organize"
+              ? "header-end"
+              : mobileAnnualOnboardingNotice.target === "profile"
+                ? "nav-profile"
+                : undefined
+          }
         />
       ) : null}
 
@@ -3559,6 +3429,20 @@ export default function HomePage() {
           }
         }}
         anchorPoint={authDialogAnchorPoint}
+      />
+
+      <InstallInvite
+        ready={Boolean(
+          windowContext === "main" &&
+            isMobileCalendarUi === true &&
+            !guidedOnboardingEligible &&
+            hasEstablishedSetup &&
+            (mobileHabitsOnboardingStep === null ||
+              mobileHabitsOnboardingStep === "completed" ||
+              mobileHabitsOnboardingStep === "dismissed") &&
+            !syncBlocked &&
+            !syncError
+        )}
       />
 
       {isDetailedSyncDiagnosticsEnabled ? (

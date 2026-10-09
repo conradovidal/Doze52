@@ -6,6 +6,17 @@ import { Button } from "@/components/ui/button";
 import { useFeedback } from "@/components/ui/feedback-provider";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth";
+import {
+  EMAIL_LINK_VALIDITY_MINUTES,
+  EmailConfirmationRequiredError,
+  clearPendingEmailConfirmation,
+  isEmailNotConfirmedMessage,
+  isEmailRateLimitMessage,
+  readPendingEmailConfirmation,
+  resendSecondsLeft,
+  writePendingEmailConfirmation,
+  type PendingEmailConfirmation,
+} from "@/lib/email-confirmation";
 import { GoogleButton } from "./google-button";
 
 export function AuthForm({
@@ -26,6 +37,7 @@ export function AuthForm({
   const {
     signInWithPassword,
     signUpWithPassword,
+    resendSignupConfirmation,
     signInWithGoogle,
     refreshSessionFromClient,
     closeGooglePopupIfOpen,
@@ -41,6 +53,12 @@ export function AuthForm({
     "idle" | "sending" | "sent"
   >("idle");
   const [pendingGooglePopup, setPendingGooglePopup] = React.useState(false);
+  // Cadastro feito, e-mail ainda não confirmado: fica à vista (e guardado) até
+  // a pessoa confirmar, para ela não seguir achando que já tem conta.
+  const [pendingConfirmation, setPendingConfirmation] =
+    React.useState<PendingEmailConfirmation | null>(null);
+  const [resendState, setResendState] = React.useState<"idle" | "sending" | "sent">("idle");
+  const [now, setNow] = React.useState(() => Date.now());
   const popupIntervalRef = React.useRef<number | null>(null);
   const popupTimeoutRef = React.useRef<number | null>(null);
   const popupClosedAtRef = React.useRef<number | null>(null);
@@ -64,7 +82,87 @@ export function AuthForm({
   React.useEffect(() => {
     if (!open) return;
     setMode(initialMode);
+    setPendingConfirmation(readPendingEmailConfirmation(window.localStorage));
   }, [initialMode, open]);
+
+  const resendSeconds = pendingConfirmation
+    ? resendSecondsLeft(pendingConfirmation.sentAt, now)
+    : 0;
+  React.useEffect(() => {
+    if (resendSeconds <= 0) return;
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [resendSeconds]);
+
+  // Enquanto espera o e-mail, percebe sozinho que a conta foi confirmada (o link
+  // abre noutra janela, que compartilha a sessão): ao voltar para esta aba e a
+  // cada poucos segundos. Só esta aba entra, com o rascunho dela.
+  const confirmationWaiting = pendingConfirmation !== null && open;
+  React.useEffect(() => {
+    if (!confirmationWaiting) return;
+    let cancelled = false;
+    let inFlight = false;
+    const check = async () => {
+      if (cancelled || inFlight || document.visibilityState === "hidden") return;
+      inFlight = true;
+      try {
+        const next = await refreshSessionFromClient();
+        if (next && !cancelled) {
+          clearPendingEmailConfirmation(window.localStorage);
+          notify({ tone: "success", title: "E-mail confirmado", description: "Sua conta está ativa.", durationMs: 2500 });
+          onSuccess?.();
+        }
+      } finally {
+        inFlight = false;
+      }
+    };
+    const timer = window.setInterval(() => void check(), 3000);
+    window.addEventListener("focus", check);
+    window.addEventListener("pageshow", check);
+    document.addEventListener("visibilitychange", check);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      window.removeEventListener("focus", check);
+      window.removeEventListener("pageshow", check);
+      document.removeEventListener("visibilitychange", check);
+    };
+  }, [confirmationWaiting, notify, onSuccess, refreshSessionFromClient]);
+
+  const markConfirmationPending = (pending: PendingEmailConfirmation) => {
+    writePendingEmailConfirmation(window.localStorage, pending);
+    setPendingConfirmation(pending);
+    setResendState("idle");
+    setNow(Date.now());
+    setError(null);
+  };
+
+  const dismissConfirmation = (nextMode: "login" | "signup") => {
+    const previous = pendingConfirmation;
+    clearPendingEmailConfirmation(window.localStorage);
+    setPendingConfirmation(null);
+    setMode(nextMode);
+    // "Já confirmei": volta para o login com o e-mail já preenchido.
+    if (previous && nextMode === "login") setEmail(previous.email);
+    if (nextMode === "signup") setEmail("");
+    setPassword("");
+  };
+
+  const handleResend = async () => {
+    if (!pendingConfirmation || resendSeconds > 0 || resendState === "sending") return;
+    setResendState("sending");
+    setError(null);
+    try {
+      await resendSignupConfirmation(pendingConfirmation.email);
+      markConfirmationPending({ email: pendingConfirmation.email, sentAt: Date.now() });
+      setResendState("sent");
+    } catch (err) {
+      setResendState("idle");
+      setError(
+        err instanceof Error ? mapAuthError(err.message) : "Não foi possível reenviar o e-mail."
+      );
+    }
+  };
 
   const finalizeAuthSuccess = React.useCallback(
     async (alreadyRefreshed = false) => {
@@ -255,6 +353,12 @@ export function AuthForm({
     const msg = raw.toLowerCase();
     if (msg.includes("invalid login credentials")) return "Email ou senha invalidos.";
     if (msg.includes("user already registered")) return "Este email ja esta cadastrado.";
+    if (isEmailRateLimitMessage(raw)) {
+      return "Muitos e-mails enviados em pouco tempo. Aguarde alguns minutos e tente de novo.";
+    }
+    if (isEmailNotConfirmedMessage(raw)) {
+      return `Seu e-mail ainda não foi confirmado. Abra o link que enviamos (vale por ${EMAIL_LINK_VALIDITY_MINUTES} minutos) ou reenvie.`;
+    }
     if (msg.includes("supabase nao configurado")) {
       return "Configure NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.";
     }
@@ -278,18 +382,14 @@ export function AuthForm({
       });
       onSuccess?.();
     } catch (err) {
-      if (
-        mode === "signup" &&
-        err instanceof Error &&
-        err.message === "Conta criada. Confirme seu email para continuar."
-      ) {
-        notify({
-          tone: "info",
-          title: "Conta criada",
-          description: "Confira seu email para concluir o acesso.",
-          durationMs: 3200,
-        });
-        onSuccess?.();
+      if (mode === "signup" && err instanceof EmailConfirmationRequiredError) {
+        // O painel fica aberto e passa a mostrar o cartão "Confirme seu e-mail".
+        markConfirmationPending({ email: err.email, sentAt: Date.now() });
+        setPassword("");
+        return;
+      }
+      if (mode === "login" && err instanceof Error && isEmailNotConfirmedMessage(err.message)) {
+        markConfirmationPending({ email: email.trim(), sentAt: 0 });
         return;
       }
       setError(
@@ -337,6 +437,61 @@ export function AuthForm({
       setLoading(false);
     }
   };
+
+  if (pendingConfirmation) {
+    return (
+      <div className="space-y-3" data-email-confirmation>
+        <div className="rounded-2xl border border-border bg-card p-4">
+          <h2 className="text-base font-semibold text-foreground">Confirme seu e-mail</h2>
+          <p className="mt-1.5 text-sm leading-6 text-muted-foreground">
+            Enviamos um link para{" "}
+            <strong className="font-semibold text-foreground">{pendingConfirmation.email}</strong>.
+            Abra o e-mail neste aparelho e toque no link para entrar. Ele vale por{" "}
+            {EMAIL_LINK_VALIDITY_MINUTES} minutos. Até lá, você segue sem conta e o que montar
+            fica só neste aparelho.
+          </p>
+          <p className="mt-2 text-xs leading-5 text-muted-foreground">
+            Não achou? Veja também a caixa de spam ou lixo eletrônico.
+          </p>
+        </div>
+        {error ? (
+          <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
+            {error}
+          </p>
+        ) : null}
+        <Button
+          type="button"
+          className="w-full"
+          disabled={resendSeconds > 0 || resendState === "sending"}
+          onClick={handleResend}
+        >
+          {resendState === "sending"
+            ? "Enviando..."
+            : resendSeconds > 0
+              ? `Reenviar e-mail (${resendSeconds}s)`
+              : resendState === "sent"
+                ? "Enviado. Reenviar de novo"
+                : "Reenviar e-mail"}
+        </Button>
+        <div className="flex items-center justify-between gap-2 text-sm">
+          <button
+            type="button"
+            className="font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+            onClick={() => dismissConfirmation("login")}
+          >
+            Já confirmei, entrar
+          </button>
+          <button
+            type="button"
+            className="font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+            onClick={() => dismissConfirmation("signup")}
+          >
+            Usar outro e-mail
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-3">

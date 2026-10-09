@@ -14,6 +14,8 @@ import { FeedbackProvider } from "@/components/ui/feedback-provider";
 import { ThemeInitScript } from "@/components/theme-init-script";
 import { CalendarCatalogProvider } from "@/lib/calendar-catalog/runtime";
 import { MotionProvider } from "@/components/ui/motion-provider";
+import { ServiceWorkerRegister } from "@/components/pwa/service-worker-register";
+import { InstallProvider } from "@/components/pwa/install-provider";
 
 export const metadata: Metadata = {
   applicationName: "Doze 52",
@@ -32,16 +34,23 @@ export const metadata: Metadata = {
         type: "image/svg+xml",
       },
     ],
+    // O iOS ignora SVG no apple-touch-icon; precisa ser PNG de 180px. Declarado
+    // aqui porque `icons` explícito desliga a convenção de arquivo apple-icon.
     apple: [
       {
-        url: "/icon.svg",
-        type: "image/svg+xml",
+        url: "/icons/apple-touch-icon.png",
+        sizes: "180x180",
+        type: "image/png",
       },
     ],
   },
 };
 
 export const viewport: Viewport = {
+  // Sem `cover` os env(safe-area-inset-*) já usados no app valem sempre 0:
+  // é o que permite à barra inferior respeitar o indicador de início do iOS
+  // e às laterais respeitarem o notch com o celular deitado.
+  viewportFit: "cover",
   colorScheme: "light dark",
   themeColor: [
     {
@@ -67,20 +76,23 @@ export default function RootLayout({
         <ThemeProvider>
           <MotionProvider>
             <FeedbackProvider>
-              <AuthProvider>
-                <BillingProvider>
-                  <CalendarCatalogProvider>
-                    <div className="flex h-dvh flex-col overflow-hidden">
-                      <div className="min-h-0 flex-1 overflow-auto">
-                        {children}
+              <InstallProvider>
+                <AuthProvider>
+                  <BillingProvider>
+                    <CalendarCatalogProvider>
+                      <div className="flex h-dvh flex-col overflow-hidden pr-[env(safe-area-inset-right,0px)] pl-[env(safe-area-inset-left,0px)]">
+                        <div className="min-h-0 flex-1 overflow-auto">
+                          {children}
+                        </div>
                       </div>
-                    </div>
-                  </CalendarCatalogProvider>
-                </BillingProvider>
-              </AuthProvider>
+                    </CalendarCatalogProvider>
+                  </BillingProvider>
+                </AuthProvider>
+              </InstallProvider>
             </FeedbackProvider>
           </MotionProvider>
         </ThemeProvider>
+        <ServiceWorkerRegister />
         <Analytics />
       </body>
     </html>

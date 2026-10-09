@@ -4,6 +4,7 @@ import type { CalendarPack } from "@/lib/calendar-packs/types";
 import { applyOfficialSourceToCatalog } from "./catalog-builder";
 import { canonicalEventId } from "./catalog-builder";
 import { fetchCbfOfficialSource } from "./cbf-transport";
+import { conmebolHistoricalEvents } from "./conmebol-knockout-history";
 import { diffCatalogs, materialHash } from "./material";
 import { fetchGeFootballFeed, missingOfficialMatchIssues, reconcileGeFootballFeed } from "./ge-feed";
 import { parseOfficialFixtureParticipantKeys, parseOfficialSource } from "./parsers";
@@ -59,11 +60,13 @@ const OFFICIAL_FETCH_URLS: Record<string, readonly string[]> = {
     "https://gol.conmebol.com/libertadores/pt-br/fixture/view/711",
     "https://gol.conmebol.com/libertadores/es/news/calendario-conmebol-libertadores-2026-dias-horarios-y-sedes-de-la-fase-de-grupos",
     "https://gol.conmebol.com/libertadores/pt-br/news/datas-e-horarios-assim-serao-disputadas-oitavas-de-final-da-conmebol-libertadores",
+    "https://gol.conmebol.com/libertadores/en/news/dates-confirmed-conmebol-libertadores-semi-final-schedule-announced",
   ],
   "conmebol-sudamericana-2026": [
     "https://gol.conmebol.com/sudamericana/es/news/calendario-conmebol-sudamericana-2026-dias-horarios-y-sedes-de-la-fase-de-grupos",
     "https://gol.conmebol.com/sudamericana/pt-br/news/para-tomar-nota-assim-serao-disputados-os-playoffs-das-oitavas-de-final-da-conmebol",
     "https://gol.conmebol.com/sudamericana/pt-br/news/assim-serao-disputadas-oitavas-de-final-da-conmebol-sudamericana",
+    "https://gol.conmebol.com/sudamericana/en/news/pursuit-great-conquest-everything-set-conmebol-sudamericana-semi-finals",
   ],
 };
 
@@ -112,7 +115,7 @@ const fetchOfficialEvents = async (
       throw stageError("official_parser", error, url);
     }
   }));
-  const events = Array.from(new Map(batches.flatMap((batch) => batch.events)
+  const events = Array.from(new Map([...batches.flatMap((batch) => batch.events), ...conmebolHistoricalEvents(source)]
     .map((event) => [event.externalId, event])).values())
     .sort((left, right) => `${left.date}T${left.time}`.localeCompare(`${right.date}T${right.time}`));
   if (events.length > MAX_OFFICIAL_EVENTS_PER_SOURCE) {

@@ -6,6 +6,8 @@ import {
   hasAuthorCalendarEvents,
   migrateGuidedOnboardingState,
   reduceGuidedOnboardingState,
+  isMobileJourneyPastExample,
+  shouldDiscardAnonymousSandbox,
   shouldPresentOnboardingHabitShowcase,
   shouldShowGuidedOnboarding,
   type GuidedOnboardingState,
@@ -1340,5 +1342,28 @@ test("sessões salvas nos passos legados de tema/aparência migram para o resumo
     expect(
       migrateGuidedOnboardingState({ version: 15, step, context: "personal" }).step
     ).toBe("wrap_up_instruction");
+  }
+});
+
+test("no login, o que a pessoa montou no mobile não é descartado como sandbox", () => {
+  // Guia do desktop parado no valor inicial, que é o caso de quem usa a jornada mobile.
+  for (const mobileStep of ["annual_organize", "goto_profile", "completed", "dismissed"]) {
+    expect(shouldDiscardAnonymousSandbox("context_selection", mobileStep), mobileStep).toBe(false);
+  }
+  // Ainda no exemplo, ou sem jornada mobile (desktop): o sandbox continua sendo descartado.
+  for (const mobileStep of [null, "intro", "create_habit", "mark_day", "goto_annual", "annual_explore"]) {
+    expect(shouldDiscardAnonymousSandbox("context_selection", mobileStep), String(mobileStep)).toBe(true);
+    expect(shouldDiscardAnonymousSandbox("demo_exploration", mobileStep), String(mobileStep)).toBe(true);
+  }
+  // Guia já adiante no desktop: nada a descartar.
+  expect(shouldDiscardAnonymousSandbox("completed" as GuidedOnboardingState["step"], null)).toBe(false);
+});
+
+test("a jornada mobile só sai do ano de exemplo depois de annual_explore", () => {
+  for (const step of [null, "intro", "create_habit", "mark_day", "goto_annual", "annual_explore"]) {
+    expect(isMobileJourneyPastExample(step), String(step)).toBe(false);
+  }
+  for (const step of ["annual_organize", "goto_profile", "completed", "dismissed"]) {
+    expect(isMobileJourneyPastExample(step), step).toBe(true);
   }
 });

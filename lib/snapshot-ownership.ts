@@ -4,6 +4,7 @@ import {
   getOnboardingDefaultProfiles,
   ONBOARDING_DEFAULT_CATEGORY_ID,
   ONBOARDING_DEFAULT_PROFILE_ID,
+  ONBOARDING_PROFILE_IDS,
 } from "@/lib/store";
 import type { CalendarSnapshot } from "@/lib/sync";
 
@@ -99,4 +100,34 @@ export const withoutOnboardingExamples = (snapshot: CalendarSnapshot): CalendarS
   const categories = snapshot.categories.filter((c) => !isOnboardingPersonalDemoGroup(c.calendarPackGroupId));
   const ids = new Set(categories.map((c) => c.id));
   return { ...snapshot, categories, events: snapshot.events.filter((e) => ids.has(e.categoryId) && !isOnboardingPersonalDemoGroup(e.calendarPackGroupId)) };
+};
+
+/**
+ * Os contextos do exemplo (Pessoal, Profissional, Triatlo) que a pessoa não
+ * chegou a usar não são conteúdo dela. No plano Free a conta aceita 1 contexto,
+ * e levar os vazios fazia o servidor recusar o rascunho inteiro
+ * (free_snapshot_profile_limit): o app o descartava e a conta ficava sem as
+ * categorias escolhidas. No mobile sobra o Pessoal; no desktop, quem definiu o
+ * Profissional (com categorias nele) o mantém.
+ *
+ * Só saem contextos do exemplo: um contexto que a pessoa criou fica, mesmo vazio.
+ * Sempre sobra ao menos um (o Pessoal, ou o primeiro).
+ */
+const EXAMPLE_PROFILE_IDS: ReadonlySet<string> = new Set(
+  Object.values(ONBOARDING_PROFILE_IDS)
+);
+
+export const withoutUnusedProfiles = (snapshot: CalendarSnapshot): CalendarSnapshot => {
+  const used = new Set(snapshot.categories.map((category) => category.profileId));
+  const kept = snapshot.profiles.filter(
+    (profile) => used.has(profile.id) || !EXAMPLE_PROFILE_IDS.has(profile.id)
+  );
+  const result =
+    kept.length > 0
+      ? kept
+      : snapshot.profiles.filter(
+          (profile) => profile.id === ONBOARDING_DEFAULT_PROFILE_ID
+        ).concat(snapshot.profiles).slice(0, 1);
+  if (result.length === snapshot.profiles.length) return snapshot;
+  return { ...snapshot, profiles: result };
 };

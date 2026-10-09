@@ -3,6 +3,7 @@ import { deterministicCalendarUuid } from "../../lib/calendar-catalog/ids";
 import { diffCatalogs, incrementChangedPackVersions, materialHash } from "../../lib/calendar-catalog/material";
 import { parseOfficialFixtureParticipantKeys, parseOfficialSource } from "../../lib/calendar-catalog/parsers";
 import { validateOfficialCandidate } from "../../lib/calendar-catalog/validation";
+import { conmebolHistoricalEvents } from "../../lib/calendar-catalog/conmebol-knockout-history";
 import { applyOfficialSourceToCatalog } from "../../lib/calendar-catalog/catalog-builder";
 import {
   fetchGeFootballFeed,
@@ -303,4 +304,70 @@ test("uma carga oficial do Brasileirão produz as 20 opções de clubes sem depl
   const result = applyOfficialSourceToCatalog([], { ...source("cbf"), id: "cbf-brasileirao-2026" }, matches);
   expect(result).toHaveLength(20);
   expect(new Set(result.map((candidate) => candidate.variantGroup?.optionLabel)).size).toBe(20);
+});
+
+const semifinalArticle = (first: string, second: string) =>
+  `<h1>Dates confirmed</h1><p>The four teams still in contention now know their schedule on the road to the Final.</p>
+   <p>Fluminense vs Palmeiras</p><p>${first}</p><p>${second}</p>
+   <p>Boca Juniors vs Vasco da Gama</p>
+   <p>First leg: Tuesday, 13 October at 21:30h at La Bombonera, Buenos Aires.</p>
+   <p>Second leg: Tuesday, 20 October at 21:30h at a venue to be confirmed.</p>`;
+
+test("parser CONMEBOL lê as semifinais em inglês (ida, volta e sede indefinida)", () => {
+  const conmebol = { ...source("conmebol"), id: "conmebol-libertadores-2026", competition: "CONMEBOL Libertadores" };
+  const events = parseOfficialSource(
+    semifinalArticle(
+      "First leg: Wednesday, 14 October at 21:30 at the Maracanã Stadium, Rio de Janeiro.",
+      "Second leg: Wednesday, 21 October at 21:30 at the NuBank Parque, São Paulo."
+    ),
+    "text/html", conmebol
+  );
+  expect(events).toHaveLength(4);
+  expect(events[0]).toMatchObject({
+    date: "2026-10-13", time: "21:30", homeTeam: "Boca Juniors", awayTeam: "Vasco da Gama",
+    venue: "Estádio La Bombonera", city: "Buenos Aires", phase: "Semifinal",
+    timezone: "America/Argentina/Buenos_Aires",
+  });
+  expect(events[1]).toMatchObject({
+    date: "2026-10-14", homeTeam: "Fluminense", awayTeam: "Palmeiras",
+    venue: "Estádio Maracanã", city: "Rio de Janeiro",
+  });
+  expect(events[2]).toMatchObject({
+    date: "2026-10-20", homeTeam: "Vasco da Gama", awayTeam: "Boca Juniors", venue: "", city: "",
+  });
+  expect(events[3]).toMatchObject({
+    date: "2026-10-21", homeTeam: "Palmeiras", awayTeam: "Fluminense",
+    venue: "Estádio NuBank Parque", city: "São Paulo",
+  });
+  expect(new Set(events.map((event) => event.externalId)).size).toBe(4);
+});
+
+test("quartas de final da CONMEBOL: 8 jogos por competição, ids únicos e reconciliados com o GE", () => {
+  for (const id of ["conmebol-libertadores-2026", "conmebol-sudamericana-2026"]) {
+    const geSource = { ...source("conmebol"), id, competition: id.includes("liberta") ? "CONMEBOL Libertadores" : "CONMEBOL Sul-Americana", feed_provider: "GE", feed_url: "https://ge.globo.com/tabela" };
+    const official = conmebolHistoricalEvents(geSource);
+    expect(official).toHaveLength(8);
+    expect(new Set(official.map((event) => event.externalId)).size).toBe(8);
+    expect(official.every((event) => event.phase === "Quartas de final" && event.date >= "2026-09-08" && event.date <= "2026-09-17")).toBe(true);
+
+    // O GE lista os mesmos jogos (com nomes populares e horário de Brasília):
+    // nenhum pode ficar sem correspondência na fonte oficial.
+    const feedEvents = official.map((event, index) => ({
+      ...event,
+      homeTeam: event.homeTeam === "L.D.U. Quito" ? "LDU" : event.homeTeam,
+      awayTeam: event.awayTeam === "L.D.U. Quito" ? "LDU" : event.awayTeam,
+      provider: "GE", providerExternalId: String(900 + index), externalId: `ge:${900 + index}`,
+      status: "finished" as const, result: "1 x 0",
+    }));
+    const reconciliation = reconcileGeFootballFeed({ source: geSource, officialEvents: official, feedEvents });
+    expect(reconciliation.unmatchedFeedEvents).toEqual([]);
+    expect(reconciliation.providerMappings).toHaveLength(8);
+  }
+  expect(conmebolHistoricalEvents({ id: "cbf-brasileirao-2026", competition: "Brasileirão", season: 2026 })).toEqual([]);
+});
+
+test("volta de Platense x Fluminense nas quartas da Libertadores é em Vicente López", () => {
+  const libertadores = { ...source("conmebol"), id: "conmebol-libertadores-2026", competition: "CONMEBOL Libertadores" };
+  const volta = conmebolHistoricalEvents(libertadores).find((event) => event.homeTeam === "Platense");
+  expect(volta).toMatchObject({ date: "2026-09-15", time: "19:00", awayTeam: "Fluminense", city: "Vicente López" });
 });

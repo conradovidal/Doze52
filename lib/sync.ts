@@ -320,6 +320,9 @@ const isTransientError = (message: string) => {
     normalized.includes("network") ||
     normalized.includes("timeout") ||
     normalized.includes("failed to fetch") ||
+    // Safari/WebKit ("Load failed") e Node ("fetch failed") dizem o mesmo.
+    normalized.includes("load failed") ||
+    normalized.includes("fetch failed") ||
     normalized.includes("status 5") ||
     normalized.includes("503") ||
     normalized.includes("502") ||
@@ -422,6 +425,20 @@ const classifySyncError = (error: unknown): SyncError => {
     return new SyncError("network", userMessageForKind("network"), true, meta);
   }
   return new SyncError("unknown", userMessageForKind("unknown", message), false, meta);
+};
+
+// Esta consulta roda antes de qualquer `try` que classifique erros: sem rede ela
+// falha primeiro e o erro subia cru, virando "unknown" na tela e escapando do
+// retry automático. Só a falha de rede é reclassificada; o resto sobe como antes.
+const asNetworkSyncError = (error: unknown) => {
+  // O Supabase marca a falha de fetch pelo nome, qualquer que seja a mensagem.
+  if (error instanceof Error && error.name === "AuthRetryableFetchError") {
+    return new SyncError("network", userMessageForKind("network"), true, {
+      rawMessage: safeSupabaseMessage(error.message),
+    });
+  }
+  const classified = classifySyncError(error);
+  return classified.kind === "network" ? classified : error;
 };
 
 async function withRetry<T>(fn: () => Promise<T>, retries = 1): Promise<T> {
@@ -530,11 +547,21 @@ const ensureSupabase = () => {
 
 const getCurrentUserIdOrThrow = async () => {
   const supabase = ensureSupabase();
-  const { data, error } = await supabase.auth.getUser();
-  assertQuerySuccess(error, {
-    table: "auth",
-    action: "getUser",
-  });
+  let result: Awaited<ReturnType<typeof supabase.auth.getUser>>;
+  try {
+    result = await supabase.auth.getUser();
+  } catch (error) {
+    throw asNetworkSyncError(error);
+  }
+  const { data, error } = result;
+  try {
+    assertQuerySuccess(error, {
+      table: "auth",
+      action: "getUser",
+    });
+  } catch (authError) {
+    throw asNetworkSyncError(authError);
+  }
   const userId = data.user?.id;
   if (!userId) {
     const authError = new Error("Nao autenticado.");

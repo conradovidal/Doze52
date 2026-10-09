@@ -3,6 +3,11 @@
 import * as React from "react";
 import type { Session } from "@supabase/supabase-js";
 import { getSupabaseBrowserClient, hasSupabaseEnv } from "@/lib/supabase";
+import {
+  EmailConfirmationRequiredError,
+  clearPendingEmailConfirmation,
+  emailConfirmationRedirectTo,
+} from "@/lib/email-confirmation";
 
 export type AuthSession = {
   accessToken: string;
@@ -24,6 +29,7 @@ type AuthContextValue = {
   refreshSessionFromClient: () => Promise<AuthSession | null>;
   signInWithPassword: (email: string, password: string) => Promise<void>;
   signUpWithPassword: (email: string, password: string) => Promise<void>;
+  resendSignupConfirmation: (email: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   closeGooglePopupIfOpen: () => void;
   isGooglePopupOpen: () => boolean;
@@ -94,6 +100,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           userId: nextSession?.user?.id ?? null,
         });
       }
+      if (nextSession) clearPendingEmailConfirmation(window.localStorage);
       setSession(nextSession ? toAuthSession(nextSession) : null);
       setLoading(false);
     });
@@ -142,13 +149,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data, error } = await supabase.auth.signUp({
       email: email.trim(),
       password,
+      // O link do e-mail volta para esta mesma origem (preview, produção…) e
+      // não para o "Site URL" do projeto. Precisa estar em Redirect URLs.
+      options: { emailRedirectTo: emailConfirmationRedirectTo(window.location.origin) },
     });
     if (error) throw error;
     if (data.session) {
       setSession(toAuthSession(data.session));
       return;
     }
-    throw new Error("Conta criada. Confirme seu email para continuar.");
+    throw new EmailConfirmationRequiredError(email.trim());
+  };
+
+  const resendSignupConfirmation = async (email: string) => {
+    if (!hasSupabaseEnv) {
+      throw new Error(
+        "Supabase nao configurado. Defina NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY."
+      );
+    }
+    const { error } = await getSupabaseBrowserClient().auth.resend({
+      type: "signup",
+      email: email.trim(),
+      options: { emailRedirectTo: emailConfirmationRedirectTo(window.location.origin) },
+    });
+    if (error) throw error;
   };
 
   const signInWithGoogle = async () => {
@@ -336,6 +360,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         refreshSessionFromClient,
         signInWithPassword,
         signUpWithPassword,
+        resendSignupConfirmation,
         signInWithGoogle,
         closeGooglePopupIfOpen,
         isGooglePopupOpen,

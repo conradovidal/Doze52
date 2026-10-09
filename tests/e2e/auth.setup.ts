@@ -14,8 +14,9 @@ setup("autenticar a conta E2E no Supabase DEV", async ({ page }) => {
   await page.goto("/");
   await expect(page).toHaveTitle("Doze 52 | Seu ano em uma página");
 
-  await page.getByRole("button", { name: "Entrar", exact: true }).click();
-  const dialog = page.getByRole("dialog", { name: "Entrar" });
+  // O login mora no painel de perfil (não há mais um botão "Entrar" solto).
+  await page.getByRole("button", { name: "Abrir perfil" }).first().click();
+  const dialog = page.getByRole("dialog").filter({ has: page.getByLabel("Email") });
   const credentials = getE2eCredentials();
   await dialog.getByLabel("Email").fill(credentials.email);
   await dialog.getByLabel("Senha").fill(credentials.password);

@@ -192,11 +192,11 @@ const timezoneForCity = (city: string) => {
   if (/caracas|valencia/.test(normalized)) return "America/Caracas";
   if (/asuncion/.test(normalized)) return "America/Asuncion";
   if (/montevideo/.test(normalized)) return "America/Montevideo";
-  if (/buenos aires|la plata|mendoza|rosario|victoria|avellaneda|banfield/.test(normalized)) return "America/Argentina/Buenos_Aires";
+  if (/buenos aires|la plata|mendoza|rosario|victoria|avellaneda|banfield|vicente lopez/.test(normalized)) return "America/Argentina/Buenos_Aires";
   return "America/Sao_Paulo";
 };
 
-const conmebolEvent = ({
+export const conmebolEvent = ({
   source, externalId, date, time, city, venue, phase, homeTeam, awayTeam,
 }: {
   source: CalendarCatalogSource; externalId: string; date: string; time: string;
@@ -269,6 +269,55 @@ const parseConmebolKnockoutArticle = (body: string, source: CalendarCatalogSourc
       source,
       externalId: `${slugIdentity(phase)}-${date}-${slugIdentity(homeTeam)}-${slugIdentity(awayTeam)}`,
       date, time: `${match[4].padStart(2, "0")}:${match[5] ?? "00"}`,
+      city, venue, phase, homeTeam, awayTeam,
+    }));
+  }
+  return events;
+};
+
+const ENGLISH_MONTHS: Record<string, string> = {
+  january: "01", february: "02", march: "03", april: "04", may: "05", june: "06",
+  july: "07", august: "08", september: "09", october: "10", november: "11", december: "12",
+};
+
+// Matérias em inglês das fases decisivas: um parágrafo "A vs B" seguido de
+// "First leg: Wednesday, 14 October at 21:30 at Maracanã Stadium, Rio de
+// Janeiro." e "Second leg: ...". Sede ainda indefinida ("a venue to be
+// confirmed") fica sem estádio e cidade.
+const parseConmebolEnglishLegsArticle = (body: string, source: CalendarCatalogSource) => {
+  let matchup: { home: string; away: string } | null = null;
+  const events: OfficialCalendarEvent[] = [];
+  const phase = "Semifinal";
+  for (const element of articleElements(body)) {
+    if (element.tag !== "p") continue;
+    const versus = element.text.length < 90
+      ? element.text.match(/^(.+?)\s+vs\.?\s+(.+)$/i)
+      : null;
+    if (versus && !/\bleg:/i.test(element.text)) {
+      matchup = { home: versus[1].trim(), away: versus[2].trim() };
+      continue;
+    }
+    const leg = element.text.match(
+      /^(First|Second)\s+leg:\s*[A-Za-z]+,\s*(\d{1,2})\s+([A-Za-z]+)\s+at\s+(\d{1,2}):(\d{2})h?\s+at\s+(.+?)\.?$/i
+    );
+    if (!leg || !matchup) continue;
+    const month = ENGLISH_MONTHS[leg[3].toLowerCase()];
+    if (!month) continue;
+    const isReturn = leg[1].toLowerCase() === "second";
+    const homeTeam = isReturn ? matchup.away : matchup.home;
+    const awayTeam = isReturn ? matchup.home : matchup.away;
+    const tbc = /to be confirmed/i.test(leg[6]);
+    const locationParts = tbc ? [] : leg[6].replace(/^the\s+/i, "")
+      .split(",").map((part) => part.trim()).filter(Boolean);
+    const city = locationParts.at(-1) ?? "";
+    const venueName = locationParts.slice(0, -1).join(", ")
+      .replace(/\s+Stadium$/i, "").replace(/^(?:estadio|estádio)\s+/i, "");
+    const venue = !venueName || /^arena\b/i.test(venueName) ? venueName : `Estádio ${venueName}`;
+    const date = `2026-${month}-${leg[2].padStart(2, "0")}`;
+    events.push(conmebolEvent({
+      source,
+      externalId: `${slugIdentity(phase)}-${date}-${slugIdentity(homeTeam)}-${slugIdentity(awayTeam)}`,
+      date, time: `${leg[4].padStart(2, "0")}:${leg[5]}`,
       city, venue, phase, homeTeam, awayTeam,
     }));
   }
@@ -357,7 +406,9 @@ const parseConmebolHtml = (body: string, source: CalendarCatalogSource, sourceUr
   }
   const events = /\b(?:Ida|Volta):/i.test(body)
     ? parseConmebolKnockoutArticle(body, source)
-    : parseConmebolGroupArticle(body, source);
+    : /\b(?:First|Second)\s+leg:/i.test(body)
+      ? parseConmebolEnglishLegsArticle(body, source)
+      : parseConmebolGroupArticle(body, source);
   return Array.from(new Map(events.map((event) => [event.externalId, event])).values())
     .sort((left, right) => `${left.date}T${left.time}`.localeCompare(`${right.date}T${right.time}`));
 };

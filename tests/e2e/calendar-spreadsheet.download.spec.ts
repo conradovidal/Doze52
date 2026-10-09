@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import {
+  createCustomCategory,
   dismissOnboardingIfVisible,
   expectAuthenticated,
   installVercelBypass,
@@ -15,18 +16,7 @@ const createExportableCategory = async (page: import("@playwright/test").Page) =
   await openQaApp(page);
   await expectAuthenticated(page);
   await dismissOnboardingIfVisible(page);
-  await page.getByRole("button", { name: "Editar contextos e categorias" }).click();
-  await page.getByRole("button", { name: "Criar nova categoria" }).click();
-  const categoryDialog = page.getByRole("dialog", { name: "Nova categoria" });
-  await categoryDialog.getByLabel("Nome da categoria").fill("QA Export");
-  const categorySaved = waitForSupabaseWrite(page, "categories", ["POST"]);
-  await categoryDialog.getByRole("button", { name: "Criar", exact: true }).click();
-  await expect(categoryDialog).toBeHidden();
-  await page
-    .getByRole("button", { name: "Finalizar edição de contextos e categorias" })
-    .click();
-  await categorySaved;
-  await waitForSyncReady(page);
+  await createCustomCategory(page, "QA Export");
 
   await page
     .locator('[data-day-cell]:not(:has([data-calendar-event-id]))')

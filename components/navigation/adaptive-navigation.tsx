@@ -272,7 +272,7 @@ export function AdaptiveNavigation({
     <nav
       aria-label="Navegação principal"
       data-product-navigation="mobile"
-      className="fixed inset-x-0 bottom-0 z-40 flex min-h-[calc(3.75rem+env(safe-area-inset-bottom,0px))] items-start border-t border-border/75 bg-background/96 px-2 pt-1.5 pb-[env(safe-area-inset-bottom,0px)] shadow-[0_-16px_36px_-30px_rgba(15,23,42,0.55)] backdrop-blur md:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 flex min-h-[calc(3.75rem+env(safe-area-inset-bottom,0px))] items-start border-t border-border/75 bg-background/96 pr-[max(0.5rem,env(safe-area-inset-right,0px))] pl-[max(0.5rem,env(safe-area-inset-left,0px))] pt-1.5 pb-[env(safe-area-inset-bottom,0px)] shadow-[0_-16px_36px_-30px_rgba(15,23,42,0.55)] backdrop-blur md:hidden"
     >
       {PRODUCT_DESTINATIONS.map((destination) => (
         <DestinationButton
